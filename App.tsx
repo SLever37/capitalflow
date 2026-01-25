@@ -18,7 +18,7 @@ import { ClientsContainer } from './containers/ClientsContainer';
 import { SourcesContainer } from './containers/SourcesContainer';
 import { ProfileContainer } from './containers/ProfileContainer';
 import { MasterContainer } from './containers/MasterContainer';
-import { LegalContainer } from './containers/LegalContainer'; // NOVO IMPORT
+import { LegalContainer } from './containers/LegalContainer'; 
 import { ModalHostContainer } from './containers/ModalHostContainer';
 
 export const App: React.FC = () => {
@@ -51,18 +51,7 @@ export const App: React.FC = () => {
             return false;
         };
 
-        if (closeIfOpen(ui.isFormOpen, () => { ui.setIsFormOpen(false); ui.setEditingLoan(null); })) return;
-        if (closeIfOpen(ui.isClientModalOpen, () => ui.setIsClientModalOpen(false))) return;
-        if (closeIfOpen(ui.isSourceModalOpen, () => ui.setIsSourceModalOpen(false))) return;
-        if (closeIfOpen(!!ui.paymentModal, () => ui.setPaymentModal(null))) return;
-        if (closeIfOpen(!!ui.messageModalLoan, () => ui.setMessageModalLoan(null))) return;
-        if (closeIfOpen(ui.showAgendaModal, () => ui.setShowAgendaModal(false))) return;
-        if (closeIfOpen(ui.showCalcModal, () => ui.setShowCalcModal(false))) return;
-        if (closeIfOpen(ui.showFlowModal, () => ui.setShowFlowModal(false))) return;
-        if (closeIfOpen(!!ui.viewProofModal, () => ui.setViewProofModal(null))) return;
-        if (closeIfOpen(!!ui.confirmation, () => ui.setConfirmation(null))) return;
-        if (closeIfOpen(!!ui.masterEditUser, () => ui.setMasterEditUser(null))) return;
-        if (closeIfOpen(ui.isAiAssistantOpen, () => ui.setIsAiAssistantOpen(false))) return;
+        if (closeIfOpen(!!ui.activeModal, () => ui.closeModal())) return;
         if (closeIfOpen(ui.showNavHub, () => ui.setShowNavHub(false))) return;
 
         // 2. Navegação entre Abas (Se não for Dashboard, volta para Dashboard)
@@ -110,9 +99,9 @@ export const App: React.FC = () => {
     >
       <AppShell 
         toast={toast} activeTab={activeTab} setActiveTab={setActiveTab} activeUser={activeUser} 
-        isLoadingData={isLoadingData} onOpenNav={() => ui.setShowNavHub(true)} onNewLoan={() => { ui.setEditingLoan(null); ui.setIsFormOpen(true); }}
+        isLoadingData={isLoadingData} onOpenNav={() => ui.setShowNavHub(true)} onNewLoan={() => { ui.setEditingLoan(null); ui.openModal('LOAN_FORM'); }}
         isStealthMode={ui.isStealthMode} toggleStealthMode={() => ui.setIsStealthMode(!ui.isStealthMode)}
-        onOpenAssistant={() => ui.setIsAiAssistantOpen(true)} // ATIVADO
+        onOpenAssistant={() => ui.openModal('AI_ASSISTANT')}
       >
         {activeTab === 'DASHBOARD' && (
             <DashboardContainer 

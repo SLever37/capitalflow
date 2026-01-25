@@ -1,3 +1,4 @@
+
 import { supabase } from '../../lib/supabase';
 import { CapitalSource, UserProfile } from '../../types';
 
@@ -28,7 +29,7 @@ export const useSourceController = (
       };
       setSources([...sources, newSource]);
       showToast("Fonte criada (Demo)", "success");
-      ui.setIsSourceModalOpen(false);
+      ui.closeModal();
       return;
     }
 
@@ -51,7 +52,7 @@ export const useSourceController = (
         showToast("Erro ao criar fonte: " + error.message, "error");
       } else {
         showToast("Fonte criada!", "success");
-        ui.setIsSourceModalOpen(false);
+        ui.closeModal();
         await fetchFullData(activeUser.id);
       }
     } catch (e: any) {
@@ -62,7 +63,7 @@ export const useSourceController = (
   };
 
   const handleAddFunds = async () => {
-    if (!activeUser || !ui.isAddFundsModalOpen || ui.addFundsValue == null) return;
+    if (!activeUser || !ui.activeModal?.payload || ui.addFundsValue == null) return;
 
     const amount = Number(ui.addFundsValue);
     if (!Number.isFinite(amount) || amount <= 0) {
@@ -73,16 +74,16 @@ export const useSourceController = (
     if (activeUser.id === 'DEMO') {
       setSources(
         sources.map((s) =>
-          s.id === ui.isAddFundsModalOpen?.id ? { ...s, balance: s.balance + amount } : s
+          s.id === ui.activeModal.payload?.id ? { ...s, balance: s.balance + amount } : s
         )
       );
       showToast("Fundos adicionados (Demo)", "success");
-      ui.setIsAddFundsModalOpen(null);
+      ui.closeModal();
       return;
     }
 
     const { error } = await supabase.rpc('adjust_source_balance', {
-      p_source_id: ui.isAddFundsModalOpen.id,
+      p_source_id: ui.activeModal.payload.id,
       p_delta: amount,
     });
 
@@ -90,7 +91,7 @@ export const useSourceController = (
       showToast("Erro ao adicionar fundos: " + error.message, "error");
     } else {
       showToast("Saldo atualizado com segurança!", "success");
-      ui.setIsAddFundsModalOpen(null);
+      ui.closeModal();
       await fetchFullData(activeUser.id);
     }
   };
@@ -163,12 +164,10 @@ export const useSourceController = (
       }
 
       showToast("Resgate realizado (Demo)!", "success");
-      ui.setWithdrawModal(false);
+      ui.closeModal();
       return;
     }
 
-    // ✅ FIX: nome correto da função no banco (sem downgrade)
-    // Banco: public.profit_withdrawal_atomic(p_amount, p_profile_id, p_target_source_id)
     const { error } = await supabase.rpc('profit_withdrawal_atomic', {
       p_amount: amount,
       p_profile_id: activeUser.id,
@@ -179,7 +178,7 @@ export const useSourceController = (
       showToast("Falha no resgate: " + error.message, "error");
     } else {
       showToast("Resgate processado com sucesso!", "success");
-      ui.setWithdrawModal(false);
+      ui.closeModal();
       await fetchFullData(activeUser.id);
     }
   };

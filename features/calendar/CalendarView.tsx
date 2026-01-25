@@ -1,8 +1,10 @@
 
-import React, { useState, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, Plus, ShieldAlert, MessageSquare, DollarSign, AlertTriangle, CheckCircle2, Zap, Clock, ArrowRight, X, Calendar as CalIcon } from 'lucide-react';
+import React, { useState } from 'react';
+import { ChevronLeft, ChevronRight, Plus, ShieldAlert, MessageSquare, DollarSign, CheckCircle2, Calendar as CalIcon } from 'lucide-react';
 import { useCalendar } from './hooks/useCalendar';
+import { useCalendarComputed } from './hooks/useCalendarComputed';
 import { EventModal } from './components/EventModal';
+import { SmartSidebar } from './components/SmartSidebar'; 
 import { UserProfile } from '../../types';
 
 interface CalendarViewProps {
@@ -13,45 +15,20 @@ interface CalendarViewProps {
 }
 
 export const CalendarView: React.FC<CalendarViewProps> = ({ activeUser, showToast, onClose, onSystemAction }) => {
-    const { events, currentDate, setCurrentDate, addEvent } = useCalendar(activeUser, showToast);
+    const { events, addEvent } = useCalendar(activeUser, showToast);
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [isEventModalOpen, setIsEventModalOpen] = useState(false);
     const [targetDateForModal, setTargetDateForModal] = useState<Date>(new Date());
     const [showRadar, setShowRadar] = useState(false);
     
-    // NAVIGATION
-    const dayStrip = useMemo(() => {
-        const days = [];
-        const start = new Date(selectedDate);
-        start.setDate(start.getDate() - 3); // 3 dias antes
-        
-        for(let i=0; i<7; i++) {
-            const d = new Date(start);
-            d.setDate(start.getDate() + i);
-            days.push(d);
-        }
-        return days;
-    }, [selectedDate]);
+    // LÓGICA DE COMPUTADA EXTRAÍDA
+    const { 
+        dayStrip, urgentEvents, lateEvents, radarCount, dayEvents, dayTotalReceivable 
+    } = useCalendarComputed(events, selectedDate);
 
+    // Navegação
     const handleNextDay = () => { const d = new Date(selectedDate); d.setDate(d.getDate() + 1); setSelectedDate(d); };
     const handlePrevDay = () => { const d = new Date(selectedDate); d.setDate(d.getDate() - 1); setSelectedDate(d); };
-    const jumpToToday = () => setSelectedDate(new Date());
-
-    const selectedStr = selectedDate.toDateString();
-    
-    // --- FILTERS ---
-    const urgentEvents = useMemo(() => events.filter(e => e.priority === 'URGENT'), [events]);
-    const lateEvents = useMemo(() => events.filter(e => e.status === 'LATE'), [events]);
-    const radarCount = urgentEvents.length + lateEvents.length;
-
-    const dayEvents = useMemo(() => events.filter(e => {
-        if (e.priority === 'URGENT') return false; 
-        if (e.status === 'LATE') return false;
-        const d = new Date(e.start_time);
-        return d.toDateString() === selectedStr;
-    }).sort((a,b) => (a.priority === 'HIGH' ? -1 : 1)), [events, selectedStr]);
-
-    const dayTotalReceivable = dayEvents.reduce((acc, e) => acc + (e.meta?.amount || 0), 0);
 
     const handleWhatsApp = (e: React.MouseEvent, phone: string, name: string, type: string) => {
         e.stopPropagation();
@@ -67,6 +44,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ activeUser, showToas
         setTargetDateForModal(date || selectedDate);
         setIsEventModalOpen(true);
     };
+
+    const selectedStr = selectedDate.toDateString();
 
     return (
         <div className="flex flex-col h-[85vh] -m-6 sm:-m-12 overflow-hidden bg-slate-950 relative">
@@ -114,7 +93,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ activeUser, showToas
                                     <span className={`text-lg font-black ${isSelected ? 'text-white' : isToday ? 'text-blue-400' : 'text-slate-300'}`}>{date.getDate()}</span>
                                     {hasEvents && !isSelected && <div className="w-1 h-1 rounded-full bg-blue-500 mt-1"></div>}
                                     
-                                    {/* Always visible add button on mobile for selected, or hover on desktop */}
                                     <button 
                                         onClick={(e) => { e.stopPropagation(); openNewTaskModal(date); }}
                                         className={`absolute -top-2 -right-2 bg-emerald-500 text-white p-1 rounded-full shadow-sm hover:scale-110 transition-all ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
@@ -169,7 +147,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ activeUser, showToas
                             <div key={ev.id} className="group bg-slate-900 border border-slate-800 hover:border-blue-500/50 p-5 rounded-2xl transition-all cursor-pointer relative overflow-hidden" onClick={() => ev.type.startsWith('SYSTEM') ? onSystemAction('PAYMENT', ev.meta) : null}>
                                 <div className="flex items-center gap-5 relative z-10">
                                     <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 text-xl font-black border ${ev.type === 'SYSTEM_INSTALLMENT' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
-                                        {ev.type === 'SYSTEM_INSTALLMENT' ? <DollarSign/> : <Clock/>}
+                                        {ev.type === 'SYSTEM_INSTALLMENT' ? <DollarSign/> : <CalIcon/>}
                                     </div>
                                     
                                     <div className="flex-1 min-w-0">
@@ -179,7 +157,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ activeUser, showToas
                                         </div>
                                         <p className="text-xs text-slate-400 truncate mt-1">{ev.description}</p>
                                         
-                                        {/* Quick Actions appearing on hover */}
                                         <div className="flex items-center gap-3 mt-3 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity translate-y-2 sm:group-hover:translate-y-0 duration-300">
                                             {ev.meta?.clientPhone && (
                                                 <button onClick={(e) => handleWhatsApp(e, ev.meta?.clientPhone!, ev.meta?.clientName!, 'REMINDER')} className="flex items-center gap-1 text-[10px] font-bold uppercase text-emerald-500 hover:text-white hover:bg-emerald-600 px-3 py-1.5 rounded-lg transition-colors bg-emerald-950/20">
@@ -200,73 +177,24 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ activeUser, showToas
                 </div>
             </div>
 
-            {/* --- RADAR OVERLAY (MODAL) --- */}
+            {/* --- RADAR OVERLAY --- */}
             {showRadar && (
-                <div className="absolute inset-0 z-50 bg-slate-950/95 backdrop-blur-md p-6 sm:p-12 animate-in slide-in-from-top-10 duration-300">
-                    <div className="max-w-4xl mx-auto h-full flex flex-col">
-                        <div className="flex justify-between items-center mb-8">
-                            <h2 className="text-2xl font-black text-white uppercase flex items-center gap-2"><ShieldAlert className="text-rose-500"/> Radar de Pendências</h2>
-                            <button onClick={() => setShowRadar(false)} className="p-3 bg-slate-800 rounded-full text-slate-400 hover:text-white"><X/></button>
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto custom-scrollbar space-y-8">
-                            {/* PORTAL */}
-                            <div>
-                                <h3 className="text-xs font-black uppercase text-emerald-500 tracking-widest mb-4 flex items-center gap-2 bg-emerald-950/20 p-2 rounded-lg w-fit border border-emerald-500/20">
-                                    <Zap size={14}/> Solicitações do Portal ({urgentEvents.length})
-                                </h3>
-                                {urgentEvents.length === 0 ? (
-                                    <p className="text-slate-600 text-sm italic ml-2">Nenhuma solicitação pendente.</p>
-                                ) : (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        {urgentEvents.map(ev => (
-                                            <div key={ev.id} className="bg-emerald-950/10 border border-emerald-500/30 p-4 rounded-2xl hover:bg-emerald-950/20 transition-all cursor-pointer relative group" onClick={() => { onSystemAction('PORTAL_REVIEW', ev.meta); setShowRadar(false); }}>
-                                                <div className="flex justify-between items-start mb-2">
-                                                    <span className="bg-emerald-500 text-black text-[9px] font-black px-1.5 py-0.5 rounded uppercase">Novo</span>
-                                                    <span className="text-[9px] text-emerald-400 font-mono">{new Date(ev.start_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                                                </div>
-                                                <h4 className="text-sm font-bold text-white leading-tight mb-1">{ev.title}</h4>
-                                                <p className="text-xs text-slate-400">{ev.meta?.clientName}</p>
-                                                <div className="absolute right-3 bottom-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center text-black shadow-lg"><ArrowRight size={16}/></div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* ATRASADOS */}
-                            <div>
-                                <h3 className="text-xs font-black uppercase text-rose-500 tracking-widest mb-4 flex items-center gap-2 bg-rose-950/20 p-2 rounded-lg w-fit border border-rose-500/20">
-                                    <AlertTriangle size={14}/> Contratos Atrasados ({lateEvents.length})
-                                </h3>
-                                {lateEvents.length === 0 ? (
-                                    <p className="text-slate-600 text-sm italic ml-2">Nenhum pagamento atrasado.</p>
-                                ) : (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        {lateEvents.map(ev => (
-                                            <div key={ev.id} className="group flex items-center justify-between p-4 bg-slate-900 border border-slate-800 rounded-2xl hover:border-rose-500/50 transition-all cursor-pointer" onClick={() => { onSystemAction('PAYMENT', ev.meta); setShowRadar(false); }}>
-                                                <div className="min-w-0">
-                                                    <p className="text-sm font-bold text-white truncate">{ev.title}</p>
-                                                    <p className="text-xs text-rose-400 font-bold mt-1">Venceu: {new Date(ev.start_time).toLocaleDateString()}</p>
-                                                </div>
-                                                {ev.meta?.clientPhone && (
-                                                    <button onClick={(e) => handleWhatsApp(e, ev.meta?.clientPhone!, ev.meta?.clientName!, 'LATE')} className="w-10 h-10 rounded-xl bg-slate-950 text-slate-500 hover:text-white hover:bg-rose-500 flex items-center justify-center transition-colors border border-slate-800">
-                                                        <MessageSquare size={18}/>
-                                                    </button>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
+                <div className="absolute inset-0 z-50 bg-slate-950/95 backdrop-blur-md animate-in slide-in-from-right duration-300 flex justify-end">
+                    <div className="w-full max-w-md h-full relative">
+                        <button onClick={() => setShowRadar(false)} className="absolute top-4 right-4 z-50 p-2 bg-slate-800 rounded-full text-white"><ChevronRight/></button>
+                        <SmartSidebar 
+                            events={events} 
+                            currentDate={selectedDate}
+                            onAction={(ev) => {
+                                if (ev.type === 'SYSTEM_PORTAL_REQUEST') onSystemAction('PORTAL_REVIEW', ev.meta);
+                                else if (ev.type === 'SYSTEM_INSTALLMENT') onSystemAction('PAYMENT', ev.meta);
+                                setShowRadar(false);
+                            }}
+                        />
                     </div>
                 </div>
             )}
 
-            {/* Modals */}
             {isEventModalOpen && (
                 <EventModal 
                     onClose={() => setIsEventModalOpen(false)}

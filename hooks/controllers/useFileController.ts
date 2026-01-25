@@ -12,10 +12,10 @@ export const useFileController = (
   const handleOpenComprovante = async (urlOrPath: string) => {
       try {
           if (!urlOrPath) return;
-          if (/^(https?:)?\/\//i.test(urlOrPath) || urlOrPath.startsWith('data:')) { ui.setViewProofModal(urlOrPath); return; }
+          if (/^(https?:)?\/\//i.test(urlOrPath) || urlOrPath.startsWith('data:')) { ui.openModal('PROOF_VIEW', urlOrPath); return; }
           const { data, error } = await supabase.storage.from('comprovantes').createSignedUrl(urlOrPath, 60 * 60);
           if (error) throw error;
-          if (data?.signedUrl) ui.setViewProofModal(data.signedUrl);
+          if (data?.signedUrl) ui.openModal('PROOF_VIEW', data.signedUrl);
       } catch (e: any) { showToast(e?.message || 'Não foi possível abrir o comprovante.', 'error'); }
   };
 
@@ -31,7 +31,7 @@ export const useFileController = (
           if (sheets.length > 1) {
               ui.setPendingImportFile(file);
               ui.setImportSheetNames(sheets);
-              ui.setShowSheetSelectModal(true);
+              ui.openModal('IMPORT_SHEET_SELECT');
           } else {
               await processImport(file, sheets[0]);
           }
@@ -46,7 +46,7 @@ export const useFileController = (
           if (parsed.length > 0) {
               ui.setImportCandidates(parsed);
               ui.setSelectedImportIndices([]);
-              ui.setShowImportPreviewModal(true);
+              ui.openModal('IMPORT_PREVIEW');
           } else {
               showToast('Nenhum dado válido encontrado nesta aba.', 'error');
           }
@@ -58,7 +58,7 @@ export const useFileController = (
   const selectSheet = async (sheetName: string) => {
       if (ui.pendingImportFile) {
           const file = ui.pendingImportFile;
-          ui.setShowSheetSelectModal(false);
+          ui.closeModal(); // fecha modal de selecao
           await processImport(file, sheetName);
           ui.setPendingImportFile(null); // Limpeza de estado após uso
       }
@@ -68,7 +68,7 @@ export const useFileController = (
       try {
           const selected = ui.importCandidates.filter((_: any, i: number) => ui.selectedImportIndices.includes(i));
           await filesService.saveSelectedClients(selected, activeUser, showToast);
-          ui.setShowImportPreviewModal(false);
+          ui.closeModal();
           ui.setImportCandidates([]);
           if (activeUser) await fetchFullData(activeUser.id);
       } catch (err: any) {
@@ -85,7 +85,7 @@ export const useFileController = (
   };
 
   const cancelImport = () => {
-      ui.setShowSheetSelectModal(false);
+      ui.closeModal();
       ui.setPendingImportFile(null);
       ui.setImportSheetNames([]);
   };

@@ -8,6 +8,7 @@ import {
 import { Loan, CapitalSource, LedgerEntry, Agreement, AgreementInstallment, UserProfile, Installment } from '../../types';
 import { formatBRDate } from '../../utils/dateHelpers';
 import { formatMoney } from '../../utils/formatters';
+import { asArray, asString } from '../../utils/safe';
 import { AgreementView } from '../../features/agreements/components/AgreementView';
 import { useLoanCardComputed } from './hooks/useLoanCardComputed';
 import { LedgerList } from './components/LedgerList';
@@ -71,17 +72,20 @@ export const LoanCard: React.FC<LoanCardProps> = ({
   const safeAgreement: Agreement | null = hasActiveAgreement && rawAgreement ? {
       ...rawAgreement,
       // Garante ID
-      id: rawAgreement.id || `ag-temp-${loan.id}`,
+      id: asString(rawAgreement.id, `ag-temp-${loan.id}`, 'agreement.id'),
       // Garante tipo para métodos de string
-      type: rawAgreement.type || 'PARCELADO_COM_JUROS',
+      type: asString(rawAgreement.type, 'PARCELADO_COM_JUROS') as any,
       // Garante array de parcelas para .map
-      installments: Array.isArray(rawAgreement.installments) ? rawAgreement.installments : [],
-      // Normaliza campos que podem vir do banco com nomes diferentes (Snake Case vs Camel Case)
+      installments: asArray(rawAgreement.installments),
+      // Normaliza campos
       createdAt: rawAgreement.createdAt || (rawAgreement as any).created_at || new Date().toISOString(),
       negotiatedTotal: rawAgreement.negotiatedTotal || (rawAgreement as any).total_negociado || 0,
       totalDebtAtNegotiation: rawAgreement.totalDebtAtNegotiation || (rawAgreement as any).total_base || 0,
       interestRate: rawAgreement.interestRate || (rawAgreement as any).juros_mensal_percent || 0
   } : null;
+
+  const debtorNameSafe = asString(loan.debtorName, 'Sem Nome');
+  const debtorInitial = debtorNameSafe[0] || '?';
 
   return (
     <div
@@ -91,23 +95,24 @@ export const LoanCard: React.FC<LoanCardProps> = ({
       <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
         <div className="flex items-center gap-4 sm:gap-6 w-full">
           <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center font-black text-lg sm:text-xl transition-all flex-shrink-0 ${iconStyle}`}>
-            {isCritical && !hasActiveAgreement ? <ShieldAlert size={24} /> : isFullyFinalized ? <CheckCircle2 size={24}/> : loan.debtorName[0]}
+            {isCritical && !hasActiveAgreement ? <ShieldAlert size={24} /> : isFullyFinalized ? <CheckCircle2 size={24}/> : debtorInitial}
           </div>
 
           <div className="flex-1 min-w-0">
             <h3 className="font-black text-base sm:text-xl text-white truncate flex items-center gap-2">
-                {loan.debtorName}
+                {debtorNameSafe}
                 {isFullyFinalized && <span className="bg-emerald-500 text-emerald-950 text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider">Finalizado</span>}
                 {hasActiveAgreement && <span className="bg-indigo-500 text-white text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider">Em Acordo</span>}
             </h3>
 
             <div className="flex flex-wrap gap-2 mt-1 sm:mt-2">
               <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                <Phone size={10} /> {loan.debtorPhone}
+                <Phone size={10} /> {asString(loan.debtorPhone)}
               </p>
               {!hasActiveAgreement && (() => {
                 // Cálculo rápido de rótulo de vencimento (visual only)
-                const nextInst = loan.installments.find(i => i.status !== 'PAID') || loan.installments[loan.installments.length - 1];
+                const safeInsts = asArray<Installment>(loan.installments);
+                const nextInst = safeInsts.find((i) => i.status !== 'PAID') || safeInsts[safeInsts.length - 1];
                 if (!nextInst) return null;
                 const label = strategy.card.dueDateLabel(nextInst, loan); 
                 const paidUntilDate = isDailyFree ? loan.startDate : nextInst.dueDate;
@@ -153,7 +158,7 @@ export const LoanCard: React.FC<LoanCardProps> = ({
         <div className="space-y-1 text-center">
           <p className="text-[8px] sm:text-[9px] font-black text-slate-500 uppercase tracking-widest">Fonte</p>
           <p className="font-black text-[10px] sm:text-xs text-blue-400 truncate max-w-[80px] sm:max-w-none mx-auto">
-            {sources.find(s => s.id === loan.sourceId)?.name || '...'}
+            {asArray<CapitalSource>(sources).find((s) => s.id === loan.sourceId)?.name || '...'}
           </p>
         </div>
         <div className="space-y-1 text-right">

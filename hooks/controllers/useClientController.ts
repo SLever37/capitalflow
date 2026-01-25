@@ -38,7 +38,7 @@ export const useClientController = (
           ui.setClientDraftNumber(generateUniqueClientNumber(nums));
           ui.setClientForm({ name: '', phone: '', document: '', email: '', address: '', city: '', state: '', notes: '' });
       }
-      ui.setIsClientModalOpen(true);
+      ui.openModal('CLIENT_FORM');
   };
 
   const handleSaveClient = async () => {
@@ -65,7 +65,7 @@ export const useClientController = (
 
       if (activeUser.id === 'DEMO') { 
           demoService.handleSaveClient(ui.clientForm, ui.editingClient, clients, setClients, activeUser, showToast); 
-          ui.setIsClientModalOpen(false); 
+          ui.closeModal(); 
           return; 
       }
 
@@ -106,7 +106,7 @@ export const useClientController = (
           };
           
           const { error } = await supabase.from('clientes').upsert(payload);
-          if (error) { console.error(error); showToast("Erro ao salvar cliente: " + error.message, "error"); } else { showToast("Cliente salvo!", "success"); ui.setIsClientModalOpen(false); fetchFullData(activeUser.id); }
+          if (error) { console.error(error); showToast("Erro ao salvar cliente: " + error.message, "error"); } else { showToast("Cliente salvo!", "success"); ui.closeModal(); fetchFullData(activeUser.id); }
       } catch(e: any) { showToast("Erro ao salvar cliente: " + e.message, "error"); } finally { ui.setIsSaving(false); }
   };
 
@@ -159,14 +159,7 @@ export const useClientController = (
 
       try {
           ui.setIsSaving(true);
-          // Para cada cliente selecionado, executar exclusão.
-          // Idealmente seria uma única query SQL "IN", mas usando o ledgerService garantimos consistência se mudarmos a lógica.
-          // Mas como ledgerService é um por um, vamos fazer um loop ou usar supabase direto se for só delete.
-          // Clientes com contratos ativos podem bloquear a exclusão se houver FK.
-          // Vamos tentar excluir em lote.
-          
           const { error } = await supabase.from('clientes').delete().in('id', ui.selectedClientsToDelete).eq('profile_id', activeUser.id);
-          
           if (error) throw error;
           
           showToast(`${ui.selectedClientsToDelete.length} clientes excluídos.`, "success");

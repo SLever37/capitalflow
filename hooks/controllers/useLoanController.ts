@@ -22,12 +22,12 @@ export const useLoanController = (
     if (!activeUser) return;
     if (activeUser.id === 'DEMO') {
         demoService.handleSaveLoan(loan, ui.editingLoan, sources, setSources, loans, setLoans, showToast);
-        ui.setIsFormOpen(false); ui.setEditingLoan(null); return;
+        ui.closeModal(); ui.setEditingLoan(null); return;
     }
     try {
         await contractsService.saveLoan(loan, activeUser, sources, ui.editingLoan);
         showToast(ui.editingLoan ? 'Contrato Atualizado!' : 'Contrato Salvo!', 'success'); 
-        ui.setIsFormOpen(false); ui.setEditingLoan(null); fetchFullData(activeUser.id);
+        ui.closeModal(); ui.setEditingLoan(null); fetchFullData(activeUser.id);
     } catch (e: any) { showToast(e.message || "Erro desconhecido ao salvar", "error"); }
   };
 
@@ -35,9 +35,9 @@ export const useLoanController = (
       if (!activeUser || !ui.noteModalLoan) return;
       if (activeUser.id === 'DEMO') {
           setLoans(loans.map(l => l.id === ui.noteModalLoan?.id ? { ...l, notes: ui.noteText } : l));
-          showToast("Anotação salva (Demo)", "success"); ui.setNoteModalLoan(null); ui.setNoteText(''); return;
+          showToast("Anotação salva (Demo)", "success"); ui.closeModal(); ui.setNoteText(''); return;
       }
-      try { await contractsService.saveNote(ui.noteModalLoan.id, ui.noteText); showToast("Anotação salva com sucesso!"); ui.setNoteModalLoan(null); ui.setNoteText(''); fetchFullData(activeUser.id); } catch (e) { showToast("Erro ao salvar anotação", "error"); }
+      try { await contractsService.saveNote(ui.noteModalLoan.id, ui.noteText); showToast("Anotação salva com sucesso!"); ui.closeModal(); ui.setNoteText(''); fetchFullData(activeUser.id); } catch (e) { showToast("Erro ao salvar anotação", "error"); }
   };
 
   const handleReviewSignal = async (signalId: string, nextStatus: 'APROVADO' | 'NEGADO') => {
@@ -57,13 +57,17 @@ export const useLoanController = (
       showToast("Link do Portal copiado!", "success"); 
   };
 
-  const openConfirmation = (config: any) => { ui.setRefundChecked(true); ui.setConfirmation(config); };
+  const openConfirmation = (config: any) => { 
+      ui.setRefundChecked(true); 
+      ui.setConfirmation(config);
+      ui.openModal('CONFIRMATION'); 
+  };
   
   const executeConfirmation = async () => { 
     if (!ui.confirmation || !activeUser) return;
     if (activeUser.id === 'DEMO') {
         demoService.executeAction(ui.confirmation.type, ui.confirmation.target, loans, setLoans, clients, setClients, sources, setSources, showToast);
-        ui.setConfirmation(null); return;
+        ui.closeModal(); return;
     }
     
     try {
@@ -75,7 +79,7 @@ export const useLoanController = (
             const msg = await ledgerService.executeLedgerAction({ type: ui.confirmation.type, targetId, loan: typeof ui.confirmation.target === 'string' ? undefined : ui.confirmation.target, activeUser, sources, refundChecked: ui.confirmation.showRefundOption ? ui.refundChecked : false });
             showToast(msg);
         }
-    } catch (err: any) { if(!ui.confirmation.type.includes('DELETE_CLIENT')) showToast("Erro ao executar ação: " + err.message, "error"); } finally { ui.setConfirmation(null); ui.setSelectedLoanId(null); await fetchFullData(activeUser.id); }
+    } catch (err: any) { if(!ui.confirmation.type.includes('DELETE_CLIENT')) showToast("Erro ao executar ação: " + err.message, "error"); } finally { ui.closeModal(); ui.setSelectedLoanId(null); await fetchFullData(activeUser.id); }
   };
 
   const openReverseTransaction = (t: LedgerEntry, loan: Loan) => {

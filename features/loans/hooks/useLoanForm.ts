@@ -8,6 +8,7 @@ import { validateLoanForm } from '../domain/loanForm.validators';
 import { mapFormToLoan, LoanFormState } from '../domain/loanForm.mapper';
 import { calculateAutoDueDate } from '../domain/loanForm.preview';
 import { getInitialFormState } from './loanForm.defaults';
+import { safeIsoDateOnly, safeSourceId, safeFileFirst } from '../utils/formHelpers';
 
 interface UseLoanFormProps {
   initialData?: Loan | null;
@@ -24,7 +25,7 @@ export const useLoanForm = ({ initialData, clients, sources, userProfile, onAdd,
   const [fixedDuration, setFixedDuration] = useState('30');
   const [skipWeekends, setSkipWeekends] = useState(false);
   
-  const [formData, setFormData] = useState<LoanFormState>(() => getInitialFormState(sources[0]?.id));
+  const [formData, setFormData] = useState<LoanFormState>(() => getInitialFormState(safeSourceId(sources)));
 
   const [attachments, setAttachments] = useState<string[]>([]);
   const [documentPhotos, setDocumentPhotos] = useState<string[]>([]);
@@ -41,26 +42,26 @@ export const useLoanForm = ({ initialData, clients, sources, userProfile, onAdd,
 
   const isDailyModality = formData.billingCycle !== 'MONTHLY';
 
-  // Initialization
+  // Initialization with Guards
   useEffect(() => {
     if (initialData) {
       setFormData({
-        clientId: initialData.clientId,
-        debtorName: initialData.debtorName,
+        clientId: initialData.clientId || '',
+        debtorName: initialData.debtorName || '',
         debtorPhone: maskPhone(initialData.debtorPhone || ''),
         debtorDocument: maskDocument(initialData.debtorDocument || ''),
         debtorAddress: initialData.debtorAddress || '',
-        sourceId: initialData.sourceId,
+        sourceId: initialData.sourceId || safeSourceId(sources),
         preferredPaymentMethod: initialData.preferredPaymentMethod || 'PIX',
         pixKey: initialData.pixKey || '',
-        principal: initialData.principal.toString(),
-        interestRate: initialData.interestRate.toString(),
-        finePercent: (initialData.finePercent || 2).toString(),
-        dailyInterestPercent: (initialData.dailyInterestPercent || 1).toString(),
+        principal: String(initialData.principal || ''),
+        interestRate: String(initialData.interestRate || ''),
+        finePercent: String(initialData.finePercent || 2),
+        dailyInterestPercent: String(initialData.dailyInterestPercent || 1),
         billingCycle: initialData.billingCycle || 'MONTHLY',
-        notes: initialData.notes,
+        notes: initialData.notes || '',
         guaranteeDescription: initialData.guaranteeDescription || '',
-        startDate: initialData.startDate.includes('T') ? initialData.startDate.split('T')[0] : initialData.startDate
+        startDate: safeIsoDateOnly(initialData.startDate)
       });
       setFixedDuration('30');
       setSkipWeekends(initialData.skipWeekends || false);
@@ -70,15 +71,16 @@ export const useLoanForm = ({ initialData, clients, sources, userProfile, onAdd,
     } else {
         setFormData(prev => ({ 
             ...prev, 
+            sourceId: prev.sourceId || safeSourceId(sources),
             pixKey: userProfile?.pixKey || '',
             interestRate: userProfile?.defaultInterestRate ? String(userProfile.defaultInterestRate) : '30',
             finePercent: userProfile?.defaultFinePercent ? String(userProfile.defaultFinePercent) : '2',
             dailyInterestPercent: userProfile?.defaultDailyInterestPercent ? String(userProfile.defaultDailyInterestPercent) : '1',
         }));
     }
-  }, [initialData, userProfile]);
+  }, [initialData, userProfile, sources]);
 
-  // CORREÇÃO: Cleanup de URLs blob criadas para preview em modo Demo
+  // CORREÇÃO: Cleanup de URLs blob
   useEffect(() => {
       return () => {
           customDocuments.forEach(doc => {
@@ -147,9 +149,7 @@ export const useLoanForm = ({ initialData, clients, sources, userProfile, onAdd,
           const name = contact.name && contact.name.length > 0 ? contact.name[0] : '';
           let number = contact.tel && contact.tel.length > 0 ? contact.tel[0] : '';
           
-          // Uso da normalização inteligente
           const normalizedPhone = normalizeBrazilianPhone(number);
-          
           setFormData((prev) => ({ ...prev, debtorName: name || prev.debtorName, debtorPhone: normalizedPhone }));
         }
       } catch (ex) {}
@@ -157,8 +157,8 @@ export const useLoanForm = ({ initialData, clients, sources, userProfile, onAdd,
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (e.target.files && e.target.files[0]) {
-          const file = e.target.files[0];
+      const file = safeFileFirst(e.target.files);
+      if (file) {
           const fileType = file.type.includes('pdf') ? 'PDF' : 'IMAGE';
           setIsUploading(true);
           try {

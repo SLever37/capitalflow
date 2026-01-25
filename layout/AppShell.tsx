@@ -4,8 +4,6 @@ import { AlertCircle, AlertTriangle, CheckCircle2, Mic } from 'lucide-react';
 import { HeaderBar } from './HeaderBar';
 import { BottomNav } from './BottomNav';
 import { UserProfile } from '../types';
-import { useUiState } from '../hooks/useUiState'; // Necessário importar para usar no FAB, mas o AppShell recebe props.
-// Como AppShell é UI pura, vamos passar a função via props.
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -18,7 +16,7 @@ interface AppShellProps {
   onNewLoan: () => void;
   isStealthMode: boolean;
   toggleStealthMode: () => void;
-  onOpenAssistant?: () => void; // Nova Prop
+  onOpenAssistant?: () => void; 
 }
 
 export const AppShell: React.FC<AppShellProps> = ({ 

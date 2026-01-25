@@ -9,10 +9,11 @@ interface MasterPageProps {
   setMasterEditUser: (user: any) => void;
   handleToggleAdmin: (user: any) => void;
   handleAdminResetPassword: (user: any) => void;
+  ui?: any;
 }
 
 export const MasterPage: React.FC<MasterPageProps> = ({ 
-  allUsers, sacSearch, setSacSearch, setMasterEditUser, handleToggleAdmin, handleAdminResetPassword 
+  allUsers, sacSearch, setSacSearch, setMasterEditUser, handleToggleAdmin, handleAdminResetPassword, ui
 }) => {
   
   // Função helper para verificar online (últimos 5 min)
@@ -48,7 +49,7 @@ export const MasterPage: React.FC<MasterPageProps> = ({
                                 <p className="text-xs text-slate-500 ml-4.5">{u.usuario_email}</p>
                             </div>
                             <div className="flex gap-2">
-                                <button onClick={() => setMasterEditUser(u)} className="p-2 bg-slate-800 text-blue-500 rounded-lg hover:bg-slate-700 transition-colors"><Edit size={16}/></button>
+                                <button onClick={() => { setMasterEditUser(u); ui?.openModal('MASTER_EDIT_USER'); }} className="p-2 bg-slate-800 text-blue-500 rounded-lg hover:bg-slate-700 transition-colors"><Edit size={16}/></button>
                                 <button onClick={() => handleToggleAdmin(u)} className="p-2 bg-slate-800 text-purple-500 rounded-lg hover:bg-slate-700 transition-colors"><ShieldAlert size={16}/></button>
                                 <button onClick={() => handleAdminResetPassword(u)} className="p-2 bg-slate-800 text-rose-500 rounded-lg hover:bg-slate-700 transition-colors"><KeyRound size={16}/></button>
                             </div>

@@ -1,31 +1,28 @@
 
-import { useState, useRef } from 'react';
-import { CapitalSource, Loan, Client, Installment, LedgerEntry, AgreementInstallment } from '../types';
+import { useState, useRef, useCallback } from 'react';
+import { CapitalSource, Loan, Client, Installment, AgreementInstallment } from '../types';
+import { ModalType, ModalState } from '../contexts/ModalContext';
 
 export const useUiState = () => {
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [isClientModalOpen, setIsClientModalOpen] = useState(false);
-  const [isSourceModalOpen, setIsSourceModalOpen] = useState(false);
-  const [isAddFundsModalOpen, setIsAddFundsModalOpen] = useState<CapitalSource | null>(null);
-  
-  const [isAiAssistantOpen, setIsAiAssistantOpen] = useState(false); 
+  // --- NOVO ESTADO UNIFICADO DE MODAL ---
+  const [activeModal, setActiveModal] = useState<ModalState | null>(null);
 
-  const [donateModal, setDonateModal] = useState(false);
-  const [resetDataModal, setResetDataModal] = useState(false);
-  const [deleteAccountModal, setDeleteAccountModal] = useState(false);
-  const [deleteAccountAgree, setDeleteAccountAgree] = useState(false);
-  const [deleteAccountConfirm, setDeleteAccountConfirm] = useState('');
-  const [resetPasswordInput, setResetPasswordInput] = useState('');
+  const openModal = useCallback((type: ModalType, payload?: any) => {
+      setActiveModal({ type, payload });
+  }, []);
+
+  const closeModal = useCallback(() => {
+      setActiveModal(null);
+      // Limpezas automáticas ao fechar
+      setEditingLoan(null);
+      setPaymentModal(null);
+      setConfirmation(null);
+  }, []);
+
+  // --- ESTADOS DE DADOS (FORMS E INPUTS) ---
+  // Mantidos aqui para persistência enquanto o modal está aberto/fechado
+  // e para binding dos inputs controlados.
   
-  const [showNavHub, setShowNavHub] = useState(false);
-  const [showCalcModal, setShowCalcModal] = useState(false);
-  const [showAgendaModal, setShowAgendaModal] = useState(false);
-  const [showFlowModal, setShowFlowModal] = useState(false);
-  
-  // Stealth Mode State
-  const [isStealthMode, setIsStealthMode] = useState(false);
-  
-  const [noteModalLoan, setNoteModalLoan] = useState<Loan | null>(null);
   const [noteText, setNoteText] = useState('');
   
   const [editingSource, setEditingSource] = useState<CapitalSource | null>(null);
@@ -35,7 +32,6 @@ export const useUiState = () => {
   const [selectedLoanId, setSelectedLoanId] = useState<string | null>(null);
   
   const [showReceipt, setShowReceipt] = useState<{loan: Loan, inst: Installment | AgreementInstallment, amountPaid: number, type: string} | null>(null);
-  const [viewProofModal, setViewProofModal] = useState<string | null>(null);
   
   const [masterEditUser, setMasterEditUser] = useState<any>(null); 
   const [sacSearch, setSacSearch] = useState('');
@@ -51,11 +47,9 @@ export const useUiState = () => {
 
   const [paymentModal, setPaymentModal] = useState<{loan: Loan, inst: Installment, calculations: any} | null>(null);
   
-  // AGREEMENT MODAL STATE
   const [renegotiationModalLoan, setRenegotiationModalLoan] = useState<Loan | null>(null);
-
   const [messageModalLoan, setMessageModalLoan] = useState<Loan | null>(null);
-  const [withdrawModal, setWithdrawModal] = useState(false);
+  
   const [withdrawValue, setWithdrawValue] = useState('');
   const [withdrawSourceId, setWithdrawSourceId] = useState('');
   const [paymentType, setPaymentType] = useState<'FULL' | 'RENEW_INTEREST' | 'RENEW_AV' | 'LEND_MORE'>('FULL');
@@ -77,15 +71,20 @@ export const useUiState = () => {
 
   const [importCandidates, setImportCandidates] = useState<any[]>([]);
   const [selectedImportIndices, setSelectedImportIndices] = useState<number[]>([]);
-  const [showImportPreviewModal, setShowImportPreviewModal] = useState(false);
   
   const [importSheetNames, setImportSheetNames] = useState<string[]>([]);
-  const [showSheetSelectModal, setShowSheetSelectModal] = useState(false);
   const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
 
   const [isBulkDeleteMode, setIsBulkDeleteMode] = useState(false);
   const [selectedClientsToDelete, setSelectedClientsToDelete] = useState<string[]>([]);
+  const [deleteAccountAgree, setDeleteAccountAgree] = useState(false);
+  const [deleteAccountConfirm, setDeleteAccountConfirm] = useState('');
+  const [resetPasswordInput, setResetPasswordInput] = useState('');
+  
+  const [isStealthMode, setIsStealthMode] = useState(false);
+  const [showNavHub, setShowNavHub] = useState(false);
 
+  // Refs
   const fileInputBackupRef = useRef<HTMLInputElement>(null);
   const fileInputExcelRef = useRef<HTMLInputElement>(null);
   const profilePhotoInputRef = useRef<HTMLInputElement>(null);
@@ -93,30 +92,18 @@ export const useUiState = () => {
   const extraDocFileInputRef = useRef<HTMLInputElement>(null);
 
   return {
-    isFormOpen, setIsFormOpen,
-    isClientModalOpen, setIsClientModalOpen,
-    isSourceModalOpen, setIsSourceModalOpen,
-    isAddFundsModalOpen, setIsAddFundsModalOpen,
-    isAiAssistantOpen, setIsAiAssistantOpen,
-    donateModal, setDonateModal,
-    resetDataModal, setResetDataModal,
-    deleteAccountModal, setDeleteAccountModal,
-    deleteAccountAgree, setDeleteAccountAgree,
-    deleteAccountConfirm, setDeleteAccountConfirm,
-    resetPasswordInput, setResetPasswordInput,
-    showNavHub, setShowNavHub,
-    showCalcModal, setShowCalcModal,
-    showAgendaModal, setShowAgendaModal,
-    showFlowModal, setShowFlowModal,
-    isStealthMode, setIsStealthMode,
-    noteModalLoan, setNoteModalLoan,
+    // Core Modal State
+    activeModal,
+    openModal,
+    closeModal,
+
+    // Data States
     noteText, setNoteText,
     editingSource, setEditingSource,
     editingLoan, setEditingLoan,
     editingClient, setEditingClient,
     selectedLoanId, setSelectedLoanId,
     showReceipt, setShowReceipt,
-    viewProofModal, setViewProofModal,
     masterEditUser, setMasterEditUser,
     sacSearch, setSacSearch,
     isSaving, setIsSaving,
@@ -128,7 +115,6 @@ export const useUiState = () => {
     addFundsValue, setAddFundsValue,
     paymentModal, setPaymentModal,
     messageModalLoan, setMessageModalLoan,
-    withdrawModal, setWithdrawModal,
     withdrawValue, setWithdrawValue,
     withdrawSourceId, setWithdrawSourceId,
     paymentType, setPaymentType,
@@ -138,19 +124,20 @@ export const useUiState = () => {
     promissoriaUploadLoanId, setPromissoriaUploadLoanId,
     extraDocUploadLoanId, setExtraDocUploadLoanId,
     extraDocKind, setExtraDocKind,
-    
-    // Agreements
     renegotiationModalLoan, setRenegotiationModalLoan,
-
     importCandidates, setImportCandidates,
     selectedImportIndices, setSelectedImportIndices,
-    showImportPreviewModal, setShowImportPreviewModal,
     importSheetNames, setImportSheetNames,
-    showSheetSelectModal, setShowSheetSelectModal,
     pendingImportFile, setPendingImportFile,
     isBulkDeleteMode, setIsBulkDeleteMode,
     selectedClientsToDelete, setSelectedClientsToDelete,
+    deleteAccountAgree, setDeleteAccountAgree,
+    deleteAccountConfirm, setDeleteAccountConfirm,
+    resetPasswordInput, setResetPasswordInput,
+    isStealthMode, setIsStealthMode,
+    showNavHub, setShowNavHub,
 
+    // Refs
     fileInputBackupRef, fileInputExcelRef, profilePhotoInputRef, promissoriaFileInputRef, extraDocFileInputRef
   };
 };

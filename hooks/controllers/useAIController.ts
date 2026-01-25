@@ -14,8 +14,6 @@ export const useAIController = (
         const { intent, data } = result;
 
         if (intent === 'ANALYZE_PORTFOLIO') {
-            // A análise já foi exibida no modal.
-            // Aqui podemos apenas registrar um log ou realizar uma ação secundária se necessário.
             return;
         }
 
@@ -37,7 +35,7 @@ export const useAIController = (
                 state: '',
                 notes: 'Adicionado via Assistente IA'
             });
-            ui.setIsClientModalOpen(true);
+            ui.openModal('CLIENT_FORM');
         } 
         else if (intent === 'REGISTER_PAYMENT') {
             if (!data.name) { showToast("Não consegui identificar o nome do cliente na sua fala.", "error"); return; }
@@ -52,6 +50,7 @@ export const useAIController = (
                 if (inst) {
                     const calcs = calculateTotalDue(loan, inst);
                     ui.setPaymentModal({ loan, inst, calculations: calcs });
+                    ui.openModal('PAYMENT');
                     
                     if (data.amount) {
                         if (Math.abs(data.amount - calcs.interest) < 5) {
@@ -84,7 +83,7 @@ export const useAIController = (
             events.push(newEvent);
             localStorage.setItem('cm_agenda_events', JSON.stringify(events));
             
-            ui.setShowAgendaModal(true);
+            ui.openModal('AGENDA');
             showToast("Evento agendado com sucesso!", "success");
         }
     };

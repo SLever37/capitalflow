@@ -121,7 +121,7 @@ export const useProfileController = (
       if (activeUser.id === 'DEMO') { showToast("Conta Demo não pode ser excluída.", "error"); return; } 
       ui.setDeleteAccountAgree(false); 
       ui.setDeleteAccountConfirm(''); 
-      ui.setDeleteAccountModal(true); 
+      ui.openModal('DELETE_ACCOUNT'); 
   };
 
   const handleResetData = async () => {
@@ -131,11 +131,11 @@ export const useProfileController = (
          setIsLoadingData(true); 
          fetchFullData('DEMO'); 
          showToast("Dados Demo resetados.", "success"); 
-         ui.setResetDataModal(false); 
+         ui.closeModal(); 
          setIsLoadingData(false);
          return; 
      }
-     ui.setResetDataModal(true);
+     ui.openModal('RESET_DATA');
   };
 
   return {

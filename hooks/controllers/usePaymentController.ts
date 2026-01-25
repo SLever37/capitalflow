@@ -21,7 +21,7 @@ export const usePaymentController = (
       // Demo Logic (simplified fallback)
       if (activeUser.id === 'DEMO') {
           demoService.handlePayment({ loan: ui.paymentModal.loan, inst: ui.paymentModal.inst, amountToPay: customAmount || ui.paymentModal.calculations.total, paymentType: ui.paymentType, activeUser, loans, setLoans, setActiveUser, showToast, forgivePenalty });
-          ui.setPaymentModal(null); ui.setAvAmount(''); ui.setShowReceipt({ loan: ui.paymentModal.loan, inst: ui.paymentModal.inst, amountPaid: 0, type: ui.paymentType }); ui.setIsProcessingPayment(false); return;
+          ui.closeModal(); ui.setAvAmount(''); ui.setShowReceipt({ loan: ui.paymentModal.loan, inst: ui.paymentModal.inst, amountPaid: 0, type: ui.paymentType }); ui.setIsProcessingPayment(false); return;
       }
 
       try {
@@ -45,11 +45,12 @@ export const usePaymentController = (
           
           showToast(msg, "success"); 
           
-          ui.setPaymentModal(null); 
+          ui.closeModal(); 
           ui.setAvAmount(''); 
           
           if (type !== 'LEND_MORE') {
             ui.setShowReceipt({ loan: ui.paymentModal.loan, inst: ui.paymentModal.inst, amountPaid: amountToPay, type }); 
+            ui.openModal('RECEIPT');
           }
           
           await fetchFullData(activeUser.id);
