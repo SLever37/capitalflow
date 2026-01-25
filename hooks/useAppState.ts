@@ -1,8 +1,50 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import { Loan, Client, CapitalSource, UserProfile, LoanStatus } from '../types';
+import { Loan, Client, CapitalSource, UserProfile, LoanStatus, Agreement, AgreementStatus } from '../types';
 import { maskPhone, maskDocument } from '../utils/formatters';
+
+// --- ADAPTER JURÍDICO (BANCO -> FRONTEND) ---
+// Converte schema real do banco (acordos_inadimplencia) para o modelo da aplicação (Agreement)
+// Garante integridade de dados para o Módulo Jurídico e evita quebras de renderização.
+const agreementAdapter = (raw: any): Agreement => {
+    // 1. Normalização de Status (Banco -> Frontend)
+    const dbStatus = String(raw.status || '').toUpperCase();
+    let normalizedStatus: AgreementStatus = 'ACTIVE'; // Default seguro
+
+    if (['PAGO', 'PAID', 'QUITADO'].includes(dbStatus)) normalizedStatus = 'PAID';
+    else if (['BROKEN', 'QUEBRADO', 'CANCELADO', 'INATIVO'].includes(dbStatus)) normalizedStatus = 'BROKEN';
+    else if (['ATIVO', 'ACTIVE'].includes(dbStatus)) normalizedStatus = 'ACTIVE';
+    else normalizedStatus = 'ACTIVE'; // Fallback para ATIVO se desconhecido, para não esconder o acordo
+
+    // 2. Normalização de Parcelas
+    const installments = (raw.acordo_parcelas || []).map((p: any) => ({
+        id: p.id,
+        agreementId: raw.id,
+        number: p.numero, // Campo DB: numero
+        dueDate: p.due_date, // Campo DB: due_date
+        amount: Number(p.amount), // Campo DB: amount
+        status: (['PAGO', 'PAID'].includes(String(p.status).toUpperCase())) ? 'PAID' : String(p.status || 'PENDING').toUpperCase(),
+        paidAmount: Number(p.paid_amount || 0), // Campo DB: paid_amount
+        paidDate: p.paid_at // Campo DB: paid_at
+    })).sort((a: any, b: any) => a.number - b.number);
+
+    // 3. Objeto Final Tipado
+    return {
+        id: raw.id,
+        loanId: raw.loan_id,
+        type: raw.tipo || 'PARCELADO_COM_JUROS', // Campo DB: tipo
+        totalDebtAtNegotiation: Number(raw.total_base || 0), // Campo DB: total_base
+        negotiatedTotal: Number(raw.total_negociado || 0), // Campo DB: total_negociado
+        interestRate: Number(raw.juros_mensal_percent || 0), // Campo DB: juros_mensal_percent
+        installmentsCount: Number(raw.num_parcelas || installments.length), // Campo DB: num_parcelas
+        frequency: raw.periodicidade || 'MONTHLY', // Campo DB: periodicidade
+        startDate: raw.created_at, // Usa data de criação como início
+        status: normalizedStatus,
+        createdAt: raw.created_at,
+        installments: installments
+    } as Agreement;
+};
 
 export const useAppState = (activeProfileId: string | null) => {
   const [activeUser, setActiveUser] = useState<UserProfile | null>(null);
@@ -192,35 +234,12 @@ export const useAppState = (activeProfileId: string | null) => {
                       reviewNote: s.review_note
                   }));
 
-                  // Mapeamento Estrito de Acordos
+                  // Mapeamento Estrito de Acordos (MÓDULO JURÍDICO)
                   let activeAgreement = undefined;
                   if (l.acordos_inadimplencia && l.acordos_inadimplencia.length > 0) {
-                      // Pega o acordo mais recente
+                      // Ordena para pegar o mais recente e aplica o Adapter
                       const rawAgreement = l.acordos_inadimplencia.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
-                      
-                      activeAgreement = {
-                          id: rawAgreement.id,
-                          loanId: l.id,
-                          type: rawAgreement.tipo, // DB: tipo
-                          totalDebtAtNegotiation: Number(rawAgreement.total_base), // DB: total_base
-                          negotiatedTotal: Number(rawAgreement.total_negociado), // DB: total_negociado
-                          interestRate: Number(rawAgreement.juros_mensal_percent), // DB: juros_mensal_percent
-                          installmentsCount: Number(rawAgreement.num_parcelas), // DB: num_parcelas
-                          frequency: rawAgreement.periodicidade, // DB: periodicidade
-                          startDate: rawAgreement.created_at,
-                          status: rawAgreement.status, // DB: status ('ACTIVE' ou 'ATIVO')
-                          createdAt: rawAgreement.created_at,
-                          installments: (rawAgreement.acordo_parcelas || []).map((ap: any) => ({
-                              id: ap.id,
-                              agreementId: rawAgreement.id,
-                              number: ap.numero, // DB: numero
-                              dueDate: ap.due_date, // DB: due_date (ESTRITO)
-                              amount: Number(ap.amount), // DB: amount (ESTRITO)
-                              status: ap.status,
-                              paidAmount: Number(ap.paid_amount || 0), // DB: paid_amount (ESTRITO)
-                              paidDate: ap.paid_at // DB: paid_at (ESTRITO)
-                          }))
-                      };
+                      activeAgreement = agreementAdapter(rawAgreement);
                   }
 
                   // LÓGICA DE FALLBACK ROBUSTO PARA TELEFONE
@@ -232,7 +251,6 @@ export const useAppState = (activeProfileId: string | null) => {
                       }
                   }
                   
-                  // Se ainda assim não existir, aplica o fallback obrigatório '000.000.000-00'
                   if (!phone || String(phone).trim() === '') {
                       phone = '000.000.000-00';
                   }
@@ -241,7 +259,7 @@ export const useAppState = (activeProfileId: string | null) => {
                       id: l.id,
                       clientId: l.client_id,
                       debtorName: l.debtor_name,
-                      debtorPhone: maskPhone(phone), // Aplica máscara no valor garantido
+                      debtorPhone: maskPhone(phone),
                       debtorDocument: l.debtor_document,
                       debtorAddress: l.debtor_address,
                       sourceId: l.source_id,

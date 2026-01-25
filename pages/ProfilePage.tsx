@@ -1,9 +1,10 @@
 
-import React, { useState, useMemo, useRef } from 'react';
-import { User, Heart, LogOut, Camera, Download, History, Activity, AlertCircle, FileUp, Settings, RotateCcw } from 'lucide-react';
-import { UserProfile, Loan, LedgerEntry } from '../types';
-import { maskPhone, formatMoney } from '../utils/formatters';
-import { humanizeAuditLog } from '../utils/auditHelpers';
+import React from 'react';
+import { User, Heart, LogOut, Camera, Download, History, FileUp, Settings, RotateCcw } from 'lucide-react';
+import { UserProfile, Loan } from '../types';
+import { maskPhone } from '../utils/formatters';
+import { useProfilePageLogic } from '../features/profile/hooks/useProfilePageLogic';
+import { ProfileAuditLog } from '../features/profile/components/ProfileAuditLog';
 
 interface ProfilePageProps {
   activeUser: UserProfile;
@@ -33,58 +34,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   profileEditForm, setProfileEditForm, handleSaveProfile, handlePhotoUpload, 
   handleExportBackup, profilePhotoInputRef, loans, profileCtrl
 }) => {
-  const [activeSection, setActiveSection] = useState<'PERSONAL' | 'BRAND' | 'DEFAULTS' | 'AUDIT'>('PERSONAL');
-  const profileImportRef = useRef<HTMLInputElement>(null);
-  const backupRestoreRef = useRef<HTMLInputElement>(null);
-
-  const auditLogs = useMemo(() => {
-      if (!loans) return [];
-      const all = loans.flatMap(l => 
-          (l.ledger || []).map(t => ({
-              ...t,
-              clientName: l.debtorName,
-              loanId: l.id
-          }))
-      );
-      return all.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 50);
-  }, [loans]);
-
-  const renderAuditEntry = (log: LedgerEntry & { clientName: string }) => {
-      const isAudit = log.category === 'AUDIT' || log.notes?.startsWith('{');
-      const lines = isAudit ? humanizeAuditLog(log.notes || '') : [log.notes || 'Operação realizada'];
-
-      return (
-        <div key={log.id} className="bg-slate-950 p-4 rounded-2xl border border-slate-800 hover:border-blue-500/50 transition-colors flex flex-col gap-3">
-            <div className="flex justify-between items-start">
-                <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-xl ${log.type === 'ADJUSTMENT' ? 'bg-indigo-500/10 text-indigo-400' : log.type === 'LEND_MORE' ? 'bg-rose-500/10 text-rose-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
-                        <Activity size={18}/>
-                    </div>
-                    <div>
-                        <p className="text-xs font-black text-white uppercase">{log.clientName}</p>
-                        <p className="text-[10px] text-slate-500">{new Date(log.date).toLocaleString('pt-BR')}</p>
-                    </div>
-                </div>
-                {!isAudit ? (
-                    <p className={`text-sm font-black ${log.type === 'LEND_MORE' ? 'text-rose-500' : 'text-emerald-500'}`}>
-                        {log.type === 'LEND_MORE' ? '-' : '+'} {formatMoney(log.amount, false)}
-                    </p>
-                ) : (
-                    <span className="px-2 py-0.5 bg-indigo-500/10 text-indigo-400 text-[8px] font-black rounded uppercase">Audit Edit</span>
-                )}
-            </div>
-            
-            <div className={`p-3 rounded-xl ${isAudit ? 'bg-indigo-950/20 border border-indigo-500/20' : 'bg-slate-900/50'}`}>
-                {lines.map((line, idx) => (
-                    <p key={idx} className="text-[10px] text-slate-300 leading-relaxed italic flex items-start gap-2">
-                        {isAudit && <AlertCircle size={10} className="mt-0.5 flex-shrink-0"/>}
-                        {line}
-                    </p>
-                ))}
-            </div>
-        </div>
-      );
-  };
+  
+  const { activeSection, setActiveSection, profileImportRef, backupRestoreRef, auditLogs } = useProfilePageLogic(loans);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -104,7 +55,6 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                         <History size={16}/> Auditoria Completa
                     </button>
                     
-                    {/* BOTÃO RESTAURAR PLANILHA REPOSICIONADO AQUI */}
                     <button onClick={() => profileImportRef.current?.click()} className="p-3 rounded-xl text-xs font-black uppercase transition-all flex items-center gap-3 bg-slate-950 text-emerald-500 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/30">
                         <FileUp size={16}/> Restaurar Planilha
                     </button>
@@ -161,18 +111,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                        )}
 
                        {activeSection === 'AUDIT' && (
-                           <div className="animate-in slide-in-from-right space-y-6">
-                               <div className="bg-blue-900/10 border border-blue-500/20 p-4 rounded-2xl text-xs text-blue-300 font-bold mb-4 flex items-center gap-2">
-                                   <History size={18}/> Registro detalhado de alterações e transações (Compliance)
-                               </div>
-                               <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-                                   {auditLogs.length === 0 ? (
-                                       <div className="text-center text-slate-600 py-20 uppercase text-xs font-black tracking-widest border-2 border-dashed border-slate-800 rounded-3xl">Nenhum registro de auditoria.</div>
-                                   ) : (
-                                       auditLogs.map((log: any) => renderAuditEntry(log))
-                                   )}
-                               </div>
-                           </div>
+                           <ProfileAuditLog logs={auditLogs} />
                        )}
 
                        {activeSection !== 'AUDIT' && (
@@ -183,7 +122,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                                </div>
                                
                                <div className="grid grid-cols-1 gap-4">
-                                   {/* RESTAURAR SNAPSHOT (Planilha movida para sidebar) */}
+                                   {/* RESTAURAR SNAPSHOT */}
                                    <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex justify-between items-center">
                                        <div className="flex flex-col">
                                            <span className="text-xs font-bold text-white uppercase flex items-center gap-2"><RotateCcw size={14} className="text-amber-500"/> Restaurar Backup</span>

@@ -1,8 +1,9 @@
+
 import { useEffect } from 'react';
 
 export const usePersistedTab = (
-  activeTab: 'DASHBOARD' | 'CLIENTS' | 'SOURCES' | 'PROFILE' | 'MASTER',
-  setActiveTab: (tab: 'DASHBOARD' | 'CLIENTS' | 'SOURCES' | 'PROFILE' | 'MASTER') => void
+  activeTab: 'DASHBOARD' | 'CLIENTS' | 'SOURCES' | 'PROFILE' | 'MASTER' | 'LEGAL',
+  setActiveTab: (tab: 'DASHBOARD' | 'CLIENTS' | 'SOURCES' | 'PROFILE' | 'MASTER' | 'LEGAL') => void
 ) => {
   useEffect(() => {
     const lastTab = localStorage.getItem('cm_last_tab');
