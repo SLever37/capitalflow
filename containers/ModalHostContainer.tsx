@@ -5,6 +5,7 @@ import { UserProfile, Client, CapitalSource, Loan } from '../types';
 import { filesService } from '../services/files.service';
 import { supabase } from '../lib/supabase';
 import { AIAssistantModal } from '../components/modals/AIAssistantModal';
+import { RenegotiationModal } from '../features/agreements/components/RenegotiationModal';
 
 interface ModalHostContainerProps {
   ui: any;
@@ -74,6 +75,15 @@ export const ModalHostContainer: React.FC<ModalHostContainerProps> = ({
            fileCtrl={fileCtrl}
        />
        
+       {ui.renegotiationModalLoan && activeUser && (
+           <RenegotiationModal 
+               loan={ui.renegotiationModalLoan}
+               activeUser={activeUser}
+               onClose={() => ui.setRenegotiationModalLoan(null)}
+               onSuccess={() => { showToast("Acordo criado com sucesso!", "success"); fetchFullData(activeUser.id); }}
+           />
+       )}
+
        {ui.isAiAssistantOpen && (
            <AIAssistantModal 
                 onClose={() => ui.setIsAiAssistantOpen(false)} 

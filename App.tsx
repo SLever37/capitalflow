@@ -119,6 +119,7 @@ export const App: React.FC = () => {
                 mobileDashboardTab={mobileDashboardTab} setMobileDashboardTab={setMobileDashboardTab}
                 statusFilter={statusFilter} setStatusFilter={setStatusFilter} searchTerm={searchTerm} setSearchTerm={setSearchTerm}
                 ui={ui} loanCtrl={loanCtrl} fileCtrl={fileCtrl} showToast={showToast}
+                onRefresh={() => fetchFullData(activeUser?.id || '')}
             />
         )}
         

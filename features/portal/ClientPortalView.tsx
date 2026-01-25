@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, ExternalLink, Printer, FileText, Upload, RefreshCw, KeyRound, UserCheck, AlertCircle } from 'lucide-react';
+import { ShieldCheck, ExternalLink, Printer, FileText, Upload, RefreshCw, KeyRound, UserCheck, AlertCircle, Handshake } from 'lucide-react';
 import { openSystemPromissoriaPrint } from '../../utils/printHelpers';
 import { portalService, PortalSession } from '../../services/portal.service';
 
@@ -24,6 +24,7 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
     const [installments, setInstallments] = useState<any[]>([]);
     const [portalSignals, setPortalSignals] = useState<any[]>([]);
     const [clientLoans, setClientLoans] = useState<any[]>([]);
+    const [isAgreementActive, setIsAgreementActive] = useState(false);
 
     // Action State
     const [intentId, setIntentId] = useState<string | null>(null);
@@ -71,6 +72,8 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
             setPixKey(data.pixKey);
             setInstallments(data.installments);
             setPortalSignals(data.signals);
+            setIsAgreementActive(data.isAgreementActive);
+            
             if (data.loan.profile_id) {
                 const list = await portalService.fetchClientLoansList(clientId, data.loan.profile_id);
                 setClientLoans(list);
@@ -256,12 +259,14 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
 
                         {/* EXTRATO SIMPLIFICADO */}
                         <div className="bg-slate-950/50 p-4 rounded-2xl border border-slate-800 max-h-48 overflow-y-auto custom-scrollbar">
-                            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-3">Extrato do Contrato</p>
+                            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                {isAgreementActive ? <><Handshake size={12} className="text-indigo-500"/> Acordo de Pagamento</> : 'Extrato do Contrato'}
+                            </p>
                             <div className="space-y-2">
                                 {(installments || []).map((p, idx) => (
                                     <div key={idx} className="flex justify-between items-center text-xs py-2 border-b border-slate-800/50 last:border-0">
                                         <div className="flex flex-col">
-                                            <span className="text-slate-400 font-bold">{idx + 1}ª Parcela</span>
+                                            <span className="text-slate-400 font-bold">{p.numero_parcela}ª Parcela</span>
                                             <span className="text-[9px] text-slate-500">Venc. {new Date(p.data_vencimento).toLocaleDateString()}</span>
                                         </div>
                                         <span className={p.status === 'PAID' ? 'text-emerald-500 font-black' : 'text-white font-black'}>R$ {p.valor_parcela.toFixed(2)}</span>

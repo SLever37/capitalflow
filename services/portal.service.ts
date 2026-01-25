@@ -54,8 +54,6 @@ export const portalService = {
     const dbClientNum = onlyDigits(client.client_number || '');
 
     // Verificação de Identidade Robusta:
-    // O identificador informado deve ser exatamente igual ao CPF/CNPJ ou Telefone ou Numero de Cliente no banco.
-    // Nota: Removido bloqueio do CPF '00000000000' para permitir acesso de clientes legados.
     const match = 
       (dbDoc && cleanIdentifier === dbDoc) || 
       (dbPhone && cleanIdentifier === dbPhone) || 
@@ -120,12 +118,40 @@ export const portalService = {
       if (profile) pixKey = profile.pix_key || '';
     }
 
-    // 3. Parcelas
-    const { data: installments } = await supabase
-      .from('parcelas')
-      .select('data_vencimento, valor_parcela, numero_parcela, status, due_date, amount')
-      .eq('loan_id', loanId)
-      .order('data_vencimento', { ascending: true });
+    // 3. Verificar se há Acordo Ativo
+    const { data: activeAgreement } = await supabase
+        .from('acordos_inadimplencia')
+        .select('*, acordo_parcelas(*)')
+        .eq('loan_id', loanId)
+        .eq('status', 'ACTIVE')
+        .single();
+
+    let installments = [];
+
+    if (activeAgreement) {
+        // Se houver acordo, mostra as parcelas do acordo
+        installments = activeAgreement.acordo_parcelas.map((ap: any) => ({
+            data_vencimento: ap.data_vencimento,
+            valor_parcela: ap.valor,
+            numero_parcela: ap.numero,
+            status: ap.status,
+            isAgreement: true
+        })).sort((a: any, b: any) => new Date(a.data_vencimento).getTime() - new Date(b.data_vencimento).getTime());
+    } else {
+        // Se não, parcelas originais
+        const { data: originalInstallments } = await supabase
+          .from('parcelas')
+          .select('data_vencimento, valor_parcela, numero_parcela, status, due_date, amount')
+          .eq('loan_id', loanId)
+          .order('data_vencimento', { ascending: true });
+        
+        installments = (originalInstallments || []).map((p: any) => ({
+            data_vencimento: p.data_vencimento || p.due_date,
+            valor_parcela: p.valor_parcela || p.amount,
+            numero_parcela: p.numero_parcela,
+            status: p.status
+        }));
+    }
 
     // 4. Sinalizações (Histórico de pedidos)
     const { data: signals } = await supabase
@@ -135,7 +161,6 @@ export const portalService = {
       .eq('client_id', clientId)
       .order('created_at', { ascending: false });
 
-    // Marcar atualizações como vistas (se houver aprovação/negação não vista)
     if (signals && signals.length > 0) {
       const unseenIds = signals
         .filter((s: any) => (s.status === 'APROVADO' || s.status === 'NEGADO') && !s.client_viewed_at)
@@ -151,13 +176,9 @@ export const portalService = {
     return {
       loan,
       pixKey,
-      installments: (installments || []).map((p: any) => ({
-        data_vencimento: p.data_vencimento || p.due_date,
-        valor_parcela: p.valor_parcela || p.amount,
-        numero_parcela: p.numero_parcela,
-        status: p.status
-      })),
-      signals: signals || []
+      installments,
+      signals: signals || [],
+      isAgreementActive: !!activeAgreement
     };
   },
 

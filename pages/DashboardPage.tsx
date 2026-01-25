@@ -2,7 +2,7 @@
 import React from 'react';
 import { Search, ShieldAlert, BarChart3, Banknote, CheckCircle2, Briefcase, PieChart as PieIcon, TrendingUp } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, LineChart, Line, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
-import { Loan, CapitalSource, LedgerEntry } from '../types';
+import { Loan, CapitalSource, LedgerEntry, Agreement, AgreementInstallment } from '../types';
 import { LoanCard } from '../components/cards/LoanCard';
 import { StatCard } from '../components/StatCard';
 import { ProfitCard } from '../components/cards/ProfitCard';
@@ -41,6 +41,9 @@ interface DashboardPageProps {
   setWithdrawModal: (open: boolean) => void;
   showToast: (msg: string, type?: 'error'|'success') => void;
   isStealthMode: boolean;
+  onRenegotiate: (loan: Loan) => void;
+  onAgreementPayment: (loan: Loan, agreement: Agreement, inst: AgreementInstallment) => void;
+  onRefresh: () => void;
 }
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({
@@ -48,7 +51,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   statusFilter, setStatusFilter, searchTerm, setSearchTerm, selectedLoanId, setSelectedLoanId,
   onEdit, onMessage, onArchive, onRestore, onDelete, onNote, onPayment, onPortalLink,
   onUploadPromissoria, onUploadDoc, onViewPromissoria, onViewDoc, onReviewSignal, onOpenComprovante, onReverseTransaction,
-  setWithdrawModal, showToast, isStealthMode
+  setWithdrawModal, showToast, isStealthMode, onRenegotiate, onAgreementPayment, onRefresh
 }) => {
   return (
     <div className="flex flex-col gap-6">
@@ -99,6 +102,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                       onReviewSignal={onReviewSignal}
                       onOpenComprovante={onOpenComprovante}
                       onReverseTransaction={onReverseTransaction}
+                      onRenegotiate={onRenegotiate}
+                      onAgreementPayment={onAgreementPayment}
+                      onRefresh={onRefresh}
                       isStealthMode={isStealthMode}
                     />
                   ))}

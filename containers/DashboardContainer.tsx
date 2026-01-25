@@ -1,9 +1,10 @@
 
 import React, { useMemo } from 'react';
 import { DashboardPage } from '../pages/DashboardPage';
-import { Loan, CapitalSource, UserProfile } from '../types';
+import { Loan, CapitalSource, UserProfile, Agreement, AgreementInstallment } from '../types';
 import { filterLoans } from '../domain/filters/loanFilters';
 import { buildDashboardStats } from '../domain/dashboard/stats';
+import { agreementService } from '../features/agreements/services/agreementService';
 
 interface DashboardContainerProps {
   loans: Loan[];
@@ -19,14 +20,29 @@ interface DashboardContainerProps {
   loanCtrl: any;
   fileCtrl: any;
   showToast: any;
+  onRefresh: () => void;
 }
 
 export const DashboardContainer: React.FC<DashboardContainerProps> = ({
   loans, sources, activeUser, mobileDashboardTab, setMobileDashboardTab,
-  statusFilter, setStatusFilter, searchTerm, setSearchTerm, ui, loanCtrl, fileCtrl, showToast
+  statusFilter, setStatusFilter, searchTerm, setSearchTerm, ui, loanCtrl, fileCtrl, showToast, onRefresh
 }) => {
   const filteredLoans = useMemo(() => filterLoans(loans, searchTerm, statusFilter), [loans, searchTerm, statusFilter]);
   const stats = useMemo(() => buildDashboardStats(loans, activeUser), [loans, activeUser]);
+
+  // Handler rápido para pagamento de parcela de acordo
+  const handleAgreementPayment = async (loan: Loan, agreement: Agreement, inst: AgreementInstallment) => {
+      if (!activeUser || !confirm(`Confirmar recebimento da parcela ${inst.number} (R$ ${inst.amount.toFixed(2)})?`)) return;
+      try {
+          // Usa a fonte principal do contrato
+          await agreementService.processPayment(agreement, inst, inst.amount, loan.sourceId, activeUser);
+          showToast("Parcela do acordo recebida!", "success");
+          ui.setShowReceipt({ loan, inst: { ...inst, agreementId: agreement.id }, amountPaid: inst.amount, type: 'AGREEMENT_PAYMENT' });
+          onRefresh();
+      } catch (e: any) {
+          showToast("Erro ao processar pagamento: " + e.message, "error");
+      }
+  };
 
   return (
     <DashboardPage 
@@ -49,6 +65,9 @@ export const DashboardContainer: React.FC<DashboardContainerProps> = ({
         onReviewSignal={loanCtrl.handleReviewSignal}
         onOpenComprovante={fileCtrl.handleOpenComprovante}
         onReverseTransaction={loanCtrl.openReverseTransaction}
+        onRenegotiate={(l) => ui.setRenegotiationModalLoan(l)}
+        onAgreementPayment={handleAgreementPayment}
+        onRefresh={onRefresh}
         setWithdrawModal={ui.setWithdrawModal}
         showToast={showToast}
         isStealthMode={ui.isStealthMode}

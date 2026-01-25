@@ -1,6 +1,6 @@
 
 import { useState, useRef } from 'react';
-import { CapitalSource, Loan, Client, Installment, LedgerEntry } from '../types';
+import { CapitalSource, Loan, Client, Installment, LedgerEntry, AgreementInstallment } from '../types';
 
 export const useUiState = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -34,7 +34,7 @@ export const useUiState = () => {
   
   const [selectedLoanId, setSelectedLoanId] = useState<string | null>(null);
   
-  const [showReceipt, setShowReceipt] = useState<{loan: Loan, inst: Installment, amountPaid: number, type: string} | null>(null);
+  const [showReceipt, setShowReceipt] = useState<{loan: Loan, inst: Installment | AgreementInstallment, amountPaid: number, type: string} | null>(null);
   const [viewProofModal, setViewProofModal] = useState<string | null>(null);
   
   const [masterEditUser, setMasterEditUser] = useState<any>(null); 
@@ -50,6 +50,10 @@ export const useUiState = () => {
   const [addFundsValue, setAddFundsValue] = useState('');
 
   const [paymentModal, setPaymentModal] = useState<{loan: Loan, inst: Installment, calculations: any} | null>(null);
+  
+  // AGREEMENT MODAL STATE
+  const [renegotiationModalLoan, setRenegotiationModalLoan] = useState<Loan | null>(null);
+
   const [messageModalLoan, setMessageModalLoan] = useState<Loan | null>(null);
   const [withdrawModal, setWithdrawModal] = useState(false);
   const [withdrawValue, setWithdrawValue] = useState('');
@@ -64,24 +68,21 @@ export const useUiState = () => {
     title?: string,
     message?: string,
     showRefundOption?: boolean,
-    extraData?: any // Para passar dados extras como 'loan' no estorno
+    extraData?: any
   } | null>(null);
 
   const [promissoriaUploadLoanId, setPromissoriaUploadLoanId] = useState<string | null>(null);
   const [extraDocUploadLoanId, setExtraDocUploadLoanId] = useState<string | null>(null);
   const [extraDocKind, setExtraDocKind] = useState<'CONFISSAO' | null>(null);
 
-  // --- NEW STATES FOR IMPORT SELECTION ---
   const [importCandidates, setImportCandidates] = useState<any[]>([]);
   const [selectedImportIndices, setSelectedImportIndices] = useState<number[]>([]);
   const [showImportPreviewModal, setShowImportPreviewModal] = useState(false);
   
-  // --- NEW STATES FOR EXCEL SHEET SELECTION ---
   const [importSheetNames, setImportSheetNames] = useState<string[]>([]);
   const [showSheetSelectModal, setShowSheetSelectModal] = useState(false);
   const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
 
-  // --- NEW STATES FOR BULK DELETE ---
   const [isBulkDeleteMode, setIsBulkDeleteMode] = useState(false);
   const [selectedClientsToDelete, setSelectedClientsToDelete] = useState<string[]>([]);
 
@@ -138,17 +139,15 @@ export const useUiState = () => {
     extraDocUploadLoanId, setExtraDocUploadLoanId,
     extraDocKind, setExtraDocKind,
     
-    // Import Selection
+    // Agreements
+    renegotiationModalLoan, setRenegotiationModalLoan,
+
     importCandidates, setImportCandidates,
     selectedImportIndices, setSelectedImportIndices,
     showImportPreviewModal, setShowImportPreviewModal,
-    
-    // Sheet Selection
     importSheetNames, setImportSheetNames,
     showSheetSelectModal, setShowSheetSelectModal,
     pendingImportFile, setPendingImportFile,
-    
-    // Bulk Delete
     isBulkDeleteMode, setIsBulkDeleteMode,
     selectedClientsToDelete, setSelectedClientsToDelete,
 

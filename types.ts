@@ -8,6 +8,8 @@ export enum LoanStatus {
 
 export type PaymentMethod = 'PIX' | 'CASH' | 'BANK_TRANSFER' | 'OTHER';
 
+// ... (existing types remain)
+
 export interface CapitalSource {
   id: string;
   name: string;
@@ -27,12 +29,19 @@ export interface Client {
   zipCode?: string;
   notes?: string;
   createdAt: string;
+  // portal access fields
+  access_code?: string;
+  client_number?: string;
+  cpf?: string;
+  cnpj?: string;
 }
+
+// ... (Keep existing LedgerEntry, Installment, LoanPolicy, etc.)
 
 export interface LedgerEntry {
   id: string;
   date: string;
-  type: 'PAYMENT_FULL' | 'PAYMENT_PARTIAL' | 'PAYMENT_INTEREST_ONLY' | 'LEND_MORE' | 'WITHDRAW_PROFIT' | 'ADJUSTMENT' | 'ARCHIVE' | 'RESTORE' | 'REFUND_SOURCE_CHANGE';
+  type: 'PAYMENT_FULL' | 'PAYMENT_PARTIAL' | 'PAYMENT_INTEREST_ONLY' | 'LEND_MORE' | 'WITHDRAW_PROFIT' | 'ADJUSTMENT' | 'ARCHIVE' | 'RESTORE' | 'REFUND_SOURCE_CHANGE' | 'AGREEMENT_PAYMENT';
   category?: 'RECEITA' | 'INVESTIMENTO' | 'RECUPERACAO' | 'ESTORNO' | 'GERAL' | 'AUDIT';
   amount: number;
   principalDelta: number;
@@ -40,34 +49,30 @@ export interface LedgerEntry {
   lateFeeDelta: number;
   sourceId?: string; 
   installmentId?: string;
+  agreementId?: string; // Novo
   notes?: string;
 }
 
 export interface Installment {
   id: string;
   dueDate: string;
-  
   scheduledPrincipal: number; 
   scheduledInterest: number;  
   amount: number;             
-
   principalRemaining: number;
   interestRemaining: number;
   lateFeeAccrued: number;     
   avApplied: number;          
-
   paidPrincipal: number;
   paidInterest: number;
   paidLateFee: number;
   paidTotal: number;
-
   status: LoanStatus;
   paidDate?: string;
   paidAmount?: number; 
   logs?: string[];
-  
-  renewalCount?: number; // Contador de renovações/pagamentos de juros
-  number?: number; // Número da parcela (1, 2, 3...)
+  renewalCount?: number; 
+  number?: number; 
 }
 
 export interface LoanPolicy {
@@ -79,10 +84,10 @@ export interface LoanPolicy {
 export interface PaymentSignal {
   id?: string;
   date: string;
-  type: 'INTEREST' | 'AMORTIZATION' | 'FULL' | string;
+  type: string;
   receiptBase64?: string;
   comprovanteUrl?: string;
-  status: 'PENDING' | 'REVIEWED' | 'PENDENTE' | 'APROVADO' | 'NEGADO' | string;
+  status: string;
   clientViewedAt?: string;
   reviewNote?: string;
 }
@@ -97,6 +102,36 @@ export interface LoanDocument {
 }
 
 export type LoanBillingModality = 'MONTHLY' | 'DAILY_FREE' | 'DAILY_FIXED_TERM';
+
+// --- AGREEMENT TYPES ---
+export type AgreementType = 'PARCELADO_SEM_JUROS' | 'PARCELADO_COM_JUROS';
+export type AgreementStatus = 'ACTIVE' | 'PAID' | 'BROKEN';
+
+export interface AgreementInstallment {
+    id: string;
+    agreementId: string;
+    number: number;
+    dueDate: string;
+    amount: number;
+    status: 'PENDING' | 'PAID' | 'PARTIAL' | 'LATE';
+    paidAmount: number;
+    paidDate?: string;
+}
+
+export interface Agreement {
+    id: string;
+    loanId: string;
+    type: AgreementType;
+    totalDebtAtNegotiation: number;
+    negotiatedTotal: number;
+    interestRate?: number; // Se houver
+    installmentsCount: number;
+    frequency: 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
+    startDate: string;
+    status: AgreementStatus;
+    createdAt: string;
+    installments: AgreementInstallment[];
+}
 
 export interface Loan {
   id: string;
@@ -131,11 +166,13 @@ export interface Loan {
   guaranteeDescription?: string;
   attachments?: string[]; 
   documentPhotos?: string[]; 
-  
   customDocuments?: LoanDocument[]; 
 
   isArchived?: boolean;
   skipWeekends?: boolean;
+
+  // New Link
+  activeAgreement?: Agreement; 
 }
 
 export interface UserProfile {
@@ -169,4 +206,7 @@ export interface UserProfile {
   defaultDailyInterestPercent?: number;
   targetCapital?: number;
   targetProfit?: number;
+  
+  // App Logic helpers
+  lastActiveAt?: string;
 }

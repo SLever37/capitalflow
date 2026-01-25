@@ -106,14 +106,18 @@ export const useAppState = (activeProfileId: string | null) => {
               })));
           }
 
-          // 4. Loans (Complex mapping)
+          // 4. Loans & Agreements
           const { data: loansData } = await supabase
               .from('contratos')
               .select(`
                   *,
                   parcelas (*),
                   transacoes (*),
-                  sinalizacoes_pagamento (*)
+                  sinalizacoes_pagamento (*),
+                  acordos_inadimplencia (
+                      *,
+                      acordo_parcelas (*)
+                  )
               `)
               .eq('profile_id', profileId);
 
@@ -148,6 +152,7 @@ export const useAppState = (activeProfileId: string | null) => {
                       lateFeeDelta: Number(t.late_fee_delta),
                       sourceId: t.source_id,
                       installmentId: t.installment_id,
+                      agreementId: t.agreement_id,
                       notes: t.notes
                   }));
 
@@ -160,6 +165,37 @@ export const useAppState = (activeProfileId: string | null) => {
                       clientViewedAt: s.client_viewed_at,
                       reviewNote: s.review_note
                   }));
+
+                  // Map Active Agreement if exists
+                  let activeAgreement = undefined;
+                  if (l.acordos_inadimplencia && l.acordos_inadimplencia.length > 0) {
+                      // Pega o acordo mais recente ou ativo
+                      const rawAgreement = l.acordos_inadimplencia.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+                      
+                      activeAgreement = {
+                          id: rawAgreement.id,
+                          loanId: l.id,
+                          type: rawAgreement.tipo_acordo,
+                          totalDebtAtNegotiation: Number(rawAgreement.total_divida_base),
+                          negotiatedTotal: Number(rawAgreement.total_negociado),
+                          interestRate: Number(rawAgreement.juros_aplicado),
+                          installmentsCount: rawAgreement.qtd_parcelas,
+                          frequency: rawAgreement.periodicidade,
+                          startDate: rawAgreement.created_at,
+                          status: rawAgreement.status,
+                          createdAt: rawAgreement.created_at,
+                          installments: (rawAgreement.acordo_parcelas || []).map((ap: any) => ({
+                              id: ap.id,
+                              agreementId: rawAgreement.id,
+                              number: ap.numero,
+                              dueDate: ap.data_vencimento,
+                              amount: Number(ap.valor),
+                              status: ap.status,
+                              paidAmount: Number(ap.valor_pago),
+                              paidDate: ap.data_pagamento
+                          }))
+                      };
+                  }
 
                   return {
                       id: l.id,
@@ -189,7 +225,8 @@ export const useAppState = (activeProfileId: string | null) => {
                       customDocuments: l.policies_snapshot?.customDocuments || [],
                       isArchived: l.is_archived,
                       attachments: [], 
-                      documentPhotos: [] 
+                      documentPhotos: [],
+                      activeAgreement
                   };
               });
               setLoans(mappedLoans);
