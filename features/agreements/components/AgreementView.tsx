@@ -2,8 +2,9 @@
 import React, { useState } from 'react';
 import { Agreement, AgreementInstallment, Loan } from "../../../types";
 import { formatMoney } from "../../../utils/formatters";
-import { Calendar, CheckCircle2, AlertTriangle, XCircle, DollarSign, History } from "lucide-react";
+import { Calendar, CheckCircle2, AlertTriangle, XCircle, DollarSign, History, Scale } from "lucide-react";
 import { agreementService } from "../services/agreementService";
+import { LegalDocumentModal } from "../../legal/components/LegalDocumentModal";
 
 interface AgreementViewProps {
     agreement: Agreement;
@@ -15,6 +16,7 @@ interface AgreementViewProps {
 
 export const AgreementView: React.FC<AgreementViewProps> = ({ agreement, loan, activeUser, onUpdate, onPayment }) => {
     const [isProcessing, setIsProcessing] = useState(false);
+    const [showLegalModal, setShowLegalModal] = useState(false);
 
     const handleBreak = async () => {
         if (!confirm("Deseja realmente quebrar o acordo? A dívida original será restaurada.")) return;
@@ -57,9 +59,14 @@ export const AgreementView: React.FC<AgreementViewProps> = ({ agreement, loan, a
                     </h4>
                     <p className="text-white font-bold text-sm mt-1">{agreement.type.replace('_', ' ')}</p>
                 </div>
-                <button onClick={handleBreak} className="text-[9px] font-bold text-rose-500 hover:text-white hover:bg-rose-500 px-3 py-1.5 rounded-lg border border-rose-500/30 transition-all uppercase">
-                    Quebrar Acordo
-                </button>
+                <div className="flex gap-2">
+                    <button onClick={() => setShowLegalModal(true)} className="text-[9px] font-bold text-indigo-300 hover:text-white hover:bg-indigo-600 px-3 py-1.5 rounded-lg border border-indigo-500/30 transition-all uppercase flex items-center gap-1">
+                        <Scale size={10}/> Jurídico
+                    </button>
+                    <button onClick={handleBreak} className="text-[9px] font-bold text-rose-500 hover:text-white hover:bg-rose-500 px-3 py-1.5 rounded-lg border border-rose-500/30 transition-all uppercase">
+                        Quebrar
+                    </button>
+                </div>
             </div>
 
             <div className="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
@@ -83,6 +90,15 @@ export const AgreementView: React.FC<AgreementViewProps> = ({ agreement, loan, a
                     </div>
                 ))}
             </div>
+
+            {showLegalModal && (
+                <LegalDocumentModal 
+                    agreement={agreement} 
+                    loan={loan} 
+                    activeUser={activeUser}
+                    onClose={() => setShowLegalModal(false)} 
+                />
+            )}
         </div>
     );
 };

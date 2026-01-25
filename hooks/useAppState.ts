@@ -14,7 +14,7 @@ export const useAppState = (activeProfileId: string | null) => {
   const [isLoadingData, setIsLoadingData] = useState(false);
   
   // UI States managed here for persistence/sharing
-  const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'CLIENTS' | 'SOURCES' | 'PROFILE' | 'MASTER'>('DASHBOARD');
+  const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'CLIENTS' | 'SOURCES' | 'PROFILE' | 'MASTER' | 'LEGAL'>('DASHBOARD');
   const [mobileDashboardTab, setMobileDashboardTab] = useState<'CONTRACTS' | 'BALANCE'>('CONTRACTS');
   const [statusFilter, setStatusFilter] = useState<'TODOS' | 'ATRASADOS' | 'EM_DIA' | 'PAGOS' | 'ARQUIVADOS' | 'ATRASO_CRITICO'>('TODOS');
   const [searchTerm, setSearchTerm] = useState('');
@@ -42,7 +42,6 @@ export const useAppState = (activeProfileId: string | null) => {
           
           if (profileError || !profile) {
               console.error("Erro ao carregar perfil:", profileError);
-              // Não definimos activeUser, o AppGate mostrará o erro
               throw new Error("Perfil não encontrado ou acesso negado.");
           }
 
@@ -54,7 +53,14 @@ export const useAppState = (activeProfileId: string | null) => {
                   businessName: profile.nome_empresa,
                   document: profile.document,
                   phone: profile.phone,
+                  
                   address: profile.address,
+                  addressNumber: profile.address_number,
+                  neighborhood: profile.neighborhood,
+                  city: profile.city,
+                  state: profile.state,
+                  zipCode: profile.zip_code,
+
                   pixKey: profile.pix_key,
                   photo: profile.avatar_url,
                   password: profile.senha_acesso,
@@ -63,7 +69,6 @@ export const useAppState = (activeProfileId: string | null) => {
                   totalAvailableCapital: Number(profile.total_available_capital) || 0,
                   interestBalance: Number(profile.interest_balance) || 0,
                   createdAt: profile.created_at,
-                  // New Fields Mapping
                   brandColor: profile.brand_color || '#2563eb',
                   logoUrl: profile.logo_url,
                   defaultInterestRate: Number(profile.default_interest_rate) || 30,
@@ -115,8 +120,29 @@ export const useAppState = (activeProfileId: string | null) => {
                   transacoes (*),
                   sinalizacoes_pagamento (*),
                   acordos_inadimplencia (
-                      *,
-                      acordo_parcelas (*)
+                      id,
+                      loan_id,
+                      profile_id,
+                      status,
+                      tipo,
+                      total_base,
+                      total_negociado,
+                      num_parcelas,
+                      juros_mensal_percent,
+                      periodicidade,
+                      first_due_date,
+                      created_at,
+                      updated_at,
+                      acordo_parcelas (
+                          id,
+                          acordo_id,
+                          numero,
+                          due_date,
+                          amount,
+                          paid_amount,
+                          status,
+                          paid_at
+                      )
                   )
               `)
               .eq('profile_id', profileId);
@@ -166,42 +192,56 @@ export const useAppState = (activeProfileId: string | null) => {
                       reviewNote: s.review_note
                   }));
 
-                  // Map Active Agreement if exists
+                  // Mapeamento Estrito de Acordos
                   let activeAgreement = undefined;
                   if (l.acordos_inadimplencia && l.acordos_inadimplencia.length > 0) {
-                      // Pega o acordo mais recente ou ativo
+                      // Pega o acordo mais recente
                       const rawAgreement = l.acordos_inadimplencia.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
                       
                       activeAgreement = {
                           id: rawAgreement.id,
                           loanId: l.id,
-                          type: rawAgreement.tipo_acordo,
-                          totalDebtAtNegotiation: Number(rawAgreement.total_divida_base),
-                          negotiatedTotal: Number(rawAgreement.total_negociado),
-                          interestRate: Number(rawAgreement.juros_aplicado),
-                          installmentsCount: rawAgreement.qtd_parcelas,
-                          frequency: rawAgreement.periodicidade,
+                          type: rawAgreement.tipo, // DB: tipo
+                          totalDebtAtNegotiation: Number(rawAgreement.total_base), // DB: total_base
+                          negotiatedTotal: Number(rawAgreement.total_negociado), // DB: total_negociado
+                          interestRate: Number(rawAgreement.juros_mensal_percent), // DB: juros_mensal_percent
+                          installmentsCount: Number(rawAgreement.num_parcelas), // DB: num_parcelas
+                          frequency: rawAgreement.periodicidade, // DB: periodicidade
                           startDate: rawAgreement.created_at,
-                          status: rawAgreement.status,
+                          status: rawAgreement.status, // DB: status ('ACTIVE' ou 'ATIVO')
                           createdAt: rawAgreement.created_at,
                           installments: (rawAgreement.acordo_parcelas || []).map((ap: any) => ({
                               id: ap.id,
                               agreementId: rawAgreement.id,
-                              number: ap.numero,
-                              dueDate: ap.data_vencimento,
-                              amount: Number(ap.valor),
+                              number: ap.numero, // DB: numero
+                              dueDate: ap.due_date, // DB: due_date (ESTRITO)
+                              amount: Number(ap.amount), // DB: amount (ESTRITO)
                               status: ap.status,
-                              paidAmount: Number(ap.valor_pago),
-                              paidDate: ap.data_pagamento
+                              paidAmount: Number(ap.paid_amount || 0), // DB: paid_amount (ESTRITO)
+                              paidDate: ap.paid_at // DB: paid_at (ESTRITO)
                           }))
                       };
+                  }
+
+                  // LÓGICA DE FALLBACK ROBUSTO PARA TELEFONE
+                  let phone = l.debtor_phone || l.phone || l.telefone || l.celular;
+                  if ((!phone || String(phone).trim() === '') && l.client_id && clientsData) {
+                      const linkedClient = clientsData.find((c: any) => c.id === l.client_id);
+                      if (linkedClient) {
+                          phone = linkedClient.phone || linkedClient.telefone || linkedClient.celular;
+                      }
+                  }
+                  
+                  // Se ainda assim não existir, aplica o fallback obrigatório '000.000.000-00'
+                  if (!phone || String(phone).trim() === '') {
+                      phone = '000.000.000-00';
                   }
 
                   return {
                       id: l.id,
                       clientId: l.client_id,
                       debtorName: l.debtor_name,
-                      debtorPhone: l.debtor_phone,
+                      debtorPhone: maskPhone(phone), // Aplica máscara no valor garantido
                       debtorDocument: l.debtor_document,
                       debtorAddress: l.debtor_address,
                       sourceId: l.source_id,

@@ -1,6 +1,6 @@
 
-import React, { useState, useMemo } from 'react';
-import { User, Heart, LogOut, RefreshCcw, Camera, Upload, Download, FileSpreadsheet, Palette, Target, Settings2, Image, History, Activity, AlertCircle } from 'lucide-react';
+import React, { useState, useMemo, useRef } from 'react';
+import { User, Heart, LogOut, Camera, Download, History, Activity, AlertCircle, FileUp, Settings, RotateCcw } from 'lucide-react';
 import { UserProfile, Loan, LedgerEntry } from '../types';
 import { maskPhone, formatMoney } from '../utils/formatters';
 import { humanizeAuditLog } from '../utils/auditHelpers';
@@ -31,20 +31,11 @@ interface ProfilePageProps {
 export const ProfilePage: React.FC<ProfilePageProps> = ({ 
   activeUser, setDonateModal, handleLogout, setResetDataModal, handleDeleteAccount,
   profileEditForm, setProfileEditForm, handleSaveProfile, handlePhotoUpload, 
-  handleRestoreBackup, handleExportBackup, handleImportExcel, profilePhotoInputRef, fileInputExcelRef,
-  loans
+  handleExportBackup, profilePhotoInputRef, loans, profileCtrl
 }) => {
-  const [activeSection, setActiveSection] = useState<'PERSONAL' | 'BRAND' | 'DEFAULTS' | 'GOALS' | 'AUDIT'>('PERSONAL');
-
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (file && profileEditForm) {
-          if (file.size > 2 * 1024 * 1024) { alert("A imagem deve ter no máximo 2MB."); return; }
-          const reader = new FileReader();
-          reader.onloadend = () => { setProfileEditForm({ ...profileEditForm, logoUrl: reader.result as string }); };
-          reader.readAsDataURL(file);
-      }
-  };
+  const [activeSection, setActiveSection] = useState<'PERSONAL' | 'BRAND' | 'DEFAULTS' | 'AUDIT'>('PERSONAL');
+  const profileImportRef = useRef<HTMLInputElement>(null);
+  const backupRestoreRef = useRef<HTMLInputElement>(null);
 
   const auditLogs = useMemo(() => {
       if (!loans) return [];
@@ -107,17 +98,17 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                         <User size={16}/> Dados Pessoais
                     </button>
                     <button onClick={() => setActiveSection('BRAND')} className={`p-3 rounded-xl text-xs font-black uppercase transition-all flex items-center gap-3 ${activeSection === 'BRAND' ? 'bg-blue-600 text-white' : 'bg-slate-950 text-slate-400 hover:bg-slate-800'}`}>
-                        <Palette size={16}/> Marca & Identidade
-                    </button>
-                    <button onClick={() => setActiveSection('DEFAULTS')} className={`p-3 rounded-xl text-xs font-black uppercase transition-all flex items-center gap-3 ${activeSection === 'DEFAULTS' ? 'bg-blue-600 text-white' : 'bg-slate-950 text-slate-400 hover:bg-slate-800'}`}>
-                        <Settings2 size={16}/> Padrões de Contrato
-                    </button>
-                    <button onClick={() => setActiveSection('GOALS')} className={`p-3 rounded-xl text-xs font-black uppercase transition-all flex items-center gap-3 ${activeSection === 'GOALS' ? 'bg-blue-600 text-white' : 'bg-slate-950 text-slate-400 hover:bg-slate-800'}`}>
-                        <Target size={16}/> Metas Financeiras
+                        <Settings size={16}/> Preferências
                     </button>
                     <button onClick={() => setActiveSection('AUDIT')} className={`p-3 rounded-xl text-xs font-black uppercase transition-all flex items-center gap-3 ${activeSection === 'AUDIT' ? 'bg-blue-600 text-white' : 'bg-slate-950 text-slate-400 hover:bg-slate-800'}`}>
                         <History size={16}/> Auditoria Completa
                     </button>
+                    
+                    {/* BOTÃO RESTAURAR PLANILHA REPOSICIONADO AQUI */}
+                    <button onClick={() => profileImportRef.current?.click()} className="p-3 rounded-xl text-xs font-black uppercase transition-all flex items-center gap-3 bg-slate-950 text-emerald-500 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/30">
+                        <FileUp size={16}/> Restaurar Planilha
+                    </button>
+                    <input type="file" ref={profileImportRef} onChange={profileCtrl.handleImportProfile} className="hidden" accept=".csv,.xlsx,.xls" />
                 </div>
 
                 <div className="mt-8 space-y-3 pt-6 border-t border-slate-800">
@@ -135,11 +126,36 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                        {activeSection === 'PERSONAL' && (
                            <div className="animate-in slide-in-from-right">
                                <div className="flex flex-col items-center mb-6"><div className="w-24 h-24 rounded-full bg-slate-950 border-2 border-dashed border-slate-700 flex items-center justify-center overflow-hidden relative group cursor-pointer">{profileEditForm.photo ? <img src={profileEditForm.photo} className="w-full h-full object-cover" /> : <Camera className="text-slate-500" />}<input type="file" ref={profilePhotoInputRef} className="absolute inset-0 opacity-0 cursor-pointer" accept="image/*" onChange={handlePhotoUpload} /></div><p className="text-[10px] text-slate-500 uppercase font-bold mt-2">Alterar Foto Pessoal</p></div>
+                               
                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                    <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-500">Nome Operador</label><input type="text" value={profileEditForm.name} onChange={e => setProfileEditForm({...profileEditForm, name: e.target.value})} className="w-full bg-slate-950 p-4 rounded-xl border border-slate-800 text-white outline-none" /></div>
                                    <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-500">Nome Empresa</label><input type="text" value={profileEditForm.businessName} onChange={e => setProfileEditForm({...profileEditForm, businessName: e.target.value})} className="w-full bg-slate-950 p-4 rounded-xl border border-slate-800 text-white outline-none" /></div>
                                    <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-500">CPF / CNPJ</label><input type="text" value={profileEditForm.document} onChange={e => setProfileEditForm({...profileEditForm, document: e.target.value})} className="w-full bg-slate-950 p-4 rounded-xl border border-slate-800 text-white outline-none" /></div>
                                    <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-500">Telefone</label><input type="text" value={profileEditForm.phone} onChange={e => setProfileEditForm({...profileEditForm, phone: maskPhone(e.target.value)})} className="w-full bg-slate-950 p-4 rounded-xl border border-slate-800 text-white outline-none" /></div>
+                               </div>
+
+                               {/* ENDEREÇO JURÍDICO COMPLETO */}
+                               <div className="mt-4 pt-4 border-t border-slate-800">
+                                   <h3 className="text-xs font-bold text-white mb-3 flex items-center gap-2">Endereço Jurídico <span className="text-[9px] text-slate-500 font-normal">(Para documentos)</span></h3>
+                                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                       <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-500">CEP</label><input type="text" value={profileEditForm.zipCode || ''} onChange={e => setProfileEditForm({...profileEditForm, zipCode: e.target.value})} className="w-full bg-slate-950 p-4 rounded-xl border border-slate-800 text-white outline-none" /></div>
+                                       <div className="space-y-2 md:col-span-2"><label className="text-[10px] font-black uppercase text-slate-500">Logradouro (Rua/Av)</label><input type="text" value={profileEditForm.address || ''} onChange={e => setProfileEditForm({...profileEditForm, address: e.target.value})} className="w-full bg-slate-950 p-4 rounded-xl border border-slate-800 text-white outline-none" /></div>
+                                       <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-500">Número</label><input type="text" value={profileEditForm.addressNumber || ''} onChange={e => setProfileEditForm({...profileEditForm, addressNumber: e.target.value})} className="w-full bg-slate-950 p-4 rounded-xl border border-slate-800 text-white outline-none" /></div>
+                                       <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-500">Bairro</label><input type="text" value={profileEditForm.neighborhood || ''} onChange={e => setProfileEditForm({...profileEditForm, neighborhood: e.target.value})} className="w-full bg-slate-950 p-4 rounded-xl border border-slate-800 text-white outline-none" /></div>
+                                       <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-500">Cidade</label><input type="text" value={profileEditForm.city || ''} onChange={e => setProfileEditForm({...profileEditForm, city: e.target.value})} className="w-full bg-slate-950 p-4 rounded-xl border border-slate-800 text-white outline-none" /></div>
+                                       <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-500">Estado (UF)</label><input type="text" value={profileEditForm.state || ''} onChange={e => setProfileEditForm({...profileEditForm, state: e.target.value.toUpperCase()})} className="w-full bg-slate-950 p-4 rounded-xl border border-slate-800 text-white outline-none" maxLength={2} /></div>
+                                   </div>
+                               </div>
+                           </div>
+                       )}
+
+                       {activeSection === 'BRAND' && (
+                           <div className="animate-in slide-in-from-right space-y-4">
+                               <h3 className="text-sm font-bold text-white mb-2">Configurações Padrão de Contrato</h3>
+                               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                   <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-500">Juros Padrão (%)</label><input type="number" value={profileEditForm.defaultInterestRate} onChange={e => setProfileEditForm({...profileEditForm, defaultInterestRate: Number(e.target.value)})} className="w-full bg-slate-950 p-4 rounded-xl border border-slate-800 text-white outline-none" /></div>
+                                   <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-500">Multa Padrão (%)</label><input type="number" value={profileEditForm.defaultFinePercent} onChange={e => setProfileEditForm({...profileEditForm, defaultFinePercent: Number(e.target.value)})} className="w-full bg-slate-950 p-4 rounded-xl border border-slate-800 text-white outline-none" /></div>
+                                   <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-500">Meta Capital (R$)</label><input type="number" value={profileEditForm.targetCapital} onChange={e => setProfileEditForm({...profileEditForm, targetCapital: Number(e.target.value)})} className="w-full bg-slate-950 p-4 rounded-xl border border-slate-800 text-white outline-none" /></div>
                                </div>
                            </div>
                        )}
@@ -160,9 +176,23 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                        )}
 
                        {activeSection !== 'AUDIT' && (
-                           <div className="pt-6 border-t border-slate-800 flex flex-col md:flex-row gap-4">
-                               <button onClick={handleSaveProfile} className="flex-1 py-4 bg-blue-600 text-white rounded-xl font-bold uppercase shadow-lg hover:bg-blue-500 transition-all">Salvar Alterações</button>
-                               <button onClick={handleExportBackup} className="px-6 py-4 bg-slate-800 text-slate-400 rounded-xl font-bold uppercase hover:text-white transition-all flex items-center justify-center gap-2"><Download size={16}/> Backup</button>
+                           <div className="pt-6 border-t border-slate-800 flex flex-col gap-4">
+                               <div className="flex gap-4">
+                                   <button onClick={handleSaveProfile} className="flex-1 py-4 bg-blue-600 text-white rounded-xl font-bold uppercase shadow-lg hover:bg-blue-500 transition-all">Salvar Alterações</button>
+                                   <button onClick={handleExportBackup} className="px-6 py-4 bg-slate-800 text-slate-400 rounded-xl font-bold uppercase hover:text-white transition-all flex items-center justify-center gap-2"><Download size={16}/> Backup</button>
+                               </div>
+                               
+                               <div className="grid grid-cols-1 gap-4">
+                                   {/* RESTAURAR SNAPSHOT (Planilha movida para sidebar) */}
+                                   <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex justify-between items-center">
+                                       <div className="flex flex-col">
+                                           <span className="text-xs font-bold text-white uppercase flex items-center gap-2"><RotateCcw size={14} className="text-amber-500"/> Restaurar Backup</span>
+                                           <span className="text-[10px] text-slate-500">Arquivo JSON</span>
+                                       </div>
+                                       <button onClick={() => backupRestoreRef.current?.click()} className="px-4 py-2 bg-slate-800 text-amber-500 border border-amber-500/20 rounded-xl text-[10px] font-black uppercase hover:bg-amber-500/10 transition-all">Selecionar</button>
+                                       <input type="file" ref={backupRestoreRef} onChange={profileCtrl.handleRestoreBackup} className="hidden" accept=".json" />
+                                   </div>
+                               </div>
                            </div>
                        )}
                    </div>

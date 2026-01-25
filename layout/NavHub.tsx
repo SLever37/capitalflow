@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LayoutGrid, X, User, Calendar, Calculator, ArrowRightLeft, Shield } from 'lucide-react';
+import { LayoutGrid, X, User, Calendar, Calculator, ArrowRightLeft, Shield, Scale } from 'lucide-react';
 
 export const NavHub = ({ onClose, onNavigate, userLevel }: { onClose: () => void, onNavigate: (tab: string, modal?: string) => void, userLevel: number }) => (
     <div className="fixed inset-0 z-[60] bg-slate-950/40 backdrop-blur-xl flex items-center justify-center p-4 animate-in fade-in zoom-in-95 duration-200">
@@ -13,6 +13,10 @@ export const NavHub = ({ onClose, onNavigate, userLevel }: { onClose: () => void
                 <button onClick={() => onNavigate('PROFILE')} className="p-6 bg-slate-900 border border-slate-800 rounded-3xl hover:border-blue-600 transition-all group flex flex-col items-center justify-center gap-3">
                     <div className="p-4 bg-slate-800 rounded-2xl text-blue-500 group-hover:scale-110 transition-transform"><User size={32}/></div>
                     <span className="font-bold text-white uppercase text-xs tracking-widest">Meu Perfil</span>
+                </button>
+                <button onClick={() => onNavigate('LEGAL')} className="p-6 bg-slate-900 border border-slate-800 rounded-3xl hover:border-indigo-600 transition-all group flex flex-col items-center justify-center gap-3">
+                    <div className="p-4 bg-slate-800 rounded-2xl text-indigo-500 group-hover:scale-110 transition-transform"><Scale size={32}/></div>
+                    <span className="font-bold text-white uppercase text-xs tracking-widest">Jurídico</span>
                 </button>
                 <button onClick={() => onNavigate('DASHBOARD', 'AGENDA')} className="p-6 bg-slate-900 border border-slate-800 rounded-3xl hover:border-purple-600 transition-all group flex flex-col items-center justify-center gap-3">
                     <div className="p-4 bg-slate-800 rounded-2xl text-purple-500 group-hover:scale-110 transition-transform"><Calendar size={32}/></div>

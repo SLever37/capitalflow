@@ -6,7 +6,7 @@ import {
   Link as LinkIcon, Upload, CheckCircle2,
   RefreshCcw, Settings, Clock, Calculator, Undo2, Lock, Handshake
 } from 'lucide-react';
-import { Loan, LoanStatus, Installment, CapitalSource, LedgerEntry, Agreement, AgreementInstallment } from '../../types';
+import { Loan, LoanStatus, Installment, CapitalSource, LedgerEntry, Agreement, AgreementInstallment, UserProfile } from '../../types';
 import { getDaysDiff, formatBRDate, parseDateOnlyUTC, todayDateOnlyUTC, addDaysUTC } from '../../utils/dateHelpers';
 import { calculateTotalDue, getInstallmentStatusLogic } from '../../domain/finance/calculations';
 import { formatMoney } from '../../utils/formatters';
@@ -18,6 +18,7 @@ interface LoanCardProps {
   loan: Loan;
   sources: CapitalSource[];
   isExpanded: boolean;
+  activeUser: UserProfile | null; // Added Prop
   onToggleExpand: (e: React.MouseEvent) => void;
   onEdit: (e: React.MouseEvent) => void;
   onMessage: (e: React.MouseEvent) => void;
@@ -34,19 +35,18 @@ interface LoanCardProps {
   onReviewSignal: (signalId: string, status: 'APROVADO' | 'NEGADO') => void;
   onOpenComprovante: (url: string) => void;
   onReverseTransaction: (transaction: LedgerEntry, loan: Loan) => void;
-  onRenegotiate: (loan: Loan) => void; // Novo
-  onAgreementPayment: (loan: Loan, agreement: Agreement, inst: AgreementInstallment) => void; // Novo
-  onRefresh: () => void; // Novo
+  onRenegotiate: (loan: Loan) => void;
+  onAgreementPayment: (loan: Loan, agreement: Agreement, inst: AgreementInstallment) => void;
+  onRefresh: () => void;
   isStealthMode?: boolean;
 }
 
 export const LoanCard: React.FC<LoanCardProps> = ({
-  loan, sources, isExpanded, onToggleExpand, onEdit, onMessage, onArchive,
+  loan, sources, isExpanded, activeUser, onToggleExpand, onEdit, onMessage, onArchive,
   onRestore, onDelete, onNote, onPayment, onPortalLink, onUploadPromissoria,
   onUploadDoc, onViewPromissoria, onViewDoc, onReviewSignal, onOpenComprovante, onReverseTransaction,
   onRenegotiate, onAgreementPayment, onRefresh, isStealthMode
 }) => {
-  // ... (keep existing logic strategies)
   const strategy = modalityRegistry.get(loan.billingCycle);
   const showProgress = strategy.card.showProgress;
 
@@ -61,8 +61,8 @@ export const LoanCard: React.FC<LoanCardProps> = ({
   const totalDebt = loan.installments.reduce((acc, i) => acc + i.principalRemaining + i.interestRemaining, 0);
   const isZeroBalance = totalDebt < 0.10;
 
-  // NEW: Check active agreement
-  const hasActiveAgreement = loan.activeAgreement && loan.activeAgreement.status === 'ACTIVE';
+  // CORREÇÃO: Aceitar status 'ATIVO' (banco) ou 'ACTIVE'
+  const hasActiveAgreement = !!loan.activeAgreement && (loan.activeAgreement.status === 'ACTIVE' || loan.activeAgreement.status === 'ATIVO');
 
   const fixedTermStats = React.useMemo(() => {
       if (!isFixedTerm) return null;
@@ -183,7 +183,6 @@ export const LoanCard: React.FC<LoanCardProps> = ({
       className={`border transition-all duration-300 rounded-[2rem] sm:rounded-[2.5rem] p-5 sm:p-8 hover:shadow-2xl cursor-pointer overflow-hidden active:scale-[0.99] ${cardStyle} ${isExpanded ? 'ring-1 ring-white/10' : ''} ${isCritical && !hasActiveAgreement ? 'animate-pulse ring-1 ring-rose-500' : ''}`}
       onClick={onToggleExpand}
     >
-      {/* HEADER PRINCIPAL ... (Mantém inalterado) */}
       <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
         <div className="flex items-center gap-4 sm:gap-6 w-full">
           <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center font-black text-lg sm:text-xl transition-all flex-shrink-0 ${iconStyle}`}>
@@ -201,7 +200,6 @@ export const LoanCard: React.FC<LoanCardProps> = ({
               <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
                 <Phone size={10} /> {loan.debtorPhone}
               </p>
-              {/* Labels de vencimento normais só aparecem se NÃO tiver acordo ativo */}
               {!hasActiveAgreement && (() => {
                 const nextInst = loan.installments.find(i => i.status !== LoanStatus.PAID) || loan.installments[loan.installments.length - 1];
                 if (!nextInst) return null;
@@ -241,7 +239,6 @@ export const LoanCard: React.FC<LoanCardProps> = ({
         </div>
       </div>
 
-      {/* SUMMARY BAR */}
       <div className="grid grid-cols-3 gap-2 sm:gap-8 pt-6 sm:pt-8 border-t border-white/5 mt-6 sm:mt-8">
         <div className="space-y-1">
           <p className="text-[8px] sm:text-[9px] font-black text-slate-500 uppercase tracking-widest">Principal</p>
@@ -259,7 +256,6 @@ export const LoanCard: React.FC<LoanCardProps> = ({
         </div>
       </div>
 
-      {/* EXPANDED CONTENT */}
       {isExpanded && (
         <div className="mt-8 sm:mt-10 space-y-6 sm:space-y-8 animate-in slide-in-from-top-4 duration-500" onClick={e => e.stopPropagation()}>
           
@@ -274,12 +270,11 @@ export const LoanCard: React.FC<LoanCardProps> = ({
             </div>
           </div>
 
-          {/* VIEW: ACORDO ATIVO ou LISTA NORMAL */}
           {hasActiveAgreement && loan.activeAgreement ? (
               <AgreementView 
                   agreement={loan.activeAgreement} 
                   loan={loan} 
-                  activeUser={null} // Não necessário para view
+                  activeUser={activeUser} // Propagado para permitir modal jurídico
                   onUpdate={onRefresh}
                   onPayment={(inst) => onAgreementPayment(loan, loan.activeAgreement!, inst)}
               />
@@ -365,7 +360,6 @@ export const LoanCard: React.FC<LoanCardProps> = ({
               </button>
             </div>
 
-            {/* BOTÃO RENEGOCIAR (Só aparece se NÃO tiver acordo ativo e NÃO estiver finalizado) */}
             {!loan.isArchived && !isFullyFinalized && !hasActiveAgreement && (
                 <button onClick={() => onRenegotiate(loan)} className="w-full sm:w-auto px-5 py-3 bg-indigo-950/50 text-indigo-400 border border-indigo-500/30 rounded-2xl hover:text-white hover:bg-indigo-600 transition-all flex items-center justify-center gap-2 text-[9px] font-black uppercase">
                     <Handshake size={14}/> Renegociar (Inadimplência)

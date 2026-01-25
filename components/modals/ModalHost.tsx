@@ -9,7 +9,7 @@ import { AgendaModal } from './AgendaModal';
 import { FlowModal } from './FlowModal';
 import { ReceiptModal } from './ReceiptModal';
 import { MessageHubModal } from './MessageHubModal';
-import { Loader2, Search, FileSpreadsheet, Copy, BookUser, CheckSquare, Square, Banknote, ChevronRight } from 'lucide-react';
+import { Loader2, Search, FileSpreadsheet, Copy, BookUser, CheckSquare, Square, Banknote, ChevronRight, Hash, KeyRound } from 'lucide-react';
 import { maskPhone, maskDocument, formatMoney } from '../../utils/formatters';
 import { calculateTotalDue } from '../../domain/finance/calculations';
 
@@ -163,22 +163,44 @@ export const ModalHost: React.FC<ModalHostProps> = (props) => {
                <div className="space-y-3">
                    <div className="grid grid-cols-12 gap-3">
                         <div className="col-span-12">
-                            <input type="text" placeholder="Nome Completo" className="w-full bg-slate-950 p-3 rounded-xl border border-slate-800 text-white outline-none text-sm" value={props.clientForm.name} onChange={e => props.setClientForm({...props.clientForm, name: e.target.value})} />
-                        </div>
-                        <div className="col-span-6 flex gap-1">
-                            <input type="tel" placeholder="Telefone" className="w-full bg-slate-950 p-3 rounded-xl border border-slate-800 text-white outline-none text-sm" value={props.clientForm.phone} onChange={e => props.setClientForm({...props.clientForm, phone: maskPhone(e.target.value)})} />
-                            {canImportContacts && (
-                                <button onClick={props.onPickContact} className="px-3 bg-slate-900 border border-slate-800 rounded-xl text-blue-400 hover:text-white hover:bg-blue-600 transition-all" title="Importar da Agenda"><BookUser size={20}/></button>
-                            )}
+                            <label className="text-[10px] uppercase text-slate-500 font-bold ml-1 mb-1 block">Nome Completo</label>
+                            <input type="text" className="w-full bg-slate-950 p-3 rounded-xl border border-slate-800 text-white outline-none text-sm" value={props.clientForm.name} onChange={e => props.setClientForm({...props.clientForm, name: e.target.value})} />
                         </div>
                         <div className="col-span-6">
-                            <input type="text" placeholder="CPF / CNPJ" className="w-full bg-slate-950 p-3 rounded-xl border border-slate-800 text-white outline-none text-sm" value={props.clientForm.document} onChange={e => props.setClientForm({...props.clientForm, document: maskDocument(e.target.value)})} />
+                            <label className="text-[10px] uppercase text-slate-500 font-bold ml-1 mb-1 block">Telefone</label>
+                            <div className="flex gap-1">
+                                <input type="tel" className="w-full bg-slate-950 p-3 rounded-xl border border-slate-800 text-white outline-none text-sm" value={props.clientForm.phone} onChange={e => props.setClientForm({...props.clientForm, phone: maskPhone(e.target.value)})} />
+                                {canImportContacts && (
+                                    <button onClick={props.onPickContact} className="px-3 bg-slate-900 border border-slate-800 rounded-xl text-blue-400 hover:text-white hover:bg-blue-600 transition-all" title="Importar da Agenda"><BookUser size={20}/></button>
+                                )}
+                            </div>
+                        </div>
+                        <div className="col-span-6">
+                            <label className="text-[10px] uppercase text-slate-500 font-bold ml-1 mb-1 block">CPF / CNPJ</label>
+                            <input type="text" className="w-full bg-slate-950 p-3 rounded-xl border border-slate-800 text-white outline-none text-sm" value={props.clientForm.document} onChange={e => props.setClientForm({...props.clientForm, document: maskDocument(e.target.value)})} />
+                        </div>
+
+                        {/* CAMPOS AUTOMÁTICOS EM DESTAQUE */}
+                        <div className="col-span-6">
+                            <label className="text-[10px] uppercase text-slate-500 font-bold ml-1 mb-1 flex items-center gap-1"><KeyRound size={12}/> Código de Acesso</label>
+                            <div className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-3 text-emerald-500 font-black text-center text-sm tracking-widest select-all">
+                                {props.editingClient ? (props.editingClient as any).access_code : props.clientDraftAccessCode}
+                            </div>
+                        </div>
+                        <div className="col-span-6">
+                            <label className="text-[10px] uppercase text-slate-500 font-bold ml-1 mb-1 flex items-center gap-1"><Hash size={12}/> Nº do Cliente</label>
+                            <div className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-3 text-blue-500 font-black text-center text-sm tracking-widest select-all">
+                                {props.editingClient ? (props.editingClient as any).client_number : props.clientDraftNumber}
+                            </div>
+                        </div>
+
+                        <div className="col-span-12">
+                            <label className="text-[10px] uppercase text-slate-500 font-bold ml-1 mb-1 block">E-mail (Opcional)</label>
+                            <input type="email" className="w-full bg-slate-950 p-3 rounded-xl border border-slate-800 text-white outline-none text-sm" value={props.clientForm.email} onChange={e => props.setClientForm({...props.clientForm, email: e.target.value})} />
                         </div>
                         <div className="col-span-12">
-                            <input type="email" placeholder="E-mail (Opcional)" className="w-full bg-slate-950 p-3 rounded-xl border border-slate-800 text-white outline-none text-sm" value={props.clientForm.email} onChange={e => props.setClientForm({...props.clientForm, email: e.target.value})} />
-                        </div>
-                        <div className="col-span-12">
-                            <input type="text" placeholder="Endereço" className="w-full bg-slate-950 p-3 rounded-xl border border-slate-800 text-white outline-none text-sm" value={props.clientForm.address} onChange={e => props.setClientForm({...props.clientForm, address: e.target.value})} />
+                            <label className="text-[10px] uppercase text-slate-500 font-bold ml-1 mb-1 block">Endereço Completo</label>
+                            <input type="text" className="w-full bg-slate-950 p-3 rounded-xl border border-slate-800 text-white outline-none text-sm" value={props.clientForm.address} onChange={e => props.setClientForm({...props.clientForm, address: e.target.value})} />
                         </div>
                         <div className="col-span-8">
                             <input type="text" placeholder="Cidade" className="w-full bg-slate-950 p-3 rounded-xl border border-slate-800 text-white outline-none text-sm" value={props.clientForm.city} onChange={e => props.setClientForm({...props.clientForm, city: e.target.value})} />
@@ -188,7 +210,6 @@ export const ModalHost: React.FC<ModalHostProps> = (props) => {
                         </div>
                    </div>
                    <textarea placeholder="Anotações internas..." className="w-full bg-slate-950 p-3 rounded-xl border border-slate-800 text-white outline-none h-20 text-sm resize-none" value={props.clientForm.notes} onChange={e => props.setClientForm({...props.clientForm, notes: e.target.value})} />
-                   <div className="flex justify-between items-center text-xs text-slate-500 px-2"><span>Código Acesso: <b className="text-white">{props.editingClient ? (props.editingClient as any).access_code : props.clientDraftAccessCode}</b></span><span>Nº Cliente: <b className="text-white">{props.editingClient ? (props.editingClient as any).client_number : props.clientDraftNumber}</b></span></div>
                    <button onClick={props.onSaveClient} className="w-full py-4 bg-blue-600 text-white font-bold rounded-xl uppercase shadow-lg flex items-center justify-center gap-2 text-sm">{props.isSaving ? <Loader2 className="animate-spin"/> : 'Salvar Cliente'}</button>
                </div>
            </Modal>

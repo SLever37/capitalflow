@@ -105,7 +105,7 @@ export type LoanBillingModality = 'MONTHLY' | 'DAILY_FREE' | 'DAILY_FIXED_TERM';
 
 // --- AGREEMENT TYPES ---
 export type AgreementType = 'PARCELADO_SEM_JUROS' | 'PARCELADO_COM_JUROS';
-export type AgreementStatus = 'ACTIVE' | 'PAID' | 'BROKEN';
+export type AgreementStatus = 'ACTIVE' | 'ATIVO' | 'PAID' | 'BROKEN';
 
 export interface AgreementInstallment {
     id: string;
@@ -131,6 +131,48 @@ export interface Agreement {
     status: AgreementStatus;
     createdAt: string;
     installments: AgreementInstallment[];
+}
+
+// --- LEGAL TYPES (Módulo Jurídico) ---
+export interface LegalDocumentParams {
+    debtorName: string;
+    debtorDoc: string;
+    debtorPhone?: string; // Novo Campo
+    debtorAddress: string;
+    creditorName: string;
+    creditorDoc: string;
+    creditorAddress?: string;
+    totalDebt: number;
+    originDescription: string; // Origem da dívida (ex: Contrato nº X)
+    installments: AgreementInstallment[];
+    contractDate: string;
+    agreementDate: string;
+    city: string;
+    // Snapshot Integrity
+    documentHash?: string;
+    documentId?: string;
+    timestamp?: string;
+}
+
+export interface LegalSignatureMetadata {
+    ip: string;
+    user_agent: string;
+    signed_at: string;
+    method: 'ASSINATURA_ELETRONICA' | 'ICP_BRASIL' | 'MANUAL_REGISTER';
+    lei_base: string;
+    signer_name?: string;
+    signer_doc?: string;
+}
+
+export interface LegalDocumentRecord {
+    id: string;
+    agreementId: string;
+    type: 'CONFISSAO' | 'PROMISSORIA';
+    snapshot: LegalDocumentParams;
+    hashSHA256: string;
+    status: 'PENDING' | 'SIGNED';
+    signatureMetadata?: LegalSignatureMetadata;
+    createdAt: string;
 }
 
 export interface Loan {

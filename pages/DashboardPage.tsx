@@ -85,6 +85,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                       key={loan.id}
                       loan={loan}
                       sources={sources}
+                      activeUser={activeUser}
                       isExpanded={selectedLoanId === loan.id}
                       onToggleExpand={() => setSelectedLoanId(selectedLoanId === loan.id ? null : loan.id)}
                       onEdit={(e) => { e.stopPropagation(); onEdit(loan); }}

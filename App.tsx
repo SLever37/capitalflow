@@ -18,6 +18,7 @@ import { ClientsContainer } from './containers/ClientsContainer';
 import { SourcesContainer } from './containers/SourcesContainer';
 import { ProfileContainer } from './containers/ProfileContainer';
 import { MasterContainer } from './containers/MasterContainer';
+import { LegalContainer } from './containers/LegalContainer'; // NOVO IMPORT
 import { ModalHostContainer } from './containers/ModalHostContainer';
 
 export const App: React.FC = () => {
@@ -140,6 +141,15 @@ export const App: React.FC = () => {
                 ui={ui} profileCtrl={profileCtrl} handleLogout={handleLogout} showToast={showToast}
                 profileEditForm={profileEditForm} setProfileEditForm={setProfileEditForm}
                 fileCtrl={fileCtrl}
+            />
+        )}
+
+        {/* NOVA ROTA JURÍDICA */}
+        {activeTab === 'LEGAL' && (
+            <LegalContainer 
+                loans={loans} sources={sources} activeUser={activeUser}
+                ui={ui} loanCtrl={loanCtrl} fileCtrl={fileCtrl} showToast={showToast}
+                onRefresh={() => fetchFullData(activeUser?.id || '')}
             />
         )}
 

@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { ShieldCheck, ExternalLink, Printer, FileText, Upload, RefreshCw, KeyRound, UserCheck, AlertCircle, Handshake } from 'lucide-react';
 import { openSystemPromissoriaPrint } from '../../utils/printHelpers';
 import { portalService, PortalSession } from '../../services/portal.service';
+import { supabase } from '../../lib/supabase';
 
 export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) => {
     const [isLoading, setIsLoading] = useState(true);
@@ -67,12 +68,34 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
         setIsLoading(true);
         setPortalError(null);
         try {
+            // 1. Contrato Base
             const data = await portalService.fetchLoanData(loanId, clientId);
             setLoan(data.loan);
             setPixKey(data.pixKey);
-            setInstallments(data.installments);
             setPortalSignals(data.signals);
-            setIsAgreementActive(data.isAgreementActive);
+            
+            // 2. Acordo Ativo (Verificação Robusta)
+            const { data: activeAgreement } = await supabase
+                .from('acordos_inadimplencia')
+                .select('*, acordo_parcelas(*)')
+                .eq('loan_id', loanId)
+                .in('status', ['ACTIVE', 'ATIVO']) // Aceita ambos
+                .maybeSingle();
+
+            if (activeAgreement) {
+                setIsAgreementActive(true);
+                setInstallments(activeAgreement.acordo_parcelas.map((ap: any) => ({
+                    data_vencimento: ap.due_date, // Mapeamento correto
+                    valor_parcela: ap.amount, // Mapeamento correto
+                    numero_parcela: ap.numero,
+                    status: ap.status,
+                    isAgreement: true
+                })).sort((a: any, b: any) => new Date(a.data_vencimento).getTime() - new Date(b.data_vencimento).getTime()));
+            } else {
+                // Sem acordo, usa parcelas originais
+                setIsAgreementActive(false);
+                setInstallments(data.installments);
+            }
             
             if (data.loan.profile_id) {
                 const list = await portalService.fetchClientLoansList(clientId, data.loan.profile_id);
