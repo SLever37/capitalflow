@@ -1,0 +1,242 @@
+
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Loan, LoanBillingModality, Client, CapitalSource, UserProfile, LoanDocument } from '@/types';
+import { maskPhone, maskDocument, normalizeBrazilianPhone } from '@/utils/formatters';
+import { generateUUID } from '@/utils/generators';
+import { supabase } from '@/lib/supabase';
+import { validateLoanForm } from '../domain/loanForm.validators';
+import { mapFormToLoan, LoanFormState } from '../domain/loanForm.mapper';
+import { calculateAutoDueDate } from '../domain/loanForm.preview';
+import { getInitialFormState } from './loanForm.defaults';
+
+interface UseLoanFormProps {
+  initialData?: Loan | null;
+  clients: Client[];
+  sources: CapitalSource[];
+  userProfile?: UserProfile | null;
+  onAdd: (loan: Loan) => void;
+  onCancel: () => void;
+}
+
+export const useLoanForm = ({ initialData, clients, sources, userProfile, onAdd, onCancel }: UseLoanFormProps) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [fixedDuration, setFixedDuration] = useState('30');
+  const [skipWeekends, setSkipWeekends] = useState(false);
+  
+  const [formData, setFormData] = useState<LoanFormState>(() => getInitialFormState(sources[0]?.id));
+
+  const [attachments, setAttachments] = useState<string[]>([]);
+  const [documentPhotos, setDocumentPhotos] = useState<string[]>([]);
+  const [customDocuments, setCustomDocuments] = useState<LoanDocument[]>([]);
+  const [showCamera, setShowCamera] = useState<{ active: boolean, type: 'guarantee' | 'document' }>({ active: false, type: 'guarantee' });
+  
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Derived State
+  const autoDueDate = useMemo(() => 
+    calculateAutoDueDate(formData.startDate, formData.billingCycle, fixedDuration), 
+  [formData.startDate, formData.billingCycle, fixedDuration]);
+
+  const isDailyModality = formData.billingCycle !== 'MONTHLY';
+
+  // Initialization
+  useEffect(() => {
+    if (initialData) {
+      setFormData({
+        clientId: initialData.clientId,
+        debtorName: initialData.debtorName,
+        debtorPhone: maskPhone(initialData.debtorPhone || ''),
+        debtorDocument: maskDocument(initialData.debtorDocument || ''),
+        debtorAddress: initialData.debtorAddress || '',
+        sourceId: initialData.sourceId,
+        preferredPaymentMethod: initialData.preferredPaymentMethod || 'PIX',
+        pixKey: initialData.pixKey || '',
+        principal: initialData.principal.toString(),
+        interestRate: initialData.interestRate.toString(),
+        finePercent: (initialData.finePercent || 2).toString(),
+        dailyInterestPercent: (initialData.dailyInterestPercent || 1).toString(),
+        billingCycle: initialData.billingCycle || 'MONTHLY',
+        notes: initialData.notes,
+        guaranteeDescription: initialData.guaranteeDescription || '',
+        startDate: initialData.startDate.includes('T') ? initialData.startDate.split('T')[0] : initialData.startDate
+      });
+      setFixedDuration('30');
+      setSkipWeekends(initialData.skipWeekends || false);
+      setAttachments(initialData.attachments || []);
+      setDocumentPhotos(initialData.documentPhotos || []);
+      setCustomDocuments(initialData.customDocuments || []);
+    } else {
+        setFormData(prev => ({ 
+            ...prev, 
+            pixKey: userProfile?.pixKey || '',
+            interestRate: userProfile?.defaultInterestRate ? String(userProfile.defaultInterestRate) : '30',
+            finePercent: userProfile?.defaultFinePercent ? String(userProfile.defaultFinePercent) : '2',
+            dailyInterestPercent: userProfile?.defaultDailyInterestPercent ? String(userProfile.defaultDailyInterestPercent) : '1',
+        }));
+    }
+  }, [initialData, userProfile]);
+
+  // CORREÇÃO: Cleanup de URLs blob criadas para preview em modo Demo
+  useEffect(() => {
+      return () => {
+          customDocuments.forEach(doc => {
+              if (doc.url.startsWith('blob:')) URL.revokeObjectURL(doc.url);
+          });
+      };
+  }, [customDocuments]);
+
+  // Handlers
+  const handleClientSelect = (id: string) => {
+    if (!id) { setFormData({ ...formData, clientId: '' }); return; }
+    const client = clients.find(c => c.id === id);
+    if (client) {
+      setFormData({
+        ...formData,
+        clientId: client.id,
+        debtorName: client.name,
+        debtorPhone: maskPhone(client.phone),
+        debtorDocument: maskDocument(client.document),
+        debtorAddress: client.address || ''
+      });
+    }
+  };
+
+  const startCamera = async (type: 'guarantee' | 'document') => {
+    setShowCamera({ active: true, type });
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      if (videoRef.current) videoRef.current.srcObject = stream;
+    } catch (err: any) {
+      console.error("Camera Error:", err);
+      let errorMsg = "Erro ao acessar a câmera.";
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') errorMsg = "Permissão da câmera negada.";
+      else if (err.name === 'NotFoundError') errorMsg = "Nenhuma câmera encontrada.";
+      alert(errorMsg);
+      setShowCamera({ active: false, type });
+    }
+  };
+
+  const takePhoto = () => {
+    if (videoRef.current) {
+      const canvas = document.createElement('canvas');
+      canvas.width = videoRef.current.videoWidth;
+      canvas.height = videoRef.current.videoHeight;
+      canvas.getContext('2d')?.drawImage(videoRef.current, 0, 0);
+      const photo = canvas.toDataURL('image/jpeg');
+      if (showCamera.type === 'guarantee') setAttachments([...attachments, photo]);
+      else setDocumentPhotos([...documentPhotos, photo]);
+    }
+  };
+
+  const stopCamera = () => {
+    const stream = videoRef.current?.srcObject as MediaStream;
+    stream?.getTracks().forEach(t => t.stop());
+    setShowCamera({ ...showCamera, active: false });
+  };
+
+  const handlePickContact = async () => {
+    if ('contacts' in navigator && 'ContactsManager' in window) {
+      try {
+        const props = ['name', 'tel'];
+        const opts = { multiple: false };
+        const contacts = await (navigator as any).contacts.select(props, opts);
+        if (contacts.length) {
+          const contact = contacts[0];
+          const name = contact.name && contact.name.length > 0 ? contact.name[0] : '';
+          let number = contact.tel && contact.tel.length > 0 ? contact.tel[0] : '';
+          
+          // Uso da normalização inteligente
+          const normalizedPhone = normalizeBrazilianPhone(number);
+          
+          setFormData((prev) => ({ ...prev, debtorName: name || prev.debtorName, debtorPhone: normalizedPhone }));
+        }
+      } catch (ex) {}
+    } else { alert("Importação de contatos disponível apenas em dispositivos Android via Chrome."); }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files && e.target.files[0]) {
+          const file = e.target.files[0];
+          const fileType = file.type.includes('pdf') ? 'PDF' : 'IMAGE';
+          setIsUploading(true);
+          try {
+              let publicUrl = '';
+              if (userProfile?.id === 'DEMO') {
+                  publicUrl = URL.createObjectURL(file);
+              } else {
+                  const ext = file.name.split('.').pop() || 'bin';
+                  const path = `${userProfile?.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
+                  const { error: uploadError } = await supabase.storage.from('documentos').upload(path, file);
+                  if (uploadError) throw uploadError;
+                  const { data } = supabase.storage.from('documentos').getPublicUrl(path);
+                  publicUrl = data.publicUrl;
+              }
+              const newDoc: LoanDocument = { id: generateUUID(), url: publicUrl, name: file.name, type: fileType as any, visibleToClient: false, uploadedAt: new Date().toISOString() };
+              setCustomDocuments([...customDocuments, newDoc]);
+          } catch (err: any) { alert("Erro ao enviar arquivo: " + err.message); } finally { setIsUploading(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
+      }
+  };
+
+  const toggleDocVisibility = (docId: string) => setCustomDocuments(docs => docs.map(d => d.id === docId ? { ...d, visibleToClient: !d.visibleToClient } : d));
+  
+  const removeDoc = (docId: string) => { 
+      if(confirm('Remover este documento?')) {
+          const target = customDocuments.find(d => d.id === docId);
+          if (target && target.url.startsWith('blob:')) URL.revokeObjectURL(target.url);
+          setCustomDocuments(docs => docs.filter(d => d.id !== docId));
+      }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const { isValid, error } = validateLoanForm(formData, sources, !!initialData);
+    
+    if (!isValid) {
+        alert(error);
+        return;
+    }
+
+    if (formData.sourceId && !initialData) {
+        const selectedSource = sources.find(s => s.id === formData.sourceId);
+        if (selectedSource && parseFloat(formData.principal) > selectedSource.balance) {
+            if(!window.confirm(`AVISO: A fonte ${selectedSource.name} tem saldo de R$ ${selectedSource.balance.toLocaleString()}. O saldo ficará negativo. Deseja continuar?`)) return;
+        }
+    }
+
+    setIsSubmitting(true);
+    try {
+        const loanPayload = mapFormToLoan(
+            formData, 
+            fixedDuration, 
+            initialData || null, 
+            attachments, 
+            documentPhotos, 
+            customDocuments
+        );
+        loanPayload.skipWeekends = skipWeekends;
+        
+        await onAdd(loanPayload);
+    } catch (err: any) {
+        console.error("Erro interno no formulário:", err);
+        alert("Ocorreu um erro ao processar o contrato. Verifique o console.");
+    } finally {
+        setIsSubmitting(false);
+    }
+  };
+
+  return {
+    formData, setFormData,
+    fixedDuration, setFixedDuration,
+    skipWeekends, setSkipWeekends,
+    isSubmitting, isUploading,
+    attachments, documentPhotos, customDocuments,
+    showCamera, videoRef, fileInputRef,
+    autoDueDate, isDailyModality,
+    startCamera, takePhoto, stopCamera,
+    handleClientSelect, handlePickContact,
+    handleFileUpload, toggleDocVisibility, removeDoc,
+    handleSubmit
+  };
+};

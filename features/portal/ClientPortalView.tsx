@@ -1,0 +1,342 @@
+
+import React, { useState, useEffect } from 'react';
+import { ShieldCheck, ExternalLink, Printer, FileText, Upload, RefreshCw, KeyRound, UserCheck, AlertCircle } from 'lucide-react';
+import { openSystemPromissoriaPrint } from '../../utils/printHelpers';
+import { portalService, PortalSession } from '../../services/portal.service';
+
+export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) => {
+    const [isLoading, setIsLoading] = useState(true);
+    const [portalError, setPortalError] = useState<string | null>(null);
+    const [portalInfo, setPortalInfo] = useState<string | null>(null);
+
+    // Login Form State
+    const [loginIdentifier, setLoginIdentifier] = useState('');
+    const [loginCode, setLoginCode] = useState('');
+    
+    // Authenticated State
+    const [loggedClient, setLoggedClient] = useState<{ id: string; name: string; phone?: string; cpf?: string; client_number?: string; document?: string; access_code?: string } | null>(null);
+    const [byeName, setByeName] = useState<string | null>(null);
+    
+    // Data State
+    const [selectedLoanId, setSelectedLoanId] = useState<string>(initialLoanId);
+    const [loan, setLoan] = useState<any | null>(null);
+    const [pixKey, setPixKey] = useState<string>('');
+    const [installments, setInstallments] = useState<any[]>([]);
+    const [portalSignals, setPortalSignals] = useState<any[]>([]);
+    const [clientLoans, setClientLoans] = useState<any[]>([]);
+
+    // Action State
+    const [intentId, setIntentId] = useState<string | null>(null);
+    const [intentType, setIntentType] = useState<string | null>(null);
+    const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
+    const [isNoteOpen, setIsNoteOpen] = useState(false);
+
+    const PORTAL_SESSION_KEY = 'cm_portal_session';
+
+    useEffect(() => {
+        const checkSession = async () => {
+            try {
+                const raw = localStorage.getItem(PORTAL_SESSION_KEY);
+                if (!raw) { setIsLoading(false); return; }
+                const sess = JSON.parse(raw) as PortalSession;
+                if (!sess.client_id || !sess.access_code) throw new Error("Sessão inválida");
+                const clientData = await portalService.validateSession(sess.client_id, sess.access_code);
+                if (clientData) {
+                    setLoggedClient(clientData);
+                    if (sess.last_loan_id) setSelectedLoanId(sess.last_loan_id);
+                } else {
+                    localStorage.removeItem(PORTAL_SESSION_KEY);
+                }
+            } catch (e) {
+                localStorage.removeItem(PORTAL_SESSION_KEY);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        checkSession();
+    }, []);
+
+    useEffect(() => {
+        if (selectedLoanId && loggedClient) {
+            loadFullPortalData(selectedLoanId, loggedClient.id);
+        }
+    }, [selectedLoanId, loggedClient]);
+
+    const loadFullPortalData = async (loanId: string, clientId: string) => {
+        setIsLoading(true);
+        setPortalError(null);
+        try {
+            const data = await portalService.fetchLoanData(loanId, clientId);
+            setLoan(data.loan);
+            setPixKey(data.pixKey);
+            setInstallments(data.installments);
+            setPortalSignals(data.signals);
+            if (data.loan.profile_id) {
+                const list = await portalService.fetchClientLoansList(clientId, data.loan.profile_id);
+                setClientLoans(list);
+            }
+        } catch (e: any) {
+            setPortalError('Não foi possível carregar os dados do contrato.');
+            console.error(e);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleLogin = async () => {
+        if (!loginIdentifier || !loginCode) {
+            setPortalError("Preencha todos os campos para entrar.");
+            return;
+        }
+        setPortalError(null);
+        setIsLoading(true);
+        try {
+            const client = await portalService.authenticate(selectedLoanId, loginIdentifier, loginCode);
+            setLoggedClient(client);
+            setByeName(null);
+            const session: PortalSession = {
+                client_id: client.id,
+                access_code: loginCode,
+                identifier: loginIdentifier,
+                last_loan_id: selectedLoanId,
+                saved_at: new Date().toISOString()
+            };
+            localStorage.setItem(PORTAL_SESSION_KEY, JSON.stringify(session));
+        } catch (e: any) {
+            setPortalError(e.message);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleLogout = () => {
+        localStorage.removeItem(PORTAL_SESSION_KEY);
+        setByeName(loggedClient?.name || 'Cliente');
+        setLoggedClient(null);
+        setPortalError(null);
+        setPortalInfo(null);
+        setLoginIdentifier('');
+        setLoginCode('');
+        setSelectedLoanId(initialLoanId);
+        setLoan(null);
+        setInstallments([]);
+    };
+
+    const handleSignalIntent = async (tipo: string) => {
+        if (!loggedClient || !loan) return;
+        setPortalError(null);
+        setIntentType(tipo);
+        if (tipo === 'PAGAR_PIX') {
+            if (pixKey) navigator.clipboard.writeText(pixKey).then(() => setPortalInfo('PIX copiado!')).catch(() => setPortalInfo('PIX disponível.'));
+            else setPortalInfo('Chave PIX não cadastrada.');
+        } else {
+            setPortalInfo('Solicitação enviada.');
+        }
+        try {
+            const id = await portalService.submitPaymentIntent(loggedClient.id, selectedLoanId, loan.profile_id, tipo);
+            setIntentId(id);
+            setReceiptPreview(null);
+        } catch (e: any) {
+            setPortalError('Erro ao registrar solicitação: ' + e.message);
+        }
+    };
+
+    const handleReceiptUpload = async (file: File) => {
+        if (!intentId || !loggedClient || !loan) { setPortalError('Erro: Solicitação não encontrada.'); return; }
+        try {
+            setReceiptPreview(URL.createObjectURL(file));
+            await portalService.uploadReceipt(file, intentId, loan.profile_id, loggedClient.id);
+            setPortalInfo('Comprovante enviado com sucesso!');
+        } catch (e: any) { setPortalError('Falha no envio: ' + e.message); }
+    };
+
+    if (isLoading && !loan) {
+        return (
+            <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+                <div className="bg-slate-900 p-8 rounded-3xl border border-slate-800 text-center max-w-md w-full shadow-2xl">
+                    <RefreshCw className="w-10 h-10 text-blue-500 animate-spin mx-auto mb-4" />
+                    <h1 className="text-xl font-black text-white uppercase mb-2">Portal do Cliente</h1>
+                    <p className="text-slate-400 text-sm">Validando sua segurança...</p>
+                </div>
+            </div>
+        );
+    }
+
+    const visibleDocuments = (loan?.policies_snapshot?.customDocuments || []).filter((d: any) => d.visibleToClient);
+
+    return (
+        <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-[2.5rem] w-full max-w-md shadow-2xl relative overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
+                <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-emerald-600"></div>
+                
+                <div className="p-8 pb-4 text-center">
+                    <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600/10 text-blue-500 rounded-2xl mb-4">
+                        <ShieldCheck size={40} />
+                    </div>
+                    <h1 className="text-2xl font-black text-white uppercase tracking-tighter mb-1">Portal do Cliente</h1>
+                    <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest">Acesso Restrito ao Contrato</p>
+                </div>
+
+                {portalError && (
+                    <div className="mx-8 mb-4 bg-rose-500/10 border border-rose-500/20 p-4 rounded-2xl flex items-start gap-3 animate-in shake duration-300">
+                        <AlertCircle className="text-rose-500 flex-shrink-0" size={18}/>
+                        <p className="text-rose-200 text-xs font-bold leading-tight">{portalError}</p>
+                    </div>
+                )}
+
+                {byeName && (
+                    <div className="mx-8 mb-4 bg-slate-800/50 border border-slate-700 p-3 rounded-xl text-center">
+                        <p className="text-white text-xs font-medium">Sessão encerrada para <span className="font-bold">{byeName}</span>.</p>
+                    </div>
+                )}
+
+                {!loggedClient ? (
+                    <div className="px-8 pb-10 space-y-6">
+                        <div className="space-y-4">
+                            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 focus-within:border-blue-500 transition-all">
+                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                    <UserCheck size={12}/> CPF, CNPJ ou Telefone
+                                </label>
+                                <input 
+                                    value={loginIdentifier} 
+                                    onChange={e => setLoginIdentifier(e.target.value)} 
+                                    className="w-full bg-transparent text-white text-sm font-bold outline-none placeholder:text-slate-700" 
+                                    placeholder="Ex: 000.000.000-00" 
+                                />
+                            </div>
+                            
+                            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 focus-within:border-blue-500 transition-all">
+                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                    <KeyRound size={12}/> Código de Acesso (4 dígitos)
+                                </label>
+                                <input 
+                                    value={loginCode} 
+                                    onChange={e => setLoginCode(e.target.value)} 
+                                    className="w-full bg-transparent text-white text-lg font-black tracking-[0.5em] outline-none placeholder:text-slate-700" 
+                                    placeholder="****" 
+                                    inputMode="numeric" 
+                                    maxLength={4} 
+                                />
+                            </div>
+                        </div>
+
+                        <button 
+                            onClick={handleLogin} 
+                            disabled={isLoading} 
+                            className="w-full py-5 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-black uppercase text-xs shadow-lg shadow-blue-600/20 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3"
+                        >
+                            {isLoading ? <RefreshCw className="animate-spin" size={18}/> : <>Acessar Minha Conta <ExternalLink size={16}/></>}
+                        </button>
+                        
+                        <p className="text-center text-[9px] text-slate-600 font-bold uppercase tracking-wider">
+                            Segurança CapitalFlow • Ref: {selectedLoanId.slice(0, 8)}
+                        </p>
+                    </div>
+                ) : (
+                    <div className="px-8 pb-10 space-y-6">
+                        <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 text-left relative overflow-hidden">
+                            <div className="absolute top-0 right-0 p-4 opacity-5"><ShieldCheck size={60}/></div>
+                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Bem-vindo(a),</p>
+                            <p className="text-white font-black text-lg truncate leading-tight mb-3">{loggedClient.name}</p>
+                            <div className="flex justify-between items-center text-[9px] text-slate-500 font-black uppercase border-t border-slate-800/50 pt-3">
+                                <span>ID: <strong className="text-blue-500">{loggedClient.client_number || '-'}</strong></span>
+                                <span>Código: <strong className="text-emerald-500">****</strong></span>
+                            </div>
+                            
+                            {portalSignals.length > 0 && (
+                                <div className="mt-4 p-3 rounded-xl bg-blue-600/10 border border-blue-500/20">
+                                    <p className="text-[9px] text-blue-400 font-black uppercase mb-1">Última Solicitação</p>
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-xs text-white font-bold">{portalSignals[0].status}</span>
+                                        <span className="text-[10px] text-slate-500">{new Date(portalSignals[0].created_at).toLocaleDateString()}</span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* EXTRATO SIMPLIFICADO */}
+                        <div className="bg-slate-950/50 p-4 rounded-2xl border border-slate-800 max-h-48 overflow-y-auto custom-scrollbar">
+                            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-3">Extrato do Contrato</p>
+                            <div className="space-y-2">
+                                {(installments || []).map((p, idx) => (
+                                    <div key={idx} className="flex justify-between items-center text-xs py-2 border-b border-slate-800/50 last:border-0">
+                                        <div className="flex flex-col">
+                                            <span className="text-slate-400 font-bold">{idx + 1}ª Parcela</span>
+                                            <span className="text-[9px] text-slate-500">Venc. {new Date(p.data_vencimento).toLocaleDateString()}</span>
+                                        </div>
+                                        <span className={p.status === 'PAID' ? 'text-emerald-500 font-black' : 'text-white font-black'}>R$ {p.valor_parcela.toFixed(2)}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-3">
+                            <button onClick={() => handleSignalIntent('PAGAR_PIX')} className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black uppercase text-xs transition-all shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2">
+                                Enviar Comprovante (PIX)
+                            </button>
+                            <button onClick={() => handleSignalIntent('RENEGOCIAR')} className="w-full py-4 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl font-black uppercase text-xs transition-all flex items-center justify-center gap-2">
+                                <RefreshCw size={14}/> Solicitar Renegociação
+                            </button>
+                        </div>
+
+                        {/* ÁREA DE UPLOAD E INFO */}
+                        {intentId && (
+                            <div className="bg-slate-950 border border-blue-500/30 rounded-2xl p-5 text-left animate-in slide-in-from-top-2">
+                                <p className="text-[10px] text-blue-400 mb-2 font-black uppercase tracking-widest">{intentType === 'PAGAR_PIX' ? 'Pagamento PIX' : 'Solicitação Ativa'}</p>
+                                {portalInfo && <p className="text-xs text-emerald-400 mb-4 font-bold bg-emerald-950/30 p-3 rounded-xl border border-emerald-500/20">{portalInfo}</p>}
+                                
+                                <div className="mt-2 pt-3 border-t border-slate-800">
+                                    <label className="block text-[10px] text-slate-500 uppercase font-black mb-2 flex items-center gap-2">
+                                        <Upload size={14} className="text-blue-500"/> Selecionar Comprovante
+                                    </label>
+                                    <input 
+                                        type="file" 
+                                        accept="image/*,application/pdf" 
+                                        className="text-xs text-slate-300 w-full file:bg-slate-800 file:border-none file:text-white file:px-4 file:py-2 file:rounded-lg file:mr-4 file:font-black file:uppercase file:text-[9px] cursor-pointer" 
+                                        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleReceiptUpload(f); }} 
+                                    />
+                                    {receiptPreview && <p className="text-[10px] text-emerald-500 mt-3 font-bold flex items-center gap-1"><ShieldCheck size={12}/> Arquivo pronto para envio.</p>}
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="flex flex-col gap-2">
+                            <button onClick={() => setIsNoteOpen(true)} className="w-full py-4 bg-slate-800/50 hover:bg-slate-800 text-slate-300 rounded-2xl font-black uppercase text-[10px] transition-all flex items-center justify-center gap-2">
+                                <FileText size={14}/> Meus Documentos
+                            </button>
+                            <button onClick={handleLogout} className="w-full py-3 text-slate-600 hover:text-rose-500 font-black uppercase text-[9px] transition-all">Sair do Portal</button>
+                        </div>
+
+                        {isNoteOpen && (
+                            <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-6 z-50 animate-in fade-in duration-200">
+                                <div className="bg-slate-900 p-8 rounded-[2.5rem] border border-slate-800 max-w-md w-full shadow-2xl">
+                                    <div className="flex justify-between items-center mb-8">
+                                        <h2 className="text-white font-black uppercase text-sm tracking-widest flex items-center gap-2">
+                                            <FileText className="text-blue-500"/> Documentos
+                                        </h2>
+                                        <button onClick={() => setIsNoteOpen(false)} className="bg-slate-800 p-2 rounded-full text-slate-400 hover:text-white"><RefreshCw size={20} className="rotate-45"/></button>
+                                    </div>
+                                    <div className="space-y-3">
+                                        {visibleDocuments.length === 0 ? (
+                                            <p className="text-slate-600 text-xs italic text-center py-6">Nenhum documento compartilhado pelo operador.</p>
+                                        ) : (
+                                            visibleDocuments.map((doc: any) => (
+                                                <a key={doc.id} href={doc.url} target="_blank" className="block p-4 rounded-2xl bg-slate-950 border border-slate-800 text-xs text-white font-bold hover:border-blue-500 transition-all flex items-center justify-between group">
+                                                    {doc.name}
+                                                    <ExternalLink size={14} className="text-slate-600 group-hover:text-blue-500"/>
+                                                </a>
+                                            ))
+                                        )}
+                                        <button onClick={() => openSystemPromissoriaPrint({ clientName: loggedClient.name, loanId: selectedLoanId, principal: Number(loan?.principal), interestRate: loan?.interest_rate })} className="flex items-center justify-center gap-3 w-full py-4 bg-slate-950 text-blue-500 border border-blue-500/20 rounded-2xl mt-4 text-[10px] font-black uppercase hover:bg-blue-600 hover:text-white transition-all">
+                                            <Printer size={16}/> Imprimir Promissória
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};

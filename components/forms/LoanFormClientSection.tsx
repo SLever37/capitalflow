@@ -1,0 +1,35 @@
+
+import React from 'react';
+import { Users, Search } from 'lucide-react';
+import { Client } from '../../types';
+import { maskPhone, maskDocument } from '../../utils/formatters';
+
+interface LoanFormClientSectionProps {
+  clients: Client[];
+  formData: any;
+  setFormData: any;
+  handleClientSelect: (id: string) => void;
+  handlePickContact: () => void;
+}
+
+export const LoanFormClientSection: React.FC<LoanFormClientSectionProps> = ({
+  clients, formData, setFormData, handleClientSelect, handlePickContact
+}) => {
+  return (
+    <div className="space-y-4 sm:space-y-6">
+      <h3 className="text-[10px] font-black uppercase tracking-widest text-blue-500 flex items-center gap-2"><Users className="w-4 h-4" /> Devedor</h3>
+      <div className="space-y-4">
+        <select value={formData.clientId} onChange={e => handleClientSelect(e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-white outline-none focus:ring-1 focus:ring-blue-500 transition-all text-sm">
+          <option value="">-- Selecionar ou Criar --</option>
+          {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+        <input required type="text" value={formData.debtorName} onChange={e => setFormData({...formData, debtorName: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 text-white text-sm focus:border-blue-500 outline-none" placeholder="Nome Completo" />
+        <div className="flex gap-2">
+          <input required type="tel" value={formData.debtorPhone} onChange={e => setFormData({...formData, debtorPhone: maskPhone(e.target.value)})} className="flex-1 bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 text-white text-sm focus:border-blue-500 outline-none" placeholder="WhatsApp" />
+          <button type="button" onClick={handlePickContact} className="px-4 bg-slate-950 border border-slate-800 rounded-2xl text-slate-400 hover:text-emerald-500"><Search className="w-5 h-5" /></button>
+        </div>
+        <input type="text" value={formData.debtorDocument} onChange={e => setFormData({...formData, debtorDocument: maskDocument(e.target.value)})} className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 text-white text-sm focus:border-blue-500 outline-none" placeholder="CPF/CNPJ" />
+      </div>
+    </div>
+  );
+};
