@@ -11,6 +11,23 @@ export const useSourceController = (
   fetchFullData: (id: string) => Promise<void>,
   showToast: (msg: string, type?: 'success' | 'error') => void
 ) => {
+
+  // Helper de parsing robusto (BRL/US)
+  const safeFloat = (val: string | number | undefined) => {
+      if (!val) return 0;
+      if (typeof val === 'number') return val;
+      const str = String(val).trim();
+      // Formato BR (1.000,00) -> Remove ponto, troca vírgula por ponto
+      if (str.includes('.') && str.includes(',')) {
+          return parseFloat(str.replace(/\./g, '').replace(',', '.')) || 0;
+      }
+      // Formato simples com vírgula (1000,00)
+      if (str.includes(',')) {
+          return parseFloat(str.replace(',', '.')) || 0;
+      }
+      return parseFloat(str) || 0;
+  };
+
   const handleSaveSource = async () => {
     if (!activeUser) return;
 
@@ -20,12 +37,14 @@ export const useSourceController = (
     }
     if (ui.isSaving) return;
 
+    const initialBalance = safeFloat(ui.sourceForm.balance);
+
     if (activeUser.id === 'DEMO') {
       const newSource: CapitalSource = {
         id: crypto.randomUUID(),
         name: ui.sourceForm.name,
         type: ui.sourceForm.type as any,
-        balance: Number(ui.sourceForm.balance),
+        balance: initialBalance,
       };
       setSources([...sources, newSource]);
       showToast("Fonte criada (Demo)", "success");
@@ -44,7 +63,7 @@ export const useSourceController = (
             profile_id: activeUser.id,
             name: ui.sourceForm.name,
             type: ui.sourceForm.type,
-            balance: Number(ui.sourceForm.balance),
+            balance: initialBalance,
           },
         ]);
 
@@ -65,8 +84,9 @@ export const useSourceController = (
   const handleAddFunds = async () => {
     if (!activeUser || !ui.activeModal?.payload || ui.addFundsValue == null) return;
 
-    const amount = Number(ui.addFundsValue);
-    if (!Number.isFinite(amount) || amount <= 0) {
+    const amount = safeFloat(ui.addFundsValue);
+    
+    if (amount <= 0) {
       showToast("Informe um valor válido para adicionar.", "error");
       return;
     }
@@ -99,11 +119,9 @@ export const useSourceController = (
   const handleUpdateSourceBalance = async () => {
     if (!activeUser || !ui.editingSource) return;
 
-    const newBalance = Number(ui.editingSource.balance);
-    if (!Number.isFinite(newBalance)) {
-      showToast("Saldo inválido.", "error");
-      return;
-    }
+    // Nota: editingSource.balance já é number (bindado no input number local da page), 
+    // mas se mudarmos o input lá no futuro, safeFloat garante.
+    const newBalance = safeFloat(ui.editingSource.balance);
 
     if (activeUser.id === 'DEMO') {
       setSources(
@@ -133,11 +151,9 @@ export const useSourceController = (
   const handleWithdrawProfit = async () => {
     if (!activeUser || ui.withdrawValue == null) return;
 
-    // melhora: parse robusto + arredondamento em 2 casas
-    const amountRaw = String(ui.withdrawValue).replace(',', '.');
-    const amount = Math.round((parseFloat(amountRaw) + Number.EPSILON) * 100) / 100;
+    const amount = safeFloat(ui.withdrawValue);
 
-    if (!Number.isFinite(amount) || amount <= 0) {
+    if (amount <= 0) {
       showToast("Informe um valor válido para resgatar.", "error");
       return;
     }
@@ -147,7 +163,6 @@ export const useSourceController = (
       return;
     }
 
-    // valida a fonte destino (quando não for saque externo)
     const targetSourceId =
       ui.withdrawSourceId === 'EXTERNAL_WITHDRAWAL' ? null : ui.withdrawSourceId;
 

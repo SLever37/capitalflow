@@ -7,9 +7,10 @@ import { ConfirmationModalWrapper, ReceiptModalWrapper, MessageHubWrapper, Donat
 import { RenegotiationModal } from '../../../features/agreements/components/RenegotiationModal';
 import { CheckSquare, Square, Banknote } from 'lucide-react';
 import { formatMoney } from '../../../utils/formatters';
+import { calculateTotalDue } from '../../../domain/finance/calculations';
 
 export const SystemModalsWrapper = () => {
-    const { activeModal, closeModal, ui, activeUser, fileCtrl, showToast, fetchFullData, loanCtrl, profileCtrl } = useModal();
+    const { activeModal, closeModal, ui, activeUser, fileCtrl, showToast, fetchFullData, loanCtrl, profileCtrl, loans } = useModal();
 
     switch (activeModal?.type) {
         case 'CONFIRMATION': return <ConfirmationModalWrapper />;
@@ -44,11 +45,30 @@ export const SystemModalsWrapper = () => {
             ) : null;
         case 'AGENDA':
             const handleSystemAction = (type: string, meta: any) => {
-                ui.closeModal(); 
-                if (type === 'PAYMENT' && meta?.loanId) {
-                    // Logic handled in view, here simply close agenda to reveal underlying view
+                ui.closeModal(); // Fecha a agenda visualmente
+                
+                if (type === 'PAYMENT' && meta?.loanId && meta?.installmentId) {
+                    // Busca os dados
+                    const loan = loans.find(l => l.id === meta.loanId);
+                    if (loan) {
+                        const inst = loan.installments.find(i => i.id === meta.installmentId);
+                        if (inst) {
+                            const calcs = calculateTotalDue(loan, inst);
+                            
+                            // CRÍTICO: Configura o modal DENTRO do timeout para garantir
+                            // que a limpeza do closeModal() anterior já ocorreu e não vai sobrescrever.
+                            setTimeout(() => {
+                                ui.setPaymentModal({ loan, inst, calculations: calcs });
+                                ui.openModal('PAYMENT');
+                            }, 150); 
+                        } else {
+                            showToast("Parcela não encontrada ou já paga.", "info");
+                        }
+                    } else {
+                        showToast("Contrato não encontrado.", "error");
+                    }
                 } else if (type === 'PORTAL_REVIEW' && meta?.comprovanteUrl) {
-                    ui.openModal('PROOF_VIEW', meta.comprovanteUrl);
+                    setTimeout(() => ui.openModal('PROOF_VIEW', meta.comprovanteUrl), 150);
                 }
             };
             return <AgendaWrapper onSystemAction={handleSystemAction} />;

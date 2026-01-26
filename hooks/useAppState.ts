@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { Loan, Client, CapitalSource, UserProfile } from '../types';
 import { maskPhone, maskDocument } from '../utils/formatters';
-import { mapLoanFromDB } from '../services/adapters/loanAdapter';
+import { mapLoanFromDB } from '../services/adapters/dbAdapters';
 import { asString, asNumber } from '../utils/safe';
 
 export const useAppState = (activeProfileId: string | null) => {

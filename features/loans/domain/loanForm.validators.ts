@@ -31,8 +31,8 @@ export const validateLoanForm = (
   }
   
   const rate = parseFloat(formData.interestRate);
-  if(isNaN(rate)) { 
-    return { isValid: false, error: "Erro: Informe a Taxa de Juros." }; 
+  if(isNaN(rate) || rate <= 0) { 
+    return { isValid: false, error: "Erro: A Taxa de Juros deve ser maior que zero." }; 
   }
 
   if (!formData.startDate) { 

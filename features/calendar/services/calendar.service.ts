@@ -21,11 +21,12 @@ export const calendarService = {
               const dueDate = p.data_vencimento;
               const isLate = new Date(dueDate).getTime() < new Date().setHours(0,0,0,0);
               const totalDue = (p.principal_remaining || 0) + (p.interest_remaining || 0) + (p.late_fee_accrued || 0);
+              const safeAmount = Number(p.amount) || 0;
 
               events.push({
                   id: `inst-${p.id}`,
                   title: `${loan.debtor_name}`,
-                  description: `Parcela ${p.numero_parcela || 'Única'} • R$ ${p.amount.toFixed(2)}`,
+                  description: `Parcela ${p.numero_parcela || 'Única'} • R$ ${safeAmount.toFixed(2)}`,
                   start_time: dueDate,
                   end_time: dueDate,
                   is_all_day: true,

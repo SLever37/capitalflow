@@ -19,17 +19,24 @@ export const CalculatorModal = ({ onClose }: { onClose: () => void }) => {
         roi: number;
     } | null>(null);
 
+    // Helper de parser seguro (Mesmo do PaymentManager)
+    const safeParse = (val: string) => {
+        if (!val) return 0;
+        const str = String(val).trim();
+        if (str.includes('.') && str.includes(',')) {
+            return parseFloat(str.replace(/\./g, '').replace(',', '.')) || 0;
+        }
+        if (str.includes(',')) {
+            return parseFloat(str.replace(',', '.')) || 0;
+        }
+        return parseFloat(str) || 0;
+    };
+
     // Função de simulação manual e automática
     const calculate = () => {
-        // Limpeza robusta para aceitar 1.000,00 ou 1000.00
-        const cleanVal = (v: string) => parseFloat(v.replace(/\./g, '').replace(',', '.')) || 0;
-
-        // Se o valor for pequeno (ex: 30), assume que não tem milhar e apenas troca virgula
-        // Se for grande (ex: 1.000), remove ponto.
-        // Estratégia híbrida simples: Remover todos os pontos, substituir vírgula por ponto.
-        const p = cleanVal(principal);
-        const r = parseFloat(rate.replace(',', '.')); // Taxa geralmente não tem milhar
-        const t = parseFloat(duration.replace(',', '.'));
+        const p = safeParse(principal);
+        const r = safeParse(rate);
+        const t = safeParse(duration);
 
         if (p > 0 && r > 0 && t > 0) {
             let grossProfit = 0;
@@ -56,8 +63,6 @@ export const CalculatorModal = ({ onClose }: { onClose: () => void }) => {
                 profitPerPeriod,
                 roi
             });
-        } else {
-            // Não limpa results se estiver vazio para não piscar, apenas se for inválido
         }
     };
 
@@ -101,7 +106,7 @@ export const CalculatorModal = ({ onClose }: { onClose: () => void }) => {
                                 placeholder="0,00" 
                                 className="w-full bg-transparent text-white text-2xl font-black outline-none placeholder:text-slate-700" 
                                 value={principal} 
-                                onChange={e => setPrincipal(e.target.value)}
+                                onChange={e => setPrincipal(e.target.value.replace(/[^0-9.,]/g, ''))}
                                 autoFocus
                             />
                         </div>
@@ -118,7 +123,7 @@ export const CalculatorModal = ({ onClose }: { onClose: () => void }) => {
                                         placeholder="30" 
                                         className="w-full bg-transparent text-white text-xl font-bold outline-none placeholder:text-slate-700" 
                                         value={rate} 
-                                        onChange={e => setRate(e.target.value)}
+                                        onChange={e => setRate(e.target.value.replace(/[^0-9.,]/g, ''))}
                                     />
                                     <Percent size={14} className="text-slate-500"/>
                                 </div>
@@ -129,11 +134,11 @@ export const CalculatorModal = ({ onClose }: { onClose: () => void }) => {
                                 <label className="text-[9px] font-black uppercase text-slate-500 tracking-widest">{mode === 'MONTHLY' ? 'Prazo (Meses)' : 'Prazo (Dias)'}</label>
                                 <input 
                                     type="text" 
-                                    inputMode="numeric" 
+                                    inputMode="decimal" 
                                     placeholder={mode === 'MONTHLY' ? "1" : "30"} 
                                     className="w-full bg-transparent text-white text-xl font-bold outline-none placeholder:text-slate-700" 
                                     value={duration} 
-                                    onChange={e => setDuration(e.target.value)}
+                                    onChange={e => setDuration(e.target.value.replace(/[^0-9.,]/g, ''))}
                                 />
                             </div>
                         </div>

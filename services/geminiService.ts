@@ -3,14 +3,26 @@ import { GoogleGenAI } from "@google/genai";
 import { Loan, Client } from "../types";
 import { calculateTotalDue, getDaysDiff } from "../domain/finance/calculations";
 
-const genAI = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Helper para instanciar de forma preguiçosa (Lazy) e segura
+const getAIClient = () => {
+  const key = process.env.API_KEY;
+  // Verificação robusta: alguns bundlers injetam a string "undefined" ao invés do valor undefined
+  if (!key || key === 'undefined' || key.includes('PLACEHOLDER')) {
+    console.warn("Gemini API Key não configurada ou inválida.");
+    return null;
+  }
+  return new GoogleGenAI({ apiKey: key });
+};
 
 /**
  * Analisa o risco individual de um contrato.
  */
 export const analyzeLoanRisk = async (debtor: Client, loanDetails: Partial<Loan>) => {
+  const ai = getAIClient();
+  if (!ai) return "IA não configurada. Verifique a API Key.";
+
   try {
-    const response = await genAI.models.generateContent({
+    const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Analise o risco para este empréstimo privado:
       Devedor: ${debtor.name}
@@ -38,6 +50,9 @@ export const analyzeLoanRisk = async (debtor: Client, loanDetails: Partial<Loan>
  * Gera uma mensagem de cobrança personalizada.
  */
 export const getCollectionStrategy = async (loan: Loan) => {
+  const ai = getAIClient();
+  if (!ai) return "IA indisponível.";
+
   const pendingInstallment = loan.installments.find(i => i.status !== 'PAID');
   if (!pendingInstallment) return "O contrato está quitado.";
 
@@ -45,7 +60,7 @@ export const getCollectionStrategy = async (loan: Loan) => {
   const daysLate = Math.max(0, getDaysDiff(pendingInstallment.dueDate));
   
   try {
-    const response = await genAI.models.generateContent({
+    const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Gere uma mensagem de cobrança curta para WhatsApp.
       Dados: Cliente ${loan.debtorName}, Valor R$ ${debt.total.toFixed(2)}, Atraso ${daysLate} dias.
@@ -60,6 +75,9 @@ export const getCollectionStrategy = async (loan: Loan) => {
  * Processa comandos de voz com contexto macro da carteira (CFO Virtual).
  */
 export const processNaturalLanguageCommand = async (text: string, portfolioContext?: any) => {
+  const ai = getAIClient();
+  if (!ai) return { intent: "UNKNOWN", feedback: "IA não configurada. Verifique as variáveis de ambiente." };
+
   // Constrói string de contexto macro se disponível
   let contextPrompt = "";
   if (portfolioContext) {
@@ -100,7 +118,7 @@ export const processNaturalLanguageCommand = async (text: string, portfolioConte
   `;
 
   try {
-    const response = await genAI.models.generateContent({
+    const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: text,
       config: {

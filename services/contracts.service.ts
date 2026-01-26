@@ -58,74 +58,93 @@ export const contractsService = {
     let totalToReceive = loan.totalToReceive;
 
     // --- LÓGICA DE SALDO ATÔMICA (Deltas via RPC) ---
-    if (editingLoan) {
-        const oldPrincipal = Number(editingLoan.principal) || 0;
-        const diff = principal - oldPrincipal;
+    // Armazena as operações de saldo realizadas para possível rollback
+    const rollbackOperations: Array<() => Promise<void>> = [];
 
-        if (editingLoan.sourceId !== finalSourceId) {
-            // TROCA DE FONTE: Estorna integral na antiga, debita integral na nova
-            await supabase.rpc('adjust_source_balance', { p_source_id: editingLoan.sourceId, p_delta: oldPrincipal });
+    try {
+        if (editingLoan) {
+            const oldPrincipal = Number(editingLoan.principal) || 0;
+            const diff = principal - oldPrincipal;
+
+            if (editingLoan.sourceId !== finalSourceId) {
+                // TROCA DE FONTE: Estorna integral na antiga, debita integral na nova
+                await supabase.rpc('adjust_source_balance', { p_source_id: editingLoan.sourceId, p_delta: oldPrincipal });
+                rollbackOperations.push(() => supabase.rpc('adjust_source_balance', { p_source_id: editingLoan.sourceId, p_delta: -oldPrincipal })); // Rollback
+
+                await supabase.rpc('adjust_source_balance', { p_source_id: finalSourceId, p_delta: -principal });
+                rollbackOperations.push(() => supabase.rpc('adjust_source_balance', { p_source_id: finalSourceId, p_delta: principal })); // Rollback
+                
+                // Log de Estorno técnico
+                await supabase.from('transacoes').insert([{ 
+                    id: generateUUID(), loan_id: loan.id, profile_id: activeUser.id, source_id: editingLoan.sourceId, 
+                    date: new Date().toISOString(), type: 'REFUND_SOURCE_CHANGE', amount: oldPrincipal, 
+                    principal_delta: 0, interest_delta: 0, late_fee_delta: 0, category: 'ESTORNO' 
+                }]);
+            } 
+            else if (Math.abs(diff) > 0.01) {
+                // MESMA FONTE: Debita apenas a diferença
+                await supabase.rpc('adjust_source_balance', { p_source_id: finalSourceId, p_delta: -diff });
+                rollbackOperations.push(() => supabase.rpc('adjust_source_balance', { p_source_id: finalSourceId, p_delta: diff })); // Rollback
+            }
+        } else {
+            // NOVO CONTRATO: Debita valor principal total da fonte
             await supabase.rpc('adjust_source_balance', { p_source_id: finalSourceId, p_delta: -principal });
-            
-            // Log de Estorno técnico
-            await supabase.from('transacoes').insert([{ 
-                id: generateUUID(), loan_id: loan.id, profile_id: activeUser.id, source_id: editingLoan.sourceId, 
-                date: new Date().toISOString(), type: 'REFUND_SOURCE_CHANGE', amount: oldPrincipal, 
-                principal_delta: 0, interest_delta: 0, late_fee_delta: 0, category: 'ESTORNO' 
-            }]);
-        } 
-        else if (Math.abs(diff) > 0.01) {
-            // MESMA FONTE: Debita apenas a diferença (se diff > 0, delta é negativo)
-            await supabase.rpc('adjust_source_balance', { p_source_id: finalSourceId, p_delta: -diff });
+            rollbackOperations.push(() => supabase.rpc('adjust_source_balance', { p_source_id: finalSourceId, p_delta: principal })); // Rollback
         }
-    } else {
-        // NOVO CONTRATO: Debita valor principal total da fonte
-        await supabase.rpc('adjust_source_balance', { p_source_id: finalSourceId, p_delta: -principal });
-    }
 
-    const contractData: any = { 
-      id: loan.id, profile_id: activeUser.id, client_id: finalClientId, source_id: finalSourceId, 
-      debtor_name: loan.debtorName, debtor_phone: loan.debtorPhone, debtor_document: loan.debtorDocument, 
-      principal, interest_rate: interestRate, fine_percent: Number(loan.finePercent) || 0, 
-      daily_interest_percent: Number(loan.dailyInterestPercent) || 0, billing_cycle: loan.billingCycle || 'MONTHLY', 
-      amortization_type: 'JUROS', start_date: loan.startDate, preferred_payment_method: loan.preferredPaymentMethod, 
-      pix_key: loan.pixKey, notes: loan.notes, guarantee_description: loan.guaranteeDescription, is_archived: loan.isArchived || false
-    };
+        const contractData: any = { 
+          id: loan.id, profile_id: activeUser.id, client_id: finalClientId, source_id: finalSourceId, 
+          debtor_name: loan.debtorName, debtor_phone: loan.debtorPhone, debtor_document: loan.debtorDocument, 
+          principal, interest_rate: interestRate, fine_percent: Number(loan.finePercent) || 0, 
+          daily_interest_percent: Number(loan.dailyInterestPercent) || 0, billing_cycle: loan.billingCycle || 'MONTHLY', 
+          amortization_type: 'JUROS', start_date: loan.startDate, preferred_payment_method: loan.preferredPaymentMethod, 
+          pix_key: loan.pixKey, notes: loan.notes, guarantee_description: loan.guaranteeDescription, is_archived: loan.isArchived || false
+        };
 
-    if (!editingLoan) contractData.created_at = new Date().toISOString();
+        if (!editingLoan) contractData.created_at = new Date().toISOString();
 
-    const strategy = modalityRegistry.get(loan.billingCycle);
-    const { installments, totalToReceive: totalStrategy } = strategy.generateInstallments({ principal, rate: interestRate, startDate: loan.startDate });
-    contractData.total_to_receive = totalStrategy;
+        const strategy = modalityRegistry.get(loan.billingCycle);
+        const { installments, totalToReceive: totalStrategy } = strategy.generateInstallments({ principal, rate: interestRate, startDate: loan.startDate });
+        contractData.total_to_receive = totalStrategy;
 
-    const { error: loanError } = await supabase.from('contratos').upsert(contractData);
-    if (loanError) throw new Error("Erro ao salvar contrato: " + loanError.message);
+        const { error: loanError } = await supabase.from('contratos').upsert(contractData);
+        if (loanError) throw new Error(loanError.message);
 
-    const installmentsPayload = installments.map((inst, index) => ({
-        id: generateUUID(), loan_id: loan.id, profile_id: activeUser.id, numero_parcela: index + 1,
-        due_date: inst.dueDate, amount: inst.amount, scheduled_principal: inst.scheduledPrincipal,
-        scheduled_interest: inst.scheduledInterest, principal_remaining: inst.principalRemaining,
-        interest_remaining: inst.interestRemaining, status: 'PENDING'
-    }));
+        const installmentsPayload = installments.map((inst, index) => ({
+            id: generateUUID(), loan_id: loan.id, profile_id: activeUser.id, numero_parcela: index + 1,
+            due_date: inst.dueDate, amount: inst.amount, scheduled_principal: inst.scheduledPrincipal,
+            scheduled_interest: inst.scheduledInterest, principal_remaining: inst.principalRemaining,
+            interest_remaining: inst.interestRemaining, status: 'PENDING'
+        }));
 
-    await supabase.from('parcelas').delete().eq('loan_id', loan.id);
-    await supabase.from('parcelas').insert(installmentsPayload);
+        await supabase.from('parcelas').delete().eq('loan_id', loan.id);
+        const { error: instError } = await supabase.from('parcelas').insert(installmentsPayload);
+        if (instError) throw new Error(instError.message);
 
-    // Auditoria simplificada
-    if (editingLoan) {
-        const diffLog = getLoanDiff(editingLoan, loan);
-        if (Object.keys(diffLog).length > 0) {
+        // Auditoria simplificada
+        if (editingLoan) {
+            const diffLog = getLoanDiff(editingLoan, loan);
+            if (Object.keys(diffLog).length > 0) {
+                await supabase.from('transacoes').insert([{ 
+                    id: generateUUID(), loan_id: loan.id, profile_id: activeUser.id, source_id: finalSourceId, 
+                    date: new Date().toISOString(), type: 'ADJUSTMENT', amount: 0, 
+                    principal_delta: 0, interest_delta: 0, late_fee_delta: 0, notes: JSON.stringify(diffLog), category: 'AUDIT'
+                }]);
+            }
+        } else {
             await supabase.from('transacoes').insert([{ 
                 id: generateUUID(), loan_id: loan.id, profile_id: activeUser.id, source_id: finalSourceId, 
-                date: new Date().toISOString(), type: 'ADJUSTMENT', amount: 0, 
-                principal_delta: 0, interest_delta: 0, late_fee_delta: 0, notes: JSON.stringify(diffLog), category: 'AUDIT'
+                date: new Date().toISOString(), type: 'LEND_MORE', amount: principal, category: 'INVESTIMENTO'
             }]);
         }
-    } else {
-        await supabase.from('transacoes').insert([{ 
-            id: generateUUID(), loan_id: loan.id, profile_id: activeUser.id, source_id: finalSourceId, 
-            date: new Date().toISOString(), type: 'LEND_MORE', amount: principal, category: 'INVESTIMENTO'
-        }]);
+
+    } catch (error: any) {
+        console.error("Erro no processo de salvamento. Iniciando rollback de saldo...", error);
+        // Executa rollbacks em ordem reversa
+        for (const rollback of rollbackOperations.reverse()) {
+            await rollback().catch(e => console.error("Falha fatal no rollback:", e));
+        }
+        throw new Error("Erro ao salvar contrato: " + error.message);
     }
   },
 

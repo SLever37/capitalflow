@@ -15,6 +15,9 @@ export const portalService = {
    * Autentica o cliente verificando se os dados batem com o cadastro vinculado ao contrato.
    */
   async authenticate(loanId: string, identifierRaw: string, code: string) {
+    // Delay artificial de segurança (500ms - 1000ms) para mitigar Timing Attacks e Brute Force simples
+    await new Promise(resolve => setTimeout(resolve, Math.random() * 500 + 500));
+
     // 1. Validar inputs
     const cleanIdentifier = onlyDigits(identifierRaw);
     const cleanCode = code.trim();
@@ -45,7 +48,7 @@ export const portalService = {
     // 4. Validar Código de Acesso
     const expectedCode = String(client.access_code || '').trim();
     if (expectedCode !== cleanCode) {
-      throw new Error('Código de acesso incorreto para este cliente.');
+      throw new Error('Código de acesso incorreto.');
     }
 
     // 5. Validar Identificador (CPF, CNPJ, Telefone ou Nº Cliente)
@@ -54,13 +57,22 @@ export const portalService = {
     const dbClientNum = onlyDigits(client.client_number || '');
 
     // Verificação de Identidade Robusta:
-    const match = 
-      (dbDoc && cleanIdentifier === dbDoc) || 
-      (dbPhone && cleanIdentifier === dbPhone) || 
-      (dbClientNum && cleanIdentifier === dbClientNum);
+    let match = false;
+
+    // A) Match Exato de Documento ou Nº Cliente
+    if ((dbDoc && cleanIdentifier === dbDoc) || (dbClientNum && cleanIdentifier === dbClientNum)) {
+        match = true;
+    } 
+    // B) Match Inteligente de Telefone (Sufixo)
+    // Permite que o usuário digite '11999999999' e o sistema encontre '5511999999999'
+    else if (dbPhone && cleanIdentifier.length >= 8) {
+        if (dbPhone === cleanIdentifier) match = true;
+        else if (dbPhone.endsWith(cleanIdentifier)) match = true;
+        else if (cleanIdentifier.endsWith(dbPhone)) match = true; // Raro, mas possível
+    }
 
     if (!match) {
-      throw new Error('O Identificador (CPF/CNPJ ou Tel) não corresponde ao cadastro deste cliente. Verifique se digitou corretamente.');
+      throw new Error('O Identificador (CPF/CNPJ ou Tel) não corresponde ao cadastro deste cliente.');
     }
 
     // 6. Registrar Log de Acesso para Auditoria

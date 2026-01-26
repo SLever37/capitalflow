@@ -37,8 +37,9 @@ export const usePaymentManagerState = ({ data, paymentType, setPaymentType, avAm
             return { dailyVal, paidUntil, totalDays: safeDays, paidDays, currentDebt };
         }
         return { dailyVal: 0, paidUntil: todayDateOnlyUTC(), totalDays: 0, paidDays: 0, currentDebt: 0 };
-    }, [data]);
+    }, [data?.loan?.id, data?.inst?.id]); // Otimização: Recalcula apenas se o contrato mudar
 
+    // Inicialização segura - Executa apenas quando o ID do empréstimo muda
     useEffect(() => {
         if (data) {
             if (data.loan.billingCycle === 'DAILY_FREE' || data.loan.billingCycle === ('DAILY_FIXED' as any)) {
@@ -48,16 +49,25 @@ export const usePaymentManagerState = ({ data, paymentType, setPaymentType, avAm
             } else if (data.loan.billingCycle === 'DAILY_FIXED_TERM') {
                 setPaymentType('RENEW_AV');
                 // Sugere o valor da diária se o campo estiver vazio
-                if (!avAmount && fixedTermData.dailyVal > 0) {
-                    setAvAmount(fixedTermData.dailyVal.toFixed(2));
+                // Usa cálculo local para evitar dependência cíclica com fixedTermData
+                const start = parseDateOnlyUTC(data.loan.startDate);
+                const due = parseDateOnlyUTC(data.inst.dueDate);
+                const days = Math.max(1, Math.round((due.getTime() - start.getTime()) / 86400000));
+                const dailyVal = (data.loan.totalToReceive || 0) / days;
+                
+                if (dailyVal > 0) {
+                    setAvAmount(dailyVal.toFixed(2));
                 }
             } else {
                 setPaymentType(paymentModalityDispatcher.getConfig(data.loan).defaultAction);
             }
-            if(data.loan.billingCycle !== 'DAILY_FIXED_TERM') setAvAmount('');
+            
+            if(data.loan.billingCycle !== 'DAILY_FIXED_TERM') {
+                setAvAmount('');
+            }
             setCustomAmount('');
         }
-    }, [data, fixedTermData.dailyVal]); // setPaymentType e setAvAmount removidos do dep array para evitar loop
+    }, [data?.loan?.id, data?.inst?.id]); // Dependência CRÍTICA: Apenas IDs para evitar reset durante digitação
 
     return {
         customAmount, setCustomAmount,

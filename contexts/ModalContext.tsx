@@ -69,7 +69,9 @@ export const ModalProvider: React.FC<ModalContextType & { children: ReactNode }>
     const { children, ...values } = props;
 
     // Warning em DEV para payloads inválidos
-    if (process.env.NODE_ENV === 'development' && values.activeModal) {
+    // Vite: use import.meta.env.DEV (process.env is not available in the browser)
+    const isDev = (import.meta as any).env?.DEV;
+    if (isDev && values.activeModal) {
         if (!values.activeModal.type) {
             console.warn("ModalContext: Tentativa de abrir modal sem tipo definido.", values.activeModal);
         }

@@ -4,6 +4,7 @@ import { portalService, PortalSession } from '@/services/portal.service';
 import { supabase } from '@/lib/supabase';
 
 const PORTAL_SESSION_KEY = 'cm_portal_session';
+const LOCKOUT_KEY = 'cm_portal_lockout';
 
 export const useClientPortalLogic = (initialLoanId: string) => {
     const [isLoading, setIsLoading] = useState(true);
@@ -13,6 +14,8 @@ export const useClientPortalLogic = (initialLoanId: string) => {
     // Login Form State
     const [loginIdentifier, setLoginIdentifier] = useState('');
     const [loginCode, setLoginCode] = useState('');
+    const [loginAttempts, setLoginAttempts] = useState(0);
+    const [isLocked, setIsLocked] = useState(false);
     
     // Authenticated State
     const [loggedClient, setLoggedClient] = useState<{ id: string; name: string; phone?: string; cpf?: string; client_number?: string; document?: string; access_code?: string } | null>(null);
@@ -78,6 +81,24 @@ export const useClientPortalLogic = (initialLoanId: string) => {
         }
     }, []);
 
+    // Lockout Logic Check on Mount
+    useEffect(() => {
+        const checkLockout = () => {
+            const lockoutStr = localStorage.getItem(LOCKOUT_KEY);
+            if (lockoutStr) {
+                const unlockTime = parseInt(lockoutStr);
+                if (Date.now() < unlockTime) {
+                    setIsLocked(true);
+                    setPortalError(`Muitas tentativas. Aguarde ${Math.ceil((unlockTime - Date.now())/1000)}s.`);
+                    setTimeout(() => { setIsLocked(false); setPortalError(null); localStorage.removeItem(LOCKOUT_KEY); }, unlockTime - Date.now());
+                } else {
+                    localStorage.removeItem(LOCKOUT_KEY);
+                }
+            }
+        };
+        checkLockout();
+    }, []);
+
     useEffect(() => {
         const checkSession = async () => {
             try {
@@ -108,6 +129,8 @@ export const useClientPortalLogic = (initialLoanId: string) => {
     }, [selectedLoanId, loggedClient, loadFullPortalData]);
 
     const handleLogin = async () => {
+        if (isLocked) return;
+        
         if (!loginIdentifier || !loginCode) {
             setPortalError("Preencha todos os campos para entrar.");
             return;
@@ -116,8 +139,12 @@ export const useClientPortalLogic = (initialLoanId: string) => {
         setIsLoading(true);
         try {
             const client = await portalService.authenticate(selectedLoanId, loginIdentifier, loginCode);
+            
+            // Login Success
+            setLoginAttempts(0);
             setLoggedClient(client);
             setByeName(null);
+            
             const session: PortalSession = {
                 client_id: client.id,
                 access_code: loginCode,
@@ -127,7 +154,17 @@ export const useClientPortalLogic = (initialLoanId: string) => {
             };
             localStorage.setItem(PORTAL_SESSION_KEY, JSON.stringify(session));
         } catch (e: any) {
-            setPortalError(e.message);
+            const newAttempts = loginAttempts + 1;
+            setLoginAttempts(newAttempts);
+            if (newAttempts >= 3) {
+                const unlockTime = Date.now() + 30000; // 30s Lockout
+                localStorage.setItem(LOCKOUT_KEY, String(unlockTime));
+                setIsLocked(true);
+                setPortalError("Muitas tentativas falhas. Bloqueado por 30 segundos.");
+                setTimeout(() => { setIsLocked(false); setPortalError(null); localStorage.removeItem(LOCKOUT_KEY); setLoginAttempts(0); }, 30000);
+            } else {
+                setPortalError(e.message);
+            }
         } finally {
             setIsLoading(false);
         }

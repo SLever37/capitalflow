@@ -21,9 +21,26 @@ export const FlexibleDailyScreen = ({
         );
     }
 
+    // Helper seguro para parsing (Suporta 1.000,00 ou 1000.00)
+    const safeParseAmount = (val: string) => {
+        if (!val) return 0;
+        const str = String(val).trim();
+        // Se tem ponto e vírgula, assume formato BR (remove ponto, troca virgula por ponto)
+        if (str.includes('.') && str.includes(',')) {
+            return parseFloat(str.replace(/\./g, '').replace(',', '.')) || 0;
+        }
+        // Se só tem vírgula, troca por ponto
+        if (str.includes(',')) {
+            return parseFloat(str.replace(',', '.')) || 0;
+        }
+        return parseFloat(str) || 0;
+    };
+
+    const cleanAmount = safeParseAmount(amount);
+    
     const dailyRate = (Number(loan.interestRate || 0) / 100) / 30;
     const dailyCost = Number(debt.principal || 0) * dailyRate;
-    const daysPaid = dailyCost > 0 ? Math.floor(parseFloat(amount || '0') / dailyCost) : 0;
+    const daysPaid = dailyCost > 0 ? Math.floor((cleanAmount + 0.01) / dailyCost) : 0; // +0.01 tolerância float
 
     const baseDateStr =
       loan.billingCycle === 'DAILY_FREE'
@@ -64,18 +81,18 @@ export const FlexibleDailyScreen = ({
                 <div className="flex items-center gap-2">
                     <span className="text-2xl text-emerald-500 font-black">R$</span>
                     <input 
-                        type="number" 
-                        step="0.01" 
+                        type="text"
+                        inputMode="decimal"
                         className="w-full bg-transparent text-3xl font-black text-white outline-none placeholder:text-slate-700"
-                        placeholder="0.00"
+                        placeholder="0,00"
                         value={amount}
-                        onChange={e => setAmount(e.target.value)}
+                        onChange={e => setAmount(e.target.value.replace(/[^0-9.,]/g, ''))}
                         autoFocus
                     />
                 </div>
             </div>
 
-            {subMode === 'DAYS' && parseFloat(amount) > 0 && (
+            {subMode === 'DAYS' && cleanAmount > 0 && (
                 <div className="bg-blue-900/10 border border-blue-500/30 p-4 rounded-2xl animate-in zoom-in-95">
                     <div className="flex justify-between items-center mb-2">
                         <span className="text-[10px] font-black text-blue-400 uppercase">Avanço do Contrato</span>
@@ -95,7 +112,7 @@ export const FlexibleDailyScreen = ({
                 </div>
             )}
 
-            {subMode === 'AMORTIZE' && parseFloat(amount) > 0 && (
+            {subMode === 'AMORTIZE' && cleanAmount > 0 && (
                 <div className="bg-purple-900/10 border border-purple-500/30 p-4 rounded-2xl animate-in zoom-in-95">
                     <p className="text-[10px] font-black text-purple-400 uppercase mb-2">Resultado da Amortização</p>
                     <div className="flex justify-between items-end">
@@ -105,7 +122,7 @@ export const FlexibleDailyScreen = ({
                         </div>
                         <div className="text-right">
                             <p className="text-[9px] text-purple-400 font-black uppercase">Saldo Restante</p>
-                            <p className="text-lg font-black text-white">R$ {Math.max(0, debt.principal - parseFloat(amount)).toFixed(2)}</p>
+                            <p className="text-lg font-black text-white">R$ {Math.max(0, debt.principal - cleanAmount).toFixed(2)}</p>
                         </div>
                     </div>
                 </div>

@@ -8,6 +8,8 @@ import { AgendaModal } from './AgendaModal';
 import { FlowModal } from './FlowModal';
 import { ReceiptModal } from './ReceiptModal';
 import { MessageHubModal } from './MessageHubModal';
+import { AIAssistantModal } from './AIAssistantModal';
+import { NoteWrapper } from './ModalWrappers'; // Reutilizando wrapper existente
 import { Copy, KeyRound, User } from 'lucide-react';
 import { maskPhone, maskDocument } from '../../utils/formatters';
 
@@ -91,7 +93,14 @@ export const FinanceModals = () => {
                         <select className="w-full bg-slate-950 p-4 rounded-xl text-white outline-none border border-slate-800" value={ui.sourceForm.type} onChange={e => ui.setSourceForm({...ui.sourceForm, type: e.target.value})}>
                             <option value="BANK">Banco / Conta Digital</option><option value="CASH">Dinheiro em Espécie</option><option value="WALLET">Carteira Física</option><option value="CARD">Cartão de Crédito</option>
                         </select>
-                        <input type="number" placeholder="Saldo Inicial (R$)" className="w-full bg-slate-950 p-4 rounded-xl text-white outline-none border border-slate-800" value={ui.sourceForm.balance} onChange={e => ui.setSourceForm({...ui.sourceForm, balance: e.target.value})} />
+                        <input 
+                            type="text" 
+                            inputMode="decimal"
+                            placeholder="Saldo Inicial (R$)" 
+                            className="w-full bg-slate-950 p-4 rounded-xl text-white outline-none border border-slate-800" 
+                            value={ui.sourceForm.balance} 
+                            onChange={e => ui.setSourceForm({...ui.sourceForm, balance: e.target.value.replace(/[^0-9.,]/g, '')})} 
+                        />
                         <button onClick={sourceCtrl.handleSaveSource} disabled={ui.isSaving} className="w-full py-4 bg-emerald-600 text-white font-bold rounded-xl uppercase">{ui.isSaving ? 'Salvando...' : 'Criar Fonte'}</button>
                     </div>
                 </Modal>
@@ -100,7 +109,15 @@ export const FinanceModals = () => {
             {activeModal?.type === 'ADD_FUNDS' && (
                 <Modal onClose={closeModal} title={`Adicionar Fundos: ${activeModal.payload.name}`}>
                     <div className="space-y-4">
-                        <input type="number" placeholder="Valor (R$)" className="w-full bg-slate-950 p-4 rounded-xl text-white text-xl font-bold outline-none border border-slate-800" value={ui.addFundsValue} onChange={e => ui.setAddFundsValue(e.target.value)} />
+                        <input 
+                            type="text"
+                            inputMode="decimal" 
+                            placeholder="Valor (R$)" 
+                            className="w-full bg-slate-950 p-4 rounded-xl text-white text-xl font-bold outline-none border border-slate-800" 
+                            value={ui.addFundsValue} 
+                            onChange={e => ui.setAddFundsValue(e.target.value.replace(/[^0-9.,]/g, ''))} 
+                            autoFocus
+                        />
                         <button onClick={sourceCtrl.handleAddFunds} className="w-full py-4 bg-emerald-600 text-white font-bold rounded-xl uppercase">Confirmar Aporte</button>
                     </div>
                 </Modal>
@@ -124,7 +141,14 @@ export const FinanceModals = () => {
                 <Modal onClose={closeModal} title="Resgatar Lucros">
                     <div className="space-y-4">
                         <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center"><p className="text-xs text-slate-500 uppercase font-bold">Disponível para Saque</p><p className="text-2xl font-black text-emerald-400">R$ {activeUser.interestBalance.toFixed(2)}</p></div>
-                        <input type="number" placeholder="Valor do Resgate" className="w-full bg-slate-950 p-4 rounded-xl text-white outline-none border border-slate-800" value={ui.withdrawValue} onChange={e => ui.setWithdrawValue(e.target.value)} />
+                        <input 
+                            type="text"
+                            inputMode="decimal"
+                            placeholder="Valor do Resgate" 
+                            className="w-full bg-slate-950 p-4 rounded-xl text-white outline-none border border-slate-800" 
+                            value={ui.withdrawValue} 
+                            onChange={e => ui.setWithdrawValue(e.target.value.replace(/[^0-9.,]/g, ''))} 
+                        />
                         <select className="w-full bg-slate-950 p-4 rounded-xl text-white outline-none border border-slate-800" value={ui.withdrawSourceId} onChange={e => ui.setWithdrawSourceId(e.target.value)}>
                             <option value="">Selecione o destino...</option>
                             <option value="EXTERNAL_WITHDRAWAL">Saque Externo</option>
@@ -140,7 +164,8 @@ export const FinanceModals = () => {
 
 // --- MODAIS DE SISTEMA ---
 export const SystemModals = ({ handleSystemAction }: { handleSystemAction: any }) => {
-    const { activeModal, closeModal, ui, loanCtrl, activeUser, loans, clients, showToast } = useModal();
+    // DESESTRUTURAÇÃO CORRIGIDA: Inclui sources e aiCtrl
+    const { activeModal, closeModal, ui, loanCtrl, activeUser, loans, clients, showToast, sources, aiCtrl } = useModal();
     const pixCopiaCola = "00020126580014br.gov.bcb.pix0136d8135204-13f6-483b-90c9-fb530257d7b55204000053039865802BR5925MANOEL SOCRATES COSTA LEV6011Itacoatiara6211050726f78796304E08B";
 
     return (
@@ -201,14 +226,9 @@ export const SystemModals = ({ handleSystemAction }: { handleSystemAction: any }
                 <Modal onClose={closeModal} title="Comprovante"><img src={activeModal.payload} alt="Comprovante" className="w-full h-auto rounded-xl" /></Modal>
             )}
             
-            {activeModal?.type === 'NOTE' && ui.noteModalLoan && (
-               <Modal onClose={closeModal} title="Anotações do Contrato">
-                   <div className="space-y-4">
-                       <textarea className="w-full h-40 bg-slate-950 p-4 rounded-xl text-white outline-none border border-slate-800 resize-none" placeholder="Escreva observações aqui..." value={ui.noteText} onChange={e => ui.setNoteText(e.target.value)}></textarea>
-                       <button onClick={loanCtrl.handleSaveNote} className="w-full py-4 bg-blue-600 text-white font-bold rounded-xl uppercase">Salvar Anotação</button>
-                   </div>
-               </Modal>
-            )}
+            {activeModal?.type === 'NOTE' && <NoteWrapper />}
+            
+            {activeModal?.type === 'AI_ASSISTANT' && <AIAssistantModal onClose={closeModal} onCommandDetected={aiCtrl.handleAICommand} loans={loans} sources={sources} activeUser={activeUser} />}
         </>
     );
 };

@@ -36,6 +36,19 @@ export const PaymentManagerModal: React.FC<PaymentManagerModalProps> = ({
     const isDailyFree = loan.billingCycle === 'DAILY_FREE' || loan.billingCycle === ('DAILY_FIXED' as any);
     const isFixedTerm = loan.billingCycle === 'DAILY_FIXED_TERM';
 
+    // Helper para Parsing Seguro (Mesma lógica do FlexibleDailyScreen)
+    const safeParse = (val: string) => {
+        if (!val) return 0;
+        const str = String(val).trim();
+        if (str.includes('.') && str.includes(',')) {
+            return parseFloat(str.replace(/\./g, '').replace(',', '.')) || 0;
+        }
+        if (str.includes(',')) {
+            return parseFloat(str.replace(',', '.')) || 0;
+        }
+        return parseFloat(str) || 0;
+    };
+
     const handleConfirmWrapper = (forceFull: boolean = false) => {
         if (forceFull) {
             setPaymentType('FULL');
@@ -43,14 +56,14 @@ export const PaymentManagerModal: React.FC<PaymentManagerModalProps> = ({
         }
 
         if (isDailyFree && paymentType !== 'FULL') {
-            const val = parseFloat(customAmount);
+            const val = safeParse(customAmount);
             if (!val || val <= 0) return;
             const date = manualDateStr ? parseDateOnlyUTC(manualDateStr) : null;
 
             if (subMode === 'AMORTIZE') {
                 setPaymentType('RENEW_AV');
                 setAvAmount(String(val));
-                onConfirm(false, date, 0);
+                onConfirm(false, date, 0); // 0 no customAmount pois vai via avAmount
             } else {
                 onConfirm(false, date, val);
             }
@@ -98,12 +111,12 @@ export const PaymentManagerModal: React.FC<PaymentManagerModalProps> = ({
                     <div className="space-y-3">
                         {isFixedTerm && fixedTermData.dailyVal > 0 && (
                             <div className="space-y-3">
-                                {avAmount && parseFloat(avAmount) > 0 && (
+                                {avAmount && safeParse(avAmount) > 0 && (
                                     <div className="bg-blue-900/10 border border-blue-500/30 p-4 rounded-2xl animate-in zoom-in-95">
                                         <div className="flex justify-between items-center mb-2">
                                             <span className="text-[10px] font-black text-blue-400 uppercase">Projeção</span>
                                             <span className="bg-blue-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full">
-                                                +{Math.floor((parseFloat(avAmount) + 0.1) / fixedTermData.dailyVal)} DIAS
+                                                +{Math.floor((safeParse(avAmount) + 0.1) / fixedTermData.dailyVal)} DIAS
                                             </span>
                                         </div>
                                         <div className="flex items-center gap-3">
@@ -115,7 +128,7 @@ export const PaymentManagerModal: React.FC<PaymentManagerModalProps> = ({
                                             <div className="flex-1 text-right">
                                                 <p className="text-[9px] text-blue-400 font-black uppercase">Novo "Pago Até"</p>
                                                 <p className="text-base font-black text-white">
-                                                    {formatBRDate(addDaysUTC(fixedTermData.paidUntil, Math.floor((parseFloat(avAmount) + 0.1) / fixedTermData.dailyVal)))}
+                                                    {formatBRDate(addDaysUTC(fixedTermData.paidUntil, Math.floor((safeParse(avAmount) + 0.1) / fixedTermData.dailyVal)))}
                                                 </p>
                                             </div>
                                         </div>
@@ -160,7 +173,16 @@ export const PaymentManagerModal: React.FC<PaymentManagerModalProps> = ({
                                 <label className="text-xs font-bold text-slate-500 mb-1 block">Valor a pagar</label>
                                 <div className="flex items-center gap-2">
                                     <span className="text-slate-500 font-bold">R$</span>
-                                    <input type="number" step="0.01" value={avAmount} onChange={e => setAvAmount(e.target.value)} disabled={isProcessing} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-lg font-bold outline-none focus:border-blue-500 transition-colors" placeholder="0.00" autoFocus />
+                                    <input 
+                                        type="text" 
+                                        inputMode="decimal"
+                                        value={avAmount} 
+                                        onChange={e => setAvAmount(e.target.value.replace(/[^0-9.,]/g, ''))} 
+                                        disabled={isProcessing} 
+                                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-lg font-bold outline-none focus:border-blue-500 transition-colors" 
+                                        placeholder="0,00" 
+                                        autoFocus 
+                                    />
                                 </div>
                             </div>
                         )}

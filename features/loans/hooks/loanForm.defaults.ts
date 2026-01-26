@@ -3,9 +3,11 @@ import { LoanFormState } from '../domain/loanForm.mapper';
 import { LoanBillingModality, PaymentMethod } from '@/types';
 
 export const getInitialFormState = (defaultSourceId: string = ''): LoanFormState => {
-    const defaultDate = new Date();
-    defaultDate.setHours(12, 0, 0, 0);
-    const defaultDateStr = defaultDate.toISOString().split('T')[0];
+    // FIX: Usar a data local correta ao invés de UTC para o input type="date"
+    const now = new Date();
+    // Subtrai o offset do fuso horário para garantir que toISOString() retorne o dia local
+    const localDate = new Date(now.getTime() - (now.getTimezoneOffset() * 60000));
+    const defaultDateStr = localDate.toISOString().split('T')[0];
 
     return {
         clientId: '',

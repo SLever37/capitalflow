@@ -2,7 +2,12 @@
 import { CapitalSource } from '../../../types';
 
 export const safeIsoDateOnly = (val: string | undefined): string => {
-    if (!val) return new Date().toISOString().split('T')[0];
+    if (!val) {
+        // CORREÇÃO: Usar data local compensada para evitar bugs de UTC (data caindo no dia seguinte)
+        const now = new Date();
+        const localDate = new Date(now.getTime() - (now.getTimezoneOffset() * 60000));
+        return localDate.toISOString().split('T')[0];
+    }
     return val.includes('T') ? val.split('T')[0] : val;
 };
 

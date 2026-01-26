@@ -89,6 +89,16 @@ export const useLoanForm = ({ initialData, clients, sources, userProfile, onAdd,
       };
   }, [customDocuments]);
 
+  // CORREÇÃO: Cleanup da Câmera ao desmontar
+  useEffect(() => {
+      return () => {
+          if (videoRef.current && videoRef.current.srcObject) {
+              const stream = videoRef.current.srcObject as MediaStream;
+              stream.getTracks().forEach(t => t.stop());
+          }
+      };
+  }, []);
+
   // Handlers
   const handleClientSelect = (id: string) => {
     if (!id) { setFormData({ ...formData, clientId: '' }); return; }

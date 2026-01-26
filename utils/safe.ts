@@ -45,7 +45,9 @@ export const asNumber = (v: any, fallback = 0, fieldName?: string): number => {
 
 /**
  * Retorna uma string de data ISO segura.
- * Se a entrada for inválida, retorna a data atual para evitar quebra de UI (ex: new Date(invalid)).
+ * Se a entrada for inválida, retorna fallback seguro:
+ * - para campos críticos (ex.: dueDate/startDate) retorna '' (evita distorcer regras/ordenação)
+ * - para campos não críticos, retorna data atual ISO (evita quebra em UI que espera Date)
  */
 export const safeDateString = (v: any, fieldName?: string): string => {
     if (v instanceof Date && !isNaN(v.getTime())) return v.toISOString();
@@ -54,7 +56,9 @@ export const safeDateString = (v: any, fieldName?: string): string => {
         const d = new Date(v);
         if (!isNaN(d.getTime())) return v;
     }
-    const now = new Date().toISOString();
-    logWarning(fieldName, v, now);
-    return now;
+    // Para datas críticas (ex.: vencimento), não use "agora" como fallback, pois isso distorce regras/ordenação.
+    const criticalDateField = fieldName === 'dueDate' || fieldName === 'startDate';
+    const fallback = criticalDateField ? '' : new Date().toISOString();
+    logWarning(fieldName, v, fallback);
+    return fallback;
 };

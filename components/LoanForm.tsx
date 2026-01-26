@@ -34,7 +34,7 @@ export const LoanForm: React.FC<LoanFormProps> = (props) => {
 
   return (
     <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-md flex items-start md:items-center justify-center z-[100] p-4 overflow-y-auto">
-      <div className="bg-slate-900 border border-slate-800 rounded-[2rem] sm:rounded-[3rem] w-full max-w-6xl p-5 sm:p-12 shadow-2xl my-4 md:my-auto animate-in zoom-in-95 duration-200">
+      <div className="bg-slate-900 border border-slate-800 rounded-[2rem] sm:rounded-[3rem] w-full max-w-6xl p-5 sm:p-12 shadow-2xl my-4 md:my-auto animate-in zoom-in-95 duration-200 mb-20 md:mb-auto">
         <div className="flex justify-between items-start mb-6 sm:mb-10">
             <div>
                 <h2 className="text-xl sm:text-3xl font-black text-white tracking-tighter uppercase leading-none">

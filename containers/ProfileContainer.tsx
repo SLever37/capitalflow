@@ -38,7 +38,7 @@ export const ProfileContainer: React.FC<ProfileContainerProps> = ({
         setProfileEditForm={setProfileEditForm} 
         handleSaveProfile={profileCtrl.handleSaveProfile} 
         handlePhotoUpload={profileCtrl.handlePhotoUpload}
-        handleRestoreBackup={(e) => {}} 
+        handleRestoreBackup={profileCtrl.handleRestoreBackup}
         handleExportBackup={() => filesService.handleExportBackup(activeUser, clients, loans, sources, showToast)}
         handleImportExcel={fileCtrl.handleFilePick}
         profilePhotoInputRef={ui.profilePhotoInputRef}
