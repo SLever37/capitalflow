@@ -1,11 +1,40 @@
+
 import { Loan, LoanStatus, UserProfile } from '../../types';
 import { getInstallmentStatusLogic } from '../../domain/finance/calculations';
 
 export const buildDashboardStats = (loans: Loan[], activeUser: UserProfile | null) => {
   const activeLoans = loans.filter(l => !l.isArchived);
-  const totalLent = activeLoans.reduce((acc, l) => acc + l.installments.reduce((instAcc, i) => instAcc + (Number(i.principalRemaining) || 0), 0), 0);
+  
+  // Cálculo de Capital na Rua com filtro de resíduos (Tolerância R$ 0.10)
+  const totalLent = activeLoans.reduce((acc, l) => {
+      // Se todas as parcelas estão pagas, ignora
+      if (l.installments.every(i => i.status === LoanStatus.PAID)) return acc;
+
+      const loanPrincipal = l.installments.reduce((sum, i) => sum + (Number(i.principalRemaining) || 0), 0);
+      const loanInterest = l.installments.reduce((sum, i) => sum + (Number(i.interestRemaining) || 0), 0);
+      const totalDebt = loanPrincipal + loanInterest;
+
+      // Se a dívida total for menor que 10 centavos, considera quitado/resíduo e não soma
+      if (totalDebt < 0.10) return acc;
+
+      return acc + loanPrincipal;
+  }, 0);
+
   const totalReceived = loans.reduce((acc, l) => acc + l.installments.reduce((sum, i) => sum + (Number(i.paidTotal) || 0), 0), 0);
-  const expectedProfit = activeLoans.reduce((acc, l) => acc + l.installments.reduce((sum, i) => sum + (Number(i.interestRemaining) || 0) + (Number(i.lateFeeAccrued) || 0), 0), 0);
+  
+  // Lucro Projetado também deve ignorar resíduos
+  const expectedProfit = activeLoans.reduce((acc, l) => {
+      if (l.installments.every(i => i.status === LoanStatus.PAID)) return acc;
+      
+      const loanPrincipal = l.installments.reduce((sum, i) => sum + (Number(i.principalRemaining) || 0), 0);
+      const loanInterest = l.installments.reduce((sum, i) => sum + (Number(i.interestRemaining) || 0), 0);
+      
+      if ((loanPrincipal + loanInterest) < 0.10) return acc;
+
+      const loanLateFee = l.installments.reduce((sum, i) => sum + (Number(i.lateFeeAccrued) || 0), 0);
+      return acc + loanInterest + loanLateFee;
+  }, 0);
+
   const interestBalance = Number(activeUser?.interestBalance) || 0;
   
   const paidCount = loans.filter(l => l.installments.every(i => i.status === LoanStatus.PAID)).length; 

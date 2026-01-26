@@ -128,7 +128,10 @@ export const processNaturalLanguageCommand = async (text: string, portfolioConte
       }
     });
 
-    const cleanJson = response.text || '{}';
+    let cleanJson = response.text || '{}';
+    // Remove marcadores de código Markdown se existirem
+    cleanJson = cleanJson.replace(/```json/g, '').replace(/```/g, '').trim();
+    
     return JSON.parse(cleanJson);
   } catch (error) {
     console.error("AI CFO Error:", error);

@@ -1,10 +1,14 @@
-import React from 'react';
+
+import React, { useMemo } from 'react';
 import { Receipt, Share2 } from 'lucide-react';
 import { Loan, Installment } from '../../types';
 import { Modal } from '../ui/Modal';
 
 export const ReceiptModal = ({ data, onClose, userName, userDoc }: { data: {loan: Loan, inst: Installment, amountPaid: number, type: string}, onClose: () => void, userName: string, userDoc?: string }) => {
-    const authCode = `${data.inst.id.substring(0, 4).toUpperCase()}-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 1000)}`;
+    // Código de autenticação estável
+    const authCode = useMemo(() => {
+        return `${data.inst.id.substring(0, 4).toUpperCase()}-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 1000)}`;
+    }, [data.inst.id]);
     
     const share = () => {
         const text = `*COMPROVANTE DE PAGAMENTO*\n` +

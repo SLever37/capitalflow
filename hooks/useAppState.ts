@@ -42,6 +42,16 @@ export const useAppState = (activeProfileId: string | null) => {
           
           if (profileError || !profile) {
               console.error("Erro ao carregar perfil:", profileError);
+              
+              // AUTO-RECOVERY: Se o usuário não existe (foi deletado ou ID inválido em localStorage)
+              // Limpa a sessão e recarrega para voltar ao Login.
+              if (profileError?.code === 'PGRST116') {
+                  console.warn("Perfil não encontrado. Sessão inválida detectada. Realizando logout forçado...");
+                  localStorage.removeItem('cm_session');
+                  window.location.reload();
+                  return;
+              }
+
               throw new Error("Perfil não encontrado ou acesso negado.");
           }
 

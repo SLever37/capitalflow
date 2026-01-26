@@ -23,19 +23,20 @@ export const EventModal: React.FC<EventModalProps> = ({ onClose, onSave, initial
     if (initialData) {
       setTitle(initialData.title);
       setDescription(initialData.description || '');
-      // Para editar, usamos o valor salvo (que está em UTC/ISO), pegamos a parte da data.
-      // Se o backend salvar '2023-10-10T00:00:00Z', queremos '2023-10-10'.
+      
+      // CORREÇÃO FUSO HORÁRIO: Ao editar, precisamos da data LOCAL, não UTC.
+      // O input type="date" espera YYYY-MM-DD.
+      // toISOString() retorna UTC. Ex: 20:00 no Brasil vira 23:00 ou 00:00 do dia seguinte em UTC.
       const d = new Date(initialData.start_time);
-      setDate(d.toISOString().split('T')[0]);
+      // Hack seguro para obter YYYY-MM-DD local
+      const localIso = d.toLocaleDateString('sv-SE'); // Formato ISO local (YYYY-MM-DD) suportado por todos browsers modernos
+      setDate(localIso);
+      
       setTime(d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}));
       setPriority(initialData.priority as any);
       setType(initialData.type as any);
     } else if (selectedDate) {
-      // CORREÇÃO DE FUSO HORÁRIO CRÍTICA
-      // O objeto 'selectedDate' vem do clique no calendário (que pode ter hora zerada localmente).
-      // Ao converter para ISOString direto, o JS converte para UTC. 
-      // Se for GMT-3 (Brasil) 00:00, vira dia anterior 21:00 UTC.
-      // Subtrair o offset garante que a string de data (YYYY-MM-DD) seja a local.
+      // Mesma correção para data selecionada no calendário
       const localDate = new Date(selectedDate.getTime() - (selectedDate.getTimezoneOffset() * 60000));
       setDate(localDate.toISOString().split('T')[0]);
     } else {
@@ -50,7 +51,7 @@ export const EventModal: React.FC<EventModalProps> = ({ onClose, onSave, initial
     if (!title) return alert('Título é obrigatório');
     
     // Combina data e hora para criar o timestamp final
-    // Aqui deixamos o navegador criar a data baseada na string local (YYYY-MM-DD + T + HH:MM)
+    // O construtor new Date("YYYY-MM-DDTHH:mm:ss") cria data local no browser
     const combinedDate = new Date(`${date}T${time}:00`);
     
     onSave({
