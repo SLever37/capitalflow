@@ -1,10 +1,11 @@
 
 import React from 'react';
-import { User, Heart, LogOut, Camera, Download, History, FileUp, Settings, RotateCcw } from 'lucide-react';
+import { User, Heart, LogOut, Camera, Download, History, FileUp, Settings, RotateCcw, ShieldAlert } from 'lucide-react';
 import { UserProfile, Loan } from '../types';
 import { maskPhone } from '../utils/formatters';
 import { useProfilePageLogic } from '../features/profile/hooks/useProfilePageLogic';
 import { ProfileAuditLog } from '../features/profile/components/ProfileAuditLog';
+import { ProfileDangerZone } from '../features/profile/components/ProfileDangerZone';
 
 interface ProfilePageProps {
   activeUser: UserProfile;
@@ -59,6 +60,12 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                         <FileUp size={16}/> Restaurar Planilha
                     </button>
                     <input type="file" ref={profileImportRef} onChange={profileCtrl.handleImportProfile} className="hidden" accept=".csv,.xlsx,.xls" />
+
+                    <div className="h-px bg-slate-800 my-2"></div>
+
+                    <button onClick={() => setActiveSection('DANGER')} className={`p-3 rounded-xl text-xs font-black uppercase transition-all flex items-center gap-3 ${activeSection === 'DANGER' ? 'bg-rose-600 text-white shadow-lg shadow-rose-900/20' : 'bg-slate-950 text-rose-500 hover:bg-rose-950/20 border border-slate-800 hover:border-rose-500/30'}`}>
+                        <ShieldAlert size={16}/> Área de Risco
+                    </button>
                 </div>
 
                 <div className="mt-8 space-y-3 pt-6 border-t border-slate-800">
@@ -114,7 +121,14 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                            <ProfileAuditLog logs={auditLogs} />
                        )}
 
-                       {activeSection !== 'AUDIT' && (
+                        {activeSection === 'DANGER' && (
+                           <ProfileDangerZone 
+                               onResetData={() => setResetDataModal(true)}
+                               onDeleteAccount={handleDeleteAccount}
+                           />
+                       )}
+
+                       {!['AUDIT', 'DANGER'].includes(activeSection) && (
                            <div className="pt-6 border-t border-slate-800 flex flex-col gap-4">
                                <div className="flex gap-4">
                                    <button onClick={handleSaveProfile} className="flex-1 py-4 bg-blue-600 text-white rounded-xl font-bold uppercase shadow-lg hover:bg-blue-500 transition-all">Salvar Alterações</button>

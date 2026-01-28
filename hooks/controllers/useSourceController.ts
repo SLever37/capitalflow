@@ -1,6 +1,7 @@
 
 import { supabase } from '../../lib/supabase';
 import { CapitalSource, UserProfile } from '../../types';
+import { parseCurrency } from '../../utils/formatters';
 
 export const useSourceController = (
   activeUser: UserProfile | null,
@@ -12,22 +13,6 @@ export const useSourceController = (
   showToast: (msg: string, type?: 'success' | 'error') => void
 ) => {
 
-  // Helper de parsing robusto (BRL/US)
-  const safeFloat = (val: string | number | undefined) => {
-      if (!val) return 0;
-      if (typeof val === 'number') return val;
-      const str = String(val).trim();
-      // Formato BR (1.000,00) -> Remove ponto, troca vírgula por ponto
-      if (str.includes('.') && str.includes(',')) {
-          return parseFloat(str.replace(/\./g, '').replace(',', '.')) || 0;
-      }
-      // Formato simples com vírgula (1000,00)
-      if (str.includes(',')) {
-          return parseFloat(str.replace(',', '.')) || 0;
-      }
-      return parseFloat(str) || 0;
-  };
-
   const handleSaveSource = async () => {
     if (!activeUser) return;
 
@@ -37,7 +22,7 @@ export const useSourceController = (
     }
     if (ui.isSaving) return;
 
-    const initialBalance = safeFloat(ui.sourceForm.balance);
+    const initialBalance = parseCurrency(ui.sourceForm.balance);
 
     if (activeUser.id === 'DEMO') {
       const newSource: CapitalSource = {
@@ -84,7 +69,7 @@ export const useSourceController = (
   const handleAddFunds = async () => {
     if (!activeUser || !ui.activeModal?.payload || ui.addFundsValue == null) return;
 
-    const amount = safeFloat(ui.addFundsValue);
+    const amount = parseCurrency(ui.addFundsValue);
     
     if (amount <= 0) {
       showToast("Informe um valor válido para adicionar.", "error");
@@ -119,9 +104,7 @@ export const useSourceController = (
   const handleUpdateSourceBalance = async () => {
     if (!activeUser || !ui.editingSource) return;
 
-    // Nota: editingSource.balance já é number (bindado no input number local da page), 
-    // mas se mudarmos o input lá no futuro, safeFloat garante.
-    const newBalance = safeFloat(ui.editingSource.balance);
+    const newBalance = parseCurrency(ui.editingSource.balance);
 
     if (activeUser.id === 'DEMO') {
       setSources(
@@ -151,7 +134,7 @@ export const useSourceController = (
   const handleWithdrawProfit = async () => {
     if (!activeUser || ui.withdrawValue == null) return;
 
-    const amount = safeFloat(ui.withdrawValue);
+    const amount = parseCurrency(ui.withdrawValue);
 
     if (amount <= 0) {
       showToast("Informe um valor válido para resgatar.", "error");

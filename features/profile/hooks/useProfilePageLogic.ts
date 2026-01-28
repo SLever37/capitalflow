@@ -3,7 +3,7 @@ import { useState, useRef, useMemo } from 'react';
 import { Loan, LedgerEntry } from '../../../types';
 
 export const useProfilePageLogic = (loans: Loan[]) => {
-    const [activeSection, setActiveSection] = useState<'PERSONAL' | 'BRAND' | 'DEFAULTS' | 'AUDIT'>('PERSONAL');
+    const [activeSection, setActiveSection] = useState<'PERSONAL' | 'BRAND' | 'DEFAULTS' | 'AUDIT' | 'DANGER'>('PERSONAL');
     const profileImportRef = useRef<HTMLInputElement>(null);
     const backupRestoreRef = useRef<HTMLInputElement>(null);
 

@@ -30,9 +30,9 @@ export const ProfileContainer: React.FC<ProfileContainerProps> = ({
         ui={ui}
         profileCtrl={profileCtrl}
         showToast={showToast}
-        setDonateModal={ui.setDonateModal} 
+        setDonateModal={(val) => val ? ui.openModal('DONATE') : ui.closeModal()} 
         handleLogout={handleLogout} 
-        setResetDataModal={ui.setResetDataModal} 
+        setResetDataModal={(val) => val ? ui.openModal('RESET_DATA') : ui.closeModal()} 
         handleDeleteAccount={profileCtrl.handleDeleteAccount}
         profileEditForm={profileEditForm} 
         setProfileEditForm={setProfileEditForm} 

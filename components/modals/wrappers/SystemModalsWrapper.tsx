@@ -5,12 +5,12 @@ import { Modal } from '../../ui/Modal';
 import { AdminModals } from '../ModalGroups';
 import { ConfirmationModalWrapper, ReceiptModalWrapper, MessageHubWrapper, DonateModalWrapper, AgendaWrapper, FlowWrapper, CalculatorWrapper, AIWrapper, NoteWrapper } from '../ModalWrappers';
 import { RenegotiationModal } from '../../../features/agreements/components/RenegotiationModal';
-import { CheckSquare, Square, Banknote } from 'lucide-react';
+import { CheckSquare, Square, Banknote, AlertTriangle, Loader2 } from 'lucide-react';
 import { formatMoney } from '../../../utils/formatters';
 import { calculateTotalDue } from '../../../domain/finance/calculations';
 
 export const SystemModalsWrapper = () => {
-    const { activeModal, closeModal, ui, activeUser, fileCtrl, showToast, fetchFullData, loanCtrl, profileCtrl, loans } = useModal();
+    const { activeModal, closeModal, ui, activeUser, fileCtrl, showToast, fetchFullData, loanCtrl, profileCtrl, loans, isLoadingData } = useModal();
 
     switch (activeModal?.type) {
         case 'CONFIRMATION': return <ConfirmationModalWrapper />;
@@ -24,39 +24,95 @@ export const SystemModalsWrapper = () => {
         case 'MASTER_EDIT_USER': return <AdminModals />;
         case 'DELETE_ACCOUNT':
             return (
-               <Modal onClose={closeModal} title="EXCLUIR CONTA">
-                   <div className="space-y-4">
-                       <div className="bg-rose-950/30 p-4 rounded-xl border border-rose-500/30 text-rose-200 text-sm font-bold text-center">ATENÇÃO: Esta ação é irreversível.</div>
-                       <div className="flex items-center gap-3"><input type="checkbox" checked={ui.deleteAccountAgree} onChange={e => ui.setDeleteAccountAgree(e.target.checked)} className="w-6 h-6 accent-rose-600" /><span className="text-white text-sm">Eu entendo que perderei tudo.</span></div>
-                       <input type="text" placeholder="Digite DELETAR para confirmar" className="w-full bg-slate-950 p-4 rounded-xl text-white outline-none border border-slate-800" value={ui.deleteAccountConfirm} onChange={e => ui.setDeleteAccountConfirm(e.target.value)} />
-                       <button onClick={async () => { if(ui.deleteAccountAgree && ui.deleteAccountConfirm === 'DELETAR') { await profileCtrl.handleDeleteAccount(); } }} disabled={!ui.deleteAccountAgree || ui.deleteAccountConfirm !== 'DELETAR'} className="w-full py-4 bg-rose-600 text-white font-bold rounded-xl uppercase disabled:opacity-50">Excluir Tudo</button>
+               <Modal onClose={closeModal} title="EXCLUSÃO DE CONTA">
+                   <div className="space-y-5 animate-in fade-in zoom-in-95 duration-200">
+                       <div className="bg-rose-950/30 p-5 rounded-2xl border border-rose-500/30 text-rose-200 text-sm font-medium text-center flex flex-col items-center gap-2">
+                           <AlertTriangle size={32} className="text-rose-500 mb-1"/>
+                           <p className="font-bold uppercase text-xs tracking-widest">Ação Irreversível</p>
+                           <p className="text-xs opacity-80">Você está prestes a apagar sua conta e todos os dados associados permanentemente.</p>
+                       </div>
+                       
+                       <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+                           <label className="flex items-start gap-3 cursor-pointer group">
+                               <div className="relative flex items-center">
+                                   <input type="checkbox" checked={ui.deleteAccountAgree} onChange={e => ui.setDeleteAccountAgree(e.target.checked)} className="peer w-5 h-5 appearance-none border-2 border-slate-600 rounded bg-slate-900 checked:bg-rose-600 checked:border-rose-600 transition-all cursor-pointer" />
+                                   <CheckSquare size={14} className="absolute left-0.5 text-white opacity-0 peer-checked:opacity-100 pointer-events-none"/>
+                               </div>
+                               <span className="text-xs text-slate-300 group-hover:text-white transition-colors select-none leading-tight pt-0.5">
+                                   Li e aceito os termos: Entendo que perderei o acesso imediato e todos os meus dados serão destruídos sem possibilidade de recuperação.
+                               </span>
+                           </label>
+                       </div>
+
+                       <div className="space-y-2">
+                           <label className="text-[10px] font-black uppercase text-slate-500 ml-1">Confirmação de Segurança</label>
+                           <input 
+                                type="text" 
+                                placeholder="Digite DELETAR para confirmar" 
+                                className="w-full bg-slate-950 p-4 rounded-xl text-white outline-none border border-slate-800 focus:border-rose-500 transition-all font-bold placeholder:font-normal" 
+                                value={ui.deleteAccountConfirm} 
+                                onChange={e => ui.setDeleteAccountConfirm(e.target.value)} 
+                           />
+                       </div>
+
+                       <button 
+                            onClick={async () => { if(ui.deleteAccountAgree && ui.deleteAccountConfirm === 'DELETAR') { await profileCtrl.handleDeleteAccount(); } }} 
+                            disabled={!ui.deleteAccountAgree || ui.deleteAccountConfirm !== 'DELETAR' || isLoadingData} 
+                            className="w-full py-4 bg-rose-600 hover:bg-rose-500 text-white font-black rounded-xl uppercase disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-rose-900/20 flex items-center justify-center gap-2"
+                        >
+                            {isLoadingData ? <Loader2 className="animate-spin" size={18}/> : 'Confirmar Exclusão Total'}
+                       </button>
                    </div>
                </Modal>
             );
         case 'RESET_DATA':
             return activeUser ? (
                <Modal onClose={closeModal} title="Zerar Dados">
-                   <div className="space-y-4">
-                       <p className="text-slate-400 text-sm">Apaga clientes e contratos, mantendo a conta.</p>
-                       {activeUser.id !== 'DEMO' && <input type="password" placeholder="Sua senha atual" className="w-full bg-slate-950 p-4 rounded-xl text-white outline-none border border-slate-800" value={ui.resetPasswordInput} onChange={e => ui.setResetPasswordInput(e.target.value)} />}
-                       <button onClick={profileCtrl.handleResetData} className="w-full py-4 bg-rose-600 text-white font-bold rounded-xl uppercase">Confirmar Reset</button>
+                   <div className="space-y-5 animate-in fade-in zoom-in-95 duration-200">
+                       <div className="bg-amber-950/30 p-4 rounded-2xl border border-amber-500/30 flex items-center gap-3">
+                           <AlertTriangle className="text-amber-500 flex-shrink-0" size={24}/>
+                           <div className="text-amber-200 text-xs">
+                               <p className="font-bold uppercase mb-1">Limpeza de Base</p>
+                               <p className="leading-tight opacity-90">Isso apagará TODOS os clientes, contratos e histórico financeiro. Sua conta e login permanecerão ativos.</p>
+                           </div>
+                       </div>
+
+                       {activeUser.id !== 'DEMO' && (
+                           <div className="space-y-2">
+                               <label className="text-[10px] font-black uppercase text-slate-500 ml-1">Senha Atual</label>
+                               <input 
+                                    type="password" 
+                                    placeholder="Digite sua senha para confirmar" 
+                                    className="w-full bg-slate-950 p-4 rounded-xl text-white outline-none border border-slate-800 focus:border-amber-500 transition-all" 
+                                    value={ui.resetPasswordInput} 
+                                    onChange={e => ui.setResetPasswordInput(e.target.value)} 
+                               />
+                           </div>
+                       )}
+                       
+                       <div className="flex gap-3">
+                           <button onClick={closeModal} disabled={isLoadingData} className="flex-1 py-4 bg-slate-800 text-white font-bold rounded-xl uppercase text-xs disabled:opacity-50">Cancelar</button>
+                           <button 
+                                onClick={profileCtrl.executeResetData} 
+                                disabled={(activeUser.id !== 'DEMO' && !ui.resetPasswordInput) || isLoadingData}
+                                className="flex-[2] py-4 bg-rose-600 hover:bg-rose-500 text-white font-black rounded-xl uppercase transition-all shadow-lg shadow-rose-900/20 text-xs disabled:opacity-50 flex items-center justify-center gap-2"
+                           >
+                               {isLoadingData ? <Loader2 className="animate-spin" size={18}/> : 'Confirmar Reset'}
+                           </button>
+                       </div>
                    </div>
                </Modal>
             ) : null;
         case 'AGENDA':
             const handleSystemAction = (type: string, meta: any) => {
-                ui.closeModal(); // Fecha a agenda visualmente
+                ui.closeModal(); 
                 
                 if (type === 'PAYMENT' && meta?.loanId && meta?.installmentId) {
-                    // Busca os dados
                     const loan = loans.find(l => l.id === meta.loanId);
                     if (loan) {
                         const inst = loan.installments.find(i => i.id === meta.installmentId);
                         if (inst) {
                             const calcs = calculateTotalDue(loan, inst);
-                            
-                            // CRÍTICO: Configura o modal DENTRO do timeout para garantir
-                            // que a limpeza do closeModal() anterior já ocorreu e não vai sobrescrever.
                             setTimeout(() => {
                                 ui.setPaymentModal({ loan, inst, calculations: calcs });
                                 ui.openModal('PAYMENT');

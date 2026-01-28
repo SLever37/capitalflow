@@ -28,6 +28,31 @@ export const formatMoney = (value: number | string | undefined | null, isStealth
 };
 
 /**
+ * Converte inputs de string (ex: "1.200,50" ou "1200.50") para number float de forma segura.
+ */
+export const parseCurrency = (val: string | number | undefined | null): number => {
+    if (val === null || val === undefined || val === '') return 0;
+    if (typeof val === 'number') return val;
+    
+    const str = String(val).trim();
+    
+    // Formato Brasileiro (com ponto separador de milhar e vírgula decimal)
+    // Ex: 1.000,00 -> remove ponto, troca virgula por ponto
+    if (str.includes('.') && str.includes(',')) {
+        return parseFloat(str.replace(/\./g, '').replace(',', '.')) || 0;
+    }
+    
+    // Formato com vírgula decimal simples
+    // Ex: 1000,00 -> troca virgula por ponto
+    if (str.includes(',')) {
+        return parseFloat(str.replace(',', '.')) || 0;
+    }
+    
+    // Formato padrão ou limpo
+    return parseFloat(str) || 0;
+};
+
+/**
  * Normaliza telefone para o padrão brasileiro celular: (XX) 9XXXX-XXXX
  */
 export const normalizeBrazilianPhone = (value: string | undefined | null): string => {

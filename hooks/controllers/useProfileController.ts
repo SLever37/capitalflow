@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { supabase } from '../../lib/supabase';
 import { operatorProfileService } from '../../features/profile/services/operatorProfileService';
 import { readBackupFile } from '../../services/dataService';
 import { UserProfile } from '../../types';
@@ -33,7 +34,6 @@ export const useProfileController = (
       
       setIsLoadingData(true);
       try {
-          // Delegação total ao serviço seguro
           const updatedProfile = await operatorProfileService.updateProfile(activeUser.id, profileEditForm, 'MANUAL');
           
           if (updatedProfile) {
@@ -119,9 +119,30 @@ export const useProfileController = (
   const handleDeleteAccount = async () => { 
       if (!activeUser) return; 
       if (activeUser.id === 'DEMO') { showToast("Conta Demo não pode ser excluída.", "error"); return; } 
-      ui.setDeleteAccountAgree(false); 
-      ui.setDeleteAccountConfirm(''); 
-      ui.openModal('DELETE_ACCOUNT'); 
+      
+      if (ui.deleteAccountConfirm === 'DELETAR') {
+          setIsLoadingData(true);
+          try {
+              // Reutiliza a lógica robusta de limpeza de dados primeiro
+              await executeCleanData(activeUser.id);
+              
+              // Por fim, remove o perfil
+              const { error } = await supabase.from('perfis').delete().eq('id', activeUser.id);
+              if (error) throw error;
+              
+              showToast("Conta excluída com sucesso. Até logo!", "success");
+              handleLogout();
+          } catch (e: any) {
+              showToast("Erro ao excluir conta: " + e.message, "error");
+          } finally {
+              setIsLoadingData(false);
+              ui.closeModal();
+          }
+      } else {
+          ui.setDeleteAccountAgree(false); 
+          ui.setDeleteAccountConfirm(''); 
+          ui.openModal('DELETE_ACCOUNT'); 
+      }
   };
 
   const handleResetData = async () => {
@@ -135,7 +156,72 @@ export const useProfileController = (
          setIsLoadingData(false);
          return; 
      }
+     ui.setResetPasswordInput(''); 
      ui.openModal('RESET_DATA');
+  };
+
+  // Função auxiliar isolada para limpeza sequencial segura
+  const executeCleanData = async (profileId: string) => {
+      // 1. Limpeza de Logs de Acesso (Dependência Crítica de Clientes)
+      // Precisamos buscar os IDs dos clientes primeiro, pois os logs apontam para eles.
+      const { data: clients } = await supabase.from('clientes').select('id').eq('profile_id', profileId);
+      if (clients && clients.length > 0) {
+          const clientIds = clients.map(c => c.id);
+          // Deleta em lotes para evitar timeout se houver muitos logs
+          await supabase.from('logs_acesso_cliente').delete().in('client_id', clientIds);
+      }
+
+      // 2. Transações (Ledger) - Dependência Crítica de Fontes e Contratos
+      // Deve ser apagado antes de contratos e fontes.
+      await supabase.from('transacoes').delete().eq('profile_id', profileId);
+
+      // 3. Módulo Jurídico e Acordos (Cascata Manual)
+      await supabase.from('documentos_juridicos').delete().eq('profile_id', profileId);
+      await supabase.from('acordo_pagamentos').delete().eq('profile_id', profileId);
+      await supabase.from('acordo_parcelas').delete().eq('profile_id', profileId);
+      await supabase.from('acordos_inadimplencia').delete().eq('profile_id', profileId);
+
+      // 4. Módulo Operacional (Contratos e Parcelas)
+      await supabase.from('sinalizacoes_pagamento').delete().eq('profile_id', profileId);
+      await supabase.from('parcelas').delete().eq('profile_id', profileId);
+      await supabase.from('contratos').delete().eq('profile_id', profileId);
+      
+      // 5. Clientes (Agora seguro pois logs e contratos foram removidos)
+      await supabase.from('clientes').delete().eq('profile_id', profileId);
+      
+      // 6. Fontes (Agora seguro pois transações foram removidas)
+      await supabase.from('fontes').delete().eq('profile_id', profileId);
+  };
+
+  // Executa o reset real (Chamado pelo botão "Confirmar Reset" no modal)
+  const executeResetData = async () => {
+      if (!activeUser) return;
+      
+      if (activeUser.id !== 'DEMO' && ui.resetPasswordInput !== activeUser.password) {
+          showToast("Senha incorreta.", "error");
+          return;
+      }
+
+      setIsLoadingData(true);
+      try {
+          await executeCleanData(activeUser.id);
+
+          // Reset de sado no perfil para zerar caixa
+          await supabase.from('perfis').update({ 
+              total_available_capital: 0, 
+              interest_balance: 0 
+          }).eq('id', activeUser.id);
+
+          showToast("Base de dados limpa com sucesso!", "success");
+          ui.closeModal();
+          await fetchFullData(activeUser.id);
+
+      } catch (e: any) {
+          console.error("Critical Reset Error:", e);
+          showToast("Erro durante o reset: " + (e.message || "Violação de integridade"), "error");
+      } finally {
+          setIsLoadingData(false);
+      }
   };
 
   return {
@@ -144,6 +230,7 @@ export const useProfileController = (
     handleImportProfile,
     handleRestoreBackup,
     handleDeleteAccount,
-    handleResetData
+    handleResetData,
+    executeResetData
   };
 };
