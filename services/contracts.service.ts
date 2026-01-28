@@ -1,4 +1,3 @@
-
 import { supabase } from '../lib/supabase';
 import { Loan, UserProfile, CapitalSource } from '../types';
 import { onlyDigits, isTestClientName } from '../utils/formatters';
@@ -57,7 +56,6 @@ export const contractsService = {
     const interestRate = Number(loan.interestRate) || 0;
 
     // --- LÓGICA DE SALDO ATÔMICA (Deltas via RPC) ---
-    // Armazena as operações de saldo realizadas para possível rollback
     const rollbackOperations: Array<() => Promise<void>> = [];
 
     try {
@@ -68,10 +66,16 @@ export const contractsService = {
             if (editingLoan.sourceId !== finalSourceId) {
                 // TROCA DE FONTE: Estorna integral na antiga, debita integral na nova
                 await supabase.rpc('adjust_source_balance', { p_source_id: editingLoan.sourceId, p_delta: oldPrincipal });
-                rollbackOperations.push(async () => { await supabase.rpc('adjust_source_balance', { p_source_id: editingLoan.sourceId, p_delta: -oldPrincipal }); });
+                rollbackOperations.push(async () => { 
+                    await supabase.rpc('adjust_source_balance', { p_source_id: editingLoan.sourceId, p_delta: -oldPrincipal }); 
+                    return;
+                });
 
                 await supabase.rpc('adjust_source_balance', { p_source_id: finalSourceId, p_delta: -principal });
-                rollbackOperations.push(async () => { await supabase.rpc('adjust_source_balance', { p_source_id: finalSourceId, p_delta: principal }); });
+                rollbackOperations.push(async () => { 
+                    await supabase.rpc('adjust_source_balance', { p_source_id: finalSourceId, p_delta: principal }); 
+                    return;
+                });
                 
                 // Log de Estorno técnico
                 await supabase.from('transacoes').insert([{ 
@@ -83,12 +87,18 @@ export const contractsService = {
             else if (Math.abs(diff) > 0.01) {
                 // MESMA FONTE: Debita apenas a diferença
                 await supabase.rpc('adjust_source_balance', { p_source_id: finalSourceId, p_delta: -diff });
-                rollbackOperations.push(async () => { await supabase.rpc('adjust_source_balance', { p_source_id: finalSourceId, p_delta: diff }); });
+                rollbackOperations.push(async () => { 
+                    await supabase.rpc('adjust_source_balance', { p_source_id: finalSourceId, p_delta: diff }); 
+                    return;
+                });
             }
         } else {
             // NOVO CONTRATO: Debita valor principal total da fonte
             await supabase.rpc('adjust_source_balance', { p_source_id: finalSourceId, p_delta: -principal });
-            rollbackOperations.push(async () => { await supabase.rpc('adjust_source_balance', { p_source_id: finalSourceId, p_delta: principal }); });
+            rollbackOperations.push(async () => { 
+                await supabase.rpc('adjust_source_balance', { p_source_id: finalSourceId, p_delta: principal }); 
+                return;
+            });
         }
 
         const contractData: any = { 

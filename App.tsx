@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef } from 'react';
 
 import { AppShell } from './layout/AppShell';
@@ -146,8 +145,10 @@ export const App: React.FC = () => {
             <MasterContainer allUsers={allUsers} ui={ui} adminCtrl={adminCtrl} />
         )}
 
+        {/* Fix: Passed missing isLoadingData prop to ModalHostContainer */}
         <ModalHostContainer 
             ui={ui} activeUser={activeUser} clients={clients} sources={sources} loans={loans}
+            isLoadingData={isLoadingData}
             loanCtrl={loanCtrl} clientCtrl={clientCtrl} sourceCtrl={sourceCtrl} paymentCtrl={paymentCtrl}
             profileCtrl={profileCtrl} adminCtrl={adminCtrl} fileCtrl={fileCtrl} aiCtrl={aiCtrl}
             showToast={showToast} fetchFullData={fetchFullData} handleLogout={handleLogout}

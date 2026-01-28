@@ -23,13 +23,13 @@ export const useFileController = (
       const file = e.target.files?.[0];
       if (!file) return;
       
-      e.target.value = ''; // Reset input to allow same file selection
+      e.target.value = ''; // Reset input
 
       try {
           const sheets = await filesService.getImportSheets(file);
+          ui.setPendingImportFile(file);
           
           if (sheets.length > 1) {
-              ui.setPendingImportFile(file);
               ui.setImportSheetNames(sheets);
               ui.openModal('IMPORT_SHEET_SELECT');
           } else {
@@ -45,7 +45,11 @@ export const useFileController = (
           const parsed = await filesService.parseImportFile(file, sheetName);
           if (parsed.length > 0) {
               ui.setImportCandidates(parsed);
-              ui.setSelectedImportIndices([]);
+              // Pré-seleciona apenas os válidos
+              const validIndices = parsed
+                  .map((c, i) => c.status === 'VALID' ? i : -1)
+                  .filter(idx => idx !== -1);
+              ui.setSelectedImportIndices(validIndices);
               ui.openModal('IMPORT_PREVIEW');
           } else {
               showToast('Nenhum dado válido encontrado nesta aba.', 'error');
@@ -58,18 +62,22 @@ export const useFileController = (
   const selectSheet = async (sheetName: string) => {
       if (ui.pendingImportFile) {
           const file = ui.pendingImportFile;
-          ui.closeModal(); // fecha modal de selecao
+          ui.closeModal(); 
           await processImport(file, sheetName);
-          ui.setPendingImportFile(null); // Limpeza de estado após uso
       }
   };
 
   const handleConfirmImport = async (activeUser: UserProfile | null, fetchFullData: (id: string) => Promise<void>) => {
       try {
           const selected = ui.importCandidates.filter((_: any, i: number) => ui.selectedImportIndices.includes(i));
+          if (selected.length === 0) {
+              showToast('Nenhum registro selecionado.', 'info');
+              return;
+          }
           await filesService.saveSelectedClients(selected, activeUser, showToast);
           ui.closeModal();
           ui.setImportCandidates([]);
+          ui.setPendingImportFile(null);
           if (activeUser) await fetchFullData(activeUser.id);
       } catch (err: any) {
           showToast(err.message, 'error');
@@ -77,6 +85,8 @@ export const useFileController = (
   };
 
   const toggleImportSelection = (index: number) => {
+      if (ui.importCandidates[index].status === 'INVALID') return; // Bloqueia seleção de inválidos
+      
       if (ui.selectedImportIndices.includes(index)) {
           ui.setSelectedImportIndices((prev: number[]) => prev.filter(i => i !== index));
       } else {
@@ -88,6 +98,7 @@ export const useFileController = (
       ui.closeModal();
       ui.setPendingImportFile(null);
       ui.setImportSheetNames([]);
+      ui.setImportCandidates([]);
   };
 
   return {

@@ -56,8 +56,7 @@ export const filesService = {
             if (row.status === 'INVALID') continue;
             
             const clientId = generateUUID();
-            // Add explicit string typing to Sets to fix "Set<unknown>" vs "Set<string>" error
-            const codes = new Set<string>(); // Em um cenário real, precisaríamos de uma lista de códigos existentes aqui
+            const codes = new Set<string>(); 
             const clientNumSet = new Set<string>();
 
             const { error: clientError } = await supabase.from('clientes').insert({ 
@@ -71,7 +70,8 @@ export const filesService = {
                 document: row.document || null, 
                 cpf: (row.document?.length === 11 ? row.document : null), 
                 cnpj: (row.document?.length === 14 ? row.document : null), 
-                notes: row.notes,
+                address: row.address || null,
+                notes: row.notes || 'Importado via Planilha',
                 created_at: new Date().toISOString() 
             });
 
@@ -81,6 +81,7 @@ export const filesService = {
             }
             clientsCount++;
 
+            // Se a planilha tinha dados financeiros, cria o contrato automaticamente
             if (row.principal && row.principal > 0) {
                 const loanId = generateUUID();
                 const rate = row.interestRate || activeUser.defaultInterestRate || 30;
@@ -98,6 +99,7 @@ export const filesService = {
                     debtor_name: row.name,
                     debtor_phone: row.phone,
                     debtor_document: row.document,
+                    debtor_address: row.address,
                     principal: row.principal,
                     interest_rate: rate,
                     fine_percent: activeUser.defaultFinePercent || 2,
@@ -108,7 +110,7 @@ export const filesService = {
                     total_to_receive: totalAmount,
                     status: 'ACTIVE',
                     created_at: startDate,
-                    notes: 'Importado via Planilha'
+                    notes: 'Contrato gerado via Importação Inteligente'
                 });
 
                 if (!loanError) {
@@ -127,16 +129,10 @@ export const filesService = {
                         status: 'PENDING'
                     });
 
-                    // RPC UNIFICADO: adjust_source_balance com delta negativo
-                    const { error: rpcError } = await supabase.rpc('adjust_source_balance', { 
+                    await supabase.rpc('adjust_source_balance', { 
                         p_source_id: defaultSourceId, 
                         p_delta: -row.principal 
                     });
-
-                    if (rpcError) {
-                        const { data: curr } = await supabase.from('fontes').select('balance').eq('id', defaultSourceId).single();
-                        if (curr) await supabase.from('fontes').update({ balance: curr.balance - row.principal }).eq('id', defaultSourceId);
-                    }
 
                     await supabase.from('transacoes').insert({
                         id: generateUUID(),
@@ -147,7 +143,7 @@ export const filesService = {
                         type: 'LEND_MORE',
                         amount: row.principal,
                         principal_delta: 0, interest_delta: 0, late_fee_delta: 0, 
-                        notes: 'Empréstimo Importado',
+                        notes: 'Aporte inicial (Importação)',
                         category: 'INVESTIMENTO'
                     });
 
@@ -156,11 +152,11 @@ export const filesService = {
             }
         }
         
-        showToast(`Importação: ${clientsCount} clientes, ${loansCount} contratos criados.`, "success"); 
+        showToast(`Sucesso: ${clientsCount} clientes importados, ${loansCount} contratos criados.`, "success"); 
         
     } catch (err: any) { 
         console.error(err); 
-        throw new Error("Erro crítico na importação: " + (err?.message || 'desconhecido')); 
+        throw new Error("Erro na gravação dos dados: " + (err?.message || 'desconhecido')); 
     }
   },
 

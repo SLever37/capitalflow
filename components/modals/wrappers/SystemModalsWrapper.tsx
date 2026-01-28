@@ -5,7 +5,7 @@ import { Modal } from '../../ui/Modal';
 import { AdminModals } from '../ModalGroups';
 import { ConfirmationModalWrapper, ReceiptModalWrapper, MessageHubWrapper, DonateModalWrapper, AgendaWrapper, FlowWrapper, CalculatorWrapper, AIWrapper, NoteWrapper } from '../ModalWrappers';
 import { RenegotiationModal } from '../../../features/agreements/components/RenegotiationModal';
-import { CheckSquare, Square, Banknote, AlertTriangle, Loader2 } from 'lucide-react';
+import { CheckSquare, Square, Banknote, AlertTriangle, Loader2, Calendar, Percent, Info, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { formatMoney } from '../../../utils/formatters';
 import { calculateTotalDue } from '../../../domain/finance/calculations';
 
@@ -146,41 +146,112 @@ export const SystemModalsWrapper = () => {
 
         case 'IMPORT_SHEET_SELECT':
             return (
-               <Modal onClose={closeModal} title="Selecione a Aba">
-                   <div className="space-y-2">
-                       <p className="text-slate-400 text-sm mb-4">O arquivo possui múltiplas planilhas. Qual deseja importar?</p>
-                       {ui.importSheetNames.map((sheet: string) => (
-                           <button key={sheet} onClick={() => fileCtrl.selectSheet(sheet)} className="w-full p-4 bg-slate-950 border border-slate-800 rounded-xl text-left hover:border-blue-500 hover:text-blue-400 transition-all font-bold text-white">
-                               {sheet}
-                           </button>
-                       ))}
+               <Modal onClose={closeModal} title="Selecione a Planilha">
+                   <div className="space-y-3">
+                       <div className="bg-blue-900/20 p-4 rounded-2xl border border-blue-500/30 flex items-start gap-3 mb-4">
+                           <Info className="text-blue-400 shrink-0" size={20}/>
+                           <p className="text-xs text-blue-200">Detectamos múltiplas abas no seu arquivo. Escolha qual contém os dados dos clientes.</p>
+                       </div>
+                       <div className="grid grid-cols-1 gap-2">
+                           {ui.importSheetNames.map((sheet: string) => (
+                               <button key={sheet} onClick={() => fileCtrl.selectSheet(sheet)} className="w-full p-5 bg-slate-950 border border-slate-800 rounded-2xl text-left hover:border-blue-500 hover:bg-slate-900 transition-all font-black uppercase text-xs text-white flex justify-between items-center group">
+                                   {sheet}
+                                   <Calendar className="text-slate-700 group-hover:text-blue-500" size={16}/>
+                               </button>
+                           ))}
+                       </div>
                    </div>
                </Modal>
             );
 
         case 'IMPORT_PREVIEW':
             return (
-               <Modal onClose={fileCtrl.cancelImport} title="Selecionar Dados">
-                   <div className="space-y-4">
-                       <p className="text-slate-400 text-xs">Foram encontrados {ui.importCandidates.length} registros.</p>
-                       <div className="bg-slate-950 border border-slate-800 rounded-xl max-h-[300px] overflow-y-auto custom-scrollbar">
-                           {ui.importCandidates.map((c: any, i: number) => (
-                               <div key={i} className="flex items-center gap-3 p-3 border-b border-slate-800 last:border-0 hover:bg-slate-900 transition-colors cursor-pointer" onClick={() => fileCtrl.toggleImportSelection(i)}>
-                                   <div className={`p-1 rounded ${ui.selectedImportIndices.includes(i) ? 'text-blue-500' : 'text-slate-600'}`}>
-                                       {ui.selectedImportIndices.includes(i) ? <CheckSquare size={20}/> : <Square size={20}/>}
-                                   </div>
-                                   <div className="overflow-hidden flex-1">
-                                       <div className="flex justify-between items-start">
-                                           <p className="text-xs font-bold text-white truncate">{c.name || 'Sem Nome'}</p>
-                                           {c.principal && (<span className="text-[10px] font-black text-emerald-500 bg-emerald-950/30 px-1.5 py-0.5 rounded flex items-center gap-1"><Banknote size={10}/> {formatMoney(c.principal)}</span>)}
-                                       </div>
-                                       <p className="text-[10px] text-slate-500 truncate">{c.phone} {c.document ? `• ${c.document}` : ''}</p>
-                                   </div>
+               <Modal onClose={fileCtrl.cancelImport} title="Curadoria de Importação">
+                   <div className="space-y-6">
+                       <div className="flex justify-between items-center">
+                           <div className="flex gap-4">
+                               <div className="text-center">
+                                   <p className="text-[10px] font-black uppercase text-slate-500">Total Detectado</p>
+                                   <p className="text-lg font-black text-white">{ui.importCandidates.length}</p>
                                </div>
-                           ))}
+                               <div className="text-center">
+                                   <p className="text-[10px] font-black uppercase text-blue-500">Selecionados</p>
+                                   <p className="text-lg font-black text-blue-400">{ui.selectedImportIndices.length}</p>
+                               </div>
+                           </div>
+                           <div className="flex gap-2">
+                               <button onClick={() => ui.setSelectedImportIndices(ui.importCandidates.map((_:any, i:number) => i).filter((i:number) => ui.importCandidates[i].status === 'VALID'))} className="text-[9px] font-black uppercase text-blue-500 hover:text-white">Marcar Todos Válidos</button>
+                               <span className="text-slate-800">|</span>
+                               <button onClick={() => ui.setSelectedImportIndices([])} className="text-[9px] font-black uppercase text-slate-500 hover:text-white">Desmarcar</button>
+                           </div>
                        </div>
-                       <button onClick={() => fileCtrl.handleConfirmImport(activeUser, fetchFullData)} className="w-full py-4 bg-emerald-600 text-white font-bold rounded-xl uppercase shadow-lg flex items-center justify-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled={ui.selectedImportIndices.length === 0}>
-                           Confirmar Importação
+
+                       <div className="bg-slate-950 border border-slate-800 rounded-[2rem] overflow-hidden">
+                           <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
+                               {ui.importCandidates.map((c: any, i: number) => {
+                                   const isSelected = ui.selectedImportIndices.includes(i);
+                                   const isInvalid = c.status === 'INVALID';
+                                   
+                                   return (
+                                       <div key={i} 
+                                            className={`flex items-start gap-4 p-4 border-b border-slate-900 last:border-0 hover:bg-slate-900/50 transition-colors cursor-pointer ${isInvalid ? 'opacity-50 grayscale' : ''}`} 
+                                            onClick={() => fileCtrl.toggleImportSelection(i)}
+                                       >
+                                           <div className={`mt-1 p-0.5 rounded transition-colors ${isSelected ? 'text-blue-500' : 'text-slate-700'}`}>
+                                               {isSelected ? <CheckSquare size={22}/> : <Square size={22}/>}
+                                           </div>
+                                           <div className="flex-1 min-w-0">
+                                               <div className="flex justify-between items-start gap-2">
+                                                   <h4 className="text-sm font-black text-white uppercase truncate">{c.name || 'Sem Nome'}</h4>
+                                                   {isInvalid ? (
+                                                       <span className="shrink-0 flex items-center gap-1 text-[8px] font-black uppercase bg-rose-500/10 text-rose-500 px-2 py-0.5 rounded border border-rose-500/20">
+                                                           <AlertCircle size={10}/> {c.error}
+                                                       </span>
+                                                   ) : (
+                                                       <span className="shrink-0 flex items-center gap-1 text-[8px] font-black uppercase bg-emerald-500/10 text-emerald-500 px-2 py-0.5 rounded border border-emerald-500/20">
+                                                           <CheckCircle2 size={10}/> Pronto
+                                                       </span>
+                                                   )}
+                                               </div>
+                                               <p className="text-[10px] text-slate-500 font-bold mb-3">{c.phone || 'Sem Telefone'} {c.document ? `• ${c.document}` : ''}</p>
+                                               
+                                               {/* Resumo Financeiro Curado */}
+                                               <div className="grid grid-cols-3 gap-2">
+                                                   <div className="bg-slate-900/80 p-2 rounded-xl border border-slate-800">
+                                                       <p className="text-[8px] font-black text-slate-600 uppercase mb-0.5">Capital</p>
+                                                       <p className="text-[10px] font-bold text-white truncate">{c.principal ? formatMoney(c.principal) : '-'}</p>
+                                                   </div>
+                                                   <div className="bg-slate-900/80 p-2 rounded-xl border border-slate-800">
+                                                       <p className="text-[8px] font-black text-slate-600 uppercase mb-0.5">Taxa</p>
+                                                       <p className="text-[10px] font-bold text-emerald-500">{c.interestRate ? `${c.interestRate}%` : '-'}</p>
+                                                   </div>
+                                                   <div className="bg-slate-900/80 p-2 rounded-xl border border-slate-800">
+                                                       <p className="text-[8px] font-black text-slate-600 uppercase mb-0.5">Início</p>
+                                                       <p className="text-[10px] font-bold text-blue-400">{c.startDate ? new Date(c.startDate).toLocaleDateString() : '-'}</p>
+                                                   </div>
+                                               </div>
+                                           </div>
+                                       </div>
+                                   );
+                               })}
+                           </div>
+                       </div>
+
+                       <div className="bg-amber-900/10 border border-amber-500/20 p-4 rounded-2xl flex items-start gap-3">
+                           <AlertTriangle className="text-amber-500 shrink-0" size={18}/>
+                           <p className="text-[10px] text-amber-200/80 leading-relaxed font-medium uppercase">
+                               <b>Curadoria:</b> Contratos com Capital serão gerados automaticamente na <b>Carteira Principal</b> com vencimento para 30 dias após a data de início.
+                           </p>
+                       </div>
+
+                       <button 
+                           onClick={() => fileCtrl.handleConfirmImport(activeUser, fetchFullData)} 
+                           className="w-full py-5 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-2xl uppercase shadow-xl shadow-emerald-900/20 flex items-center justify-center gap-3 text-xs disabled:opacity-50 disabled:cursor-not-allowed transition-all" 
+                           disabled={ui.selectedImportIndices.length === 0}
+                       >
+                           {ui.selectedImportIndices.length > 0 ? (
+                               <><Banknote size={18}/> Importar {ui.selectedImportIndices.length} Registros</>
+                           ) : 'Selecione registros para importar'}
                        </button>
                    </div>
                </Modal>

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { ModalHost } from '../components/modals/ModalHost';
 import { UserProfile, Client, CapitalSource, Loan } from '../types';
@@ -11,6 +10,8 @@ interface ModalHostContainerProps {
   clients: Client[];
   sources: CapitalSource[];
   loans: Loan[];
+  // Fix: Added missing isLoadingData to ModalHostContainerProps
+  isLoadingData: boolean;
   loanCtrl: any;
   clientCtrl: any;
   sourceCtrl: any;

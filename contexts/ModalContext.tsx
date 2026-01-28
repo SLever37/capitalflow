@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, ReactNode } from 'react';
 import { UserProfile, Client, Loan, CapitalSource } from '../types';
 
@@ -46,6 +45,8 @@ interface ModalContextType {
     clients: Client[];
     sources: CapitalSource[];
     loans: Loan[];
+    // Fix: Added missing isLoadingData to ModalContextType
+    isLoadingData: boolean;
 
     // Controladores
     loanCtrl: any;

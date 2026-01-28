@@ -3,33 +3,47 @@ import * as XLSX from 'xlsx';
 import { ImportCandidate } from '../domain/importSchema';
 import { onlyDigits, normalizeBrazilianPhone } from '../../../../utils/formatters';
 
-// Helper para converter valores monetários (R$ 1.000,00 -> 1000.00) ou (1,000.00 -> 1000.00)
+// Helper para converter valores monetários de forma agressiva
 const parseCurrency = (val: any): number => {
     if (typeof val === 'number') return val;
     if (!val) return 0;
     const str = String(val).trim();
-    // Se tiver formato brasileiro (ponto separando milhar, vírgula decimal)
-    if (str.includes(',') && !str.includes('US') && !str.includes('$')) {
-        return parseFloat(str.replace(/\./g, '').replace(',', '.')) || 0;
+    // Suporte a R$ 1.000,00 ou 1,000.00
+    if (str.includes(',') && str.includes('.')) {
+        // Se a vírgula vem depois do ponto, é formato BR
+        if (str.lastIndexOf(',') > str.lastIndexOf('.')) {
+            return parseFloat(str.replace(/\./g, '').replace(',', '.')) || 0;
+        }
     }
+    if (str.includes(',')) return parseFloat(str.replace(',', '.')) || 0;
     return parseFloat(str.replace(/[^0-9.-]+/g, '')) || 0;
 };
 
-// Helper para datas do Excel
+// Helper para datas do Excel (Serial ou String)
 const parseExcelDate = (val: any): string | undefined => {
     if (!val) return undefined;
     if (val instanceof Date) return val.toISOString();
-    // Excel Serial Date
+    
+    // Serial do Excel (número de dias desde 1900)
     if (typeof val === 'number' && val > 20000) {
         const date = new Date(Math.round((val - 25569) * 86400 * 1000));
         return date.toISOString();
     }
-    // String DD/MM/YYYY
+    
     const str = String(val).trim();
-    if (/^\d{2}\/\d{2}\/\d{4}$/.test(str)) {
-        const [d, m, y] = str.split('/').map(Number);
+    // DD/MM/YYYY
+    if (/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(str)) {
+        const parts = str.split('/');
+        const d = parseInt(parts[0]);
+        const m = parseInt(parts[1]);
+        let y = parseInt(parts[2]);
+        if (y < 100) y += 2000;
         return new Date(y, m - 1, d).toISOString();
     }
+    
+    // YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return new Date(str).toISOString();
+
     return undefined;
 };
 
@@ -57,69 +71,69 @@ export const importService = {
             reader.onload = (e) => {
                 try {
                     const data = new Uint8Array(e.target?.result as ArrayBuffer);
-                    const workbook = XLSX.read(data, { type: 'array' });
-                    
-                    // Se sheetName não for fornecido, pega a primeira
+                    const workbook = XLSX.read(data, { type: 'array', cellDates: true });
                     const targetSheetName = sheetName || workbook.SheetNames[0];
                     const sheet = workbook.Sheets[targetSheetName];
                     
                     if (!sheet) throw new Error(`Aba '${targetSheetName}' não encontrada.`);
 
                     const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
-                    
-                    if (json.length < 2) throw new Error("Aba vazia ou sem cabeçalho");
+                    if (json.length < 2) throw new Error("A planilha deve conter um cabeçalho e ao menos uma linha de dados.");
 
-                    // Smart Header Mapping
-                    const header = json[0].map(h => String(h).toLowerCase().trim());
+                    // MAPEAMENTO HEURÍSTICO DE COLUNAS
+                    const header = json[0].map(h => String(h || '').toLowerCase().trim());
                     
-                    // Identificadores de Coluna
-                    const idxName = header.findIndex(h => h.includes('nome') || h.includes('cliente') || h.includes('devedor') || h.includes('name'));
-                    const idxPhone = header.findIndex(h => h.includes('tel') || h.includes('cel') || h.includes('phone') || h.includes('whats'));
-                    const idxDoc = header.findIndex(h => h.includes('cpf') || h.includes('cnpj') || h.includes('doc'));
-                    const idxEmail = header.findIndex(h => h.includes('email') || h.includes('e-mail'));
-                    const idxNotes = header.findIndex(h => h.includes('obs') || h.includes('nota') || h.includes('desc'));
-                    
-                    // Financeiros
-                    const idxPrincipal = header.findIndex(h => h.includes('valor') || h.includes('principal') || h.includes('emprestimo') || h.includes('montante'));
-                    const idxRate = header.findIndex(h => h.includes('taxa') || h.includes('juro') || h.includes('%'));
-                    const idxDate = header.findIndex(h => h.includes('data') || h.includes('inicio') || h.includes('criacao'));
+                    const findIdx = (terms: string[]) => header.findIndex(h => terms.some(t => h.includes(t)));
 
-                    if (idxName === -1) throw new Error("Coluna 'Nome' não encontrada nesta aba.");
+                    const idxName = findIdx(['nome', 'cliente', 'devedor', 'name', 'razao']);
+                    const idxPhone = findIdx(['tel', 'cel', 'whats', 'fone', 'phone', 'contato']);
+                    const idxDoc = findIdx(['cpf', 'cnpj', 'doc', 'identidade', 'documento']);
+                    const idxEmail = findIdx(['email', 'e-mail', 'correio']);
+                    const idxAddress = findIdx(['end', 'rua', 'address', 'local']);
+                    
+                    // Colunas Financeiras
+                    const idxPrincipal = findIdx(['valor', 'principal', 'emprestimo', 'montante', 'capital', 'divida']);
+                    const idxRate = findIdx(['taxa', 'juro', '%', 'interest', 'rate']);
+                    const idxDate = findIdx(['data', 'inicio', 'contrato', 'vencimento', 'date', 'created']);
+
+                    if (idxName === -1) throw new Error("Não foi possível identificar a coluna de 'Nome' ou 'Cliente'. Verifique o cabeçalho.");
 
                     const candidates: ImportCandidate[] = [];
                     
                     for (let i = 1; i < json.length; i++) {
                         const row = json[i];
-                        if (!row[idxName]) continue;
+                        if (!row || !row[idxName]) continue;
 
                         const name = String(row[idxName]).trim();
+                        if (name.length < 2) continue;
+
                         const phoneRaw = idxPhone > -1 ? String(row[idxPhone] || '') : '';
                         const docRaw = idxDoc > -1 ? String(row[idxDoc] || '') : '';
                         
-                        // Parse Financeiro
-                        let principal = 0;
-                        let interestRate = 0;
-                        let startDate = undefined;
-
-                        if (idxPrincipal > -1) principal = parseCurrency(row[idxPrincipal]);
-                        if (idxRate > -1) interestRate = parseCurrency(row[idxRate]);
-                        if (idxDate > -1) startDate = parseExcelDate(row[idxDate]);
+                        let principal = idxPrincipal > -1 ? parseCurrency(row[idxPrincipal]) : 0;
+                        let interestRate = idxRate > -1 ? parseCurrency(row[idxRate]) : 0;
+                        let startDate = idxDate > -1 ? parseExcelDate(row[idxDate]) : undefined;
 
                         const candidate: ImportCandidate = {
                             name,
                             phone: normalizeBrazilianPhone(phoneRaw),
                             document: onlyDigits(docRaw),
                             email: idxEmail > -1 ? String(row[idxEmail] || '') : undefined,
-                            notes: idxNotes > -1 ? String(row[idxNotes] || '') : undefined,
-                            
+                            address: idxAddress > -1 ? String(row[idxAddress] || '') : undefined,
                             principal: principal > 0 ? principal : undefined,
                             interestRate: interestRate > 0 ? interestRate : undefined,
                             startDate: startDate,
-
                             status: 'VALID'
                         };
                         
-                        if (!candidate.name) { candidate.status = 'INVALID'; candidate.error = 'Nome vazio'; }
+                        // Validação básica de curadoria
+                        if (!candidate.name) {
+                            candidate.status = 'INVALID';
+                            candidate.error = 'Nome ausente';
+                        } else if (candidate.phone && candidate.phone.length < 8) {
+                            candidate.status = 'INVALID';
+                            candidate.error = 'Telefone inválido';
+                        }
                         
                         candidates.push(candidate);
                     }

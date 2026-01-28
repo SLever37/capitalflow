@@ -1,4 +1,3 @@
-
 import { ModalityPaymentConfig } from "../types";
 
 export const paymentFlowFixedTerm: ModalityPaymentConfig = {
