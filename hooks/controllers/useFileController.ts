@@ -21,22 +21,18 @@ export const useFileController = (
   const handleFilePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
-      
       e.target.value = '';
 
       try {
           const sheets = await filesService.getImportSheets(file);
           ui.setPendingImportFile(file);
-          
           if (sheets.length > 1) {
               ui.setImportSheetNames(sheets);
               ui.openModal('IMPORT_SHEET_SELECT');
           } else {
               await processImport(file, sheets[0]);
           }
-      } catch (err: any) {
-          showToast('Erro ao ler arquivo: ' + err.message, 'error');
-      }
+      } catch (err: any) { showToast('Erro ao ler arquivo: ' + err.message, 'error'); }
   };
 
   const processImport = async (file: File, sheetName?: string) => {
@@ -44,17 +40,10 @@ export const useFileController = (
           const parsed = await filesService.parseImportFile(file, sheetName);
           if (parsed.length > 0) {
               ui.setImportCandidates(parsed);
-              const validIndices = parsed
-                  .map((c, i) => c.status === 'VALID' ? i : -1)
-                  .filter(idx => idx !== -1);
-              ui.setSelectedImportIndices(validIndices);
+              ui.setSelectedImportIndices(parsed.map((c, i) => c.status === 'VALID' ? i : -1).filter(idx => idx !== -1));
               ui.openModal('IMPORT_PREVIEW');
-          } else {
-              showToast('Nenhum dado válido encontrado nesta aba.', 'error');
-          }
-      } catch (err: any) {
-          showToast('Erro ao processar: ' + err.message, 'error');
-      }
+          } else { showToast('Nenhum dado válido encontrado nesta aba.', 'error'); }
+      } catch (err: any) { showToast('Erro ao processar: ' + err.message, 'error'); }
   };
 
   const selectSheet = async (sheetName: string) => {
@@ -68,18 +57,13 @@ export const useFileController = (
   const handleConfirmImport = async (activeUser: UserProfile | null, fetchFullData: (id: string) => Promise<void>) => {
       try {
           const selected = ui.importCandidates.filter((_: any, i: number) => ui.selectedImportIndices.includes(i));
-          if (selected.length === 0) {
-              showToast('Nenhum registro selecionado.', 'info');
-              return;
-          }
+          if (selected.length === 0) { showToast('Nenhum registro selecionado.', 'info'); return; }
           await filesService.saveSelectedClients(selected, activeUser, showToast);
           ui.closeModal();
           ui.setImportCandidates([]);
           ui.setPendingImportFile(null);
           if (activeUser) await fetchFullData(activeUser.id);
-      } catch (err: any) {
-          showToast(err.message, 'error');
-      }
+      } catch (err: any) { showToast(err.message, 'error'); }
   };
 
   const toggleImportSelection = (index: number) => {
@@ -98,12 +82,5 @@ export const useFileController = (
       ui.setImportCandidates([]);
   };
 
-  return {
-    handleOpenComprovante,
-    handleFilePick,
-    handleConfirmImport,
-    toggleImportSelection,
-    selectSheet,
-    cancelImport
-  };
+  return { handleOpenComprovante, handleFilePick, handleConfirmImport, toggleImportSelection, selectSheet, cancelImport };
 };

@@ -45,20 +45,10 @@ export const SystemModalsWrapper = () => {
 
                        <div className="space-y-2">
                            <label className="text-[10px] font-black uppercase text-slate-500 ml-1">Confirmação</label>
-                           <input 
-                                type="text" 
-                                placeholder="Digite DELETAR para confirmar" 
-                                className="w-full bg-slate-950 p-4 rounded-xl text-white outline-none border border-slate-800 focus:border-rose-500 transition-all font-bold" 
-                                value={ui.deleteAccountConfirm} 
-                                onChange={e => ui.setDeleteAccountConfirm(e.target.value)} 
-                           />
+                           <input type="text" placeholder="Digite DELETAR para confirmar" className="w-full bg-slate-950 p-4 rounded-xl text-white outline-none border border-slate-800 focus:border-rose-500 transition-all font-bold" value={ui.deleteAccountConfirm} onChange={e => ui.setDeleteAccountConfirm(e.target.value)} />
                        </div>
 
-                       <button 
-                            onClick={async () => { if(ui.deleteAccountAgree && ui.deleteAccountConfirm === 'DELETAR') { await profileCtrl.handleDeleteAccount(); } }} 
-                            disabled={!ui.deleteAccountAgree || ui.deleteAccountConfirm !== 'DELETAR' || isLoadingData} 
-                            className="w-full py-4 bg-rose-600 hover:bg-rose-500 text-white font-black rounded-xl uppercase disabled:opacity-50 transition-all"
-                        >
+                       <button onClick={async () => { if(ui.deleteAccountAgree && ui.deleteAccountConfirm === 'DELETAR') { await profileCtrl.handleDeleteAccount(); } }} disabled={!ui.deleteAccountAgree || ui.deleteAccountConfirm !== 'DELETAR' || isLoadingData} className="w-full py-4 bg-rose-600 hover:bg-rose-500 text-white font-black rounded-xl uppercase disabled:opacity-50 transition-all">
                             {isLoadingData ? <Loader2 className="animate-spin" size={18}/> : 'Confirmar Exclusão'}
                        </button>
                    </div>
@@ -78,13 +68,7 @@ export const SystemModalsWrapper = () => {
                        {activeUser.id !== 'DEMO' && (
                            <div className="space-y-2">
                                <label className="text-[10px] font-black uppercase text-slate-500 ml-1">Senha Atual</label>
-                               <input 
-                                    type="password" 
-                                    placeholder="Digite sua senha" 
-                                    className="w-full bg-slate-950 p-4 rounded-xl text-white outline-none border border-slate-800 focus:border-amber-500 transition-all" 
-                                    value={ui.resetPasswordInput} 
-                                    onChange={e => ui.setResetPasswordInput(e.target.value)} 
-                               />
+                               <input type="password" placeholder="Digite sua senha" className="w-full bg-slate-950 p-4 rounded-xl text-white outline-none border border-slate-800 focus:border-amber-500 transition-all" value={ui.resetPasswordInput} onChange={e => ui.setResetPasswordInput(e.target.value)} />
                            </div>
                        )}
                        <div className="flex gap-3">
@@ -103,10 +87,7 @@ export const SystemModalsWrapper = () => {
                         const inst = loan.installments.find(i => i.id === meta.installmentId);
                         if (inst) {
                             const calcs = calculateTotalDue(loan, inst);
-                            setTimeout(() => {
-                                ui.setPaymentModal({ loan, inst, calculations: calcs });
-                                ui.openModal('PAYMENT');
-                            }, 150); 
+                            setTimeout(() => { ui.setPaymentModal({ loan, inst, calculations: calcs }); ui.openModal('PAYMENT'); }, 150); 
                         }
                     }
                 } else if (type === 'PORTAL_REVIEW' && meta?.comprovanteUrl) {
@@ -139,14 +120,8 @@ export const SystemModalsWrapper = () => {
                    <div className="space-y-6">
                        <div className="flex justify-between items-center">
                            <div className="flex gap-4">
-                               <div className="text-center">
-                                   <p className="text-[10px] font-black uppercase text-slate-500">Total</p>
-                                   <p className="text-lg font-black text-white">{ui.importCandidates.length}</p>
-                               </div>
-                               <div className="text-center">
-                                   <p className="text-[10px] font-black uppercase text-blue-500">Selecionados</p>
-                                   <p className="text-lg font-black text-blue-400">{ui.selectedImportIndices.length}</p>
-                               </div>
+                               <div className="text-center"><p className="text-[10px] font-black uppercase text-slate-500">Total</p><p className="text-lg font-black text-white">{ui.importCandidates.length}</p></div>
+                               <div className="text-center"><p className="text-[10px] font-black uppercase text-blue-500">Selecionados</p><p className="text-lg font-black text-blue-400">{ui.selectedImportIndices.length}</p></div>
                            </div>
                            <button onClick={() => ui.setSelectedImportIndices(ui.importCandidates.map((_:any, i:number) => i).filter((i:number) => ui.importCandidates[i].status === 'VALID'))} className="text-[9px] font-black uppercase text-blue-500 hover:text-white">Marcar Todos Válidos</button>
                        </div>
@@ -158,9 +133,7 @@ export const SystemModalsWrapper = () => {
                                    const isInvalid = c.status === 'INVALID';
                                    return (
                                        <div key={i} className={`flex items-start gap-4 p-4 border-b border-slate-900 last:border-0 hover:bg-slate-900/50 transition-colors cursor-pointer ${isInvalid ? 'opacity-50' : ''}`} onClick={() => fileCtrl.toggleImportSelection(i)}>
-                                           <div className={`mt-1 transition-colors ${isSelected ? 'text-blue-500' : 'text-slate-700'}`}>
-                                               {isSelected ? <CheckSquare size={22}/> : <Square size={22}/>}
-                                           </div>
+                                           <div className={`mt-1 transition-colors ${isSelected ? 'text-blue-500' : 'text-slate-700'}`}>{isSelected ? <CheckSquare size={22}/> : <Square size={22}/>}</div>
                                            <div className="flex-1 min-w-0">
                                                <div className="flex justify-between items-start gap-2">
                                                    <h4 className="text-sm font-black text-white uppercase truncate">{c.name}</h4>
@@ -168,18 +141,9 @@ export const SystemModalsWrapper = () => {
                                                </div>
                                                <p className="text-[10px] text-slate-500 font-bold mb-3">{c.phone || 'Sem Tel'} {c.document ? `• ${c.document}` : ''}</p>
                                                <div className="grid grid-cols-3 gap-2">
-                                                   <div className="bg-slate-900/80 p-2 rounded-xl border border-slate-800">
-                                                       <p className="text-[8px] font-black text-slate-600 uppercase mb-0.5">Capital</p>
-                                                       <p className="text-[10px] font-bold text-white truncate">{c.principal ? formatMoney(c.principal) : '-'}</p>
-                                                   </div>
-                                                   <div className="bg-slate-900/80 p-2 rounded-xl border border-slate-800">
-                                                       <p className="text-[8px] font-black text-slate-600 uppercase mb-0.5">Taxa</p>
-                                                       <p className="text-[10px] font-bold text-emerald-500">{c.interestRate ? `${c.interestRate}%` : '-'}</p>
-                                                   </div>
-                                                   <div className="bg-slate-900/80 p-2 rounded-xl border border-slate-800">
-                                                       <p className="text-[8px] font-black text-slate-600 uppercase mb-0.5">Início</p>
-                                                       <p className="text-[10px] font-bold text-blue-400">{c.startDate ? new Date(c.startDate).toLocaleDateString() : '-'}</p>
-                                                   </div>
+                                                   <div className="bg-slate-900/80 p-2 rounded-xl border border-slate-800"><p className="text-[8px] font-black text-slate-600 uppercase mb-0.5">Capital</p><p className="text-[10px] font-bold text-white truncate">{c.principal ? formatMoney(c.principal) : '-'}</p></div>
+                                                   <div className="bg-slate-900/80 p-2 rounded-xl border border-slate-800"><p className="text-[8px] font-black text-slate-600 uppercase mb-0.5">Taxa</p><p className="text-[10px] font-bold text-emerald-500">{c.interestRate ? `${c.interestRate}%` : '-'}</p></div>
+                                                   <div className="bg-slate-900/80 p-2 rounded-xl border border-slate-800"><p className="text-[8px] font-black text-slate-600 uppercase mb-0.5">Início</p><p className="text-[10px] font-bold text-blue-400">{c.startDate ? new Date(c.startDate).toLocaleDateString() : '-'}</p></div>
                                                </div>
                                            </div>
                                        </div>
@@ -190,9 +154,7 @@ export const SystemModalsWrapper = () => {
 
                        <div className="bg-amber-900/10 border border-amber-500/20 p-4 rounded-2xl flex items-start gap-3">
                            <AlertTriangle className="text-amber-500 shrink-0" size={18}/>
-                           <p className="text-[10px] text-amber-200/80 leading-relaxed font-medium uppercase">
-                               Contratos com Capital detectado serão gerados na <b>Carteira Principal</b>.
-                           </p>
+                           <p className="text-[10px] text-amber-200/80 leading-relaxed font-medium uppercase">Contratos com Capital detectado serão gerados na <b>Carteira Principal</b> com vencimento em 30 dias.</p>
                        </div>
 
                        <button onClick={() => fileCtrl.handleConfirmImport(activeUser, fetchFullData)} className="w-full py-5 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-2xl uppercase shadow-xl flex items-center justify-center gap-3 text-xs disabled:opacity-50" disabled={ui.selectedImportIndices.length === 0}>

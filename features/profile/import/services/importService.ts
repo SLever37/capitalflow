@@ -1,23 +1,7 @@
 import * as XLSX from 'xlsx';
-import { ImportCandidate } from '../domain/importSchema';
-import { onlyDigits, normalizeBrazilianPhone } from '../../../../utils/formatters';
+import { ImportCandidate, SYNONYMS } from '../domain/importSchema';
+import { onlyDigits, normalizeBrazilianPhone, parseCurrency } from '../../../../utils/formatters';
 
-// Helper para converter valores monetários de forma agressiva
-const parseCurrency = (val: any): number => {
-    if (typeof val === 'number') return val;
-    if (!val) return 0;
-    const str = String(val).trim();
-    // Suporte a R$ 1.000,00 ou 1,000.00
-    if (str.includes(',') && str.includes('.')) {
-        if (str.lastIndexOf(',') > str.lastIndexOf('.')) {
-            return parseFloat(str.replace(/\./g, '').replace(',', '.')) || 0;
-        }
-    }
-    if (str.includes(',')) return parseFloat(str.replace(',', '.')) || 0;
-    return parseFloat(str.replace(/[^0-9.-]+/g, '')) || 0;
-};
-
-// Helper para datas do Excel (Serial ou String)
 const parseExcelDate = (val: any): string | undefined => {
     if (!val) return undefined;
     if (val instanceof Date) return val.toISOString();
@@ -50,9 +34,7 @@ export const importService = {
                     const data = new Uint8Array(e.target?.result as ArrayBuffer);
                     const workbook = XLSX.read(data, { type: 'array' });
                     resolve(workbook.SheetNames);
-                } catch (err) {
-                    reject(err);
-                }
+                } catch (err) { reject(err); }
             };
             reader.onerror = reject;
             reader.readAsArrayBuffer(file);
@@ -72,39 +54,41 @@ export const importService = {
                     if (!sheet) throw new Error(`Aba '${targetSheetName}' não encontrada.`);
 
                     const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
-                    if (json.length < 2) throw new Error("A planilha deve conter cabeçalho e dados.");
+                    if (json.length < 2) throw new Error("Planilha vazia ou sem dados.");
 
                     const header = json[0].map(h => String(h || '').toLowerCase().trim());
-                    const findIdx = (terms: string[]) => header.findIndex(h => terms.some(t => h.includes(t)));
+                    const findIdx = (list: string[]) => header.findIndex(h => list.some(s => h.includes(s)));
 
-                    const idxName = findIdx(['nome', 'cliente', 'devedor', 'name', 'razao']);
-                    const idxPhone = findIdx(['tel', 'cel', 'whats', 'fone', 'phone', 'contato']);
-                    const idxDoc = findIdx(['cpf', 'cnpj', 'doc', 'identidade', 'documento']);
-                    const idxEmail = findIdx(['email', 'e-mail', 'correio']);
-                    const idxAddress = findIdx(['end', 'rua', 'address', 'local']);
-                    const idxPrincipal = findIdx(['valor', 'principal', 'emprestimo', 'montante', 'capital', 'divida']);
-                    const idxRate = findIdx(['taxa', 'juro', '%', 'interest', 'rate']);
-                    const idxDate = findIdx(['data', 'inicio', 'contrato', 'vencimento', 'date', 'created']);
+                    const idxs = {
+                        name: findIdx(SYNONYMS.name),
+                        phone: findIdx(SYNONYMS.phone),
+                        document: findIdx(SYNONYMS.document),
+                        email: findIdx(SYNONYMS.email),
+                        address: findIdx(SYNONYMS.address),
+                        principal: findIdx(SYNONYMS.principal),
+                        rate: findIdx(SYNONYMS.interestRate),
+                        date: findIdx(SYNONYMS.startDate)
+                    };
 
-                    if (idxName === -1) throw new Error("Coluna 'Nome' não identificada.");
+                    if (idxs.name === -1) throw new Error("Coluna de 'Nome' não identificada. Verifique o cabeçalho.");
 
                     const candidates: ImportCandidate[] = [];
                     for (let i = 1; i < json.length; i++) {
                         const row = json[i];
-                        if (!row || !row[idxName]) continue;
+                        if (!row || !row[idxs.name]) continue;
 
-                        const name = String(row[idxName]).trim();
+                        const name = String(row[idxs.name]).trim();
                         if (name.length < 2) continue;
 
                         const candidate: ImportCandidate = {
                             name,
-                            phone: normalizeBrazilianPhone(idxPhone > -1 ? String(row[idxPhone] || '') : ''),
-                            document: onlyDigits(idxDoc > -1 ? String(row[idxDoc] || '') : ''),
-                            email: idxEmail > -1 ? String(row[idxEmail] || '') : undefined,
-                            address: idxAddress > -1 ? String(row[idxAddress] || '') : undefined,
-                            principal: idxPrincipal > -1 ? parseCurrency(row[idxPrincipal]) : undefined,
-                            interestRate: idxRate > -1 ? parseCurrency(row[idxRate]) : undefined,
-                            startDate: idxDate > -1 ? parseExcelDate(row[idxDate]) : undefined,
+                            phone: normalizeBrazilianPhone(idxs.phone > -1 ? row[idxs.phone] : ''),
+                            document: onlyDigits(idxs.document > -1 ? row[idxs.document] : ''),
+                            email: idxs.email > -1 ? String(row[idxs.email] || '') : undefined,
+                            address: idxs.address > -1 ? String(row[idxs.address] || '') : undefined,
+                            principal: idxs.principal > -1 ? parseCurrency(row[idxs.principal]) : undefined,
+                            interestRate: idxs.rate > -1 ? parseCurrency(row[idxs.rate]) : undefined,
+                            startDate: idxs.date > -1 ? parseExcelDate(row[idxs.date]) : undefined,
                             status: 'VALID'
                         };
                         
@@ -116,9 +100,7 @@ export const importService = {
                         candidates.push(candidate);
                     }
                     resolve(candidates);
-                } catch (err) {
-                    reject(err);
-                }
+                } catch (err) { reject(err); }
             };
             reader.onerror = reject;
             reader.readAsArrayBuffer(file);

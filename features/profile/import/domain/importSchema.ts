@@ -1,4 +1,3 @@
-
 export interface ImportCandidate {
     name: string;
     phone: string;
@@ -9,13 +8,22 @@ export interface ImportCandidate {
     state?: string;
     notes?: string;
     
-    // Financial fields (opcionais para carga inicial)
+    // Campos Financeiros detectados via curadoria
     principal?: number;
     interestRate?: number;
     startDate?: string;
     
-    status: 'VALID' | 'INVALID';
+    status: 'VALID' | 'INVALID' | 'WARNING';
     error?: string;
 }
 
-export const REQUIRED_COLUMNS = ['nome', 'name', 'cliente'];
+export const SYNONYMS = {
+    name: ['nome', 'cliente', 'devedor', 'servidor', 'funcionario', 'name', 'razao'],
+    phone: ['tel', 'cel', 'whats', 'fone', 'phone', 'contato', 'telefone'],
+    document: ['cpf', 'cnpj', 'doc', 'identidade', 'documento', 'inscricao'],
+    email: ['email', 'e-mail', 'correio'],
+    address: ['end', 'rua', 'address', 'local', 'endereco', 'logradouro'],
+    principal: ['valor', 'principal', 'emprestimo', 'montante', 'capital', 'divida', 'vencimento'],
+    interestRate: ['taxa', 'juro', '%', 'interest', 'rate'],
+    startDate: ['data', 'inicio', 'contrato', 'entrada', 'date', 'created', 'emissao']
+};
