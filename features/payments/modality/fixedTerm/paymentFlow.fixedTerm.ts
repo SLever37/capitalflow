@@ -1,5 +1,5 @@
 
-import { ModalityPaymentConfig } from "../../types";
+import { ModalityPaymentConfig } from "../types";
 
 export const paymentFlowFixedTerm: ModalityPaymentConfig = {
     allowPartial: true,  // Permitido abater aos poucos
