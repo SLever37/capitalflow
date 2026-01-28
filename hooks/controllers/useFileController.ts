@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { supabase } from '../../lib/supabase';
 import { filesService } from '../../services/files.service';
@@ -23,7 +22,7 @@ export const useFileController = (
       const file = e.target.files?.[0];
       if (!file) return;
       
-      e.target.value = ''; // Reset input
+      e.target.value = '';
 
       try {
           const sheets = await filesService.getImportSheets(file);
@@ -45,7 +44,6 @@ export const useFileController = (
           const parsed = await filesService.parseImportFile(file, sheetName);
           if (parsed.length > 0) {
               ui.setImportCandidates(parsed);
-              // Pré-seleciona apenas os válidos
               const validIndices = parsed
                   .map((c, i) => c.status === 'VALID' ? i : -1)
                   .filter(idx => idx !== -1);
@@ -85,8 +83,7 @@ export const useFileController = (
   };
 
   const toggleImportSelection = (index: number) => {
-      if (ui.importCandidates[index].status === 'INVALID') return; // Bloqueia seleção de inválidos
-      
+      if (ui.importCandidates[index].status === 'INVALID') return;
       if (ui.selectedImportIndices.includes(index)) {
           ui.setSelectedImportIndices((prev: number[]) => prev.filter(i => i !== index));
       } else {
