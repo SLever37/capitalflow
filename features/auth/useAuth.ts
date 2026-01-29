@@ -29,7 +29,7 @@ export const useAuth = () => {
         const cleanPass = loginPassword.trim();
         
         if (!cleanLogin) {
-            showToast("Digite seu e-mail ou usuário.", "warning");
+            showToast("Digite seu e-mail.", "warning");
             setIsLoading(false);
             return;
         }
@@ -41,54 +41,48 @@ export const useAuth = () => {
         }
 
         try {
-            let profile = null;
+            // TENTATIVA: Login via Supabase Auth (Seguro)
+            const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+                email: cleanLogin,
+                password: cleanPass
+            });
 
-            // 1. TENTATIVA RPC (Servidor)
-            try {
-                const { data: rpcData, error: rpcError } = await supabase.rpc('login_user', {
-                    login_input: cleanLogin,
-                    password_input: cleanPass
-                });
-
-                if (!rpcError && rpcData) {
-                    profile = rpcData; 
+            if (authError) {
+                console.error("Erro Auth:", authError.message);
+                if (authError.message.includes("Invalid login credentials")) {
+                    showToast("Credenciais inválidas. Verifique e-mail e senha.", "error");
+                } else {
+                    showToast("Erro ao autenticar: " + authError.message, "error");
                 }
-            } catch (rpcErr) {
-                console.warn("RPC fallback.");
-            }
-
-            // 2. FALLBACK MANUAL
-            if (!profile) {
-                const { data: legacyProfiles, error: legacyError } = await supabase
-                    .from('perfis')
-                    .select('*')
-                    .or(`usuario_email.eq.${cleanLogin},nome_operador.eq.${cleanLogin}`);
-                
-                if (legacyProfiles && legacyProfiles.length > 0) {
-                    profile = legacyProfiles.find(p => p.senha_acesso === cleanPass);
-                }
-            }
-        
-            if (!profile) {
-                // MENSAGEM DE ERRO ESPECÍFICA SOLICITADA
-                showToast("E-mail/Usuário ou senha incorretos. Tente novamente.", "error");
                 setIsLoading(false);
                 return;
             }
-        
-            // Sucesso
-            setActiveProfileId(profile.id);
-            
-            const newSaved = [
-                ...savedProfiles.filter(p => p.id !== profile.id), 
-                { id: profile.id, name: profile.nome_operador, email: profile.usuario_email }
-            ].slice(0, 5);
-            
-            setSavedProfiles(newSaved);
-            localStorage.setItem('cm_saved_profiles', JSON.stringify(newSaved));
-            localStorage.setItem('cm_session', JSON.stringify({ profileId: profile.id, timestamp: Date.now() }));
-            
-            showToast(`Bem-vindo de volta, ${profile.nome_operador}!`, 'success');
+
+            if (authData.user) {
+                // Sucesso no Auth, busca perfil vinculado
+                const { data: profile, error: profileError } = await supabase
+                    .from('perfis')
+                    .select('*')
+                    .eq('id', authData.user.id)
+                    .single();
+
+                if (profile) {
+                    setActiveProfileId(profile.id);
+                    
+                    const newSaved = [
+                        ...savedProfiles.filter(p => p.id !== profile.id), 
+                        { id: profile.id, name: profile.nome_operador, email: profile.usuario_email }
+                    ].slice(0, 5);
+                    
+                    setSavedProfiles(newSaved);
+                    localStorage.setItem('cm_saved_profiles', JSON.stringify(newSaved));
+                    localStorage.setItem('cm_session', JSON.stringify({ profileId: profile.id, timestamp: Date.now() }));
+                    
+                    showToast(`Bem-vindo de volta, ${profile.nome_operador}!`, 'success');
+                } else {
+                    showToast("Perfil não encontrado. Contate o suporte.", "error");
+                }
+            }
 
         } catch (err: any) {
             console.error("Erro Crítico de Auth:", err);
@@ -98,7 +92,8 @@ export const useAuth = () => {
         }
     };
 
-    const handleLogout = () => { 
+    const handleLogout = async () => { 
+        await supabase.auth.signOut();
         setActiveProfileId(null); 
         localStorage.removeItem('cm_session'); 
     };

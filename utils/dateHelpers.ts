@@ -11,6 +11,7 @@ export const todayDateOnlyUTC = (): Date => {
 export const parseDateOnlyUTC = (input: DateInput): Date => {
   if (!input) return todayDateOnlyUTC();
 
+  // Se já for Date válido
   if (input instanceof Date) {
     if (isNaN(input.getTime())) return todayDateOnlyUTC();
     return new Date(Date.UTC(input.getUTCFullYear(), input.getUTCMonth(), input.getUTCDate()));
@@ -20,19 +21,22 @@ export const parseDateOnlyUTC = (input: DateInput): Date => {
     const raw = String(input).trim();
     if (!raw) return todayDateOnlyUTC();
 
+    // ISO YYYY-MM-DD
     const iso10 = raw.slice(0, 10);
     if (/^\d{4}-\d{2}-\d{2}$/.test(iso10)) {
       const [y, m, d] = iso10.split('-').map(Number);
       return new Date(Date.UTC(y, m - 1, d));
     }
 
+    // BR DD/MM/YYYY
     if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) {
       const [dd, mm, yyyy] = raw.split('/').map(Number);
       return new Date(Date.UTC(yyyy, mm - 1, dd));
     }
 
+    // Tenta construtor padrão
     const d = new Date(raw);
-    if (Number.isNaN(d.getTime())) return todayDateOnlyUTC();
+    if (Number.isNaN(d.getTime())) return todayDateOnlyUTC(); // Fallback seguro
     return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
   } catch (e) {
     return todayDateOnlyUTC();
