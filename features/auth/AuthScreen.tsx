@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { HelpCircle, TrendingUp, User, KeyRound, Loader2, X, ChevronRight, Beaker } from 'lucide-react';
 import { Modal } from '../../components/ui/Modal';
 import { supabase } from '../../lib/supabase';
+import { generateUUID } from '../../utils/generators';
 
 interface AuthScreenProps {
     loginUser: string;
@@ -14,7 +15,7 @@ interface AuthScreenProps {
     savedProfiles: {id: string, name: string, email: string}[];
     handleSelectSavedProfile: (p: any) => void;
     handleRemoveSavedProfile: (id: string) => void;
-    showToast: (msg: string, type?: 'error' | 'success') => void;
+    showToast: (msg: string, type?: 'error' | 'success' | 'info' | 'warning') => void;
 }
 
 export const AuthScreen: React.FC<AuthScreenProps> = ({
@@ -26,6 +27,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     const [isRecoveringPassword, setIsRecoveringPassword] = useState(false);
     const [recoveryForm, setRecoveryForm] = useState({ email: '', phrase: '', newPassword: '' });
     const [showHelpModal, setShowHelpModal] = useState(false);
+    const [isProcessingCreate, setIsProcessingCreate] = useState(false);
 
     const handleCreateProfile = async () => {
         // Validações de entrada
@@ -58,20 +60,42 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
             return;
         }
         
-        const { error } = await supabase.from('perfis').insert([{ 
-            nome_operador: newProfileForm.name, 
-            usuario_email: newProfileForm.email, 
-            nome_empresa: newProfileForm.businessName, 
-            senha_acesso: newProfileForm.password, 
-            recovery_phrase: newProfileForm.recoveryPhrase, 
-            access_level: 2
-        }]);
+        setIsProcessingCreate(true);
+        try {
+            const newId = generateUUID();
+            
+            // Inserção Direta na Tabela perfis (Modelo Custom Auth)
+            const { error } = await supabase.from('perfis').insert([{
+                id: newId,
+                nome_operador: newProfileForm.name,
+                usuario_email: newProfileForm.email.trim(),
+                email: newProfileForm.email.trim(),
+                nome_empresa: newProfileForm.businessName,
+                senha_acesso: newProfileForm.password.trim(),
+                recovery_phrase: newProfileForm.recoveryPhrase,
+                access_level: 2,
+                total_available_capital: 0,
+                interest_balance: 0,
+                created_at: new Date().toISOString()
+            }]);
     
-        if (error) { 
-            window.alert('Erro no Banco: ' + error.message);
-        } else { 
-            showToast("Conta criada com sucesso! Faça login agora.", "success"); 
-            setIsCreatingProfile(false); 
+            if (error) { 
+                if (error.message.includes("Failed to fetch")) {
+                    showToast('Erro de conexão. Verifique a internet.', 'error');
+                } else if (error.code === '23505') { // Unique violation
+                    showToast('Este e-mail já está cadastrado.', 'error');
+                } else {
+                    showToast('Erro ao criar conta: ' + error.message, 'error');
+                }
+            } else { 
+                showToast("Conta criada com sucesso! Faça login.", "success");
+                setIsCreatingProfile(false);
+                setLoginUser(newProfileForm.email);
+            }
+        } catch (e: any) {
+            showToast("Erro inesperado: " + e.message, "error");
+        } finally {
+            setIsProcessingCreate(false);
         }
     };
     
@@ -80,37 +104,22 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
             showToast("Informe o e-mail cadastrado.", "error");
             return;
         }
-        if (!recoveryForm.phrase.trim()) {
-            showToast("Informe sua frase secreta de recuperação.", "error");
-            return;
-        }
-        if (!recoveryForm.newPassword || recoveryForm.newPassword.length < 6) {
-            showToast("A nova senha deve ter pelo menos 6 caracteres.", "error");
-            return;
-        }
-
-        const { data: profiles } = await supabase.from('perfis').select('*').eq('usuario_email', recoveryForm.email);
-        const profile = profiles?.find(p => p.recovery_phrase === recoveryForm.phrase);
-        if (profile) { 
-            await supabase.from('perfis').update({ senha_acesso: recoveryForm.newPassword }).eq('id', profile.id); 
-            showToast("Senha redefinida com sucesso!", "success"); 
-            setIsRecoveringPassword(false); 
-        } else { 
-            showToast("E-mail ou frase de recuperação incorretos.", "error"); 
-        }
+        // Como não usamos Supabase Auth, apenas exibimos mensagem de suporte ou lógica futura
+        showToast("Recuperação automática indisponível. Contate o suporte via WhatsApp.", "info");
+        handleHelpSupport('password');
+        setIsRecoveringPassword(false);
     };
     
     const handleHelpSupport = (type: 'password' | 'user') => {
         const number = "5592991148103";
         let msg = "";
-        if(type === 'password') msg = "Olá, esqueci minha senha no CrediMaster. Poderia me ajudar?";
-        if(type === 'user') msg = "Olá, esqueci meu usuário de login no CrediMaster. Poderia me ajudar?";
+        if(type === 'password') msg = "Olá, esqueci minha senha no CapitalFlow. Poderia me ajudar?";
+        if(type === 'user') msg = "Olá, esqueci meu usuário de login no CapitalFlow. Poderia me ajudar?";
         
         window.open(`https://wa.me/${number}?text=${encodeURIComponent(msg)}`, '_blank');
     };
 
     const handleDemoMode = () => {
-        // Usa um ID especial 'DEMO' que o useAppState irá interceptar
         localStorage.setItem('cm_session', JSON.stringify({ profileId: 'DEMO', timestamp: Date.now() }));
         window.location.reload();
     };
@@ -171,16 +180,19 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                         <input type="text" placeholder="Nome do Negócio" className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-white text-sm outline-none" value={newProfileForm.businessName} onChange={e => setNewProfileForm({...newProfileForm, businessName: e.target.value})} />
                         <input type="password" placeholder="Senha" className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-white text-sm outline-none" value={newProfileForm.password} onChange={e => setNewProfileForm({...newProfileForm, password: e.target.value})} />
                         <input type="text" placeholder="Frase de Recuperação" className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-white text-sm outline-none" value={newProfileForm.recoveryPhrase} onChange={e => setNewProfileForm({...newProfileForm, recoveryPhrase: e.target.value})} />
-                        <div className="flex gap-3 pt-2"><button onClick={() => setIsCreatingProfile(false)} className="flex-1 py-4 bg-slate-800 text-slate-400 rounded-2xl text-xs font-black uppercase">Cancelar</button><button onClick={handleCreateProfile} className="flex-1 py-4 bg-blue-600 text-white rounded-2xl text-xs font-black uppercase shadow-lg">Criar</button></div>
+                        <div className="flex gap-3 pt-2">
+                            <button onClick={() => setIsCreatingProfile(false)} disabled={isProcessingCreate} className="flex-1 py-4 bg-slate-800 text-slate-400 rounded-2xl text-xs font-black uppercase">Cancelar</button>
+                            <button onClick={handleCreateProfile} disabled={isProcessingCreate} className="flex-1 py-4 bg-blue-600 text-white rounded-2xl text-xs font-black uppercase shadow-lg flex items-center justify-center gap-2">
+                                {isProcessingCreate ? <Loader2 className="animate-spin"/> : 'Criar'}
+                            </button>
+                        </div>
                     </div>
                 )}
                 {isRecoveringPassword && (
                     <div className="space-y-4 animate-in slide-in-from-right duration-300">
                         <h3 className="text-center text-white font-bold text-sm uppercase mb-2">Recuperar Acesso</h3>
-                        <input type="email" placeholder="E-mail ou Usuário" className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-white text-sm outline-none" value={recoveryForm.email} onChange={e => setRecoveryForm({...recoveryForm, email: e.target.value})} />
-                        <input type="text" placeholder="Frase Secreta" className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-white text-sm outline-none" value={recoveryForm.phrase} onChange={e => setRecoveryForm({...recoveryForm, phrase: e.target.value})} />
-                        <input type="password" placeholder="Nova Senha" className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-white text-sm outline-none" value={recoveryForm.newPassword} onChange={e => setRecoveryForm({...recoveryForm, newPassword: e.target.value})} />
-                        <div className="flex gap-3 pt-2"><button onClick={() => setIsRecoveringPassword(false)} className="flex-1 py-4 bg-slate-800 text-slate-400 rounded-2xl text-xs font-black uppercase">Voltar</button><button onClick={handlePasswordRecovery} className="flex-1 py-4 bg-rose-600 text-white rounded-2xl text-xs font-black uppercase shadow-lg">Redefinir</button></div>
+                        <input type="email" placeholder="E-mail Cadastrado" className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-white text-sm outline-none" value={recoveryForm.email} onChange={e => setRecoveryForm({...recoveryForm, email: e.target.value})} />
+                        <div className="flex gap-3 pt-2"><button onClick={() => setIsRecoveringPassword(false)} className="flex-1 py-4 bg-slate-800 text-slate-400 rounded-2xl text-xs font-black uppercase">Voltar</button><button onClick={handlePasswordRecovery} className="flex-1 py-4 bg-rose-600 text-white rounded-2xl text-xs font-black uppercase shadow-lg">Contatar Suporte</button></div>
                     </div>
                 )}
             </div>

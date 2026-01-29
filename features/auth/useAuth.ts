@@ -29,7 +29,7 @@ export const useAuth = () => {
         const cleanPass = loginPassword.trim();
         
         if (!cleanLogin) {
-            showToast("Digite seu e-mail.", "warning");
+            showToast("Digite seu e-mail ou usuário.", "warning");
             setIsLoading(false);
             return;
         }
@@ -41,65 +41,67 @@ export const useAuth = () => {
         }
 
         try {
-            // TENTATIVA: Login via Supabase Auth (Seguro)
-            const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-                email: cleanLogin,
-                password: cleanPass
-            });
+            // TENTATIVA: Login via Tabela Customizada 'perfis'
+            // Verifica: usuario_email OU email OU nome_operador E senha_acesso
+            const { data: profile, error } = await supabase
+                .from('perfis')
+                .select('*')
+                .or(`usuario_email.eq.${cleanLogin},email.eq.${cleanLogin},nome_operador.eq.${cleanLogin}`)
+                .eq('senha_acesso', cleanPass)
+                .single();
 
-            if (authError) {
-                console.error("Erro Auth:", authError.message);
-                if (authError.message.includes("Invalid login credentials")) {
-                    showToast("Credenciais inválidas. Verifique e-mail e senha.", "error");
+            if (error) {
+                console.error("Erro Auth DB:", error);
+                
+                // Código PGRST116 significa que a query não retornou linhas (usuário não encontrado ou senha errada)
+                if (error.code === 'PGRST116') {
+                    showToast("Credenciais inválidas. Verifique usuário e senha.", "error");
+                } else if (error.message && error.message.includes("Failed to fetch")) {
+                    showToast("Erro de conexão. Verifique sua internet.", "error");
                 } else {
-                    showToast("Erro ao autenticar: " + authError.message, "error");
+                    showToast("Erro ao autenticar: " + error.message, "error");
                 }
                 setIsLoading(false);
                 return;
             }
 
-            if (authData.user) {
-                // Sucesso no Auth, busca perfil vinculado
-                const { data: profile, error: profileError } = await supabase
-                    .from('perfis')
-                    .select('*')
-                    .eq('id', authData.user.id)
-                    .single();
-
-                if (profile) {
-                    setActiveProfileId(profile.id);
-                    
-                    const newSaved = [
-                        ...savedProfiles.filter(p => p.id !== profile.id), 
-                        { id: profile.id, name: profile.nome_operador, email: profile.usuario_email }
-                    ].slice(0, 5);
-                    
-                    setSavedProfiles(newSaved);
-                    localStorage.setItem('cm_saved_profiles', JSON.stringify(newSaved));
-                    localStorage.setItem('cm_session', JSON.stringify({ profileId: profile.id, timestamp: Date.now() }));
-                    
-                    showToast(`Bem-vindo de volta, ${profile.nome_operador}!`, 'success');
-                } else {
-                    showToast("Perfil não encontrado. Contate o suporte.", "error");
-                }
+            if (profile) {
+                setActiveProfileId(profile.id);
+                
+                const newSaved = [
+                    ...savedProfiles.filter(p => p.id !== profile.id), 
+                    { id: profile.id, name: profile.nome_operador, email: profile.usuario_email || profile.email }
+                ].slice(0, 5);
+                
+                setSavedProfiles(newSaved);
+                localStorage.setItem('cm_saved_profiles', JSON.stringify(newSaved));
+                localStorage.setItem('cm_session', JSON.stringify({ profileId: profile.id, timestamp: Date.now() }));
+                
+                showToast(`Bem-vindo de volta, ${profile.nome_operador}!`, 'success');
+            } else {
+                showToast("Usuário não encontrado.", "error");
             }
 
         } catch (err: any) {
             console.error("Erro Crítico de Auth:", err);
-            showToast("Falha na comunicação com o servidor.", "error");
+            if (err.message && err.message.includes("Failed to fetch")) {
+                showToast("Falha na conexão com o servidor.", "error");
+            } else {
+                showToast("Erro inesperado no login.", "error");
+            }
         } finally {
             setIsLoading(false);
         }
     };
 
     const handleLogout = async () => { 
-        await supabase.auth.signOut();
+        // Apenas limpa estado local, já que não usamos sessão do Supabase Auth
         setActiveProfileId(null); 
         localStorage.removeItem('cm_session'); 
     };
 
     const handleSelectSavedProfile = (profile: any, showToast: (msg: string) => void) => {
-        setLoginUser(profile.email || profile.nome_operador);
+        setLoginUser(profile.email || profile.name); // Fallback para name se email faltar no saved
         setLoginPassword('');
         showToast(`Olá, ${profile.name}. Digite sua senha.`);
         const passField = document.getElementById('login-password');
