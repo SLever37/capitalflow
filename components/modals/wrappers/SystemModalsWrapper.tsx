@@ -2,34 +2,37 @@
 import React from 'react';
 import { useModal } from '../../../contexts/ModalContext';
 import { Modal } from '../../ui/Modal';
-import { CheckSquare, Square, Table, ArrowRight, AlertTriangle, CheckCircle2, Info, Loader2, ListFilter } from 'lucide-react';
+import { CheckSquare, Square, Table, ArrowRight, AlertTriangle, CheckCircle2, Info, Loader2, Users } from 'lucide-react';
 import { FIELD_MAPS } from '../../../features/profile/import/domain/importSchema';
 
 export const SystemModalsWrapper = () => {
-    const { activeModal, closeModal, ui, activeUser, fileCtrl, fetchFullData } = useModal();
+    const { activeModal, closeModal, ui, activeUser, fileCtrl, fetchFullData, clients } = useModal();
 
     switch (activeModal?.type) {
         case 'IMPORT_SHEET_SELECT':
             return (
-                <Modal onClose={closeModal} title="Selecione a Aba do Excel">
-                    <div className="grid grid-cols-1 gap-2">
-                        {ui.importSheets?.map((sheet: any) => (
-                            <button key={sheet.name} onClick={() => fileCtrl.startMapping(sheet)} className="w-full p-5 bg-slate-950 border border-slate-800 rounded-2xl text-left hover:border-blue-500 hover:bg-slate-900 transition-all font-black uppercase text-xs text-white flex justify-between items-center group">
-                                {sheet.name}
-                                <Table className="text-slate-700 group-hover:text-blue-500" size={16}/>
-                            </button>
-                        ))}
+                <Modal onClose={closeModal} title="Importar Clientes">
+                    <div className="space-y-4">
+                        <p className="text-xs text-slate-400 mb-4">Selecione a aba da planilha que contém os dados dos seus clientes.</p>
+                        <div className="grid grid-cols-1 gap-2">
+                            {ui.importSheets?.map((sheet: any) => (
+                                <button key={sheet.name} onClick={() => fileCtrl.startMapping(sheet)} className="w-full p-5 bg-slate-950 border border-slate-800 rounded-2xl text-left hover:border-blue-500 hover:bg-slate-900 transition-all font-black uppercase text-xs text-white flex justify-between items-center group">
+                                    {sheet.name}
+                                    <Table className="text-slate-700 group-hover:text-blue-500" size={16}/>
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 </Modal>
             );
 
         case 'IMPORT_MAPPING':
             return (
-                <Modal onClose={closeModal} title="Mapeamento de Colunas">
+                <Modal onClose={closeModal} title="Mapear Colunas">
                     <div className="space-y-6">
                         <div className="bg-blue-900/10 border border-blue-500/20 p-4 rounded-2xl flex items-start gap-3">
                             <Info className="text-blue-400 shrink-0" size={18}/>
-                            <p className="text-[10px] text-blue-200 uppercase font-bold">Relacione as colunas da sua planilha com os campos do sistema.</p>
+                            <p className="text-[10px] text-blue-200 uppercase font-bold">Relacione os campos do sistema com as colunas da sua planilha para garantir a importação correta.</p>
                         </div>
                         <div className="space-y-2 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
                             {FIELD_MAPS.map(field => (
@@ -42,7 +45,7 @@ export const SystemModalsWrapper = () => {
                                         onChange={e => ui.setImportMapping({...ui.importMapping, [field.key]: parseInt(e.target.value)})}
                                         className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-blue-500"
                                     >
-                                        <option value="">Não importar</option>
+                                        <option value="">Ignorar coluna</option>
                                         {ui.importCurrentSheet?.headers.map((h: string, i: number) => (
                                             <option key={i} value={i}>{h}</option>
                                         ))}
@@ -50,8 +53,8 @@ export const SystemModalsWrapper = () => {
                                 </div>
                             ))}
                         </div>
-                        <button onClick={() => fileCtrl.generatePreview(activeUser)} className="w-full py-4 bg-blue-600 text-white font-black rounded-xl uppercase text-xs flex items-center justify-center gap-2">
-                            Avançar para Curadoria <ArrowRight size={16}/>
+                        <button onClick={() => fileCtrl.generatePreview(activeUser, clients)} className="w-full py-4 bg-blue-600 text-white font-black rounded-xl uppercase text-xs flex items-center justify-center gap-2">
+                            Avançar para Verificação <ArrowRight size={16}/>
                         </button>
                     </div>
                 </Modal>
@@ -60,14 +63,14 @@ export const SystemModalsWrapper = () => {
         case 'IMPORT_PREVIEW':
             const selectedCount = ui.selectedImportIndices.length;
             return (
-                <Modal onClose={closeModal} title="Curadoria de Dados">
+                <Modal onClose={closeModal} title="Curadoria de Clientes">
                     <div className="space-y-4">
                         <div className="flex justify-between items-center bg-slate-950 p-4 rounded-2xl border border-slate-800">
                             <div className="flex gap-6">
-                                <div><p className="text-[9px] font-black text-slate-500 uppercase">Detectados</p><p className="text-xl font-black text-white">{ui.importCandidates.length}</p></div>
+                                <div><p className="text-[9px] font-black text-slate-500 uppercase">Na Planilha</p><p className="text-xl font-black text-white">{ui.importCandidates.length}</p></div>
                                 <div><p className="text-[9px] font-black text-blue-500 uppercase">Selecionados</p><p className="text-xl font-black text-blue-400">{selectedCount}</p></div>
                             </div>
-                            <button onClick={() => ui.setSelectedImportIndices(ui.importCandidates.map((_:any, i:number) => i).filter((i:number) => ui.importCandidates[i].status !== 'ERRO'))} className="text-[9px] font-black text-blue-500 hover:text-white uppercase underline">Marcar Todos Válidos</button>
+                            <button onClick={() => ui.setSelectedImportIndices(ui.importCandidates.map((_:any, i:number) => i).filter((i:number) => ui.importCandidates[i].status !== 'ERRO'))} className="text-[9px] font-black text-blue-500 hover:text-white uppercase underline">Marcar Válidos</button>
                         </div>
 
                         <div className="bg-slate-950 border border-slate-800 rounded-3xl overflow-hidden">
@@ -80,10 +83,10 @@ export const SystemModalsWrapper = () => {
                                             <div className={isSelected ? 'text-blue-500' : 'text-slate-700'}>{isSelected ? <CheckSquare size={20}/> : <Square size={20}/>}</div>
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex justify-between items-start">
-                                                    <h4 className="text-xs font-black text-white uppercase truncate">{c.nome || 'SEM NOME'}</h4>
+                                                    <h4 className="text-xs font-black text-white uppercase truncate">{c.nome || 'NOME AUSENTE'}</h4>
                                                     <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase ${c.status === 'OK' ? 'bg-emerald-500/10 text-emerald-500' : c.status === 'AVISO' ? 'bg-amber-500/10 text-amber-500' : 'bg-rose-500/10 text-rose-500'}`}>{c.status}</span>
                                                 </div>
-                                                <p className="text-[9px] text-slate-500 font-bold">{c.escola} • {c.funcao}</p>
+                                                <p className="text-[9px] text-slate-500 font-bold">{c.documento || 'Sem Documento'} • {c.whatsapp || 'Sem Whats'}</p>
                                                 {c.mensagens.length > 0 && (
                                                     <div className="mt-1 space-y-0.5">
                                                         {c.mensagens.map((m:string, idx:number) => (
@@ -99,11 +102,11 @@ export const SystemModalsWrapper = () => {
                         </div>
 
                         <button 
-                            onClick={() => fileCtrl.executeImport(activeUser, fetchFullData)} 
+                            onClick={() => fileCtrl.executeImport(activeUser, clients, fetchFullData)} 
                             disabled={selectedCount === 0 || ui.isSaving}
                             className="w-full py-5 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-2xl uppercase shadow-xl flex items-center justify-center gap-3 text-xs disabled:opacity-50 transition-all"
                         >
-                            {ui.isSaving ? <Loader2 className="animate-spin" size={18}/> : <><CheckCircle2 size={18}/> Iniciar Importação em Lote</>}
+                            {ui.isSaving ? <Loader2 className="animate-spin" size={18}/> : <><CheckCircle2 size={18}/> Confirmar Importação de Clientes</>}
                         </button>
                     </div>
                 </Modal>

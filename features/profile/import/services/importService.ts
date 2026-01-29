@@ -1,21 +1,8 @@
 
 import * as XLSX from 'xlsx';
 import { FIELD_MAPS, ImportCandidate } from '../domain/importSchema';
-import { onlyDigits, parseCurrency } from '../../../../utils/formatters';
-
-const parseExcelDate = (val: any): string | undefined => {
-    if (!val) return undefined;
-    if (val instanceof Date) return val.toISOString();
-    if (typeof val === 'number' && val > 20000) {
-        return new Date(Math.round((val - 25569) * 86400 * 1000)).toISOString();
-    }
-    const str = String(val).trim();
-    if (/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(str)) {
-        const [d, m, y] = str.split('/').map(Number);
-        return new Date(y < 100 ? y + 2000 : y, m - 1, d).toISOString();
-    }
-    return undefined;
-};
+import { onlyDigits } from '../../../../utils/formatters';
+import { isValidCPForCNPJ } from '../../../../utils/validators';
 
 export const importService = {
     async getSheets(file: File): Promise<{ name: string, headers: string[], rows: any[] }[]> {
@@ -24,7 +11,7 @@ export const importService = {
             reader.onload = (e) => {
                 try {
                     const data = new Uint8Array(e.target?.result as ArrayBuffer);
-                    const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+                    const workbook = XLSX.read(data, { type: 'array' });
                     const sheets = workbook.SheetNames.map(name => {
                         const sheet = workbook.Sheets[name];
                         const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
@@ -58,40 +45,46 @@ export const importService = {
     async buildPreview(
         rows: any[], 
         mapping: Record<string, number>, 
-        existingData: { escolas: string[], cpfs: string[], matriculas: string[] }
+        existingData: { documents: string[], phones: string[] }
     ): Promise<ImportCandidate[]> {
         return rows.map(row => {
             const candidate: ImportCandidate = {
                 nome: String(row[mapping.nome] || '').trim(),
-                cpf: onlyDigits(String(row[mapping.cpf] || '')),
-                matricula: String(row[mapping.matricula] || '').trim(),
-                escola: String(row[mapping.escola] || '').trim(),
-                setor: String(row[mapping.setor] || '').trim(),
-                funcao: String(row[mapping.funcao] || '').trim(),
-                data_admissao: parseExcelDate(row[mapping.data_admissao]),
-                salario: parseCurrency(row[mapping.salario]),
-                carga_horaria: String(row[mapping.carga_horaria] || '').trim(),
+                documento: onlyDigits(String(row[mapping.documento] || '')),
+                whatsapp: onlyDigits(String(row[mapping.whatsapp] || '')),
+                email: String(row[mapping.email] || '').trim(),
+                endereco: String(row[mapping.endereco] || '').trim(),
+                cidade: String(row[mapping.cidade] || '').trim(),
+                uf: String(row[mapping.uf] || '').trim().toUpperCase(),
+                notas: String(row[mapping.notas] || '').trim(),
                 status: 'OK',
                 mensagens: [],
                 original_row: row
             };
 
-            // Validações de Curadoria
+            // Curadoria: Validações de Negócio
             if (!candidate.nome) {
                 candidate.status = 'ERRO';
-                candidate.mensagens.push("Nome obrigatório ausente.");
+                candidate.mensagens.push("Nome ausente.");
             }
-            if (candidate.cpf && candidate.cpf.length !== 11) {
-                candidate.status = 'ERRO';
-                candidate.mensagens.push("CPF inválido.");
-            }
-            if (existingData.cpfs.includes(candidate.cpf)) {
+            
+            if (candidate.documento) {
+                if (!isValidCPForCNPJ(candidate.documento)) {
+                    candidate.status = 'AVISO';
+                    candidate.mensagens.push("Documento parece inválido.");
+                }
+                if (existingData.documents.includes(candidate.documento)) {
+                    candidate.status = 'AVISO';
+                    candidate.mensagens.push("Já cadastrado no sistema.");
+                }
+            } else {
                 candidate.status = 'AVISO';
-                candidate.mensagens.push("CPF já cadastrado no sistema (será ignorado ou atualizado).");
+                candidate.mensagens.push("Sem CPF/CNPJ.");
             }
-            if (candidate.escola && !existingData.escolas.some(e => e.toLowerCase() === candidate.escola.toLowerCase())) {
+
+            if (!candidate.whatsapp) {
                 candidate.status = 'AVISO';
-                candidate.mensagens.push(`Escola '${candidate.escola}' não encontrada. Será movido para 'OUTROS'.`);
+                candidate.mensagens.push("Sem telefone de contato.");
             }
 
             return candidate;

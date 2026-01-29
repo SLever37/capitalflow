@@ -1,8 +1,9 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { supabase } from '../../lib/supabase';
 import { importService } from '../../features/profile/import/services/importService';
 import { UserProfile } from '../../types';
+import { generateUniqueAccessCode, generateUniqueClientNumber } from '../../utils/generators';
 
 export const useFileController = (
   ui: any,
@@ -16,6 +17,7 @@ export const useFileController = (
 
       try {
           const sheets = await importService.getSheets(file);
+          ui.setImportSheetNames(sheets.map(s => s.name));
           ui.setImportSheets(sheets);
           
           if (sheets.length > 1) {
@@ -24,7 +26,7 @@ export const useFileController = (
               await startMapping(sheets[0]);
           }
       } catch (err: any) {
-          showToast('Erro ao ler Excel: ' + err.message, 'error');
+          showToast('Erro ao ler arquivo: ' + err.message, 'error');
       }
   };
 
@@ -35,17 +37,12 @@ export const useFileController = (
       ui.openModal('IMPORT_MAPPING');
   };
 
-  const generatePreview = async (activeUser: UserProfile | null) => {
+  const generatePreview = async (activeUser: UserProfile | null, clients: any[]) => {
       if (!activeUser) return;
       try {
-          // Busca dados para validação cruzada
-          const { data: escolas } = await supabase.from('escolas').select('nome').eq('dono_id', activeUser.id);
-          const { data: funcs } = await supabase.from('funcionarios').select('cpf, matricula').eq('dono_id', activeUser.id);
-          
           const existing = {
-              escolas: (escolas || []).map(e => e.nome),
-              cpfs: (funcs || []).map(f => f.cpf).filter(Boolean),
-              matriculas: (funcs || []).map(f => f.matricula).filter(Boolean)
+              documents: clients.map(c => c.document).filter(Boolean),
+              phones: clients.map(c => c.phone).filter(Boolean)
           };
 
           const preview = await importService.buildPreview(ui.importCurrentSheet.rows, ui.importMapping, existing);
@@ -53,11 +50,11 @@ export const useFileController = (
           ui.setSelectedImportIndices(preview.map((c, i) => c.status !== 'ERRO' ? i : -1).filter(idx => idx !== -1));
           ui.openModal('IMPORT_PREVIEW');
       } catch (err: any) {
-          showToast('Erro ao gerar preview: ' + err.message, 'error');
+          showToast('Erro na curadoria: ' + err.message, 'error');
       }
   };
 
-  const executeImport = async (activeUser: UserProfile | null, fetchFullData: any) => {
+  const executeImport = async (activeUser: UserProfile | null, clients: any[], fetchFullData: any) => {
       if (!activeUser) return;
       const selected = ui.importCandidates.filter((_: any, i: number) => ui.selectedImportIndices.includes(i));
       
@@ -65,32 +62,41 @@ export const useFileController = (
       let success = 0;
       let errors = 0;
 
+      const existingCodes = new Set(clients.map(c => c.accessCode).filter(Boolean));
+      const existingNums = new Set(clients.map(c => c.clientNumber).filter(Boolean));
+
       try {
           for (const item of selected) {
               try {
-                  // Lógica de Lote: Upsert de dependências (simplificado para este exemplo)
-                  // No mundo real, aqui você faria as verificações de setores/funções
-                  const { error } = await supabase.from('funcionarios').upsert({
-                      dono_id: activeUser.id,
-                      nome: item.nome,
-                      cpf: item.cpf,
-                      matricula: item.matricula,
-                      escola_nome: item.escola,
-                      setor_nome: item.setor,
-                      funcao_nome: item.funcao,
-                      salario: item.salario,
+                  const accessCode = generateUniqueAccessCode(existingCodes);
+                  const clientNum = generateUniqueClientNumber(existingNums);
+                  existingCodes.add(accessCode);
+                  existingNums.add(clientNum);
+
+                  const { error } = await supabase.from('clientes').insert({
+                      profile_id: activeUser.id,
+                      name: item.nome,
+                      document: item.documento,
+                      phone: item.whatsapp,
+                      email: item.email,
+                      address: item.endereco,
+                      city: item.cidade,
+                      state: item.uf,
+                      notes: item.notas || 'Importado via planilha',
+                      access_code: accessCode,
+                      client_number: clientNum,
                       created_at: new Date().toISOString()
-                  }, { onConflict: 'cpf' });
+                  });
 
                   if (error) throw error;
                   success++;
               } catch (e) {
                   errors++;
-                  console.error("Erro na linha:", item.nome, e);
+                  console.error("Erro ao importar linha:", item.nome, e);
               }
           }
           
-          showToast(`Importação finalizada: ${success} sucessos, ${errors} falhas.`, success > 0 ? 'success' : 'error');
+          showToast(`Importação de clientes concluída: ${success} adicionados, ${errors} falhas.`, success > 0 ? 'success' : 'error');
           ui.closeModal();
           await fetchFullData(activeUser.id);
       } catch (err: any) {

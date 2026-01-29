@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 
@@ -42,7 +43,7 @@ export const useAuth = () => {
         try {
             let profile = null;
 
-            // 1. TENTATIVA RPC (Servidor - Se existir a função)
+            // 1. TENTATIVA RPC (Servidor)
             try {
                 const { data: rpcData, error: rpcError } = await supabase.rpc('login_user', {
                     login_input: cleanLogin,
@@ -53,30 +54,24 @@ export const useAuth = () => {
                     profile = rpcData; 
                 }
             } catch (rpcErr) {
-                console.warn("RPC login_user não disponível ou falhou, tentando busca manual.");
+                console.warn("RPC fallback.");
             }
 
-            // 2. FALLBACK MANUAL (Busca por e-mail ou nome)
+            // 2. FALLBACK MANUAL
             if (!profile) {
-                // CORREÇÃO: Sintaxe PostgREST para .or() não deve ter aspas duplas em volta dos valores a menos que contenham caracteres especiais reservados.
-                // Para emails comuns e nomes, o valor puro é o correto.
                 const { data: legacyProfiles, error: legacyError } = await supabase
                     .from('perfis')
                     .select('*')
                     .or(`usuario_email.eq.${cleanLogin},nome_operador.eq.${cleanLogin}`);
                 
-                if (legacyError) {
-                    console.error("Erro na busca manual:", legacyError);
-                }
-
                 if (legacyProfiles && legacyProfiles.length > 0) {
-                    // Verifica senha localmente para o fallback
                     profile = legacyProfiles.find(p => p.senha_acesso === cleanPass);
                 }
             }
         
             if (!profile) {
-                showToast("Acesso negado. Verifique e-mail e senha.", "error");
+                // MENSAGEM DE ERRO ESPECÍFICA SOLICITADA
+                showToast("E-mail/Usuário ou senha incorretos. Tente novamente.", "error");
                 setIsLoading(false);
                 return;
             }
@@ -93,11 +88,11 @@ export const useAuth = () => {
             localStorage.setItem('cm_saved_profiles', JSON.stringify(newSaved));
             localStorage.setItem('cm_session', JSON.stringify({ profileId: profile.id, timestamp: Date.now() }));
             
-            showToast(`Olá, ${profile.nome_operador}!`, 'success');
+            showToast(`Bem-vindo de volta, ${profile.nome_operador}!`, 'success');
 
         } catch (err: any) {
             console.error("Erro Crítico de Auth:", err);
-            showToast("Erro na conexão com o servidor.", "error");
+            showToast("Falha na comunicação com o servidor.", "error");
         } finally {
             setIsLoading(false);
         }
