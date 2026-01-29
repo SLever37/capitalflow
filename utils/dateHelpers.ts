@@ -12,25 +12,31 @@ export const parseDateOnlyUTC = (input: DateInput): Date => {
   if (!input) return todayDateOnlyUTC();
 
   if (input instanceof Date) {
+    if (isNaN(input.getTime())) return todayDateOnlyUTC();
     return new Date(Date.UTC(input.getUTCFullYear(), input.getUTCMonth(), input.getUTCDate()));
   }
 
-  const raw = String(input).trim();
-  const iso10 = raw.slice(0, 10);
+  try {
+    const raw = String(input).trim();
+    if (!raw) return todayDateOnlyUTC();
 
-  if (/^\d{4}-\d{2}-\d{2}$/.test(iso10)) {
-    const [y, m, d] = iso10.split('-').map(Number);
-    return new Date(Date.UTC(y, m - 1, d));
+    const iso10 = raw.slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(iso10)) {
+      const [y, m, d] = iso10.split('-').map(Number);
+      return new Date(Date.UTC(y, m - 1, d));
+    }
+
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) {
+      const [dd, mm, yyyy] = raw.split('/').map(Number);
+      return new Date(Date.UTC(yyyy, mm - 1, dd));
+    }
+
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return todayDateOnlyUTC();
+    return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  } catch (e) {
+    return todayDateOnlyUTC();
   }
-
-  if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) {
-    const [dd, mm, yyyy] = raw.split('/').map(Number);
-    return new Date(Date.UTC(yyyy, mm - 1, dd));
-  }
-
-  const d = new Date(raw);
-  if (Number.isNaN(d.getTime())) return todayDateOnlyUTC();
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 };
 
 export const isWeekendUTC = (date: Date): boolean => {
@@ -58,7 +64,6 @@ export const addDaysUTC = (date: DateInput, days: number, skipWeekends: boolean 
   }
   
   // Apenas move para o próximo dia útil se a data final cair num fim de semana
-  // (Previne empurrar hoje se hoje for sábado mas days for 0)
   if (days > 0) {
     while (isWeekendUTC(d)) {
       d.setUTCDate(d.getUTCDate() + 1);

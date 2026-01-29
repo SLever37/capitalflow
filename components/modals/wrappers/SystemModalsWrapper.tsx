@@ -14,7 +14,6 @@ import { NoteWrapper } from '../ModalWrappers';
 import { Copy } from 'lucide-react';
 
 export const SystemModalsWrapper = () => {
-    // Added 'loans' to the destructuring to fix the errors on lines 138 and 141
     const { activeModal, closeModal, ui, activeUser, fileCtrl, fetchFullData, clients, loanCtrl, sources, aiCtrl, loans } = useModal();
     
     // Função auxiliar para lidar com ações de sistema vindas do Calendário/IA
@@ -92,7 +91,10 @@ export const SystemModalsWrapper = () => {
                                 <div><p className="text-[9px] font-black text-slate-500 uppercase">Encontrados</p><p className="text-xl font-black text-white">{ui.importCandidates.length}</p></div>
                                 <div><p className="text-[9px] font-black text-blue-500 uppercase">Para Importar</p><p className="text-xl font-black text-blue-400">{selectedCount}</p></div>
                             </div>
-                            <button onClick={() => ui.setSelectedImportIndices(ui.importCandidates.map((_:any, i:number) => i).filter((i:number) => ui.importCandidates[i].status !== 'ERRO'))} className="text-[9px] font-black text-blue-500 hover:text-white uppercase underline">Marcar Todos Válidos</button>
+                            <div className="flex flex-col items-end gap-1">
+                                <button onClick={() => ui.setSelectedImportIndices(ui.importCandidates.map((_:any, i:number) => i).filter((i:number) => ui.importCandidates[i].status !== 'ERRO'))} className="text-[9px] font-black text-blue-500 hover:text-white uppercase underline">Marcar Válidos</button>
+                                <button onClick={() => ui.setSelectedImportIndices([])} className="text-[9px] font-black text-slate-500 hover:text-rose-500 uppercase underline">Desmarcar Todos</button>
+                            </div>
                         </div>
 
                         <div className="bg-slate-950 border border-slate-800 rounded-3xl overflow-hidden">

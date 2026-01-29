@@ -2,12 +2,13 @@
 import React from 'react';
 import { supabase } from '../../lib/supabase';
 import { importService } from '../../features/profile/import/services/importService';
-import { UserProfile } from '../../types';
-import { generateUniqueAccessCode, generateUniqueClientNumber } from '../../utils/generators';
-import { parseCurrency } from '../../utils/formatters';
+import { UserProfile, CapitalSource, Loan } from '../../types';
+import { generateUniqueAccessCode, generateUniqueClientNumber, generateUUID } from '../../utils/generators';
+import { contractsService } from '../../services/contracts.service';
 
 export const useFileController = (
   ui: any,
+  sources: CapitalSource[],
   showToast: (msg: string, type?: 'success' | 'error' | 'info' | 'warning') => void
 ) => {
 
@@ -15,7 +16,6 @@ export const useFileController = (
       const file = e.target.files?.[0];
       if (!file) return;
       
-      // Limpa input para permitir re-selecionar o mesmo arquivo se necessário
       const input = e.target;
       
       try {
@@ -24,10 +24,8 @@ export const useFileController = (
           ui.setImportSheets(sheets);
           
           if (sheets.length > 1) {
-              // FORÇA ESCOLHA DE ABA (Pasta de Trabalho)
               ui.openModal('IMPORT_SHEET_SELECT');
           } else {
-              // Segue direto se houver apenas uma
               await startMapping(sheets[0]);
           }
       } catch (err: any) {
@@ -54,8 +52,6 @@ export const useFileController = (
 
           const preview = await importService.buildPreview(ui.importCurrentSheet.rows, ui.importMapping, existing);
           ui.setImportCandidates(preview);
-          
-          // Por padrão, seleciona todos que não possuem ERRO crítico
           ui.setSelectedImportIndices(preview.map((c, i) => c.status !== 'ERRO' ? i : -1).filter(idx => idx !== -1));
           ui.openModal('IMPORT_PREVIEW');
       } catch (err: any) {
@@ -73,21 +69,29 @@ export const useFileController = (
       }
 
       ui.setIsSaving(true);
-      let success = 0;
+      let successClients = 0;
+      let successLoans = 0;
       let errors = 0;
 
       const existingCodes = new Set(clients.map(c => c.accessCode).filter(Boolean));
       const existingNums = new Set(clients.map(c => c.clientNumber).filter(Boolean));
+
+      // Seleciona uma fonte padrão para os contratos importados
+      const defaultSourceId = sources.length > 0 ? sources[0].id : null;
 
       try {
           for (const item of selected) {
               try {
                   const accessCode = generateUniqueAccessCode(existingCodes);
                   const clientNum = generateUniqueClientNumber(existingNums);
+                  const clientId = generateUUID();
+                  
                   existingCodes.add(accessCode);
                   existingNums.add(clientNum);
 
-                  const { error } = await supabase.from('clientes').insert({
+                  // 1. Criar Cliente
+                  const { error: clientError } = await supabase.from('clientes').insert({
+                      id: clientId,
                       profile_id: activeUser.id,
                       name: item.nome,
                       document: item.documento,
@@ -102,15 +106,49 @@ export const useFileController = (
                       created_at: item.data_referencia || new Date().toISOString()
                   });
 
-                  if (error) throw error;
-                  success++;
+                  if (clientError) throw clientError;
+                  successClients++;
+
+                  // 2. Se houver valor base, criar contrato automaticamente
+                  if (item.valor_base && item.valor_base > 0 && defaultSourceId) {
+                      const loanPayload: Loan = {
+                          id: generateUUID(),
+                          clientId: clientId,
+                          debtorName: item.nome,
+                          debtorPhone: item.whatsapp,
+                          debtorDocument: item.documento || '',
+                          debtorAddress: item.endereco || '',
+                          sourceId: defaultSourceId,
+                          preferredPaymentMethod: 'PIX',
+                          pixKey: activeUser.pixKey || '',
+                          principal: item.valor_base,
+                          interestRate: activeUser.defaultInterestRate || 30,
+                          finePercent: activeUser.defaultFinePercent || 2,
+                          dailyInterestPercent: activeUser.defaultDailyInterestPercent || 1,
+                          billingCycle: 'MONTHLY',
+                          amortizationType: 'JUROS',
+                          startDate: item.data_referencia ? item.data_referencia.split('T')[0] : new Date().toISOString().split('T')[0],
+                          totalToReceive: 0, // Será calculado pelo service
+                          installments: [],
+                          ledger: [],
+                          notes: `Contrato importado automaticamente. Valor base: R$ ${item.valor_base.toFixed(2)}`,
+                          isArchived: false,
+                          skipWeekends: false
+                      };
+
+                      await contractsService.saveLoan(loanPayload, activeUser, sources, null);
+                      successLoans++;
+                  }
               } catch (e) {
                   errors++;
                   console.error("Erro ao importar linha:", item.nome, e);
               }
           }
           
-          showToast(`Importação concluída: ${success} adicionados, ${errors} falhas.`, success > 0 ? 'success' : 'error');
+          showToast(
+            `Importação concluída: ${successClients} clientes e ${successLoans} contratos adicionados. ${errors} falhas.`, 
+            successClients > 0 ? 'success' : 'error'
+          );
           ui.closeModal();
           await fetchFullData(activeUser.id);
       } catch (err: any) {

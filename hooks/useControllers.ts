@@ -33,7 +33,7 @@ export const useControllers = (
   const profileCtrl = useProfileController(activeUser, ui, profileEditForm, setProfileEditForm, setActiveUser, setIsLoadingData, fetchFullData, handleLogout, showToast);
   const adminCtrl = useAdminController(activeUser, ui, fetchAllUsers, showToast);
   const paymentCtrl = usePaymentController(activeUser, ui, sources, loans, setLoans, setActiveUser, fetchFullData, showToast);
-  const fileCtrl = useFileController(ui, showToast);
+  const fileCtrl = useFileController(ui, sources, showToast);
   const aiCtrl = useAIController(loans, clients, ui, showToast);
 
   return {
