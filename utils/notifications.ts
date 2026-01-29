@@ -1,36 +1,28 @@
-export const requestBrowserNotificationPermission = async (): Promise<NotificationPermission | null> => {
-  if (!('Notification' in window)) {
-    console.warn('Este navegador não suporta notificações.');
-    return null;
-  }
+// src/utils/notifications.ts
 
-  if (Notification.permission === 'granted') {
-    return 'granted';
-  }
+export const requestBrowserNotificationPermission = async () => {
+  if (!('Notification' in window)) return;
 
-  if (Notification.permission === 'denied') {
-    return 'denied';
-  }
-
-  try {
-    const permission = await Notification.requestPermission();
-    return permission;
-  } catch (err) {
-    console.error('Erro ao solicitar permissão de notificação', err);
-    return null;
+  if (Notification.permission === 'default') {
+    try {
+      await Notification.requestPermission();
+    } catch {
+      // silencioso para não quebrar UX
+    }
   }
 };
 
-export const fireBrowserNotification = (
-  title: string,
-  options?: NotificationOptions
-) => {
+export const fireBrowserNotification = (title: string, message: string) => {
   if (!('Notification' in window)) return;
   if (Notification.permission !== 'granted') return;
 
-  new Notification(title, {
-    icon: '/favicon.ico',
-    badge: '/favicon.ico',
-    ...options,
-  });
+  try {
+    new Notification(title, {
+      body: message,
+      icon: '/favicon.ico',
+      badge: '/favicon.ico',
+    });
+  } catch {
+    // não quebra o app
+  }
 };
