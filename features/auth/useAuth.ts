@@ -1,6 +1,10 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import {
+  requestBrowserNotificationPermission,
+  fireBrowserNotification
+} from '../utils/notifications';
 
 export const useAuth = () => {
     const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
@@ -43,7 +47,7 @@ export const useAuth = () => {
         setIsLoading(true);
 
         try {
-            // ETAPA 1: Busca pelo identificador único (E-mail, Usuário ou Documento)
+            // ETAPA 1: Busca pelo identificador (E-mail, Usuário ou Documento)
             const { data: profile, error } = await supabase
                 .from('perfis')
                 .select('id, senha_acesso, nome_operador, usuario_email, email')
@@ -51,24 +55,29 @@ export const useAuth = () => {
                 .maybeSingle();
 
             if (error) {
-                console.error("Supabase Auth Error:", error);
-                showToast("Erro de conexão com o banco de dados.", "error");
+                console.error("Erro de conexão Supabase:", error);
+                showToast("Erro ao conectar com o servidor. Verifique sua rede.", "error");
+                setIsLoading(false);
                 return;
             }
 
-            // CASO 1: Identificador não encontrado
+            // CASO 1: Usuário não existe no banco
             if (!profile) {
-                showToast("Usuário ou e-mail não encontrado.", "error");
+                showToast("Erro: Usuário ou E-mail não cadastrado.", "error");
+                setIsLoading(false);
                 return;
             }
 
-            // CASO 2: Usuário encontrado, mas senha não confere
+            // CASO 2: Usuário existe, mas senha está incorreta
             if (profile.senha_acesso !== cleanPass) {
-                showToast("Senha incorreta. Tente novamente.", "error");
+                showToast("Senha incorreta! Verifique os dados e tente novamente.", "error");
+                setIsLoading(false);
+                const passInput = document.getElementById('login-password');
+                if (passInput) passInput.focus();
                 return;
             }
 
-            // CASO 3: Sucesso Total
+            // CASO 3: Login Sucesso
             setActiveProfileId(profile.id);
             
             const newSaved = [
@@ -83,8 +92,8 @@ export const useAuth = () => {
             showToast(`Bem-vindo, ${profile.nome_operador}!`, 'success');
 
         } catch (err: any) {
-            console.error("Critical Auth Crash:", err);
-            showToast("Ocorreu um erro inesperado no acesso.", "error");
+            console.error("Crash de Autenticação:", err);
+            showToast("Erro crítico no sistema de login.", "error");
         } finally {
             setIsLoading(false);
         }
