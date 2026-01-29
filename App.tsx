@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef } from 'react';
 
 import { AppShell } from './layout/AppShell';
@@ -25,7 +26,7 @@ export const App: React.FC = () => {
   const { toast, showToast } = useToast();
   const { loans, setLoans, clients, setClients, sources, setSources, activeUser, setActiveUser, allUsers, isLoadingData, setIsLoadingData, fetchFullData, fetchAllUsers, activeTab, setActiveTab, mobileDashboardTab, setMobileDashboardTab, statusFilter, setStatusFilter, searchTerm, setSearchTerm, clientSearchTerm, setClientSearchTerm, profileEditForm, setProfileEditForm } = useAppState(activeProfileId);
   const ui = useUiState();
-  const { portalLoanId } = usePortalRouting();
+  const { portalLoanId, legalSignToken } = usePortalRouting();
   usePersistedTab(activeTab, setActiveTab);
 
   const { loanCtrl, clientCtrl, sourceCtrl, profileCtrl, adminCtrl, paymentCtrl, fileCtrl, aiCtrl } = useControllers(
@@ -82,6 +83,7 @@ export const App: React.FC = () => {
   return (
     <AppGate
       portalLoanId={portalLoanId}
+      legalSignToken={legalSignToken}
       activeProfileId={activeProfileId}
       activeUser={activeUser}
       isLoadingData={isLoadingData}

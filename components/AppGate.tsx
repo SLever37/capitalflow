@@ -2,6 +2,7 @@
 import React from 'react';
 import { Loader2, LogOut, AlertCircle } from 'lucide-react';
 import { ClientPortalView } from '../features/portal/ClientPortalView';
+import { PublicLegalSignPage } from '../features/legal/components/PublicLegalSignPage';
 import { AuthScreen } from '../features/auth/AuthScreen';
 import { UserProfile } from '../types';
 
@@ -21,6 +22,7 @@ interface AppGateProps {
   showToast: any;
   setIsLoadingData: (v: boolean) => void;
   children: React.ReactNode;
+  legalSignToken?: string | null; // Novo prop opcional
 }
 
 export const AppGate: React.FC<AppGateProps> = ({
@@ -38,7 +40,8 @@ export const AppGate: React.FC<AppGateProps> = ({
   handleRemoveSavedProfile,
   showToast,
   setIsLoadingData,
-  children
+  children,
+  legalSignToken
 }) => {
   // Reset de emergência caso fique preso
   const handleEmergencyLogout = () => {
@@ -46,11 +49,17 @@ export const AppGate: React.FC<AppGateProps> = ({
       window.location.reload();
   };
 
+  // 1. Rota de Assinatura Jurídica (Prioridade Alta - Sem Auth)
+  if (legalSignToken) {
+    return <PublicLegalSignPage token={legalSignToken} />;
+  }
+
+  // 2. Rota do Portal do Cliente (Sem Auth de Operador)
   if (portalLoanId) {
     return <ClientPortalView initialLoanId={portalLoanId} />;
   }
 
-  // Se tem ID mas não tem usuário carregado
+  // 3. Se tem ID mas não tem usuário carregado (Estado de Loading ou Erro)
   if (activeProfileId && !activeUser) {
     const knownName = savedProfiles.find(p => p.id === activeProfileId)?.name || 'Usuário';
     
@@ -69,7 +78,6 @@ export const AppGate: React.FC<AppGateProps> = ({
           </h2>
           <p className="text-blue-500 font-bold text-lg mb-8">{knownName}...</p>
           
-          {/* Botão de Emergência: Aparece se não estiver carregando ou se demorar muito */}
           <div className="space-y-3 w-full">
               {!isLoadingData && (
                   <div className="bg-rose-950/30 border border-rose-500/30 p-3 rounded-xl text-xs text-rose-200 text-center mb-4">
@@ -89,6 +97,7 @@ export const AppGate: React.FC<AppGateProps> = ({
     );
   }
 
+  // 4. Tela de Login (Auth Screen)
   if (!activeProfileId || !activeUser) {
     return (
       <AuthScreen 
@@ -106,5 +115,6 @@ export const AppGate: React.FC<AppGateProps> = ({
     );
   }
 
+  // 5. Aplicação Principal Logada
   return <>{children}</>;
 };

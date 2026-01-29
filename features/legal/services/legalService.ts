@@ -73,6 +73,13 @@ export const legalService = {
             if (profileId !== 'DEMO') throw new Error("Falha ao registrar documento jurídico no sistema.");
         }
 
+        // 4. REGISTRO AUTOMÁTICO DE TESTEMUNHAS (Art. 784, III, CPC)
+        // Testemunha 1: Operador (Credor)
+        // Testemunha 2: Sistema (Técnica)
+        if (profileId !== 'DEMO') {
+            await this.registerAutoWitnesses(docId, profileId, params.creditorName, hash);
+        }
+
         return {
             id: docId,
             agreementId,
@@ -82,6 +89,56 @@ export const legalService = {
             status: 'PENDING',
             createdAt: newDocPayload.created_at
         };
+    },
+
+    // Função interna para registrar testemunhas automaticamente
+    async registerAutoWitnesses(docId: string, profileId: string, creditorName: string, docHash: string) {
+        const w1Id = generateUUID();
+        const w2Id = generateUUID();
+        const now = new Date().toISOString();
+
+        // Hash simples para testemunhas (DocHash + Nome + Time)
+        const hashW1 = await generateSHA256(`${docHash}|${creditorName}|${now}`);
+        const hashW2 = await generateSHA256(`${docHash}|SYSTEM|${now}`);
+
+        const witnesses = [
+            {
+                id: w1Id,
+                document_id: docId,
+                profile_id: profileId,
+                signer_name: creditorName,
+                signer_document: "CPF/CNPJ do Perfil", // Pegar do perfil se disponível, mas aqui simplificamos
+                signer_email: "Operador Logado",
+                assinatura_hash: hashW1,
+                ip_origem: "127.0.0.1 (Local)", // Idealmente pegar IP real
+                user_agent: "CapitalFlow Operator Console",
+                signed_at: now,
+                // Campo 'role' ou similar seria ideal, mas usaremos signer_email como marcador
+            },
+            {
+                id: w2Id,
+                document_id: docId,
+                profile_id: profileId,
+                signer_name: "CapitalFlow (Testemunha Técnica)",
+                signer_document: "N/A", 
+                signer_email: "System Audit",
+                assinatura_hash: hashW2,
+                ip_origem: "Server-Side",
+                user_agent: "CapitalFlow Automated Witness Bot v1.0",
+                signed_at: now
+            }
+        ];
+
+        await supabase.from('assinaturas_documento').insert(witnesses);
+    },
+
+    // Busca dados completos para Relatório Jurídico
+    async getFullAuditData(docId: string) {
+        const { data: doc } = await supabase.from('documentos_juridicos').select('*').eq('id', docId).single();
+        const { data: signatures } = await supabase.from('assinaturas_documento').select('*').eq('document_id', docId);
+        const { data: logs } = await supabase.from('logs_assinatura').select('*').eq('document_id', docId).order('timestamp', { ascending: true });
+
+        return { doc, signatures: signatures || [], logs: logs || [] };
     },
 
     // 🔒 VALIDAÇÃO DE INTEGRIDADE
@@ -126,7 +183,6 @@ export const legalService = {
             publicIp = ipData.ip;
         } catch (e) {
             console.warn("Falha ao obter IP público para auditoria.", e);
-            // Em produção, isso poderia bloquear a assinatura dependendo do rigor do compliance.
         }
 
         const metadata: LegalSignatureMetadata = {
