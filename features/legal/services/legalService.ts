@@ -12,7 +12,7 @@ export const legalService = {
             debtorDoc: loan.debtorDocument,
             debtorPhone: loan.debtorPhone, // Mapeado
             debtorAddress: loan.debtorAddress || 'Endereço não informado',
-            creditorName: activeUser.businessName || activeUser.name,
+            creditorName: activeUser.fullName || activeUser.businessName || activeUser.name,
             creditorDoc: activeUser.document || 'Não informado',
             creditorAddress: activeUser.address || `${activeUser.city || 'Manaus'} - ${activeUser.state || 'AM'}`,
             totalDebt: agreement.negotiatedTotal,

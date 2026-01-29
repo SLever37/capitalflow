@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { Loan, Client, CapitalSource, UserProfile } from '../types';
@@ -29,7 +30,7 @@ export const useAppState = (activeProfileId: string | null) => {
       
       if (profileId === 'DEMO') {
           setActiveUser({
-              id: 'DEMO', name: 'Usuário Demo', email: 'demo@app.com', totalAvailableCapital: 100000, interestBalance: 5000,
+              id: 'DEMO', name: 'Usuário Demo', fullName: 'Operador Demonstração Completo', email: 'demo@app.com', totalAvailableCapital: 100000, interestBalance: 5000,
               photo: undefined, businessName: 'Demo Capital', accessLevel: 2, createdAt: new Date().toISOString(),
               brandColor: '#2563eb', defaultInterestRate: 30, defaultFinePercent: 2, defaultDailyInterestPercent: 1, targetCapital: 150000, targetProfit: 20000
           });
@@ -54,6 +55,7 @@ export const useAppState = (activeProfileId: string | null) => {
           const u: UserProfile = {
               id: asString(profile.id),
               name: asString(profile.nome_operador, 'Sem Nome'),
+              fullName: asString(profile.nome_completo),
               email: asString(profile.usuario_email),
               businessName: asString(profile.nome_empresa),
               document: asString(profile.document),

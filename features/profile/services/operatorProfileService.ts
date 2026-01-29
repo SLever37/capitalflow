@@ -1,3 +1,4 @@
+
 import { supabase } from '../../../lib/supabase';
 import { UserProfile } from '../../../types';
 import { generateUUID } from '../../../utils/generators';
@@ -16,10 +17,12 @@ export const operatorProfileService = {
             .from('perfis')
             .update({
                 nome_operador: curatedData.name,
+                nome_completo: curatedData.fullName,
                 nome_empresa: curatedData.businessName,
                 document: curatedData.document,
                 phone: curatedData.phone,
                 address: curatedData.address,
+                address_number: (curatedData as any).addressNumber, // MAPEAMENTO CORRIGIDO
                 neighborhood: (curatedData as any).neighborhood,
                 city: (curatedData as any).city,
                 state: (curatedData as any).state,
@@ -39,7 +42,11 @@ export const operatorProfileService = {
             .select()
             .single();
 
-        if (error) throw new Error("Falha ao atualizar perfil: " + error.message);
+        if (error) {
+            console.error("Erro ao atualizar perfil no banco:", error);
+            throw new Error("Falha ao atualizar perfil: " + error.message);
+        }
+        
         await this.logAudit(profileId, `PROFILE_UPDATE_${origin}`, `Perfil atualizado via ${origin}.`);
         return this.mapToUserProfile(updated);
     },
@@ -64,10 +71,12 @@ export const operatorProfileService = {
 
                     const mappedData: UpdatableProfileFields = {
                         name: row['Nome'] || row['Operador'] || row['name'],
+                        fullName: row['Nome Completo'] || row['fullName'],
                         businessName: row['Empresa'] || row['Negocio'] || row['businessName'],
                         document: row['CPF'] || row['CNPJ'] || row['Documento'] || row['document'],
                         phone: row['Telefone'] || row['Celular'] || row['phone'],
                         address: row['Endereco'] || row['address'],
+                        addressNumber: row['Numero'] || row['Nº'] || row['addressNumber'],
                         pixKey: row['Pix'] || row['Chave Pix'] || row['pixKey'],
                         defaultInterestRate: row['Taxa Padrão'] || row['defaultInterestRate'],
                         targetCapital: row['Meta Capital'] || row['targetCapital']
@@ -90,10 +99,12 @@ export const operatorProfileService = {
         const cleanPhone = onlyDigits(raw.phone || '');
         return {
             name: (raw.name || 'Operador').trim().substring(0, 100),
+            fullName: (raw.fullName || '').trim().substring(0, 200),
             businessName: (raw.businessName || 'Minha Empresa').trim().substring(0, 100),
             document: cleanDoc ? maskDocument(cleanDoc) : '000.000.000-00',
             phone: cleanPhone ? maskPhone(cleanPhone) : '00000000000',
             address: (raw.address || '').substring(0, 200),
+            addressNumber: (raw.addressNumber || '').substring(0, 20), // CURADORIA ADICIONADA
             pixKey: (raw.pixKey || '').substring(0, 100),
             photo: raw.photo,
             brandColor: raw.brandColor || '#2563eb',
@@ -111,14 +122,17 @@ export const operatorProfileService = {
     },
 
     mapToUserProfile(dbProfile: any): UserProfile {
+        if (!dbProfile) throw new Error("Dados de perfil nulos no mapeamento.");
         return {
             id: dbProfile.id,
             name: dbProfile.nome_operador,
+            fullName: dbProfile.nome_completo || '',
             email: dbProfile.usuario_email,
             businessName: dbProfile.nome_empresa,
             document: dbProfile.document,
             phone: dbProfile.phone,
             address: dbProfile.address,
+            addressNumber: dbProfile.address_number || '', // MAPEAMENTO DE RETORNO ADICIONADO
             neighborhood: dbProfile.neighborhood,
             city: dbProfile.city,
             state: dbProfile.state,

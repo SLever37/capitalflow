@@ -8,8 +8,6 @@ export enum LoanStatus {
 
 export type PaymentMethod = 'PIX' | 'CASH' | 'BANK_TRANSFER' | 'OTHER';
 
-// ... (existing types remain)
-
 export interface CapitalSource {
   id: string;
   name: string;
@@ -29,14 +27,11 @@ export interface Client {
   zipCode?: string;
   notes?: string;
   createdAt: string;
-  // portal access fields
   access_code?: string;
   client_number?: string;
   cpf?: string;
   cnpj?: string;
 }
-
-// ... (Keep existing LedgerEntry, Installment, LoanPolicy, etc.)
 
 export interface LedgerEntry {
   id: string;
@@ -220,6 +215,7 @@ export interface Loan {
 export interface UserProfile {
   id: string;
   name: string;
+  fullName?: string; // Novo Campo Jurídico
   password?: string;
   recoveryPhrase?: string;
   accessLevel?: number;
