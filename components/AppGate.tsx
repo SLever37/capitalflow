@@ -22,82 +22,42 @@ interface AppGateProps {
   showToast: any;
   setIsLoadingData: (v: boolean) => void;
   children: React.ReactNode;
-  legalSignToken?: string | null; // Novo prop opcional
+  legalSignToken?: string | null;
 }
 
 export const AppGate: React.FC<AppGateProps> = ({
-  portalLoanId,
-  activeProfileId,
-  activeUser,
-  isLoadingData,
-  loginUser,
-  setLoginUser,
-  loginPassword,
-  setLoginPassword,
-  submitLogin,
-  savedProfiles,
-  handleSelectSavedProfile,
-  handleRemoveSavedProfile,
-  showToast,
-  setIsLoadingData,
-  children,
-  legalSignToken
+  portalLoanId, activeProfileId, activeUser, isLoadingData, loginUser, setLoginUser,
+  loginPassword, setLoginPassword, submitLogin, savedProfiles,
+  handleSelectSavedProfile, handleRemoveSavedProfile, showToast, setIsLoadingData,
+  children, legalSignToken
 }) => {
-  // Reset de emergência caso fique preso
+  
   const handleEmergencyLogout = () => {
       localStorage.removeItem('cm_session');
       window.location.reload();
   };
 
-  // 1. Rota de Assinatura Jurídica (Prioridade Alta - Sem Auth)
-  if (legalSignToken) {
-    return <PublicLegalSignPage token={legalSignToken} />;
-  }
+  if (legalSignToken) return <PublicLegalSignPage token={legalSignToken} />;
+  if (portalLoanId) return <ClientPortalView initialLoanId={portalLoanId} />;
 
-  // 2. Rota do Portal do Cliente (Sem Auth de Operador)
-  if (portalLoanId) {
-    return <ClientPortalView initialLoanId={portalLoanId} />;
-  }
-
-  // 3. Se tem ID mas não tem usuário carregado (Estado de Loading ou Erro)
   if (activeProfileId && !activeUser) {
     const knownName = savedProfiles.find(p => p.id === activeProfileId)?.name || 'Usuário';
-    
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4">
         <div className="flex flex-col items-center animate-in zoom-in duration-500 max-w-sm w-full">
-          <div className="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center mb-6 shadow-2xl shadow-blue-900/20 border border-slate-800">
-            {isLoadingData ? (
-                <Loader2 className="w-8 h-8 text-blue-500 animate-spin"/>
-            ) : (
-                <AlertCircle className="w-8 h-8 text-rose-500"/>
-            )}
+          <div className="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center mb-6 shadow-2xl border border-slate-800">
+            {isLoadingData ? <Loader2 className="w-8 h-8 text-blue-500 animate-spin"/> : <AlertCircle className="w-8 h-8 text-rose-500"/>}
           </div>
           <h2 className="text-2xl font-black text-white tracking-tighter uppercase mb-2">
               {isLoadingData ? 'Carregando' : 'Falha ao Carregar'}
           </h2>
           <p className="text-blue-500 font-bold text-lg mb-8">{knownName}...</p>
-          
-          <div className="space-y-3 w-full">
-              {!isLoadingData && (
-                  <div className="bg-rose-950/30 border border-rose-500/30 p-3 rounded-xl text-xs text-rose-200 text-center mb-4">
-                      Não foi possível conectar ao banco de dados. Verifique sua conexão ou as permissões do sistema.
-                  </div>
-              )}
-              
-              <button 
-                onClick={handleEmergencyLogout}
-                className="flex items-center justify-center gap-2 w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold uppercase text-xs transition-all"
-              >
-                <LogOut size={16}/> Cancelar e Sair
-              </button>
-          </div>
+          <button onClick={handleEmergencyLogout} className="w-full py-3 bg-slate-800 text-slate-300 rounded-xl font-bold uppercase text-xs">Sair e Tentar Novamente</button>
         </div>
       </div>
     );
   }
 
-  // 4. Tela de Login (Auth Screen)
   if (!activeProfileId || !activeUser) {
     return (
       <AuthScreen 
@@ -115,6 +75,5 @@ export const AppGate: React.FC<AppGateProps> = ({
     );
   }
 
-  // 5. Aplicação Principal Logada
   return <>{children}</>;
 };

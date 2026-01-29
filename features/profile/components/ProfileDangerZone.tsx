@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { AlertTriangle, RotateCcw, Trash2, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, RotateCcw, Trash2, ShieldAlert, ArrowRight } from 'lucide-react';
 
 interface ProfileDangerZoneProps {
     onResetData: () => void;
@@ -16,56 +16,55 @@ export const ProfileDangerZone: React.FC<ProfileDangerZoneProps> = ({ onResetDat
                 </div>
                 
                 <h3 className="text-rose-500 font-black uppercase text-sm mb-4 flex items-center gap-2 relative z-10">
-                    <AlertTriangle size={18} /> Zona de Risco e Exclusão
+                    <AlertTriangle size={18} /> Área de Risco e Controle de Dados
                 </h3>
                 
                 <div className="bg-rose-950/40 p-4 rounded-xl border border-rose-500/20 mb-6 relative z-10">
                     <p className="text-xs text-rose-200/90 font-medium leading-relaxed">
-                        <strong className="uppercase">Atenção:</strong> As ações abaixo são <b>destrutivas e irreversíveis</b>. 
-                        Ao prosseguir, você concorda que os dados apagados não poderão ser recuperados nem pelo suporte técnico.
+                        <strong className="uppercase">Atenção Crítica:</strong> As ações abaixo são irreversíveis. Elas manipulam permanentemente seu banco de dados na nuvem.
                     </p>
                 </div>
 
                 <div className="space-y-4 relative z-10">
-                    {/* Reset Data Button */}
-                    <div className="flex flex-col sm:flex-row justify-between items-center bg-slate-900/50 p-4 rounded-2xl border border-rose-500/10 gap-4 hover:border-rose-500/30 transition-colors">
-                        <div className="text-center sm:text-left">
-                            <p className="font-bold text-white text-xs uppercase mb-1 flex items-center gap-2 justify-center sm:justify-start">
-                                <RotateCcw size={12} className="text-rose-400"/> Zerar Banco de Dados
-                            </p>
-                            <p className="text-[10px] text-slate-400 leading-tight">
-                                Remove todos os clientes, contratos e histórico.<br/>
-                                Mantém seu usuário, senha e configurações de perfil.
-                            </p>
+                    {/* Reset Data */}
+                    <button 
+                        onClick={onResetData}
+                        className="w-full flex items-center justify-between bg-slate-900/50 p-5 rounded-2xl border border-rose-500/10 hover:border-rose-500/40 transition-all group text-left"
+                    >
+                        <div className="flex items-center gap-4">
+                            <div className="p-3 bg-rose-500/10 rounded-xl text-rose-500 group-hover:bg-rose-600 group-hover:text-white transition-colors">
+                                <RotateCcw size={20}/>
+                            </div>
+                            <div>
+                                <p className="font-bold text-white text-sm uppercase">Começar do Zero</p>
+                                <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest mt-0.5">Apagar Clientes e Contratos</p>
+                            </div>
                         </div>
-                        <button 
-                            onClick={onResetData} 
-                            className="px-5 py-3 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-2 whitespace-nowrap shadow-lg shadow-rose-900/30 active:scale-95"
-                        >
-                            Zerar Tudo
-                        </button>
-                    </div>
+                        <ArrowRight size={18} className="text-slate-700 group-hover:text-rose-500 transform group-hover:translate-x-1 transition-all"/>
+                    </button>
 
-                    {/* Delete Account Button */}
-                    <div className="flex flex-col sm:flex-row justify-between items-center bg-slate-900/50 p-4 rounded-2xl border border-rose-500/10 gap-4 hover:border-rose-500/30 transition-colors">
-                        <div className="text-center sm:text-left">
-                            <p className="font-bold text-white text-xs uppercase mb-1 flex items-center gap-2 justify-center sm:justify-start">
-                                <Trash2 size={12} className="text-rose-400"/> Excluir Minha Conta
-                            </p>
-                            <p className="text-[10px] text-slate-400 leading-tight">
-                                Remove seu login, assinatura e todos os dados.<br/>
-                                Você será desconectado imediatamente.
-                            </p>
+                    {/* Delete Account */}
+                    <button 
+                        onClick={onDeleteAccount}
+                        className="w-full flex items-center justify-between bg-slate-900/50 p-5 rounded-2xl border border-rose-500/10 hover:border-rose-500/60 transition-all group text-left"
+                    >
+                        <div className="flex items-center gap-4">
+                            <div className="p-3 bg-slate-800 rounded-xl text-slate-500 group-hover:bg-rose-600 group-hover:text-white transition-colors">
+                                <Trash2 size={20}/>
+                            </div>
+                            <div>
+                                <p className="font-bold text-white text-sm uppercase">Excluir Conta</p>
+                                <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest mt-0.5">Remover Perfil e Tudo Vinculado</p>
+                            </div>
                         </div>
-                        <button 
-                            onClick={onDeleteAccount} 
-                            className="px-5 py-3 bg-slate-950 text-rose-500 border border-rose-500/30 rounded-xl text-[10px] font-black uppercase hover:bg-rose-600 hover:text-white hover:border-rose-600 transition-all flex items-center gap-2 whitespace-nowrap active:scale-95"
-                        >
-                            Apagar Usuário
-                        </button>
-                    </div>
+                        <ArrowRight size={18} className="text-slate-700 group-hover:text-rose-500 transform group-hover:translate-x-1 transition-all"/>
+                    </button>
                 </div>
             </div>
+            
+            <p className="text-center text-[9px] text-slate-600 uppercase font-black tracking-[0.2em]">
+                Segurança CapitalFlow • Autenticação exigida para ações destrutivas.
+            </p>
         </div>
     );
 };

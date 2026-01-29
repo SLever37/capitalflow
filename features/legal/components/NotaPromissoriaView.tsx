@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { ArrowLeft, Printer, FileText, Landmark, Scale, Calendar } from 'lucide-react';
+import { ArrowLeft, Printer, Landmark, Scale, Calendar } from 'lucide-react';
 import { Loan, UserProfile } from '../../../types';
 import { formatMoney } from '../../../utils/formatters';
 import { DocumentTemplates } from '../templates/DocumentTemplates';
@@ -43,7 +43,7 @@ export const NotaPromissoriaView: React.FC<NotaPromissoriaViewProps> = ({ loans,
                     <h2 className="text-xl font-black text-white uppercase flex items-center gap-2">
                         <Printer className="text-blue-500" size={24}/> Notas Promissórias
                     </h2>
-                    <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Títulos Pro Soluto e Pro Solvendo</p>
+                    <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Garantia Líquida e Certa (Dec. 2.044/1908)</p>
                 </div>
             </div>
 
@@ -52,7 +52,7 @@ export const NotaPromissoriaView: React.FC<NotaPromissoriaViewProps> = ({ loans,
                     <div key={loan.id} className="bg-slate-900 border border-slate-800 p-6 rounded-[2.5rem] flex flex-col group hover:border-blue-500 transition-all">
                         <div className="flex justify-between items-start mb-4">
                             <div className="p-3 bg-blue-500/10 text-blue-500 rounded-2xl"><Landmark size={24}/></div>
-                            <span className="text-[9px] font-black uppercase bg-blue-950 text-blue-400 px-2 py-1 rounded">Líquida e Certa</span>
+                            <span className="text-[9px] font-black uppercase bg-blue-950 text-blue-400 px-2 py-1 rounded">Apta p/ Impressão</span>
                         </div>
                         <h4 className="font-bold text-white text-lg truncate mb-1 uppercase">{loan.debtorName}</h4>
                         <p className="text-[10px] text-slate-500 font-black uppercase mb-4 tracking-widest flex items-center gap-2">
@@ -61,7 +61,7 @@ export const NotaPromissoriaView: React.FC<NotaPromissoriaViewProps> = ({ loans,
                         
                         <div className="mt-auto pt-4 border-t border-slate-800 flex items-center justify-between">
                             <div>
-                                <p className="text-[9px] text-slate-500 uppercase font-black">Principal</p>
+                                <p className="text-[9px] text-slate-500 uppercase font-black">Capital Base</p>
                                 <p className="text-lg font-black text-white">{formatMoney(loan.principal)}</p>
                             </div>
                             <button 

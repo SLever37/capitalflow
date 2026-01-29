@@ -12,6 +12,7 @@ import { useUiState } from './hooks/useUiState';
 import { usePortalRouting } from './hooks/usePortalRouting';
 import { usePersistedTab } from './hooks/usePersistedTab';
 import { useControllers } from './hooks/useControllers';
+import { useAppNotifications } from './hooks/useAppNotifications';
 
 import { DashboardContainer } from './containers/DashboardContainer';
 import { ClientsContainer } from './containers/ClientsContainer';
@@ -33,19 +34,20 @@ export const App: React.FC = () => {
     activeUser, ui, loans, setLoans, clients, setClients, sources, setSources, setActiveUser, setIsLoadingData, fetchFullData, fetchAllUsers, handleLogout, showToast, profileEditForm, setProfileEditForm
   );
 
+  // --- SISTEMA DE NOTIFICAÇÕES INTELIGENTES ---
+  useAppNotifications(loans, activeUser, showToast);
+
   // --- MECANISMO ANTISSAÍDA ACIDENTAL ---
   const exitAttemptRef = useRef(false);
 
   useEffect(() => {
-    // Empurra um estado inicial para ter algo para "voltar"
     window.history.pushState(null, document.title, window.location.href);
 
     const handlePopState = (event: PopStateEvent) => {
-        // 1. Verificar se há modais abertos e fechá-los (Prioridade Alta)
         const closeIfOpen = (isOpen: boolean, closeFn: () => void) => {
             if (isOpen) {
                 closeFn();
-                window.history.pushState(null, "", window.location.href); // Restaura a "armadilha"
+                window.history.pushState(null, "", window.location.href);
                 return true;
             }
             return false;
@@ -54,25 +56,21 @@ export const App: React.FC = () => {
         if (closeIfOpen(!!ui.activeModal, () => ui.closeModal())) return;
         if (closeIfOpen(ui.showNavHub, () => ui.setShowNavHub(false))) return;
 
-        // 2. Navegação entre Abas (Se não for Dashboard, volta para Dashboard)
         if (activeTab !== 'DASHBOARD') {
             setActiveTab('DASHBOARD');
             window.history.pushState(null, "", window.location.href);
             return;
         }
 
-        // 3. Confirmação de Saída
         if (exitAttemptRef.current) {
-            // Se pressionou duas vezes rápido, permite o comportamento padrão (sair/voltar histórico real)
-            // Não fazemos pushState aqui, permitindo que o navegador saia ou volte a página anterior real
         } else {
             showToast("Pressione voltar novamente para sair.", "info");
             exitAttemptRef.current = true;
-            window.history.pushState(null, "", window.location.href); // Restaura a "armadilha"
+            window.history.pushState(null, "", window.location.href);
             
             setTimeout(() => {
                 exitAttemptRef.current = false;
-            }, 2000); // 2 segundos para confirmar
+            }, 2000);
         }
     };
 
@@ -134,7 +132,6 @@ export const App: React.FC = () => {
             />
         )}
 
-        {/* NOVA ROTA JURÍDICA */}
         {activeTab === 'LEGAL' && (
             <LegalContainer 
                 loans={loans} sources={sources} activeUser={activeUser}
@@ -147,7 +144,6 @@ export const App: React.FC = () => {
             <MasterContainer allUsers={allUsers} ui={ui} adminCtrl={adminCtrl} />
         )}
 
-        {/* Fix: Passed missing isLoadingData prop to ModalHostContainer */}
         <ModalHostContainer 
             ui={ui} activeUser={activeUser} clients={clients} sources={sources} loans={loans}
             isLoadingData={isLoadingData}
