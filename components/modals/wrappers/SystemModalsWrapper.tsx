@@ -1,168 +1,114 @@
+
 import React from 'react';
 import { useModal } from '../../../contexts/ModalContext';
 import { Modal } from '../../ui/Modal';
-import { AdminModals } from '../ModalGroups';
-import { ConfirmationModalWrapper, ReceiptModalWrapper, MessageHubWrapper, DonateModalWrapper, AgendaWrapper, FlowWrapper, CalculatorWrapper, AIWrapper, NoteWrapper } from '../ModalWrappers';
-import { RenegotiationModal } from '../../../features/agreements/components/RenegotiationModal';
-import { CheckSquare, Square, Banknote, AlertTriangle, Loader2, Calendar, Info, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { formatMoney } from '../../../utils/formatters';
-import { calculateTotalDue } from '../../../domain/finance/calculations';
+import { CheckSquare, Square, Table, ArrowRight, AlertTriangle, CheckCircle2, Info, Loader2, ListFilter } from 'lucide-react';
+import { FIELD_MAPS } from '../../../features/profile/import/domain/importSchema';
 
 export const SystemModalsWrapper = () => {
-    const { activeModal, closeModal, ui, activeUser, fileCtrl, showToast, fetchFullData, loanCtrl, profileCtrl, loans, isLoadingData } = useModal();
+    const { activeModal, closeModal, ui, activeUser, fileCtrl, fetchFullData } = useModal();
 
     switch (activeModal?.type) {
-        case 'CONFIRMATION': return <ConfirmationModalWrapper />;
-        case 'RECEIPT': return <ReceiptModalWrapper />;
-        case 'MESSAGE_HUB': return <MessageHubWrapper />;
-        case 'DONATE': return <DonateModalWrapper />;
-        case 'CALC': return <CalculatorWrapper />;
-        case 'FLOW': return <FlowWrapper />;
-        case 'AI_ASSISTANT': return <AIWrapper />;
-        case 'NOTE': return <NoteWrapper />;
-        case 'MASTER_EDIT_USER': return <AdminModals />;
-        case 'DELETE_ACCOUNT':
-            return (
-               <Modal onClose={closeModal} title="EXCLUSÃO DE CONTA">
-                   <div className="space-y-5 animate-in fade-in zoom-in-95 duration-200">
-                       <div className="bg-rose-950/30 p-5 rounded-2xl border border-rose-500/30 text-rose-200 text-sm font-medium text-center flex flex-col items-center gap-2">
-                           <AlertTriangle size={32} className="text-rose-500 mb-1"/>
-                           <p className="font-bold uppercase text-xs tracking-widest">Ação Irreversível</p>
-                           <p className="text-xs opacity-80">Você está prestes a apagar sua conta permanentemente.</p>
-                       </div>
-                       
-                       <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
-                           <label className="flex items-start gap-3 cursor-pointer group">
-                               <div className="relative flex items-center">
-                                   <input type="checkbox" checked={ui.deleteAccountAgree} onChange={e => ui.setDeleteAccountAgree(e.target.checked)} className="peer w-5 h-5 appearance-none border-2 border-slate-600 rounded bg-slate-900 checked:bg-rose-600 checked:border-rose-600 transition-all cursor-pointer" />
-                                   <CheckSquare size={14} className="absolute left-0.5 text-white opacity-0 peer-checked:opacity-100 pointer-events-none"/>
-                               </div>
-                               <span className="text-xs text-slate-300 group-hover:text-white transition-colors select-none leading-tight pt-0.5">
-                                   Entendo que perderei o acesso imediato e todos os meus dados serão destruídos.
-                               </span>
-                           </label>
-                       </div>
-
-                       <div className="space-y-2">
-                           <label className="text-[10px] font-black uppercase text-slate-500 ml-1">Confirmação</label>
-                           <input type="text" placeholder="Digite DELETAR para confirmar" className="w-full bg-slate-950 p-4 rounded-xl text-white outline-none border border-slate-800 focus:border-rose-500 transition-all font-bold" value={ui.deleteAccountConfirm} onChange={e => ui.setDeleteAccountConfirm(e.target.value)} />
-                       </div>
-
-                       <button onClick={async () => { if(ui.deleteAccountAgree && ui.deleteAccountConfirm === 'DELETAR') { await profileCtrl.handleDeleteAccount(); } }} disabled={!ui.deleteAccountAgree || ui.deleteAccountConfirm !== 'DELETAR' || isLoadingData} className="w-full py-4 bg-rose-600 hover:bg-rose-500 text-white font-black rounded-xl uppercase disabled:opacity-50 transition-all">
-                            {isLoadingData ? <Loader2 className="animate-spin" size={18}/> : 'Confirmar Exclusão'}
-                       </button>
-                   </div>
-               </Modal>
-            );
-        case 'RESET_DATA':
-            return activeUser ? (
-               <Modal onClose={closeModal} title="Zerar Dados">
-                   <div className="space-y-5 animate-in fade-in zoom-in-95 duration-200">
-                       <div className="bg-amber-950/30 p-4 rounded-2xl border border-amber-500/30 flex items-center gap-3">
-                           <AlertTriangle className="text-amber-500 flex-shrink-0" size={24}/>
-                           <div className="text-amber-200 text-xs">
-                               <p className="font-bold uppercase mb-1">Limpeza de Base</p>
-                               <p className="leading-tight opacity-90">Isso apagará TODOS os clientes e contratos. Seu login permanecerá ativo.</p>
-                           </div>
-                       </div>
-                       {activeUser.id !== 'DEMO' && (
-                           <div className="space-y-2">
-                               <label className="text-[10px] font-black uppercase text-slate-500 ml-1">Senha Atual</label>
-                               <input type="password" placeholder="Digite sua senha" className="w-full bg-slate-950 p-4 rounded-xl text-white outline-none border border-slate-800 focus:border-amber-500 transition-all" value={ui.resetPasswordInput} onChange={e => ui.setResetPasswordInput(e.target.value)} />
-                           </div>
-                       )}
-                       <div className="flex gap-3">
-                           <button onClick={closeModal} className="flex-1 py-4 bg-slate-800 text-white font-bold rounded-xl uppercase text-xs">Cancelar</button>
-                           <button onClick={profileCtrl.executeResetData} className="flex-[2] py-4 bg-rose-600 text-white font-black rounded-xl uppercase text-xs">Confirmar Reset</button>
-                       </div>
-                   </div>
-               </Modal>
-            ) : null;
-        case 'AGENDA':
-            const handleSystemAction = (type: string, meta: any) => {
-                ui.closeModal(); 
-                if (type === 'PAYMENT' && meta?.loanId && meta?.installmentId) {
-                    const loan = loans.find(l => l.id === meta.loanId);
-                    if (loan) {
-                        const inst = loan.installments.find(i => i.id === meta.installmentId);
-                        if (inst) {
-                            const calcs = calculateTotalDue(loan, inst);
-                            setTimeout(() => { ui.setPaymentModal({ loan, inst, calculations: calcs }); ui.openModal('PAYMENT'); }, 150); 
-                        }
-                    }
-                } else if (type === 'PORTAL_REVIEW' && meta?.comprovanteUrl) {
-                    setTimeout(() => ui.openModal('PROOF_VIEW', meta.comprovanteUrl), 150);
-                }
-            };
-            return <AgendaWrapper onSystemAction={handleSystemAction} />;
         case 'IMPORT_SHEET_SELECT':
             return (
-               <Modal onClose={closeModal} title="Selecione a Aba">
-                   <div className="space-y-3">
-                       <div className="bg-blue-900/20 p-4 rounded-2xl border border-blue-500/30 flex items-start gap-3 mb-4">
-                           <Info className="text-blue-400 shrink-0" size={20}/>
-                           <p className="text-xs text-blue-200">Várias abas detectadas. Escolha a que contém os devedores.</p>
-                       </div>
-                       <div className="grid grid-cols-1 gap-2">
-                           {ui.importSheetNames.map((sheet: string) => (
-                               <button key={sheet} onClick={() => fileCtrl.selectSheet(sheet)} className="w-full p-5 bg-slate-950 border border-slate-800 rounded-2xl text-left hover:border-blue-500 font-black uppercase text-xs text-white flex justify-between items-center group">
-                                   {sheet}
-                                   <Calendar className="text-slate-700 group-hover:text-blue-500" size={16}/>
-                               </button>
-                           ))}
-                       </div>
-                   </div>
-               </Modal>
+                <Modal onClose={closeModal} title="Selecione a Aba do Excel">
+                    <div className="grid grid-cols-1 gap-2">
+                        {ui.importSheets?.map((sheet: any) => (
+                            <button key={sheet.name} onClick={() => fileCtrl.startMapping(sheet)} className="w-full p-5 bg-slate-950 border border-slate-800 rounded-2xl text-left hover:border-blue-500 hover:bg-slate-900 transition-all font-black uppercase text-xs text-white flex justify-between items-center group">
+                                {sheet.name}
+                                <Table className="text-slate-700 group-hover:text-blue-500" size={16}/>
+                            </button>
+                        ))}
+                    </div>
+                </Modal>
             );
-        case 'IMPORT_PREVIEW':
+
+        case 'IMPORT_MAPPING':
             return (
-               <Modal onClose={fileCtrl.cancelImport} title="Curadoria de Dados">
-                   <div className="space-y-6">
-                       <div className="flex justify-between items-center">
-                           <div className="flex gap-4">
-                               <div className="text-center"><p className="text-[10px] font-black uppercase text-slate-500">Total</p><p className="text-lg font-black text-white">{ui.importCandidates.length}</p></div>
-                               <div className="text-center"><p className="text-[10px] font-black uppercase text-blue-500">Selecionados</p><p className="text-lg font-black text-blue-400">{ui.selectedImportIndices.length}</p></div>
-                           </div>
-                           <button onClick={() => ui.setSelectedImportIndices(ui.importCandidates.map((_:any, i:number) => i).filter((i:number) => ui.importCandidates[i].status === 'VALID'))} className="text-[9px] font-black uppercase text-blue-500 hover:text-white">Marcar Todos Válidos</button>
-                       </div>
-
-                       <div className="bg-slate-950 border border-slate-800 rounded-[2rem] overflow-hidden">
-                           <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
-                               {ui.importCandidates.map((c: any, i: number) => {
-                                   const isSelected = ui.selectedImportIndices.includes(i);
-                                   const isInvalid = c.status === 'INVALID';
-                                   return (
-                                       <div key={i} className={`flex items-start gap-4 p-4 border-b border-slate-900 last:border-0 hover:bg-slate-900/50 transition-colors cursor-pointer ${isInvalid ? 'opacity-50' : ''}`} onClick={() => fileCtrl.toggleImportSelection(i)}>
-                                           <div className={`mt-1 transition-colors ${isSelected ? 'text-blue-500' : 'text-slate-700'}`}>{isSelected ? <CheckSquare size={22}/> : <Square size={22}/>}</div>
-                                           <div className="flex-1 min-w-0">
-                                               <div className="flex justify-between items-start gap-2">
-                                                   <h4 className="text-sm font-black text-white uppercase truncate">{c.name}</h4>
-                                                   {isInvalid && <span className="text-[8px] font-black uppercase bg-rose-500/10 text-rose-500 px-2 py-0.5 rounded border border-rose-500/20">{c.error}</span>}
-                                               </div>
-                                               <p className="text-[10px] text-slate-500 font-bold mb-3">{c.phone || 'Sem Tel'} {c.document ? `• ${c.document}` : ''}</p>
-                                               <div className="grid grid-cols-3 gap-2">
-                                                   <div className="bg-slate-900/80 p-2 rounded-xl border border-slate-800"><p className="text-[8px] font-black text-slate-600 uppercase mb-0.5">Capital</p><p className="text-[10px] font-bold text-white truncate">{c.principal ? formatMoney(c.principal) : '-'}</p></div>
-                                                   <div className="bg-slate-900/80 p-2 rounded-xl border border-slate-800"><p className="text-[8px] font-black text-slate-600 uppercase mb-0.5">Taxa</p><p className="text-[10px] font-bold text-emerald-500">{c.interestRate ? `${c.interestRate}%` : '-'}</p></div>
-                                                   <div className="bg-slate-900/80 p-2 rounded-xl border border-slate-800"><p className="text-[8px] font-black text-slate-600 uppercase mb-0.5">Início</p><p className="text-[10px] font-bold text-blue-400">{c.startDate ? new Date(c.startDate).toLocaleDateString() : '-'}</p></div>
-                                               </div>
-                                           </div>
-                                       </div>
-                                   );
-                               })}
-                           </div>
-                       </div>
-
-                       <div className="bg-amber-900/10 border border-amber-500/20 p-4 rounded-2xl flex items-start gap-3">
-                           <AlertTriangle className="text-amber-500 shrink-0" size={18}/>
-                           <p className="text-[10px] text-amber-200/80 leading-relaxed font-medium uppercase">Contratos com Capital detectado serão gerados na <b>Carteira Principal</b> com vencimento em 30 dias.</p>
-                       </div>
-
-                       <button onClick={() => fileCtrl.handleConfirmImport(activeUser, fetchFullData)} className="w-full py-5 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-2xl uppercase shadow-xl flex items-center justify-center gap-3 text-xs disabled:opacity-50" disabled={ui.selectedImportIndices.length === 0}>
-                           {ui.selectedImportIndices.length > 0 ? <><Banknote size={18}/> Importar Selecionados</> : 'Selecione registros'}
-                       </button>
-                   </div>
-               </Modal>
+                <Modal onClose={closeModal} title="Mapeamento de Colunas">
+                    <div className="space-y-6">
+                        <div className="bg-blue-900/10 border border-blue-500/20 p-4 rounded-2xl flex items-start gap-3">
+                            <Info className="text-blue-400 shrink-0" size={18}/>
+                            <p className="text-[10px] text-blue-200 uppercase font-bold">Relacione as colunas da sua planilha com os campos do sistema.</p>
+                        </div>
+                        <div className="space-y-2 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
+                            {FIELD_MAPS.map(field => (
+                                <div key={field.key} className="flex items-center gap-4 bg-slate-950 p-3 rounded-xl border border-slate-800">
+                                    <div className="flex-1">
+                                        <p className="text-[10px] font-black text-blue-500 uppercase">{field.key.replace('_', ' ')}</p>
+                                    </div>
+                                    <select 
+                                        value={ui.importMapping[field.key] ?? ''} 
+                                        onChange={e => ui.setImportMapping({...ui.importMapping, [field.key]: parseInt(e.target.value)})}
+                                        className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-blue-500"
+                                    >
+                                        <option value="">Não importar</option>
+                                        {ui.importCurrentSheet?.headers.map((h: string, i: number) => (
+                                            <option key={i} value={i}>{h}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            ))}
+                        </div>
+                        <button onClick={() => fileCtrl.generatePreview(activeUser)} className="w-full py-4 bg-blue-600 text-white font-black rounded-xl uppercase text-xs flex items-center justify-center gap-2">
+                            Avançar para Curadoria <ArrowRight size={16}/>
+                        </button>
+                    </div>
+                </Modal>
             );
+
+        case 'IMPORT_PREVIEW':
+            const selectedCount = ui.selectedImportIndices.length;
+            return (
+                <Modal onClose={closeModal} title="Curadoria de Dados">
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-center bg-slate-950 p-4 rounded-2xl border border-slate-800">
+                            <div className="flex gap-6">
+                                <div><p className="text-[9px] font-black text-slate-500 uppercase">Detectados</p><p className="text-xl font-black text-white">{ui.importCandidates.length}</p></div>
+                                <div><p className="text-[9px] font-black text-blue-500 uppercase">Selecionados</p><p className="text-xl font-black text-blue-400">{selectedCount}</p></div>
+                            </div>
+                            <button onClick={() => ui.setSelectedImportIndices(ui.importCandidates.map((_:any, i:number) => i).filter((i:number) => ui.importCandidates[i].status !== 'ERRO'))} className="text-[9px] font-black text-blue-500 hover:text-white uppercase underline">Marcar Todos Válidos</button>
+                        </div>
+
+                        <div className="bg-slate-950 border border-slate-800 rounded-3xl overflow-hidden">
+                            <div className="max-h-[350px] overflow-y-auto custom-scrollbar">
+                                {ui.importCandidates.map((c: any, i: number) => {
+                                    const isSelected = ui.selectedImportIndices.includes(i);
+                                    const isError = c.status === 'ERRO';
+                                    return (
+                                        <div key={i} className={`flex items-start gap-3 p-4 border-b border-slate-900 last:border-0 hover:bg-slate-900/50 transition-colors cursor-pointer ${isError ? 'opacity-50' : ''}`} onClick={() => !isError && (isSelected ? ui.setSelectedImportIndices(ui.selectedImportIndices.filter((x:any)=>x!==i)) : ui.setSelectedImportIndices([...ui.selectedImportIndices, i]))}>
+                                            <div className={isSelected ? 'text-blue-500' : 'text-slate-700'}>{isSelected ? <CheckSquare size={20}/> : <Square size={20}/>}</div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex justify-between items-start">
+                                                    <h4 className="text-xs font-black text-white uppercase truncate">{c.nome || 'SEM NOME'}</h4>
+                                                    <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase ${c.status === 'OK' ? 'bg-emerald-500/10 text-emerald-500' : c.status === 'AVISO' ? 'bg-amber-500/10 text-amber-500' : 'bg-rose-500/10 text-rose-500'}`}>{c.status}</span>
+                                                </div>
+                                                <p className="text-[9px] text-slate-500 font-bold">{c.escola} • {c.funcao}</p>
+                                                {c.mensagens.length > 0 && (
+                                                    <div className="mt-1 space-y-0.5">
+                                                        {c.mensagens.map((m:string, idx:number) => (
+                                                            <p key={idx} className="text-[8px] text-amber-400 font-medium flex items-center gap-1"><AlertTriangle size={8}/> {m}</p>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        <button 
+                            onClick={() => fileCtrl.executeImport(activeUser, fetchFullData)} 
+                            disabled={selectedCount === 0 || ui.isSaving}
+                            className="w-full py-5 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-2xl uppercase shadow-xl flex items-center justify-center gap-3 text-xs disabled:opacity-50 transition-all"
+                        >
+                            {ui.isSaving ? <Loader2 className="animate-spin" size={18}/> : <><CheckCircle2 size={18}/> Iniciar Importação em Lote</>}
+                        </button>
+                    </div>
+                </Modal>
+            );
+
         default: return null;
     }
 };

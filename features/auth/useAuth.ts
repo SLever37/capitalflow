@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 
@@ -26,15 +25,16 @@ export const useAuth = () => {
     const submitLogin = async (setIsLoading: (v: boolean) => void, showToast: (msg: string, type?: 'error'|'success'|'warning') => void) => {
         setIsLoading(true);
         const cleanLogin = loginUser.trim();
+        const cleanPass = loginPassword.trim();
         
         if (!cleanLogin) {
-            showToast("Por favor, digite seu e-mail ou usuário.", "warning");
+            showToast("Digite seu e-mail ou usuário.", "warning");
             setIsLoading(false);
             return;
         }
 
-        if (!loginPassword) {
-            showToast("Por favor, digite sua senha.", "warning");
+        if (!cleanPass) {
+            showToast("Digite sua senha.", "warning");
             setIsLoading(false);
             return;
         }
@@ -42,55 +42,62 @@ export const useAuth = () => {
         try {
             let profile = null;
 
-            // 1. TENTATIVA SEGURA (RPC - Server Side)
-            // Tenta usar a função de banco de dados segura.
-            const { data: rpcData, error: rpcError } = await supabase.rpc('login_user', {
-                login_input: cleanLogin,
-                password_input: loginPassword
-            });
+            // 1. TENTATIVA RPC (Servidor - Se existir a função)
+            try {
+                const { data: rpcData, error: rpcError } = await supabase.rpc('login_user', {
+                    login_input: cleanLogin,
+                    password_input: cleanPass
+                });
 
-            if (!rpcError) {
-                // Se a RPC funcionou (mesmo que retorne null se senha errada), usamos o resultado.
-                profile = rpcData; 
-            } else {
-                // 2. FALLBACK LEGADO (Se a RPC não existir ou der erro de configuração)
-                // Isso garante que o app não pare de funcionar se o SQL não tiver sido rodado.
-                console.warn("Login via RPC falhou ou não configurado. Tentando método legado...", rpcError.message);
-                
+                if (!rpcError && rpcData) {
+                    profile = rpcData; 
+                }
+            } catch (rpcErr) {
+                console.warn("RPC login_user não disponível ou falhou, tentando busca manual.");
+            }
+
+            // 2. FALLBACK MANUAL (Busca por e-mail ou nome)
+            if (!profile) {
+                // CORREÇÃO: Sintaxe PostgREST para .or() não deve ter aspas duplas em volta dos valores a menos que contenham caracteres especiais reservados.
+                // Para emails comuns e nomes, o valor puro é o correto.
                 const { data: legacyProfiles, error: legacyError } = await supabase
                     .from('perfis')
                     .select('*')
-                    .or(`usuario_email.ilike.${cleanLogin},nome_operador.ilike.${cleanLogin}`);
+                    .or(`usuario_email.eq.${cleanLogin},nome_operador.eq.${cleanLogin}`);
                 
-                if (!legacyError && legacyProfiles) {
-                    // Validação client-side (temporária/fallback) - Funciona como antes da atualização
-                    profile = legacyProfiles.find(p => p.senha_acesso === loginPassword);
+                if (legacyError) {
+                    console.error("Erro na busca manual:", legacyError);
+                }
+
+                if (legacyProfiles && legacyProfiles.length > 0) {
+                    // Verifica senha localmente para o fallback
+                    profile = legacyProfiles.find(p => p.senha_acesso === cleanPass);
                 }
             }
         
             if (!profile) {
-                showToast("Usuário ou senha incorretos.", "error");
+                showToast("Acesso negado. Verifique e-mail e senha.", "error");
                 setIsLoading(false);
                 return;
             }
         
-            // Login Sucesso
+            // Sucesso
             setActiveProfileId(profile.id);
             
-            // Atualiza lista de salvos
             const newSaved = [
                 ...savedProfiles.filter(p => p.id !== profile.id), 
                 { id: profile.id, name: profile.nome_operador, email: profile.usuario_email }
-            ];
+            ].slice(0, 5);
+            
             setSavedProfiles(newSaved);
             localStorage.setItem('cm_saved_profiles', JSON.stringify(newSaved));
             localStorage.setItem('cm_session', JSON.stringify({ profileId: profile.id, timestamp: Date.now() }));
             
-            showToast(`Bem-vindo de volta, ${profile.nome_operador}!`, 'success');
+            showToast(`Olá, ${profile.nome_operador}!`, 'success');
 
         } catch (err: any) {
-            console.error(err);
-            showToast("Falha na conexão.", "error");
+            console.error("Erro Crítico de Auth:", err);
+            showToast("Erro na conexão com o servidor.", "error");
         } finally {
             setIsLoading(false);
         }
@@ -102,9 +109,11 @@ export const useAuth = () => {
     };
 
     const handleSelectSavedProfile = (profile: any, showToast: (msg: string) => void) => {
-        setLoginUser(profile.email);
+        setLoginUser(profile.email || profile.nome_operador);
         setLoginPassword('');
-        showToast(`Olá, ${profile.name}. Confirme sua senha.`);
+        showToast(`Olá, ${profile.name}. Digite sua senha.`);
+        const passField = document.getElementById('login-password');
+        if (passField) passField.focus();
     };
     
     const handleRemoveSavedProfile = (id: string) => {

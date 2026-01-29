@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { Loan, Client, CapitalSource, UserProfile } from '../types';
@@ -26,75 +25,71 @@ export const useAppState = (activeProfileId: string | null) => {
   const fetchFullData = useCallback(async (profileId: string) => {
       if (!profileId) return;
       
+      setIsLoadingData(true);
+      
       if (profileId === 'DEMO') {
           setActiveUser({
               id: 'DEMO', name: 'Usuário Demo', email: 'demo@app.com', totalAvailableCapital: 100000, interestBalance: 5000,
               photo: undefined, businessName: 'Demo Capital', accessLevel: 2, createdAt: new Date().toISOString(),
               brandColor: '#2563eb', defaultInterestRate: 30, defaultFinePercent: 2, defaultDailyInterestPercent: 1, targetCapital: 150000, targetProfit: 20000
           });
+          setIsLoadingData(false);
           return; 
       }
 
-      setIsLoadingData(true);
       try {
-          // 1. Profile (Critical - If this fails, everything fails)
+          // 1. Perfil (PASSO CRÍTICO)
           const { data: profile, error: profileError } = await supabase.from('perfis').select('*').eq('id', profileId).single();
           
           if (profileError || !profile) {
               console.error("Erro ao carregar perfil:", profileError);
-              
-              // AUTO-RECOVERY: Se o usuário não existe (foi deletado ou ID inválido em localStorage)
-              // Limpa a sessão e recarrega para voltar ao Login.
               if (profileError?.code === 'PGRST116') {
-                  console.warn("Perfil não encontrado. Sessão inválida detectada. Realizando logout forçado...");
                   localStorage.removeItem('cm_session');
                   window.location.reload();
                   return;
               }
-
-              throw new Error("Perfil não encontrado ou acesso negado.");
+              throw new Error("Perfil não encontrado.");
           }
 
-          if (profile) {
-              const u: UserProfile = {
-                  id: asString(profile.id),
-                  name: asString(profile.nome_operador, 'Sem Nome'),
-                  email: asString(profile.usuario_email),
-                  businessName: asString(profile.nome_empresa),
-                  document: asString(profile.document),
-                  phone: asString(profile.phone),
-                  address: asString(profile.address),
-                  addressNumber: asString(profile.address_number),
-                  neighborhood: asString(profile.neighborhood),
-                  city: asString(profile.city),
-                  state: asString(profile.state),
-                  zipCode: asString(profile.zip_code),
-                  pixKey: asString(profile.pix_key),
-                  photo: profile.avatar_url,
-                  password: profile.senha_acesso,
-                  recoveryPhrase: profile.recovery_phrase,
-                  accessLevel: asNumber(profile.access_level, 2),
-                  totalAvailableCapital: asNumber(profile.total_available_capital),
-                  interestBalance: asNumber(profile.interest_balance),
-                  createdAt: asString(profile.created_at),
-                  brandColor: asString(profile.brand_color, '#2563eb'),
-                  logoUrl: profile.logo_url,
-                  defaultInterestRate: asNumber(profile.default_interest_rate, 30),
-                  defaultFinePercent: asNumber(profile.default_fine_percent, 2),
-                  defaultDailyInterestPercent: asNumber(profile.default_daily_interest_percent, 1),
-                  targetCapital: asNumber(profile.target_capital),
-                  targetProfit: asNumber(profile.target_profit)
-              };
-              setActiveUser(u);
-              setProfileEditForm(u);
-          }
+          const u: UserProfile = {
+              id: asString(profile.id),
+              name: asString(profile.nome_operador, 'Sem Nome'),
+              email: asString(profile.usuario_email),
+              businessName: asString(profile.nome_empresa),
+              document: asString(profile.document),
+              phone: asString(profile.phone),
+              address: asString(profile.address),
+              addressNumber: asString(profile.address_number),
+              neighborhood: asString(profile.neighborhood),
+              city: asString(profile.city),
+              state: asString(profile.state),
+              zipCode: asString(profile.zip_code),
+              pixKey: asString(profile.pix_key),
+              photo: profile.avatar_url,
+              password: profile.senha_acesso,
+              recoveryPhrase: profile.recovery_phrase,
+              accessLevel: asNumber(profile.access_level, 2),
+              totalAvailableCapital: asNumber(profile.total_available_capital),
+              interestBalance: asNumber(profile.interest_balance),
+              createdAt: asString(profile.created_at),
+              brandColor: asString(profile.brand_color, '#2563eb'),
+              logoUrl: profile.logo_url,
+              defaultInterestRate: asNumber(profile.default_interest_rate, 30),
+              defaultFinePercent: asNumber(profile.default_fine_percent, 2),
+              defaultDailyInterestPercent: asNumber(profile.default_daily_interest_percent, 1),
+              targetCapital: asNumber(profile.target_capital),
+              targetProfit: asNumber(profile.target_profit)
+          };
+          setActiveUser(u);
+          setProfileEditForm(u);
 
-          // 2. Clients (Isolated Try/Catch)
-          let fetchedClients: Client[] = [];
+          // 2. Carregamento de Dados Secundários (NÃO CRÍTICO - Try/Catch isolado)
+          // Isso evita que a falta de uma tabela ou erro de fuso impeça o login
           try {
+              // 2.1 Clientes
               const { data: clientsData } = await supabase.from('clientes').select('*').eq('profile_id', profileId);
               if (clientsData) {
-                  fetchedClients = clientsData.map((c: any) => ({
+                  setClients(clientsData.map((c: any) => ({
                       id: asString(c.id),
                       name: asString(c.name, 'Desconhecido'),
                       phone: maskPhone(asString(c.phone)),
@@ -107,15 +102,10 @@ export const useAppState = (activeProfileId: string | null) => {
                       createdAt: asString(c.created_at),
                       accessCode: asString(c.access_code),
                       clientNumber: asString(c.client_number)
-                  }));
-                  setClients(fetchedClients);
+                  })));
               }
-          } catch (e) {
-              console.error("Falha ao carregar clientes", e);
-          }
 
-          // 3. Sources (Isolated Try/Catch)
-          try {
+              // 2.2 Fontes
               const { data: sourcesData } = await supabase.from('fontes').select('*').eq('profile_id', profileId);
               if (sourcesData) {
                   setSources(sourcesData.map((s: any) => ({
@@ -125,13 +115,9 @@ export const useAppState = (activeProfileId: string | null) => {
                       balance: asNumber(s.balance)
                   })));
               }
-          } catch (e) {
-              console.error("Falha ao carregar fontes", e);
-          }
 
-          // 4. Loans & Agreements (Isolated Try/Catch)
-          try {
-              const { data: loansData } = await supabase
+              // 2.3 Contratos e Acordos
+              const { data: loansData, error: loansError } = await supabase
                   .from('contratos')
                   .select(`
                       *,
@@ -147,16 +133,17 @@ export const useAppState = (activeProfileId: string | null) => {
                   .eq('profile_id', profileId);
 
               if (loansData) {
-                  // Mapeamento seguro usando Adapter
-                  const mappedLoans = loansData.map((l: any) => mapLoanFromDB(l, fetchedClients));
+                  const mappedLoans = loansData.map((l: any) => mapLoanFromDB(l, []));
                   setLoans(mappedLoans);
+              } else if (loansError) {
+                  console.warn("Erro ao buscar contratos (pode ser falta de tabelas de acordo):", loansError.message);
               }
-          } catch (e) {
-              console.error("Falha ao carregar contratos", e);
+          } catch (secondaryError) {
+              console.warn("Falha ao carregar dados secundários (Contratos/Clientes):", secondaryError);
           }
 
       } catch (error) {
-          console.error("Critical Data Error:", error);
+          console.error("Erro crítico ao carregar perfil:", error);
       } finally {
           setIsLoadingData(false);
       }

@@ -1,39 +1,40 @@
+
 import * as XLSX from 'xlsx';
-import { ImportCandidate, SYNONYMS } from '../domain/importSchema';
-import { onlyDigits, normalizeBrazilianPhone, parseCurrency } from '../../../../utils/formatters';
+import { FIELD_MAPS, ImportCandidate } from '../domain/importSchema';
+import { onlyDigits, parseCurrency } from '../../../../utils/formatters';
 
 const parseExcelDate = (val: any): string | undefined => {
     if (!val) return undefined;
     if (val instanceof Date) return val.toISOString();
-    
     if (typeof val === 'number' && val > 20000) {
-        const date = new Date(Math.round((val - 25569) * 86400 * 1000));
-        return date.toISOString();
+        return new Date(Math.round((val - 25569) * 86400 * 1000)).toISOString();
     }
-    
     const str = String(val).trim();
     if (/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(str)) {
-        const parts = str.split('/');
-        const d = parseInt(parts[0]);
-        const m = parseInt(parts[1]);
-        let y = parseInt(parts[2]);
-        if (y < 100) y += 2000;
-        return new Date(y, m - 1, d).toISOString();
+        const [d, m, y] = str.split('/').map(Number);
+        return new Date(y < 100 ? y + 2000 : y, m - 1, d).toISOString();
     }
-    
-    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return new Date(str).toISOString();
     return undefined;
 };
 
 export const importService = {
-    async getSheetNames(file: File): Promise<string[]> {
+    async getSheets(file: File): Promise<{ name: string, headers: string[], rows: any[] }[]> {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = (e) => {
                 try {
                     const data = new Uint8Array(e.target?.result as ArrayBuffer);
-                    const workbook = XLSX.read(data, { type: 'array' });
-                    resolve(workbook.SheetNames);
+                    const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+                    const sheets = workbook.SheetNames.map(name => {
+                        const sheet = workbook.Sheets[name];
+                        const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+                        return {
+                            name,
+                            headers: (json[0] || []).map(h => String(h || '').trim()),
+                            rows: json.slice(1)
+                        };
+                    });
+                    resolve(sheets);
                 } catch (err) { reject(err); }
             };
             reader.onerror = reject;
@@ -41,69 +42,59 @@ export const importService = {
         });
     },
 
-    async parseFile(file: File, sheetName?: string): Promise<ImportCandidate[]> {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                try {
-                    const data = new Uint8Array(e.target?.result as ArrayBuffer);
-                    const workbook = XLSX.read(data, { type: 'array', cellDates: true });
-                    const targetSheetName = sheetName || workbook.SheetNames[0];
-                    const sheet = workbook.Sheets[targetSheetName];
-                    
-                    if (!sheet) throw new Error(`Aba '${targetSheetName}' não encontrada.`);
+    inferMapping(headers: string[]): Record<string, number> {
+        const mapping: Record<string, number> = {};
+        headers.forEach((h, idx) => {
+            const lower = h.toLowerCase();
+            FIELD_MAPS.forEach(field => {
+                if (field.labels.some(l => lower.includes(l)) && mapping[field.key] === undefined) {
+                    mapping[field.key] = idx;
+                }
+            });
+        });
+        return mapping;
+    },
 
-                    const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
-                    if (json.length < 2) throw new Error("Planilha vazia ou sem dados.");
-
-                    const header = json[0].map(h => String(h || '').toLowerCase().trim());
-                    const findIdx = (list: string[]) => header.findIndex(h => list.some(s => h.includes(s)));
-
-                    const idxs = {
-                        name: findIdx(SYNONYMS.name),
-                        phone: findIdx(SYNONYMS.phone),
-                        document: findIdx(SYNONYMS.document),
-                        email: findIdx(SYNONYMS.email),
-                        address: findIdx(SYNONYMS.address),
-                        principal: findIdx(SYNONYMS.principal),
-                        rate: findIdx(SYNONYMS.interestRate),
-                        date: findIdx(SYNONYMS.startDate)
-                    };
-
-                    if (idxs.name === -1) throw new Error("Coluna de 'Nome' não identificada. Verifique o cabeçalho.");
-
-                    const candidates: ImportCandidate[] = [];
-                    for (let i = 1; i < json.length; i++) {
-                        const row = json[i];
-                        if (!row || !row[idxs.name]) continue;
-
-                        const name = String(row[idxs.name]).trim();
-                        if (name.length < 2) continue;
-
-                        const candidate: ImportCandidate = {
-                            name,
-                            phone: normalizeBrazilianPhone(idxs.phone > -1 ? row[idxs.phone] : ''),
-                            document: onlyDigits(idxs.document > -1 ? row[idxs.document] : ''),
-                            email: idxs.email > -1 ? String(row[idxs.email] || '') : undefined,
-                            address: idxs.address > -1 ? String(row[idxs.address] || '') : undefined,
-                            principal: idxs.principal > -1 ? parseCurrency(row[idxs.principal]) : undefined,
-                            interestRate: idxs.rate > -1 ? parseCurrency(row[idxs.rate]) : undefined,
-                            startDate: idxs.date > -1 ? parseExcelDate(row[idxs.date]) : undefined,
-                            status: 'VALID'
-                        };
-                        
-                        if (candidate.phone && candidate.phone.length < 8) {
-                            candidate.status = 'INVALID';
-                            candidate.error = 'Telefone inválido';
-                        }
-                        
-                        candidates.push(candidate);
-                    }
-                    resolve(candidates);
-                } catch (err) { reject(err); }
+    async buildPreview(
+        rows: any[], 
+        mapping: Record<string, number>, 
+        existingData: { escolas: string[], cpfs: string[], matriculas: string[] }
+    ): Promise<ImportCandidate[]> {
+        return rows.map(row => {
+            const candidate: ImportCandidate = {
+                nome: String(row[mapping.nome] || '').trim(),
+                cpf: onlyDigits(String(row[mapping.cpf] || '')),
+                matricula: String(row[mapping.matricula] || '').trim(),
+                escola: String(row[mapping.escola] || '').trim(),
+                setor: String(row[mapping.setor] || '').trim(),
+                funcao: String(row[mapping.funcao] || '').trim(),
+                data_admissao: parseExcelDate(row[mapping.data_admissao]),
+                salario: parseCurrency(row[mapping.salario]),
+                carga_horaria: String(row[mapping.carga_horaria] || '').trim(),
+                status: 'OK',
+                mensagens: [],
+                original_row: row
             };
-            reader.onerror = reject;
-            reader.readAsArrayBuffer(file);
+
+            // Validações de Curadoria
+            if (!candidate.nome) {
+                candidate.status = 'ERRO';
+                candidate.mensagens.push("Nome obrigatório ausente.");
+            }
+            if (candidate.cpf && candidate.cpf.length !== 11) {
+                candidate.status = 'ERRO';
+                candidate.mensagens.push("CPF inválido.");
+            }
+            if (existingData.cpfs.includes(candidate.cpf)) {
+                candidate.status = 'AVISO';
+                candidate.mensagens.push("CPF já cadastrado no sistema (será ignorado ou atualizado).");
+            }
+            if (candidate.escola && !existingData.escolas.some(e => e.toLowerCase() === candidate.escola.toLowerCase())) {
+                candidate.status = 'AVISO';
+                candidate.mensagens.push(`Escola '${candidate.escola}' não encontrada. Será movido para 'OUTROS'.`);
+            }
+
+            return candidate;
         });
     }
 };

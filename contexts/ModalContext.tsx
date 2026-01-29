@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, ReactNode } from 'react';
 import { UserProfile, Client, Loan, CapitalSource } from '../types';
 
@@ -20,6 +21,8 @@ export type ModalType =
     | 'NOTE'
     | 'MASTER_EDIT_USER'
     | 'IMPORT_SHEET_SELECT'
+    // Added IMPORT_MAPPING to fix type error in SystemModalsWrapper
+    | 'IMPORT_MAPPING'
     | 'IMPORT_PREVIEW'
     | 'DELETE_ACCOUNT'
     | 'RESET_DATA'
