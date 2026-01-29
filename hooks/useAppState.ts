@@ -85,8 +85,7 @@ export const useAppState = (activeProfileId: string | null) => {
           setActiveUser(u);
           setProfileEditForm(u);
 
-          // 2. Carregamento de Dados Secundários (NÃO CRÍTICO - Try/Catch isolado)
-          // Isso evita que a falta de uma tabela ou erro de fuso impeça o login
+          // 2. Carregamento de Dados Secundários (Try/Catch isolado)
           try {
               // 2.1 Clientes
               const { data: clientsData } = await supabase.from('clientes').select('*').eq('profile_id', profileId);
@@ -103,7 +102,8 @@ export const useAppState = (activeProfileId: string | null) => {
                       notes: asString(c.notes),
                       createdAt: asString(c.created_at),
                       accessCode: asString(c.access_code),
-                      clientNumber: asString(c.client_number)
+                      clientNumber: asString(c.client_number),
+                      fotoUrl: asString(c.foto_url) // Mapeamento da foto_url para o frontend
                   })));
               }
 
@@ -138,10 +138,10 @@ export const useAppState = (activeProfileId: string | null) => {
                   const mappedLoans = loansData.map((l: any) => mapLoanFromDB(l, []));
                   setLoans(mappedLoans);
               } else if (loansError) {
-                  console.warn("Erro ao buscar contratos (pode ser falta de tabelas de acordo):", loansError.message);
+                  console.warn("Erro ao buscar contratos:", loansError.message);
               }
           } catch (secondaryError) {
-              console.warn("Falha ao carregar dados secundários (Contratos/Clientes):", secondaryError);
+              console.warn("Falha ao carregar dados secundários:", secondaryError);
           }
 
       } catch (error) {

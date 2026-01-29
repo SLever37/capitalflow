@@ -1,3 +1,4 @@
+
 import type React from 'react';
 import { supabase } from '../../lib/supabase';
 import { demoService } from '../../services/demo.service';
@@ -5,7 +6,7 @@ import { Client, UserProfile } from '../../types';
 import { onlyDigits, isTestClientName, maskPhone, normalizeBrazilianPhone } from '../../utils/formatters';
 import { isValidCPForCNPJ } from '../../utils/validators';
 import { generateUniqueAccessCode, generateUniqueClientNumber } from '../../utils/generators';
-import { ledgerService } from '../../services/ledger.service';
+import { clientAvatarService } from '../../services/clientAvatar.service';
 
 export const useClientController = (
   activeUser: UserProfile | null,
@@ -29,16 +30,48 @@ export const useClientController = (
               address: (client as any).address || '', 
               city: (client as any).city || '', 
               state: (client as any).state || '', 
-              notes: (client as any).notes || ''
+              notes: (client as any).notes || '',
+              fotoUrl: client.fotoUrl || '' // Carrega a foto existente no formulário
           });
       } else {
           const codes = new Set((clients || []).map(c => String((c as any).access_code || '').trim()).filter(Boolean));
           const nums = new Set((clients || []).map(c => String((c as any).client_number || '').trim()).filter(Boolean));
           ui.setClientDraftAccessCode(generateUniqueAccessCode(codes));
           ui.setClientDraftNumber(generateUniqueClientNumber(nums));
-          ui.setClientForm({ name: '', phone: '', document: '', email: '', address: '', city: '', state: '', notes: '' });
+          ui.setClientForm({ name: '', phone: '', document: '', email: '', address: '', city: '', state: '', notes: '', fotoUrl: '' });
       }
       ui.openModal('CLIENT_FORM');
+  };
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file || !ui.editingClient) return;
+
+      if (file.size > 2 * 1024 * 1024) {
+          showToast("Imagem muito grande (máx 2MB).", "error");
+          return;
+      }
+
+      ui.setIsSaving(true);
+      try {
+          // Upload para o Storage
+          const url = await clientAvatarService.uploadAvatar(file, ui.editingClient.id);
+          
+          // Persistência imediata no banco
+          await clientAvatarService.updateClientPhoto(ui.editingClient.id, url);
+          
+          // Atualiza Estado Local do Formulário
+          ui.setClientForm({ ...ui.clientForm, fotoUrl: url });
+          showToast("Foto do cliente atualizada!", "success");
+          
+          // Refresh global para atualizar cache local de clientes e contratos
+          if (activeUser) fetchFullData(activeUser.id);
+      } catch (err: any) {
+          showToast(err.message, "error");
+      } finally {
+          ui.setIsSaving(false);
+          if (e.target) e.target.value = ''; // Reset input
+      }
   };
 
   const handleSaveClient = async () => {
@@ -82,6 +115,7 @@ export const useClientController = (
               address: ui.clientForm.address, 
               city: ui.clientForm.city, 
               state: ui.clientForm.state,
+              foto_url: ui.clientForm.fotoUrl || null, // Garante que a foto_url seja salva/persistida no upsert
               access_code: (() => {
                   const existingCode = (ui.editingClient as any)?.access_code;
                   if (existingCode && String(existingCode).trim().length > 0) return String(existingCode);
@@ -106,8 +140,14 @@ export const useClientController = (
           };
           
           const { error } = await supabase.from('clientes').upsert(payload);
-          if (error) { console.error(error); showToast("Erro ao salvar cliente: " + error.message, "error"); } 
-          else { showToast("Cliente salvo!", "success"); ui.closeModal(); fetchFullData(activeUser.id); }
+          if (error) { 
+              console.error(error); 
+              showToast("Erro ao salvar cliente: " + error.message, "error"); 
+          } else { 
+              showToast("Cliente salvo!", "success"); 
+              ui.closeModal(); 
+              fetchFullData(activeUser.id); 
+          }
       } catch(e: any) { 
           showToast("Erro ao salvar cliente: " + e.message, "error"); 
       } finally { 
@@ -126,7 +166,6 @@ export const useClientController = (
           const name = contact.name && contact.name.length > 0 ? contact.name[0] : '';
           let number = contact.tel && contact.tel.length > 0 ? contact.tel[0] : '';
           
-          // Uso da normalização inteligente
           const normalizedPhone = normalizeBrazilianPhone(number);
           
           ui.setClientForm((prev: any) => ({ ...prev, name: name || prev.name, phone: normalizedPhone }));
@@ -187,6 +226,7 @@ export const useClientController = (
     openClientModal,
     handleSaveClient,
     handlePickContact,
+    handleAvatarUpload,
     toggleBulkDeleteMode,
     toggleClientSelection,
     executeBulkDelete

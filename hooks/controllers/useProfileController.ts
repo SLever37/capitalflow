@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { supabase } from '../../lib/supabase';
 import { operatorProfileService } from '../../features/profile/services/operatorProfileService';
@@ -14,7 +13,7 @@ export const useProfileController = (
   setIsLoadingData: any,
   fetchFullData: (id: string) => Promise<void>,
   handleLogout: () => void,
-  showToast: (msg: string, type?: 'success' | 'error') => void
+  showToast: (msg: string, type?: 'success' | 'error' | 'info') => void
 ) => {
 
   const handleSaveProfile = async () => {
@@ -43,13 +42,39 @@ export const useProfileController = (
       }
   };
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
-      if (file && profileEditForm) {
-          if (file.size > 2 * 1024 * 1024) { showToast("Imagem muito grande (máx 2MB).", "error"); return; }
-          const reader = new FileReader();
-          reader.onloadend = () => { setProfileEditForm({ ...profileEditForm, photo: reader.result as string }); };
-          reader.readAsDataURL(file);
+      if (!file || !profileEditForm || !activeUser) return;
+
+      if (file.size > 2 * 1024 * 1024) { 
+          showToast("Imagem muito grande (máx 2MB).", "error"); 
+          return; 
+      }
+
+      setIsLoadingData(true);
+      try {
+          // No modo Demo, apenas gera um preview local
+          if (activeUser.id === 'DEMO') {
+              const reader = new FileReader();
+              reader.onloadend = () => { 
+                setProfileEditForm({ ...profileEditForm, photo: reader.result as string }); 
+                showToast("Foto atualizada (Modo Demo)", "info");
+              };
+              reader.readAsDataURL(file);
+              return;
+          }
+
+          // Upload real para o Storage
+          const publicUrl = await operatorProfileService.uploadAvatar(file, activeUser.id);
+          
+          setProfileEditForm({ ...profileEditForm, photo: publicUrl });
+          showToast("Foto carregada! Clique em 'Salvar Perfil' para confirmar.", "success");
+      } catch (err: any) {
+          showToast("Erro no upload: " + err.message, "error");
+      } finally {
+          setIsLoadingData(false);
+          // Limpa o input para permitir selecionar a mesma foto novamente se necessário
+          e.target.value = '';
       }
   };
 

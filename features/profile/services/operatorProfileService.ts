@@ -1,4 +1,3 @@
-
 import { supabase } from '../../../lib/supabase';
 import { UserProfile } from '../../../types';
 import { generateUUID } from '../../../utils/generators';
@@ -8,6 +7,28 @@ import * as XLSX from 'xlsx';
 type UpdatableProfileFields = Partial<Omit<UserProfile, 'id' | 'createdAt' | 'totalAvailableCapital' | 'interestBalance'>>;
 
 export const operatorProfileService = {
+    /**
+     * Realiza o upload da foto do operador para o storage
+     */
+    async uploadAvatar(file: File, profileId: string): Promise<string> {
+        if (!file) throw new Error("Arquivo inválido.");
+        
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${profileId}/avatar_${Date.now()}.${fileExt}`;
+        const filePath = `profiles/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+            .from('avatars')
+            .upload(filePath, file, { upsert: true });
+
+        if (uploadError) {
+            throw new Error(`Erro no storage: ${uploadError.message}`);
+        }
+
+        const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
+        return data.publicUrl;
+    },
+
     async updateProfile(profileId: string, data: UpdatableProfileFields, origin: 'MANUAL' | 'IMPORT' | 'RESTORE' = 'MANUAL'): Promise<UserProfile | null> {
         if (!profileId) throw new Error("ID do perfil inválido.");
 
@@ -22,7 +43,7 @@ export const operatorProfileService = {
                 document: curatedData.document,
                 phone: curatedData.phone,
                 address: curatedData.address,
-                address_number: (curatedData as any).addressNumber, // MAPEAMENTO CORRIGIDO
+                address_number: (curatedData as any).addressNumber,
                 neighborhood: (curatedData as any).neighborhood,
                 city: (curatedData as any).city,
                 state: (curatedData as any).state,
@@ -104,7 +125,7 @@ export const operatorProfileService = {
             document: cleanDoc ? maskDocument(cleanDoc) : '000.000.000-00',
             phone: cleanPhone ? maskPhone(cleanPhone) : '00000000000',
             address: (raw.address || '').substring(0, 200),
-            addressNumber: (raw.addressNumber || '').substring(0, 20), // CURADORIA ADICIONADA
+            addressNumber: (raw.addressNumber || '').substring(0, 20),
             pixKey: (raw.pixKey || '').substring(0, 100),
             photo: raw.photo,
             brandColor: raw.brandColor || '#2563eb',
@@ -132,7 +153,7 @@ export const operatorProfileService = {
             document: dbProfile.document,
             phone: dbProfile.phone,
             address: dbProfile.address,
-            addressNumber: dbProfile.address_number || '', // MAPEAMENTO DE RETORNO ADICIONADO
+            addressNumber: dbProfile.address_number || '',
             neighborhood: dbProfile.neighborhood,
             city: dbProfile.city,
             state: dbProfile.state,
