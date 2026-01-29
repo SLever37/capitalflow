@@ -139,7 +139,7 @@ export const App: React.FC = () => {
 
   return (
     <>
-      {shouldRenderGlobalToast && toast?.show && (
+      {shouldRenderGlobalToast && toast && (
         <div className="fixed bottom-6 right-6 z-[9999]">
           <div
             className={[
@@ -153,7 +153,7 @@ export const App: React.FC = () => {
                 : 'bg-slate-500/20 border-slate-400/30 text-slate-100',
             ].join(' ')}
           >
-            {toast.message}
+            {toast.msg}
           </div>
         </div>
       )}
@@ -174,6 +174,7 @@ export const App: React.FC = () => {
         handleRemoveSavedProfile={handleRemoveSavedProfile}
         showToast={showToast}
         setIsLoadingData={setIsLoadingData}
+        toast={toast}
       >
         <AppShell
           toast={toast}

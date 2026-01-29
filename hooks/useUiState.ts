@@ -27,7 +27,7 @@ export const useUiState = () => {
   const [sacSearch, setSacSearch] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-  const [clientForm, setClientForm] = useState({ name: '', phone: '', document: '', email: '', address: '', city: '', state: '', notes: '' });
+  const [clientForm, setClientForm] = useState({ name: '', phone: '', document: '', email: '', address: '', city: '', state: '', notes: '', fotoUrl: '' });
   const [clientDraftAccessCode, setClientDraftAccessCode] = useState<string>('');
   const [clientDraftNumber, setClientDraftNumber] = useState<string>('');
   const [sourceForm, setSourceForm] = useState({ name: '', type: 'BANK', balance: '' });
@@ -54,7 +54,6 @@ export const useUiState = () => {
   const [extraDocUploadLoanId, setExtraDocUploadLoanId] = useState<string | null>(null);
   const [extraDocKind, setExtraDocKind] = useState<'CONFISSAO' | null>(null);
 
-  // ESTADOS DE IMPORTAÇÃO (CORREÇÃO: Adicionando estados faltantes)
   const [importSheets, setImportSheets] = useState<any[]>([]);
   const [importSheetNames, setImportSheetNames] = useState<string[]>([]);
   const [importCurrentSheet, setImportCurrentSheet] = useState<any>(null);
@@ -74,6 +73,7 @@ export const useUiState = () => {
   const fileInputBackupRef = useRef<HTMLInputElement>(null);
   const fileInputExcelRef = useRef<HTMLInputElement>(null);
   const profilePhotoInputRef = useRef<HTMLInputElement>(null);
+  const clientAvatarInputRef = useRef<HTMLInputElement>(null); // NOVO
   const promissoriaFileInputRef = useRef<HTMLInputElement>(null);
   const extraDocFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -107,7 +107,6 @@ export const useUiState = () => {
     extraDocKind, setExtraDocKind,
     renegotiationModalLoan, setRenegotiationModalLoan,
     
-    // Estados de Importação
     importSheets, setImportSheets,
     importSheetNames, setImportSheetNames,
     importCurrentSheet, setImportCurrentSheet,
@@ -124,6 +123,6 @@ export const useUiState = () => {
     isStealthMode, setIsStealthMode,
     showNavHub, setShowNavHub,
 
-    fileInputBackupRef, fileInputExcelRef, profilePhotoInputRef, promissoriaFileInputRef, extraDocFileInputRef
+    fileInputBackupRef, fileInputExcelRef, profilePhotoInputRef, clientAvatarInputRef, promissoriaFileInputRef, extraDocFileInputRef
   };
 };

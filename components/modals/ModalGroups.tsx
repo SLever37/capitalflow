@@ -9,8 +9,8 @@ import { FlowModal } from './FlowModal';
 import { ReceiptModal } from './ReceiptModal';
 import { MessageHubModal } from './MessageHubModal';
 import { AIAssistantModal } from './AIAssistantModal';
-import { NoteWrapper } from './ModalWrappers'; // Reutilizando wrapper existente
-import { Copy, KeyRound, User } from 'lucide-react';
+import { NoteWrapper } from './ModalWrappers'; 
+import { Copy, KeyRound, User, Camera } from 'lucide-react';
 import { maskPhone, maskDocument } from '../../utils/formatters';
 
 // --- MODAIS DO CLIENTE ---
@@ -23,7 +23,40 @@ export const ClientModals = () => {
 
     return (
        <Modal onClose={closeModal} title={editingClient ? 'Editar Cliente' : 'Novo Cliente'}>
-           <div className="space-y-3">
+           <div className="space-y-4">
+               {/* Avatar Upload Area */}
+               <div className="flex justify-center mb-2">
+                   <div 
+                        className="relative w-24 h-24 rounded-full bg-slate-800 border-2 border-slate-700 flex items-center justify-center overflow-hidden cursor-pointer group"
+                        onClick={() => editingClient && ui.clientAvatarInputRef.current?.click()}
+                   >
+                       {clientForm.fotoUrl ? (
+                           <img src={clientForm.fotoUrl} alt="Avatar" className="w-full h-full object-cover" />
+                       ) : (
+                           <User size={40} className="text-slate-500" />
+                       )}
+                       
+                       {editingClient && (
+                           <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                               <Camera className="text-white" size={20} />
+                           </div>
+                       )}
+                   </div>
+               </div>
+               
+               {/* Hidden File Input */}
+               <input 
+                   type="file" 
+                   ref={ui.clientAvatarInputRef} 
+                   className="hidden" 
+                   accept="image/*" 
+                   onChange={clientCtrl.handleAvatarUpload}
+               />
+               
+               {!editingClient && (
+                   <p className="text-center text-[10px] text-slate-500 italic">Salve o cliente para adicionar uma foto.</p>
+               )}
+
                <div className="grid grid-cols-12 gap-3">
                     <div className="col-span-12">
                         <label className="text-[10px] uppercase text-slate-500 font-bold ml-1 mb-1 block">Nome Completo</label>
@@ -72,7 +105,7 @@ export const ClientModals = () => {
                     </div>
                </div>
                <textarea placeholder="Anotações internas..." className="w-full bg-slate-950 p-3 rounded-xl border border-slate-800 text-white outline-none h-20 text-sm resize-none" value={clientForm.notes} onChange={e => ui.setClientForm({...clientForm, notes: e.target.value})} />
-               <button onClick={clientCtrl.handleSaveClient} className="w-full py-4 bg-blue-600 text-white font-bold rounded-xl uppercase shadow-lg flex items-center justify-center gap-2 text-sm">
+               <button onClick={clientCtrl.handleSaveClient} disabled={ui.isSaving} className="w-full py-4 bg-blue-600 text-white font-bold rounded-xl uppercase shadow-lg flex items-center justify-center gap-2 text-sm disabled:opacity-50">
                    {ui.isSaving ? 'Salvando...' : 'Salvar Cliente'}
                </button>
            </div>
@@ -80,9 +113,9 @@ export const ClientModals = () => {
     );
 };
 
-// --- MODAIS FINANCEIROS ---
 export const FinanceModals = () => {
-    const { activeModal, closeModal, ui, sourceCtrl, paymentCtrl, loanCtrl, sources, activeUser, clients } = useModal();
+    const { activeModal, closeModal, ui, sourceCtrl, paymentCtrl } = useModal();
+    const { activeUser, sources } = useModal();
 
     return (
         <>
@@ -93,14 +126,7 @@ export const FinanceModals = () => {
                         <select className="w-full bg-slate-950 p-4 rounded-xl text-white outline-none border border-slate-800" value={ui.sourceForm.type} onChange={e => ui.setSourceForm({...ui.sourceForm, type: e.target.value})}>
                             <option value="BANK">Banco / Conta Digital</option><option value="CASH">Dinheiro em Espécie</option><option value="WALLET">Carteira Física</option><option value="CARD">Cartão de Crédito</option>
                         </select>
-                        <input 
-                            type="text" 
-                            inputMode="decimal"
-                            placeholder="Saldo Inicial (R$)" 
-                            className="w-full bg-slate-950 p-4 rounded-xl text-white outline-none border border-slate-800" 
-                            value={ui.sourceForm.balance} 
-                            onChange={e => ui.setSourceForm({...ui.sourceForm, balance: e.target.value.replace(/[^0-9.,]/g, '')})} 
-                        />
+                        <input type="text" inputMode="decimal" placeholder="Saldo Inicial (R$)" className="w-full bg-slate-950 p-4 rounded-xl text-white outline-none border border-slate-800" value={ui.sourceForm.balance} onChange={e => ui.setSourceForm({...ui.sourceForm, balance: e.target.value.replace(/[^0-9.,]/g, '')})} />
                         <button onClick={sourceCtrl.handleSaveSource} disabled={ui.isSaving} className="w-full py-4 bg-emerald-600 text-white font-bold rounded-xl uppercase">{ui.isSaving ? 'Salvando...' : 'Criar Fonte'}</button>
                     </div>
                 </Modal>
@@ -109,46 +135,21 @@ export const FinanceModals = () => {
             {activeModal?.type === 'ADD_FUNDS' && (
                 <Modal onClose={closeModal} title={`Adicionar Fundos: ${activeModal.payload.name}`}>
                     <div className="space-y-4">
-                        <input 
-                            type="text"
-                            inputMode="decimal" 
-                            placeholder="Valor (R$)" 
-                            className="w-full bg-slate-950 p-4 rounded-xl text-white text-xl font-bold outline-none border border-slate-800" 
-                            value={ui.addFundsValue} 
-                            onChange={e => ui.setAddFundsValue(e.target.value.replace(/[^0-9.,]/g, ''))} 
-                            autoFocus
-                        />
+                        <input type="text" inputMode="decimal" placeholder="Valor (R$)" className="w-full bg-slate-950 p-4 rounded-xl text-white text-xl font-bold outline-none border border-slate-800" value={ui.addFundsValue} onChange={e => ui.setAddFundsValue(e.target.value.replace(/[^0-9.,]/g, ''))} autoFocus />
                         <button onClick={sourceCtrl.handleAddFunds} className="w-full py-4 bg-emerald-600 text-white font-bold rounded-xl uppercase">Confirmar Aporte</button>
                     </div>
                 </Modal>
             )}
 
             {activeModal?.type === 'PAYMENT' && ui.paymentModal && (
-                <PaymentManagerModal 
-                    data={ui.paymentModal} 
-                    onClose={closeModal} 
-                    isProcessing={ui.isProcessingPayment} 
-                    paymentType={ui.paymentType} 
-                    setPaymentType={ui.setPaymentType} 
-                    avAmount={ui.avAmount} 
-                    setAvAmount={ui.setAvAmount} 
-                    onConfirm={paymentCtrl.handlePayment} 
-                    onOpenMessage={(l: any) => { ui.setMessageModalLoan(l); ui.openModal('MESSAGE_HUB'); }} 
-                />
+                <PaymentManagerModal data={ui.paymentModal} onClose={closeModal} isProcessing={ui.isProcessingPayment} paymentType={ui.paymentType} setPaymentType={ui.setPaymentType} avAmount={ui.avAmount} setAvAmount={ui.setAvAmount} onConfirm={paymentCtrl.handlePayment} onOpenMessage={(l: any) => { ui.setMessageModalLoan(l); ui.openModal('MESSAGE_HUB'); }} />
             )}
 
             {activeModal?.type === 'WITHDRAW' && activeUser && (
                 <Modal onClose={closeModal} title="Resgatar Lucros">
                     <div className="space-y-4">
                         <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center"><p className="text-xs text-slate-500 uppercase font-bold">Disponível para Saque</p><p className="text-2xl font-black text-emerald-400">R$ {activeUser.interestBalance.toFixed(2)}</p></div>
-                        <input 
-                            type="text"
-                            inputMode="decimal"
-                            placeholder="Valor do Resgate" 
-                            className="w-full bg-slate-950 p-4 rounded-xl text-white outline-none border border-slate-800" 
-                            value={ui.withdrawValue} 
-                            onChange={e => ui.setWithdrawValue(e.target.value.replace(/[^0-9.,]/g, ''))} 
-                        />
+                        <input type="text" inputMode="decimal" placeholder="Valor do Resgate" className="w-full bg-slate-950 p-4 rounded-xl text-white outline-none border border-slate-800" value={ui.withdrawValue} onChange={e => ui.setWithdrawValue(e.target.value.replace(/[^0-9.,]/g, ''))} />
                         <select className="w-full bg-slate-950 p-4 rounded-xl text-white outline-none border border-slate-800" value={ui.withdrawSourceId} onChange={e => ui.setWithdrawSourceId(e.target.value)}>
                             <option value="">Selecione o destino...</option>
                             <option value="EXTERNAL_WITHDRAWAL">Saque Externo</option>
@@ -162,9 +163,7 @@ export const FinanceModals = () => {
     );
 };
 
-// --- MODAIS DE SISTEMA ---
 export const SystemModals = ({ handleSystemAction }: { handleSystemAction: any }) => {
-    // DESESTRUTURAÇÃO CORRIGIDA: Inclui sources e aiCtrl
     const { activeModal, closeModal, ui, loanCtrl, activeUser, loans, clients, showToast, sources, aiCtrl } = useModal();
     const pixCopiaCola = "00020126580014br.gov.bcb.pix0136d8135204-13f6-483b-90c9-fb530257d7b55204000053039865802BR5925MANOEL SOCRATES COSTA LEV6011Itacoatiara6211050726f78796304E08B";
 
@@ -188,7 +187,7 @@ export const SystemModals = ({ handleSystemAction }: { handleSystemAction: any }
                    </div>
                </Modal>
             )}
-
+            {/* ... Demais Modais inalterados, mantidos por compatibilidade ... */}
             {activeModal?.type === 'DONATE' && (
                 <Modal onClose={closeModal} title="Apoiar o Projeto">
                     <div className="space-y-6 text-center">
@@ -204,36 +203,18 @@ export const SystemModals = ({ handleSystemAction }: { handleSystemAction: any }
                     </div>
                 </Modal>
             )}
-
             {activeModal?.type === 'CALC' && <CalculatorModal onClose={closeModal} />}
             {activeModal?.type === 'AGENDA' && <AgendaModal onClose={closeModal} activeUser={activeUser} onSystemAction={handleSystemAction} />}
             {activeModal?.type === 'FLOW' && activeUser && <FlowModal onClose={closeModal} loans={loans} profit={activeUser.interestBalance} />}
-            
-            {activeModal?.type === 'MESSAGE_HUB' && ui.messageModalLoan && (
-                <MessageHubModal loan={ui.messageModalLoan} client={clients.find((c: any) => c.id === ui.messageModalLoan?.clientId)} onClose={closeModal} />
-            )}
-            
-            {activeModal?.type === 'RECEIPT' && ui.showReceipt && activeUser && (
-                <ReceiptModal 
-                    data={ui.showReceipt} 
-                    onClose={closeModal} 
-                    userName={activeUser.businessName || activeUser.name || 'Empresa'} 
-                    userDoc={activeUser.document} 
-                />
-            )}
-            
-            {activeModal?.type === 'PROOF_VIEW' && activeModal.payload && (
-                <Modal onClose={closeModal} title="Comprovante"><img src={activeModal.payload} alt="Comprovante" className="w-full h-auto rounded-xl" /></Modal>
-            )}
-            
+            {activeModal?.type === 'MESSAGE_HUB' && ui.messageModalLoan && <MessageHubModal loan={ui.messageModalLoan} client={clients.find((c: any) => c.id === ui.messageModalLoan?.clientId)} onClose={closeModal} />}
+            {activeModal?.type === 'RECEIPT' && ui.showReceipt && activeUser && <ReceiptModal data={ui.showReceipt} onClose={closeModal} userName={activeUser.businessName || activeUser.name || 'Empresa'} userDoc={activeUser.document} />}
+            {activeModal?.type === 'PROOF_VIEW' && activeModal.payload && <Modal onClose={closeModal} title="Comprovante"><img src={activeModal.payload} alt="Comprovante" className="w-full h-auto rounded-xl" /></Modal>}
             {activeModal?.type === 'NOTE' && <NoteWrapper />}
-            
             {activeModal?.type === 'AI_ASSISTANT' && <AIAssistantModal onClose={closeModal} onCommandDetected={aiCtrl.handleAICommand} loans={loans} sources={sources} activeUser={activeUser} />}
         </>
     );
 };
 
-// --- MODAIS ADMIN ---
 export const AdminModals = () => {
     const { activeModal, closeModal, ui, adminCtrl } = useModal();
     const { masterEditUser } = ui;

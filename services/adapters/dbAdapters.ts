@@ -7,7 +7,6 @@ import { asArray, asNumber, asString, safeDateString } from '../../utils/safe';
 export const agreementAdapter = (raw: any): Agreement => {
     if (!raw) throw new Error("Dados do acordo inválidos");
 
-    // 1. Normalização de Status com asString
     const dbStatus = asString(raw.status, '', 'status').toUpperCase();
     let normalizedStatus: AgreementStatus = 'ACTIVE';
 
@@ -16,7 +15,6 @@ export const agreementAdapter = (raw: any): Agreement => {
     else if (['ATIVO', 'ACTIVE'].includes(dbStatus)) normalizedStatus = 'ACTIVE';
     else normalizedStatus = 'ACTIVE';
 
-    // 2. Normalização de Parcelas com asArray
     const installments = asArray(raw.acordo_parcelas).map((p: any) => ({
         id: asString(p.id, `tmp-${Math.random()}`),
         agreementId: asString(raw.id, '', 'agreement.id'),
@@ -93,7 +91,6 @@ export const mapLoanFromDB = (l: any, clientsData: any[] = []): Loan => {
         reviewNote: s.review_note
     }));
 
-    // Mapeamento de Acordo Ativo
     let activeAgreement = undefined;
     const agreementsArr = asArray(l.acordos_inadimplencia);
     if (agreementsArr.length > 0) {
@@ -105,7 +102,6 @@ export const mapLoanFromDB = (l: any, clientsData: any[] = []): Loan => {
         }
     }
 
-    // Lógica de Telefone Robusta
     let phone = l.debtor_phone || l.phone || l.telefone || l.celular;
     if ((!phone || String(phone).trim() === '') && l.client_id && asArray(clientsData).length > 0) {
         const linkedClient = clientsData.find((c: any) => c.id === l.client_id);
@@ -121,6 +117,7 @@ export const mapLoanFromDB = (l: any, clientsData: any[] = []): Loan => {
         debtorPhone: maskPhone(asString(phone, '00000000000')),
         debtorDocument: l.debtor_document,
         debtorAddress: l.debtor_address,
+        clientAvatarUrl: l.cliente_foto_url, // Mapeamento da foto do contrato
         sourceId: asString(l.source_id),
         preferredPaymentMethod: asString(l.preferred_payment_method, 'PIX') as any,
         pixKey: l.pix_key,

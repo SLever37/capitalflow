@@ -31,6 +31,7 @@ export interface Client {
   client_number?: string;
   cpf?: string;
   cnpj?: string;
+  fotoUrl?: string; // Novo Campo
 }
 
 export interface LedgerEntry {
@@ -44,7 +45,7 @@ export interface LedgerEntry {
   lateFeeDelta: number;
   sourceId?: string; 
   installmentId?: string;
-  agreementId?: string; // Novo
+  agreementId?: string; 
   notes?: string;
 }
 
@@ -132,13 +133,13 @@ export interface Agreement {
 export interface LegalDocumentParams {
     debtorName: string;
     debtorDoc: string;
-    debtorPhone?: string; // Novo Campo
+    debtorPhone?: string; 
     debtorAddress: string;
     creditorName: string;
     creditorDoc: string;
     creditorAddress?: string;
     totalDebt: number;
-    originDescription: string; // Origem da dívida (ex: Contrato nº X)
+    originDescription: string; 
     installments: AgreementInstallment[];
     contractDate: string;
     agreementDate: string;
@@ -177,6 +178,7 @@ export interface Loan {
   debtorPhone: string;
   debtorDocument: string;
   debtorAddress?: string;
+  clientAvatarUrl?: string; // Novo Campo
   sourceId: string;
   preferredPaymentMethod: PaymentMethod;
   pixKey?: string;
@@ -215,7 +217,7 @@ export interface Loan {
 export interface UserProfile {
   id: string;
   name: string;
-  fullName?: string; // Novo Campo Jurídico
+  fullName?: string; 
   password?: string;
   recoveryPhrase?: string;
   accessLevel?: number;

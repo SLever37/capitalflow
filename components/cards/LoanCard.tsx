@@ -47,7 +47,6 @@ export const LoanCard: React.FC<LoanCardProps> = ({
   onUploadDoc, onViewPromissoria, onViewDoc, onReverseTransaction,
   onRenegotiate, onAgreementPayment, onRefresh, isStealthMode
 }) => {
-  // LÓGICA EXTRAÍDA PARA HOOK (Performance e Organização)
   const {
     strategy,
     showProgress,
@@ -67,17 +66,12 @@ export const LoanCard: React.FC<LoanCardProps> = ({
     isZeroBalance
   } = useLoanCardComputed(loan, sources, isStealthMode);
 
-  // PREPARAÇÃO DEFENSIVA DO ACORDO (Evita telas brancas se dados estiverem parciais)
   const rawAgreement = loan.activeAgreement;
   const safeAgreement: Agreement | null = hasActiveAgreement && rawAgreement ? {
       ...rawAgreement,
-      // Garante ID
       id: asString(rawAgreement.id, `ag-temp-${loan.id}`, 'agreement.id'),
-      // Garante tipo para métodos de string
       type: asString(rawAgreement.type, 'PARCELADO_COM_JUROS') as any,
-      // Garante array de parcelas para .map
       installments: asArray(rawAgreement.installments),
-      // Normaliza campos
       createdAt: rawAgreement.createdAt || (rawAgreement as any).created_at || new Date().toISOString(),
       negotiatedTotal: rawAgreement.negotiatedTotal || (rawAgreement as any).total_negociado || 0,
       totalDebtAtNegotiation: rawAgreement.totalDebtAtNegotiation || (rawAgreement as any).total_base || 0,
@@ -87,6 +81,24 @@ export const LoanCard: React.FC<LoanCardProps> = ({
   const debtorNameSafe = asString(loan.debtorName, 'Sem Nome');
   const debtorInitial = debtorNameSafe[0] || '?';
 
+  // Ícone ou Foto do Cliente
+  const renderAvatar = () => {
+      if (loan.clientAvatarUrl) {
+          return (
+              <img 
+                  src={loan.clientAvatarUrl} 
+                  alt={debtorNameSafe} 
+                  className={`w-12 h-12 sm:w-16 sm:h-16 rounded-2xl object-cover shadow-lg border-2 ${isCritical ? 'border-rose-500' : 'border-slate-800'}`}
+              />
+          );
+      }
+      return (
+          <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center font-black text-lg sm:text-xl transition-all flex-shrink-0 ${iconStyle}`}>
+            {isCritical && !hasActiveAgreement ? <ShieldAlert size={24} /> : isFullyFinalized ? <CheckCircle2 size={24}/> : debtorInitial}
+          </div>
+      );
+  };
+
   return (
     <div
       className={`border transition-all duration-300 rounded-[2rem] sm:rounded-[2.5rem] p-5 sm:p-8 hover:shadow-2xl cursor-pointer overflow-hidden active:scale-[0.99] ${cardStyle} ${isExpanded ? 'ring-1 ring-white/10' : ''} ${isCritical && !hasActiveAgreement ? 'animate-pulse ring-1 ring-rose-500' : ''}`}
@@ -94,9 +106,7 @@ export const LoanCard: React.FC<LoanCardProps> = ({
     >
       <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
         <div className="flex items-center gap-4 sm:gap-6 w-full">
-          <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center font-black text-lg sm:text-xl transition-all flex-shrink-0 ${iconStyle}`}>
-            {isCritical && !hasActiveAgreement ? <ShieldAlert size={24} /> : isFullyFinalized ? <CheckCircle2 size={24}/> : debtorInitial}
-          </div>
+          {renderAvatar()}
 
           <div className="flex-1 min-w-0">
             <h3 className="font-black text-base sm:text-xl text-white truncate flex items-center gap-2">
@@ -110,7 +120,6 @@ export const LoanCard: React.FC<LoanCardProps> = ({
                 <Phone size={10} /> {asString(loan.debtorPhone)}
               </p>
               {!hasActiveAgreement && (() => {
-                // Cálculo rápido de rótulo de vencimento (visual only)
                 const safeInsts = asArray<Installment>(loan.installments);
                 const nextInst = safeInsts.find((i) => i.status !== 'PAID') || safeInsts[safeInsts.length - 1];
                 if (!nextInst) return null;
@@ -169,8 +178,6 @@ export const LoanCard: React.FC<LoanCardProps> = ({
 
       {isExpanded && (
         <div className="mt-8 sm:mt-10 space-y-6 sm:space-y-8 animate-in slide-in-from-top-4 duration-500" onClick={e => e.stopPropagation()}>
-          
-          {/* MÓDULO DE HISTÓRICO/AUDITORIA */}
           <div className="bg-slate-950/50 p-5 rounded-3xl border border-slate-800">
             <div className="flex justify-between items-center mb-4">
               <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
@@ -185,7 +192,6 @@ export const LoanCard: React.FC<LoanCardProps> = ({
             />
           </div>
 
-          {/* MÓDULO PRINCIPAL: ACORDO JURÍDICO OU GRADE DE PARCELAS */}
           {hasActiveAgreement && safeAgreement ? (
               <AgreementView 
                   agreement={safeAgreement} 
@@ -213,7 +219,6 @@ export const LoanCard: React.FC<LoanCardProps> = ({
               />
           )}
 
-          {/* FOOTER DE AÇÕES */}
           <div className="flex flex-col gap-3 pt-4 border-t border-slate-800 sm:flex-row sm:items-center sm:justify-between">
             <button onClick={onPortalLink} className="w-full sm:w-auto px-5 py-3 bg-slate-800 text-blue-400 rounded-2xl hover:text-white hover:bg-blue-600 transition-all flex items-center justify-center gap-2 text-[9px] font-black uppercase">
               <LinkIcon size={14} /> Portal do Cliente
