@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { User, Heart, LogOut, Camera, Download, History, FileUp, Settings, RotateCcw, ShieldAlert, Users } from 'lucide-react';
+import { User, Heart, LogOut, Camera, Download, History, Settings, RotateCcw, ShieldAlert, Users } from 'lucide-react';
 import { UserProfile, Loan } from '../types';
 import { maskPhone } from '../utils/formatters';
 import { useProfilePageLogic } from '../features/profile/hooks/useProfilePageLogic';
@@ -33,7 +33,7 @@ interface ProfilePageProps {
 export const ProfilePage: React.FC<ProfilePageProps> = ({ 
   activeUser, setDonateModal, handleLogout, setResetDataModal, handleDeleteAccount,
   profileEditForm, setProfileEditForm, handleSaveProfile, handlePhotoUpload, 
-  handleExportBackup, profilePhotoInputRef, loans, profileCtrl
+  handleExportBackup, profilePhotoInputRef, loans, profileCtrl, handleImportExcel
 }) => {
   
   const { activeSection, setActiveSection, profileImportRef, backupRestoreRef, auditLogs } = useProfilePageLogic(loans);
@@ -56,11 +56,10 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                         <History size={16}/> Auditoria Completa
                     </button>
                     
-                    {/* ALTERADO DE RESTAURAR PARA IMPORTAR CLIENTES */}
                     <button onClick={() => profileImportRef.current?.click()} className="p-3 rounded-xl text-xs font-black uppercase transition-all flex items-center gap-3 bg-slate-950 text-emerald-500 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/30">
                         <Users size={16}/> Importar Clientes (Excel)
                     </button>
-                    <input type="file" ref={profileImportRef} onChange={profileCtrl.handleImportProfile} className="hidden" accept=".csv,.xlsx,.xls" />
+                    <input type="file" ref={profileImportRef} onChange={handleImportExcel} className="hidden" accept=".csv,.xlsx,.xls" />
 
                     <div className="h-px bg-slate-800 my-2"></div>
 

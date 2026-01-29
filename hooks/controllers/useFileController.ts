@@ -4,29 +4,36 @@ import { supabase } from '../../lib/supabase';
 import { importService } from '../../features/profile/import/services/importService';
 import { UserProfile } from '../../types';
 import { generateUniqueAccessCode, generateUniqueClientNumber } from '../../utils/generators';
+import { parseCurrency } from '../../utils/formatters';
 
 export const useFileController = (
   ui: any,
-  showToast: (msg: string, type?: 'success' | 'error' | 'info') => void
+  showToast: (msg: string, type?: 'success' | 'error' | 'info' | 'warning') => void
 ) => {
 
   const handleFilePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
-      e.target.value = '';
-
+      
+      // Limpa input para permitir re-selecionar o mesmo arquivo se necessário
+      const input = e.target;
+      
       try {
           const sheets = await importService.getSheets(file);
           ui.setImportSheetNames(sheets.map(s => s.name));
           ui.setImportSheets(sheets);
           
           if (sheets.length > 1) {
+              // FORÇA ESCOLHA DE ABA (Pasta de Trabalho)
               ui.openModal('IMPORT_SHEET_SELECT');
           } else {
+              // Segue direto se houver apenas uma
               await startMapping(sheets[0]);
           }
       } catch (err: any) {
           showToast('Erro ao ler arquivo: ' + err.message, 'error');
+      } finally {
+          input.value = '';
       }
   };
 
@@ -47,6 +54,8 @@ export const useFileController = (
 
           const preview = await importService.buildPreview(ui.importCurrentSheet.rows, ui.importMapping, existing);
           ui.setImportCandidates(preview);
+          
+          // Por padrão, seleciona todos que não possuem ERRO crítico
           ui.setSelectedImportIndices(preview.map((c, i) => c.status !== 'ERRO' ? i : -1).filter(idx => idx !== -1));
           ui.openModal('IMPORT_PREVIEW');
       } catch (err: any) {
@@ -58,6 +67,11 @@ export const useFileController = (
       if (!activeUser) return;
       const selected = ui.importCandidates.filter((_: any, i: number) => ui.selectedImportIndices.includes(i));
       
+      if (selected.length === 0) {
+          showToast("Nenhum cliente selecionado para importação.", "warning");
+          return;
+      }
+
       ui.setIsSaving(true);
       let success = 0;
       let errors = 0;
@@ -85,7 +99,7 @@ export const useFileController = (
                       notes: item.notas || 'Importado via planilha',
                       access_code: accessCode,
                       client_number: clientNum,
-                      created_at: new Date().toISOString()
+                      created_at: item.data_referencia || new Date().toISOString()
                   });
 
                   if (error) throw error;
@@ -96,7 +110,7 @@ export const useFileController = (
               }
           }
           
-          showToast(`Importação de clientes concluída: ${success} adicionados, ${errors} falhas.`, success > 0 ? 'success' : 'error');
+          showToast(`Importação concluída: ${success} adicionados, ${errors} falhas.`, success > 0 ? 'success' : 'error');
           ui.closeModal();
           await fetchFullData(activeUser.id);
       } catch (err: any) {

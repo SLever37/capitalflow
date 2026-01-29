@@ -1,7 +1,7 @@
 
 import * as XLSX from 'xlsx';
 import { FIELD_MAPS, ImportCandidate } from '../domain/importSchema';
-import { onlyDigits } from '../../../../utils/formatters';
+import { onlyDigits, parseCurrency } from '../../../../utils/formatters';
 import { isValidCPForCNPJ } from '../../../../utils/validators';
 
 export const importService = {
@@ -11,14 +11,26 @@ export const importService = {
             reader.onload = (e) => {
                 try {
                     const data = new Uint8Array(e.target?.result as ArrayBuffer);
-                    const workbook = XLSX.read(data, { type: 'array' });
+                    const workbook = XLSX.read(data, { type: 'array', cellDates: true });
                     const sheets = workbook.SheetNames.map(name => {
                         const sheet = workbook.Sheets[name];
-                        const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+                        const json = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false }) as any[][];
+                        
+                        // Captura cabeçalhos (primeira linha que não seja vazia)
+                        let headers: string[] = [];
+                        let startRow = 0;
+                        for (let i = 0; i < json.length; i++) {
+                            if (json[i].some(cell => cell !== null && cell !== '')) {
+                                headers = json[i].map(h => String(h || '').trim());
+                                startRow = i + 1;
+                                break;
+                            }
+                        }
+
                         return {
                             name,
-                            headers: (json[0] || []).map(h => String(h || '').trim()),
-                            rows: json.slice(1)
+                            headers,
+                            rows: json.slice(startRow).filter(row => row.some(cell => cell !== null && cell !== ''))
                         };
                     });
                     resolve(sheets);
@@ -56,6 +68,8 @@ export const importService = {
                 endereco: String(row[mapping.endereco] || '').trim(),
                 cidade: String(row[mapping.cidade] || '').trim(),
                 uf: String(row[mapping.uf] || '').trim().toUpperCase(),
+                valor_base: parseCurrency(row[mapping.valor_base]),
+                data_referencia: row[mapping.data_referencia] ? new Date(row[mapping.data_referencia]).toISOString() : undefined,
                 notas: String(row[mapping.notas] || '').trim(),
                 status: 'OK',
                 mensagens: [],
@@ -71,20 +85,20 @@ export const importService = {
             if (candidate.documento) {
                 if (!isValidCPForCNPJ(candidate.documento)) {
                     candidate.status = 'AVISO';
-                    candidate.mensagens.push("Documento parece inválido.");
+                    candidate.mensagens.push("Documento inválido.");
                 }
                 if (existingData.documents.includes(candidate.documento)) {
                     candidate.status = 'AVISO';
-                    candidate.mensagens.push("Já cadastrado no sistema.");
+                    candidate.mensagens.push("Documento já existe no sistema.");
                 }
-            } else {
-                candidate.status = 'AVISO';
-                candidate.mensagens.push("Sem CPF/CNPJ.");
             }
 
             if (!candidate.whatsapp) {
                 candidate.status = 'AVISO';
-                candidate.mensagens.push("Sem telefone de contato.");
+                candidate.mensagens.push("Sem contato WhatsApp.");
+            } else if (candidate.whatsapp.length < 10) {
+                candidate.status = 'AVISO';
+                candidate.mensagens.push("WhatsApp incompleto.");
             }
 
             return candidate;
