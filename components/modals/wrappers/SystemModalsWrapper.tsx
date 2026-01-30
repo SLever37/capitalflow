@@ -17,14 +17,17 @@ import { ResetDataModal, DeleteAccountModal } from '../../../features/profile/co
 export const SystemModalsWrapper = () => {
     const { activeModal, closeModal, ui, activeUser, fileCtrl, fetchFullData, clients, loanCtrl, sources, aiCtrl, loans, profileCtrl, showToast } = useModal();
     
+    // Proteção contra ui undefined
+    if (!ui) return null;
+
     const handleSystemAction = (type: string, meta: any) => {
-        if (type === 'PAYMENT' && meta) {
+        if (type === 'PAYMENT' && meta && ui) {
             ui.setPaymentModal({
                 loan: { id: meta.loanId, debtorName: meta.clientName, debtorPhone: meta.clientPhone, sourceId: meta.sourceId },
                 inst: { id: meta.installmentId, dueDate: meta.start_time },
                 calculations: { total: meta.amount, principal: meta.amount, interest: 0, lateFee: 0 }
             });
-            ui.openModal('PAYMENT');
+            if (ui.openModal) ui.openModal('PAYMENT');
         }
     };
 
@@ -118,9 +121,24 @@ export const SystemModalsWrapper = () => {
                 <div className="space-y-4 text-center">
                     <p className="text-white text-lg font-bold">{ui.confirmation.title || 'Tem certeza?'}</p>
                     <p className="text-slate-400 text-sm">{ui.confirmation.message || 'Essa ação não pode ser desfeita.'}</p>
+                    
+                    {/* RESTAURAÇÃO DO CHECKBOX DE ESTORNO */}
+                    {ui.confirmation.showRefundOption && (
+                       <div className="flex items-center justify-center gap-2 bg-slate-950 p-3 rounded-xl border border-slate-800 cursor-pointer" onClick={() => ui.setRefundChecked(!ui.refundChecked)}>
+                           <input 
+                                type="checkbox" 
+                                id="refundCheck" 
+                                checked={ui.refundChecked} 
+                                onChange={e => ui.setRefundChecked(e.target.checked)} 
+                                className="w-5 h-5 accent-emerald-500 rounded cursor-pointer" 
+                           />
+                           <label htmlFor="refundCheck" className="text-sm text-slate-300 font-bold select-none cursor-pointer">Devolver capital para a Fonte?</label>
+                       </div>
+                    )}
+
                     <div className="flex gap-4 pt-2">
-                        <button onClick={closeModal} className="flex-1 py-3 bg-slate-800 text-slate-300 rounded-xl font-bold">Cancelar</button>
-                        <button onClick={loanCtrl.executeConfirmation} className="flex-1 py-3 bg-rose-600 text-white rounded-xl font-bold">Confirmar</button>
+                        <button onClick={closeModal} className="flex-1 py-3 bg-slate-800 text-slate-300 rounded-xl font-bold uppercase">Cancelar</button>
+                        <button onClick={loanCtrl.executeConfirmation} className="flex-1 py-3 bg-rose-600 text-white rounded-xl font-bold uppercase">Confirmar</button>
                     </div>
                 </div>
             </Modal>

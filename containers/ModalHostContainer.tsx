@@ -30,16 +30,16 @@ export const ModalHostContainer: React.FC<ModalHostContainerProps> = (props) => 
 
   return (
     <ModalProvider 
-        activeModal={ui.activeModal}
-        openModal={ui.openModal}
-        closeModal={ui.closeModal}
+        activeModal={ui?.activeModal}
+        openModal={ui?.openModal}
+        closeModal={ui?.closeModal}
         {...props}
     >
        <ModalHost />
        
        {/* File Inputs Hidden Refs - Mantidos aqui para acesso via ref do hook ui */}
-       <input type="file" ref={ui.promissoriaFileInputRef} className="hidden" accept="image/*,application/pdf" onChange={(e) => filesService.handlePromissoriaUpload(e.target.files?.[0] as File, activeUser, String(ui.promissoriaUploadLoanId), showToast, fetchFullData)}/>
-       <input type="file" ref={ui.extraDocFileInputRef} className="hidden" accept="image/*,application/pdf" onChange={(e) => filesService.handleExtraDocUpload(e.target.files?.[0] as File, activeUser, String(ui.extraDocUploadLoanId), 'CONFISSAO', showToast, fetchFullData)}/>
+       <input type="file" ref={ui?.promissoriaFileInputRef} className="hidden" accept="image/*,application/pdf" onChange={(e) => filesService.handlePromissoriaUpload(e.target.files?.[0] as File, activeUser, String(ui?.promissoriaUploadLoanId), showToast, fetchFullData)}/>
+       <input type="file" ref={ui?.extraDocFileInputRef} className="hidden" accept="image/*,application/pdf" onChange={(e) => filesService.handleExtraDocUpload(e.target.files?.[0] as File, activeUser, String(ui?.extraDocUploadLoanId), 'CONFISSAO', showToast, fetchFullData)}/>
     </ModalProvider>
   );
 };

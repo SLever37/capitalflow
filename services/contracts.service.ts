@@ -1,3 +1,4 @@
+
 import { supabase } from '../lib/supabase';
 import { Loan, UserProfile, CapitalSource } from '../types';
 import { onlyDigits, isTestClientName } from '../utils/formatters';
@@ -5,6 +6,43 @@ import { isValidCPForCNPJ } from '../utils/validators';
 import { generateUUID } from '../utils/generators';
 import { modalityRegistry } from '../domain/finance/modalities/registry';
 import { getLoanDiff } from '../utils/auditHelpers';
+
+// Helper para atualizar saldo com fallback (Robustez)
+const updateSourceBalance = async (sourceId: string, delta: number) => {
+    // 1. Tenta RPC (Ideal para concorrência)
+    const { error: rpcError } = await supabase.rpc('adjust_source_balance', { 
+        p_source_id: sourceId, 
+        p_delta: delta 
+    });
+
+    if (!rpcError) return;
+
+    // 2. Fallback Manual (Se RPC falhar por não existir)
+    if (rpcError.message?.includes('function') || rpcError.message?.includes('schema cache')) {
+        console.warn('RPC adjust_source_balance indisponível. Usando atualização manual.');
+        
+        const { data: source, error: fetchError } = await supabase
+            .from('fontes')
+            .select('balance')
+            .eq('id', sourceId)
+            .single();
+            
+        if (fetchError) throw new Error(`Erro ao ler saldo da fonte: ${fetchError.message}`);
+        
+        const currentBalance = Number(source.balance) || 0;
+        const newBalance = currentBalance + delta;
+        
+        const { error: updateError } = await supabase
+            .from('fontes')
+            .update({ balance: newBalance })
+            .eq('id', sourceId);
+            
+        if (updateError) throw new Error(`Erro ao atualizar saldo manualmente: ${updateError.message}`);
+    } else {
+        // Outros erros (permissão, etc)
+        throw new Error(`Erro no ajuste de saldo: ${rpcError.message}`);
+    }
+};
 
 export const contractsService = {
   async saveLoan(loan: Loan, activeUser: UserProfile, sources: CapitalSource[], editingLoan: Loan | null) {
@@ -19,7 +57,8 @@ export const contractsService = {
       if (defaultSource) finalSourceId = defaultSource.id;
       else { 
         const newId = generateUUID(); 
-        await supabase.from('fontes').insert([{ id: newId, profile_id: activeUser.id, name: 'Carteira Principal', type: 'CASH', balance: 0 }]); 
+        const { error: sourceError } = await supabase.from('fontes').insert([{ id: newId, profile_id: activeUser.id, name: 'Carteira Principal', type: 'CASH', balance: 0 }]); 
+        if (sourceError) throw new Error("Erro ao criar fonte padrão: " + sourceError.message);
         finalSourceId = newId; 
       }
     }
@@ -55,7 +94,7 @@ export const contractsService = {
     const principal = Number(loan.principal) || 0;
     const interestRate = Number(loan.interestRate) || 0;
 
-    // --- LÓGICA DE SALDO ATÔMICA (Deltas via RPC) ---
+    // --- LÓGICA DE SALDO ATÔMICA (Deltas) ---
     const rollbackOperations: Array<() => Promise<void>> = [];
 
     try {
@@ -65,16 +104,19 @@ export const contractsService = {
 
             if (editingLoan.sourceId !== finalSourceId) {
                 // TROCA DE FONTE: Estorna integral na antiga, debita integral na nova
-                await supabase.rpc('adjust_source_balance', { p_source_id: editingLoan.sourceId, p_delta: oldPrincipal });
+                
+                // 1. Estorno na Antiga
+                await updateSourceBalance(editingLoan.sourceId, oldPrincipal);
+                
                 rollbackOperations.push(async () => { 
-                    await supabase.rpc('adjust_source_balance', { p_source_id: editingLoan.sourceId, p_delta: -oldPrincipal }); 
-                    return;
+                    await updateSourceBalance(editingLoan.sourceId, -oldPrincipal); 
                 });
 
-                await supabase.rpc('adjust_source_balance', { p_source_id: finalSourceId, p_delta: -principal });
+                // 2. Débito na Nova
+                await updateSourceBalance(finalSourceId, -principal);
+
                 rollbackOperations.push(async () => { 
-                    await supabase.rpc('adjust_source_balance', { p_source_id: finalSourceId, p_delta: principal }); 
-                    return;
+                    await updateSourceBalance(finalSourceId, principal); 
                 });
                 
                 // Log de Estorno técnico
@@ -86,18 +128,18 @@ export const contractsService = {
             } 
             else if (Math.abs(diff) > 0.01) {
                 // MESMA FONTE: Debita apenas a diferença
-                await supabase.rpc('adjust_source_balance', { p_source_id: finalSourceId, p_delta: -diff });
+                await updateSourceBalance(finalSourceId, -diff);
+
                 rollbackOperations.push(async () => { 
-                    await supabase.rpc('adjust_source_balance', { p_source_id: finalSourceId, p_delta: diff }); 
-                    return;
+                    await updateSourceBalance(finalSourceId, diff); 
                 });
             }
         } else {
             // NOVO CONTRATO: Debita valor principal total da fonte
-            await supabase.rpc('adjust_source_balance', { p_source_id: finalSourceId, p_delta: -principal });
+            await updateSourceBalance(finalSourceId, -principal);
+
             rollbackOperations.push(async () => { 
-                await supabase.rpc('adjust_source_balance', { p_source_id: finalSourceId, p_delta: principal }); 
-                return;
+                await updateSourceBalance(finalSourceId, principal); 
             });
         }
 
@@ -117,7 +159,7 @@ export const contractsService = {
         contractData.total_to_receive = totalStrategy;
 
         const { error: loanError } = await supabase.from('contratos').upsert(contractData);
-        if (loanError) throw new Error(loanError.message);
+        if (loanError) throw new Error("Erro ao salvar dados do contrato: " + loanError.message);
 
         const installmentsPayload = installments.map((inst, index) => ({
             id: generateUUID(), loan_id: loan.id, profile_id: activeUser.id, numero_parcela: index + 1,
@@ -128,9 +170,9 @@ export const contractsService = {
 
         await supabase.from('parcelas').delete().eq('loan_id', loan.id);
         const { error: instError } = await supabase.from('parcelas').insert(installmentsPayload);
-        if (instError) throw new Error(instError.message);
+        if (instError) throw new Error("Erro ao gerar parcelas: " + instError.message);
 
-        // Auditoria simplificada
+        // Auditoria simplificada e Registro de Saída
         if (editingLoan) {
             const diffLog = getLoanDiff(editingLoan, loan);
             if (Object.keys(diffLog).length > 0) {
@@ -141,6 +183,7 @@ export const contractsService = {
                 }]);
             }
         } else {
+            // REGISTRO OFICIAL DE SAÍDA DE CAIXA
             await supabase.from('transacoes').insert([{ 
                 id: generateUUID(), loan_id: loan.id, profile_id: activeUser.id, source_id: finalSourceId, 
                 date: new Date().toISOString(), type: 'LEND_MORE', amount: principal, category: 'INVESTIMENTO'
@@ -153,7 +196,7 @@ export const contractsService = {
         for (const rollback of rollbackOperations.reverse()) {
             await rollback().catch(e => console.error("Falha fatal no rollback:", e));
         }
-        throw new Error("Erro ao salvar contrato: " + error.message);
+        throw error; 
     }
   },
 

@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { Loan, Client, CapitalSource, UserProfile } from '../types';
+import { Loan, Client, CapitalSource, UserProfile, SortOption } from '../types';
 import { maskPhone, maskDocument } from '../utils/formatters';
 import { mapLoanFromDB } from '../services/adapters/dbAdapters';
 import { asString, asNumber } from '../utils/safe';
@@ -55,6 +55,7 @@ export const useAppState = (activeProfileId: string | null) => {
   const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'CLIENTS' | 'SOURCES' | 'PROFILE' | 'MASTER' | 'LEGAL'>('DASHBOARD');
   const [mobileDashboardTab, setMobileDashboardTab] = useState<'CONTRACTS' | 'BALANCE'>('CONTRACTS');
   const [statusFilter, setStatusFilter] = useState<'TODOS' | 'ATRASADOS' | 'EM_DIA' | 'PAGOS' | 'ARQUIVADOS' | 'ATRASO_CRITICO'>('TODOS');
+  const [sortOption, setSortOption] = useState<SortOption>('DUE_DATE_ASC'); // Padrão: Vencimento Próximo
   const [searchTerm, setSearchTerm] = useState('');
   const [clientSearchTerm, setClientSearchTerm] = useState('');
   
@@ -82,13 +83,11 @@ export const useAppState = (activeProfileId: string | null) => {
           let profileData: any = null;
 
           // 1. Tenta usar rpc_me (Preferencial)
-          // Isso retorna (id, email, nome_exibicao, perfil, dono_id) se o usuário estiver autenticado no Supabase
           try {
               const { data: rpcData, error: rpcError } = await supabase.rpc('rpc_me');
               if (!rpcError && rpcData) {
-                  // Se rpc_me retornar uma lista, pega o primeiro
                   const me = Array.isArray(rpcData) ? rpcData[0] : rpcData;
-                  if (me && me.id === profileId) { // Garante que é o mesmo ID da sessão local
+                  if (me && me.id === profileId) { 
                       profileData = me;
                   }
               }
@@ -96,7 +95,7 @@ export const useAppState = (activeProfileId: string | null) => {
               console.warn("rpc_me failed or not available:", e);
           }
 
-          // 2. Fallback: Busca direta na tabela (Caso rpc_me falhe ou auth customizada)
+          // 2. Fallback: Busca direta na tabela
           if (!profileData) {
               const { data: tableData, error: tableError } = await supabase
                 .from('perfis')
@@ -115,7 +114,6 @@ export const useAppState = (activeProfileId: string | null) => {
               return;
           }
 
-          // MAPEAMENTO INTELIGENTE DE USUÁRIO
           const smartName = resolveSmartName(profileData);
           
           const u: UserProfile = {
@@ -136,7 +134,7 @@ export const useAppState = (activeProfileId: string | null) => {
               photo: profileData.avatar_url,
               password: profileData.senha_acesso,
               recoveryPhrase: profileData.recovery_phrase,
-              accessLevel: asNumber(profileData.access_level || profileData.perfil, 2), // Suporte a coluna 'perfil' do rpc_me
+              accessLevel: asNumber(profileData.access_level || profileData.perfil, 2),
               totalAvailableCapital: asNumber(profileData.total_available_capital),
               interestBalance: asNumber(profileData.interest_balance),
               createdAt: asString(profileData.created_at),
@@ -152,7 +150,6 @@ export const useAppState = (activeProfileId: string | null) => {
           setActiveUser(u);
           setProfileEditForm(u);
 
-          // Carrega dados relacionados
           const [clientsRes, sourcesRes, loansRes] = await Promise.all([
               supabase.from('clientes').select('*').eq('profile_id', profileId),
               supabase.from('fontes').select('*').eq('profile_id', profileId),
@@ -223,7 +220,6 @@ export const useAppState = (activeProfileId: string | null) => {
     }
   }, [activeProfileId, fetchFullData]);
 
-  // Heartbeat com proteção contra falhas
   useEffect(() => {
       if (!activeUser || activeUser.id === 'DEMO') return;
       
@@ -260,6 +256,7 @@ export const useAppState = (activeProfileId: string | null) => {
     activeTab, setActiveTab,
     mobileDashboardTab, setMobileDashboardTab,
     statusFilter, setStatusFilter,
+    sortOption, setSortOption, // Expose sort state
     searchTerm, setSearchTerm,
     clientSearchTerm, setClientSearchTerm,
     profileEditForm, setProfileEditForm

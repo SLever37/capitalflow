@@ -1,10 +1,11 @@
-
 import { useState, useRef, useCallback } from 'react';
 import { CapitalSource, Loan, Client, Installment, AgreementInstallment } from '../types';
 import { ModalType, ModalState } from '../contexts/ModalContext';
 
 export const useUiState = () => {
   const [activeModal, setActiveModal] = useState<ModalState | null>(null);
+  const [showNavHub, setShowNavHub] = useState(false);
+  const [isStealthMode, setIsStealthMode] = useState(false);
 
   const openModal = useCallback((type: ModalType, payload?: any) => {
       setActiveModal({ type, payload });
@@ -15,9 +16,11 @@ export const useUiState = () => {
       setEditingLoan(null);
       setPaymentModal(null);
       setConfirmation(null);
+      setNoteModalLoan(null);
   }, []);
 
   const [noteText, setNoteText] = useState('');
+  const [noteModalLoan, setNoteModalLoan] = useState<Loan | null>(null);
   const [editingSource, setEditingSource] = useState<CapitalSource | null>(null);
   const [editingLoan, setEditingLoan] = useState<Loan | null>(null);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
@@ -60,26 +63,26 @@ export const useUiState = () => {
   const [importMapping, setImportMapping] = useState<Record<string, number>>({});
   const [importCandidates, setImportCandidates] = useState<any[]>([]);
   const [selectedImportIndices, setSelectedImportIndices] = useState<number[]>([]);
-  const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
-
+  
   const [isBulkDeleteMode, setIsBulkDeleteMode] = useState(false);
   const [selectedClientsToDelete, setSelectedClientsToDelete] = useState<string[]>([]);
+  
+  const [resetPasswordInput, setResetPasswordInput] = useState('');
   const [deleteAccountAgree, setDeleteAccountAgree] = useState(false);
   const [deleteAccountConfirm, setDeleteAccountConfirm] = useState('');
-  const [resetPasswordInput, setResetPasswordInput] = useState('');
-  const [isStealthMode, setIsStealthMode] = useState(false);
-  const [showNavHub, setShowNavHub] = useState(false);
 
-  const fileInputBackupRef = useRef<HTMLInputElement>(null);
-  const fileInputExcelRef = useRef<HTMLInputElement>(null);
-  const profilePhotoInputRef = useRef<HTMLInputElement>(null);
-  const clientAvatarInputRef = useRef<HTMLInputElement>(null); // NOVO
   const promissoriaFileInputRef = useRef<HTMLInputElement>(null);
   const extraDocFileInputRef = useRef<HTMLInputElement>(null);
+  const clientAvatarInputRef = useRef<HTMLInputElement>(null);
+  const profilePhotoInputRef = useRef<HTMLInputElement>(null);
+  const fileInputExcelRef = useRef<HTMLInputElement>(null);
 
   return {
     activeModal, openModal, closeModal,
+    showNavHub, setShowNavHub,
+    isStealthMode, setIsStealthMode,
     noteText, setNoteText,
+    noteModalLoan, setNoteModalLoan,
     editingSource, setEditingSource,
     editingLoan, setEditingLoan,
     editingClient, setEditingClient,
@@ -95,6 +98,7 @@ export const useUiState = () => {
     sourceForm, setSourceForm,
     addFundsValue, setAddFundsValue,
     paymentModal, setPaymentModal,
+    renegotiationModalLoan, setRenegotiationModalLoan,
     messageModalLoan, setMessageModalLoan,
     withdrawValue, setWithdrawValue,
     withdrawSourceId, setWithdrawSourceId,
@@ -105,24 +109,21 @@ export const useUiState = () => {
     promissoriaUploadLoanId, setPromissoriaUploadLoanId,
     extraDocUploadLoanId, setExtraDocUploadLoanId,
     extraDocKind, setExtraDocKind,
-    renegotiationModalLoan, setRenegotiationModalLoan,
-    
     importSheets, setImportSheets,
     importSheetNames, setImportSheetNames,
     importCurrentSheet, setImportCurrentSheet,
     importMapping, setImportMapping,
     importCandidates, setImportCandidates,
     selectedImportIndices, setSelectedImportIndices,
-    pendingImportFile, setPendingImportFile,
-
     isBulkDeleteMode, setIsBulkDeleteMode,
     selectedClientsToDelete, setSelectedClientsToDelete,
+    resetPasswordInput, setResetPasswordInput,
     deleteAccountAgree, setDeleteAccountAgree,
     deleteAccountConfirm, setDeleteAccountConfirm,
-    resetPasswordInput, setResetPasswordInput,
-    isStealthMode, setIsStealthMode,
-    showNavHub, setShowNavHub,
-
-    fileInputBackupRef, fileInputExcelRef, profilePhotoInputRef, clientAvatarInputRef, promissoriaFileInputRef, extraDocFileInputRef
+    promissoriaFileInputRef,
+    extraDocFileInputRef,
+    clientAvatarInputRef,
+    profilePhotoInputRef,
+    fileInputExcelRef
   };
 };

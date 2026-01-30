@@ -208,10 +208,13 @@ export const useLoanForm = ({ initialData, clients, sources, userProfile, onAdd,
         return;
     }
 
+    // CORREÇÃO: Permitir saldo negativo explicitamente para contabilidade correta
     if (formData.sourceId && !initialData) {
         const selectedSource = sources.find(s => s.id === formData.sourceId);
         if (selectedSource && parseFloat(formData.principal) > selectedSource.balance) {
-            if(!window.confirm(`AVISO: A fonte ${selectedSource.name} tem saldo de R$ ${selectedSource.balance.toLocaleString()}. O saldo ficará negativo. Deseja continuar?`)) return;
+            const diff = parseFloat(formData.principal) - selectedSource.balance;
+            // Alerta, mas permite continuar
+            if(!window.confirm(`AVISO CONTÁBIL:\n\nO valor do empréstimo (R$ ${parseFloat(formData.principal).toLocaleString()}) é maior que o saldo na carteira ${selectedSource.name} (R$ ${selectedSource.balance.toLocaleString()}).\n\nIsso deixará a carteira NEGATIVA em R$ -${diff.toLocaleString()}.\n\nDeseja confirmar esta saída de caixa?`)) return;
         }
     }
 

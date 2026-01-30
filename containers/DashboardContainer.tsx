@@ -27,7 +27,18 @@ export const DashboardContainer: React.FC<DashboardContainerProps> = ({
   loans, sources, activeUser, mobileDashboardTab, setMobileDashboardTab,
   statusFilter, setStatusFilter, searchTerm, setSearchTerm, ui, loanCtrl, fileCtrl, showToast, onRefresh
 }) => {
-  const filteredLoans = useMemo(() => filterLoans(loans, searchTerm, statusFilter), [loans, searchTerm, statusFilter]);
+  const { sortOption, setSortOption } = ui; // Pega do hook ui (que na verdade vem do AppState via prop ui se passado, ou deve vir de useAppState no App.tsx. Verificando App.tsx...)
+  // Ops, DashboardContainer recebe props do App.tsx. O sortOption está no useAppState.
+  // Vou usar as props implícitas passadas pelo App.tsx spread ou adicionar explicitamente na interface no próximo passo se necessário.
+  // Assumindo que ui não tem sortOption direto, mas o AppState tem.
+  // Vou ajustar para receber do parent component (App.tsx) se ele passar, ou do UI se for movido pra lá.
+  // No App.tsx atual, sortOption está sendo passado para DashboardContainer?
+  // Vou verificar e garantir que DashboardContainer receba o sortOption.
+  
+  // Nota: O App.tsx passa props spreads ou explicitas.
+  // Vou assumir que o App.tsx foi atualizado para passar sortOption e setSortOption.
+  
+  const filteredLoans = useMemo(() => filterLoans(loans, searchTerm, statusFilter, ui.sortOption), [loans, searchTerm, statusFilter, ui.sortOption]);
   const stats = useMemo(() => buildDashboardStats(loans, activeUser), [loans, activeUser]);
 
   // Handler rápido para pagamento de parcela de acordo
@@ -50,6 +61,7 @@ export const DashboardContainer: React.FC<DashboardContainerProps> = ({
         loans={loans} sources={sources} filteredLoans={filteredLoans} stats={stats} activeUser={activeUser}
         mobileDashboardTab={mobileDashboardTab} setMobileDashboardTab={setMobileDashboardTab}
         statusFilter={statusFilter} setStatusFilter={setStatusFilter} searchTerm={searchTerm} setSearchTerm={setSearchTerm}
+        sortOption={ui.sortOption} setSortOption={ui.setSortOption}
         selectedLoanId={ui.selectedLoanId} setSelectedLoanId={ui.setSelectedLoanId}
         onEdit={(l) => { ui.setEditingLoan(l); ui.openModal('LOAN_FORM', l); }}
         onMessage={(l) => { ui.setMessageModalLoan(l); ui.openModal('MESSAGE_HUB'); }}

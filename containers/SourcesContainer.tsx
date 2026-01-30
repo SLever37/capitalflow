@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { SourcesPage } from '../pages/SourcesPage';
 import { CapitalSource } from '../types';
@@ -15,9 +14,11 @@ export const SourcesContainer: React.FC<SourcesContainerProps> = ({
 }) => {
   return (
     <SourcesPage 
-        sources={sources} setIsSourceModalOpen={ui.setIsSourceModalOpen} setEditingSource={ui.setEditingSource} editingSource={ui.editingSource}
-        setIsAddFundsModalOpen={ui.setIsAddFundsModalOpen} setAddFundsValue={ui.setAddFundsValue} openConfirmation={loanCtrl.openConfirmation} handleUpdateSourceBalance={sourceCtrl.handleUpdateSourceBalance}
+        sources={sources} 
+        openConfirmation={loanCtrl.openConfirmation} 
+        handleUpdateSourceBalance={sourceCtrl.handleUpdateSourceBalance}
         isStealthMode={ui.isStealthMode}
+        ui={ui}
     />
   );
 };

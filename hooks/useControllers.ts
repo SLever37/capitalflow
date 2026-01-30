@@ -1,4 +1,3 @@
-
 import { useMemo } from 'react';
 import { useLoanController } from './controllers/useLoanController';
 import { useClientController } from './controllers/useClientController';
@@ -31,6 +30,20 @@ export const useControllers = (
   // Memoizamos todos os controladores para evitar que App.tsx re-renderize 
   // infinitamente ao passar funções estáveis para os filhos.
   return useMemo(() => {
+    // PROTEÇÃO CRÍTICA: Se ui for undefined, retornamos controladores vazios ou nulos para evitar crash imediato
+    if (!ui) {
+      return {
+          loanCtrl: {} as any,
+          clientCtrl: {} as any,
+          sourceCtrl: {} as any,
+          profileCtrl: {} as any,
+          adminCtrl: {} as any,
+          paymentCtrl: {} as any,
+          fileCtrl: {} as any,
+          aiCtrl: {} as any
+      };
+    }
+
     const loanCtrl = useLoanController(activeUser, ui, sources, setSources, loans, setLoans, clients, setClients, fetchFullData, showToast);
     const clientCtrl = useClientController(activeUser, ui, clients, setClients, fetchFullData, showToast);
     const sourceCtrl = useSourceController(activeUser, ui, sources, setSources, setActiveUser, fetchFullData, showToast);
@@ -54,8 +67,8 @@ export const useControllers = (
       activeUser?.id, 
       loans.length, 
       clients.length, 
-      sources.length, 
-      ui.showNavHub, 
-      ui.activeModal?.type
+      sources.length,
+      // CRITICAL FIX: Depend on 'ui' to ensure openModal and other methods are available and fresh
+      ui 
   ]);
 };

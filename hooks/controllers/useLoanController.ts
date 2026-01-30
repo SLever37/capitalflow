@@ -58,8 +58,14 @@ export const useLoanController = (
   };
 
   const openConfirmation = (config: any) => { 
-      ui.setRefundChecked(true); 
-      ui.setConfirmation(config);
+      ui.setRefundChecked(true); // Default checked
+      // Força a exibição da opção de estorno para Delete/Archive
+      const shouldShowRefund = config.type === 'DELETE' || config.type === 'ARCHIVE';
+      
+      ui.setConfirmation({
+          ...config,
+          showRefundOption: config.showRefundOption ?? shouldShowRefund
+      });
       ui.openModal('CONFIRMATION'); 
   };
   

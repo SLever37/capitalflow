@@ -43,6 +43,19 @@ export const DocumentTemplates = {
                     <small>CREDOR(A)</small><br/><b>${data.creditorName}</b>
                 </div>
             </div>
+
+            <div style="margin-top: 60px; display: grid; grid-template-columns: 1fr 1fr; gap: 50px;">
+                <div style="text-align: center; border-top: 1px solid #000; padding-top: 5px;">
+                    <small>TESTEMUNHA 1</small><br/>
+                    <span style="font-size: 10px;">Nome: __________________________</span><br/>
+                    <span style="font-size: 10px;">CPF: ___________________________</span>
+                </div>
+                <div style="text-align: center; border-top: 1px solid #000; padding-top: 5px;">
+                    <small>TESTEMUNHA 2</small><br/>
+                    <span style="font-size: 10px;">Nome: __________________________</span><br/>
+                    <span style="font-size: 10px;">CPF: ___________________________</span>
+                </div>
+            </div>
         </div>
     `,
 

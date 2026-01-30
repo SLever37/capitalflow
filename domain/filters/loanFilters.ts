@@ -1,5 +1,5 @@
 
-import { Loan, LoanStatus } from '../../types';
+import { Loan, LoanStatus, SortOption } from '../../types';
 import { onlyDigits } from '../../utils/formatters';
 import { getInstallmentStatusLogic } from '../../domain/finance/calculations';
 import { getDaysDiff, parseDateOnlyUTC } from '../../utils/dateHelpers';
@@ -28,17 +28,41 @@ const isLoanFullyPaid = (l: Loan): boolean => {
     }
 
     // 3. Verificação de Resíduo (Tolerância de R$ 0.10)
-    // Cobre modalidade MENSAL se o principal for zerado mas status não atualizado
     const totalRemaining = l.installments.reduce((acc, i) => acc + i.principalRemaining + i.interestRemaining, 0);
     if (totalRemaining < 0.10) return true;
 
     return false;
 };
 
+// HELPER DE ORDENAÇÃO
+const sortLoans = (loans: Loan[], sortOption: SortOption): Loan[] => {
+    return [...loans].sort((a, b) => {
+        switch (sortOption) {
+            case 'NAME_ASC':
+                return a.debtorName.localeCompare(b.debtorName);
+            
+            case 'CREATED_DESC': // Entrada Mais Recente
+                return new Date(b.createdAt || b.startDate).getTime() - new Date(a.createdAt || a.startDate).getTime();
+            
+            case 'UPDATED_DESC': // Alterado Mais Recente (Baseado em Last Payment ou Update)
+                const lastA = a.ledger && a.ledger.length > 0 ? new Date(a.ledger[a.ledger.length-1].date).getTime() : new Date(a.createdAt || a.startDate).getTime();
+                const lastB = b.ledger && b.ledger.length > 0 ? new Date(b.ledger[b.ledger.length-1].date).getTime() : new Date(b.createdAt || b.startDate).getTime();
+                return lastB - lastA;
+
+            case 'DUE_DATE_ASC': // Vencimento Mais Próximo
+            default:
+                const nextA = a.installments.find(i => i.status !== 'PAID')?.dueDate || '9999-12-31';
+                const nextB = b.installments.find(i => i.status !== 'PAID')?.dueDate || '9999-12-31';
+                return new Date(nextA).getTime() - new Date(nextB).getTime();
+        }
+    });
+};
+
 export const filterLoans = (
   loans: Loan[],
   searchTerm: string,
-  statusFilter: 'TODOS' | 'ATRASADOS' | 'EM_DIA' | 'PAGOS' | 'ARQUIVADOS' | 'ATRASO_CRITICO'
+  statusFilter: 'TODOS' | 'ATRASADOS' | 'EM_DIA' | 'PAGOS' | 'ARQUIVADOS' | 'ATRASO_CRITICO',
+  sortOption: SortOption = 'DUE_DATE_ASC'
 ): Loan[] => {
   let result = loans;
   
@@ -77,5 +101,6 @@ export const filterLoans = (
     result = result.filter(l => l.isArchived);
   }
   
-  return result.sort((a, b) => b.startDate.localeCompare(a.startDate));
+  // Aplica ordenação ao final
+  return sortLoans(result, sortOption);
 };

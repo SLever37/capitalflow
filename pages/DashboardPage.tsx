@@ -1,13 +1,13 @@
 
 import React from 'react';
-import { Search, ShieldAlert, BarChart3, Banknote, CheckCircle2, Briefcase, PieChart as PieIcon, TrendingUp } from 'lucide-react';
+import { BarChart3, Banknote, CheckCircle2, Briefcase, PieChart as PieIcon, TrendingUp } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, LineChart, Line, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
-import { Loan, CapitalSource, LedgerEntry, Agreement, AgreementInstallment } from '../types';
+import { Loan, CapitalSource, LedgerEntry, Agreement, AgreementInstallment, SortOption } from '../types';
 import { LoanCard } from '../components/cards/LoanCard';
 import { StatCard } from '../components/StatCard';
 import { ProfitCard } from '../components/cards/ProfitCard';
 import { DashboardAlerts } from '../features/dashboard/DashboardAlerts';
-import { startDictation } from '../utils/speech';
+import { DashboardControls } from '../components/dashboard/DashboardControls';
 
 interface DashboardPageProps {
   loans: Loan[];
@@ -19,6 +19,8 @@ interface DashboardPageProps {
   setMobileDashboardTab: (val: 'CONTRACTS' | 'BALANCE') => void;
   statusFilter: 'TODOS' | 'ATRASADOS' | 'EM_DIA' | 'PAGOS' | 'ARQUIVADOS' | 'ATRASO_CRITICO';
   setStatusFilter: (val: any) => void;
+  sortOption: SortOption;
+  setSortOption: (val: SortOption) => void;
   searchTerm: string;
   setSearchTerm: (val: string) => void;
   selectedLoanId: string | null;
@@ -48,7 +50,7 @@ interface DashboardPageProps {
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({
   loans, sources, filteredLoans, stats, activeUser, mobileDashboardTab, setMobileDashboardTab,
-  statusFilter, setStatusFilter, searchTerm, setSearchTerm, selectedLoanId, setSelectedLoanId,
+  statusFilter, setStatusFilter, sortOption, setSortOption, searchTerm, setSearchTerm, selectedLoanId, setSelectedLoanId,
   onEdit, onMessage, onArchive, onRestore, onDelete, onNote, onPayment, onPortalLink,
   onUploadPromissoria, onUploadDoc, onViewPromissoria, onViewDoc, onReviewSignal, onOpenComprovante, onReverseTransaction,
   setWithdrawModal, showToast, isStealthMode, onRenegotiate, onAgreementPayment, onRefresh
@@ -64,20 +66,15 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           <div className={`flex-1 space-y-6 sm:space-y-8 ${mobileDashboardTab === 'BALANCE' ? 'hidden md:block' : ''}`}>
               <DashboardAlerts loans={loans} sources={sources} />
 
-              <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
-                  {['TODOS', 'ATRASADOS', 'ATRASO_CRITICO', 'EM_DIA', 'PAGOS', 'ARQUIVADOS'].map(filter => (
-                  <button key={filter} onClick={() => setStatusFilter(filter as any)} className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all border flex items-center gap-2 ${statusFilter === filter ? 'bg-blue-600 text-white border-blue-500 shadow-lg shadow-blue-600/20' : 'bg-slate-900 border-slate-800 text-slate-500 hover:text-slate-300 hover:border-slate-700'}`}>
-                      {filter === 'ATRASO_CRITICO' && <ShieldAlert size={14} className="text-rose-500" />}
-                      {filter.replace('_', ' ')}
-                  </button>
-                  ))}
-              </div>
-
-              <div className="bg-slate-900 border border-slate-800 p-2 rounded-2xl flex items-center gap-2">
-                  <Search className="text-slate-500 ml-2" size={18}/>
-                  <input type="text" placeholder="Buscar contrato por nome, CPF/CNPJ, código, telefone, e-mail..." className="bg-transparent w-full p-2 text-white outline-none text-sm" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-                  <button onClick={() => startDictation(setSearchTerm, (msg) => showToast(msg, 'error'))} className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 hover:text-white hover:border-slate-600 transition-colors text-xs font-black uppercase" title="Buscar por voz" type="button">🎙</button>
-              </div>
+              <DashboardControls 
+                  statusFilter={statusFilter}
+                  setStatusFilter={setStatusFilter}
+                  sortOption={sortOption}
+                  setSortOption={setSortOption}
+                  searchTerm={searchTerm}
+                  setSearchTerm={setSearchTerm}
+                  showToast={showToast}
+              />
 
               <div className="grid grid-cols-1 gap-4 sm:gap-5">
                   {filteredLoans.map(loan => (

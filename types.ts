@@ -8,6 +8,9 @@ export enum LoanStatus {
 
 export type PaymentMethod = 'PIX' | 'CASH' | 'BANK_TRANSFER' | 'OTHER';
 
+// Novo Tipo de Ordenação
+export type SortOption = 'DUE_DATE_ASC' | 'NAME_ASC' | 'CREATED_DESC' | 'UPDATED_DESC';
+
 export interface CapitalSource {
   id: string;
   name: string;
@@ -195,6 +198,7 @@ export interface Loan {
 
   startDate: string;
   createdAt?: string; 
+  updatedAt?: string; // Novo campo para ordenação
   installments: Installment[];
   totalToReceive: number;
   

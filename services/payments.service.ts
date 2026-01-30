@@ -46,12 +46,10 @@ export const paymentsService = {
 
     // --- LÓGICA DE ALOCAÇÃO DE PAGAMENTO ---
     if (paymentType === 'CUSTOM') {
-        // MODO DIÁRIA: O valor customizado é focado em comprar dias (juros)
         amountToPay = customAmount || 0;
         allocation = { principalPaid: 0, interestPaid: amountToPay, lateFeePaid: 0, avGenerated: 0 };
         paymentNote = `Recebimento de Diária(s) (R$ ${amountToPay.toFixed(2)})`;
     } else if (paymentType === 'RENEW_AV') {
-        // MODO AMORTIZAÇÃO: Reduz o capital
         amountToPay = parseFloat(avAmount) || 0;
         allocation = { principalPaid: 0, interestPaid: 0, lateFeePaid: 0, avGenerated: amountToPay };
         paymentNote = `Amortização de Capital (R$ ${amountToPay.toFixed(2)})`;
@@ -71,24 +69,29 @@ export const paymentsService = {
 
     if (amountToPay <= 0) throw new Error('O valor do pagamento deve ser maior que zero.');
 
+    // CORREÇÃO CRÍTICA: Juros pagos (seja na quitação ou renovação) devem ir para o Lucro
+    // Na quitação, allocation.interestPaid e allocation.lateFeePaid contêm o lucro final.
     const profitGenerated = (Number(allocation?.interestPaid) || 0) + (Number(allocation?.lateFeePaid) || 0);
+    
+    // Principal pago retorna para o caixa da fonte (não é lucro)
     const principalReturned = (Number(allocation?.principalPaid) || 0) + (Number(allocation?.avGenerated) || 0);
 
-    // --- CÁLCULO DA NOVA DATA DE VENCIMENTO ---
-    // Importante: Passamos manualDate se existir, senão o motor calcula pelo valor.
     const renewal = financeDispatcher.renew(
         loan, inst, amountToPay, allocation, todayDateOnlyUTC(), forgivePenalty || false, manualDate
     );
 
-    // --- ATUALIZAÇÃO ATÔMICA NO SUPABASE ---
-    // O RPC 'process_payment_atomic' deve atualizar:
-    // 1. parcelas.due_date = p_new_due_date
-    // 2. contratos.start_date = p_new_start_date (Para empurrar o contrato visualmente)
+    // RPC ATUALIZADA:
+    // p_profit_generated -> Incrementa interest_balance (Lucro Líquido do Perfil)
+    // p_principal_returned -> Incrementa saldo da fonte (Devolução de Capital)
     const { error } = await supabase.rpc('process_payment_atomic', {
       p_loan_id: loan.id, p_installment_id: inst.id, p_profile_id: activeUser.id, p_source_id: loan.sourceId,
       p_payment_type: paymentType === 'FULL' ? 'PAYMENT_FULL' : 'PAYMENT_PARTIAL',
-      p_amount_to_pay: amountToPay, p_profit_generated: profitGenerated, p_principal_returned: principalReturned,
-      p_principal_delta: principalReturned, p_interest_delta: profitGenerated, p_late_fee_delta: Number(allocation?.lateFeePaid) || 0,
+      p_amount_to_pay: amountToPay, 
+      p_profit_generated: profitGenerated, // Garante que juros da quitação entrem aqui
+      p_principal_returned: principalReturned,
+      p_principal_delta: principalReturned, 
+      p_interest_delta: profitGenerated, 
+      p_late_fee_delta: Number(allocation?.lateFeePaid) || 0,
       p_notes: paymentNote, p_new_start_date: renewal.newStartDateISO, p_new_due_date: renewal.newDueDateISO,
       p_new_principal_remaining: renewal.newPrincipalRemaining, p_new_interest_remaining: renewal.newInterestRemaining,
       p_new_scheduled_principal: renewal.newScheduledPrincipal, p_new_scheduled_interest: renewal.newScheduledInterest,

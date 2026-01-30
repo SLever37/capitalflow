@@ -58,6 +58,8 @@ export const App: React.FC = () => {
     setMobileDashboardTab,
     statusFilter,
     setStatusFilter,
+    sortOption,
+    setSortOption, // New hook state
     searchTerm,
     setSearchTerm,
     clientSearchTerm,
@@ -67,7 +69,13 @@ export const App: React.FC = () => {
     loadError
   } = useAppState(activeProfileId);
 
-  const ui = useUiState();
+  // Cast as any to allow property injection
+  const ui = useUiState() as any;
+  
+  // INJECT SORT INTO UI CONTEXT FOR CONVENIENCE (Optional, but helps containers)
+  ui.sortOption = sortOption;
+  ui.setSortOption = setSortOption;
+
   const { portalLoanId, legalSignToken } = usePortalRouting();
   usePersistedTab(activeTab, setActiveTab);
 

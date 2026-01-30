@@ -3,11 +3,13 @@ import { useEffect, useRef } from 'react';
 import { Loan, LoanStatus, CapitalSource } from '../types';
 import { getDaysDiff } from '../utils/dateHelpers';
 import { notificationService } from '../services/notification.service';
+import { getInstallmentStatusLogic } from '../domain/finance/calculations';
 
 export const useAppNotifications = (loans: Loan[], sources: CapitalSource[], activeUser: any, showToast: any) => {
     const checkTimer = useRef<any>(null);
     const lastPendingSignalsCount = useRef(0);
     const notifiedLowSources = useRef<Set<string>>(new Set());
+    const notifiedDueLoans = useRef<Set<string>>(new Set());
 
     const runScan = async () => {
         if (!activeUser) return;
@@ -18,15 +20,25 @@ export const useAppNotifications = (loans: Loan[], sources: CapitalSource[], act
         // 2. Monitorar Contratos Vencendo/Atrasados
         if (loans.length > 0) {
             let countLateToday = 0;
-            let countNearDue = 0;
+            const todayLoansIds: string[] = [];
+            let clientName = "";
 
             loans.forEach(loan => {
-                if (loan.isArchived) return;
+                if (loan.isArchived) return; // Ignora arquivados
+                
                 loan.installments.forEach(inst => {
-                    if (inst.status === LoanStatus.PAID) return;
+                    const status = getInstallmentStatusLogic(inst);
+                    if (status === LoanStatus.PAID) return; // Ignora pagos
+                    
                     const diff = getDaysDiff(inst.dueDate);
-                    if (diff === 0) countLateToday++;
-                    else if (diff === -1) countNearDue++;
+                    
+                    // Alerta apenas se vence HOJE (0) e ainda não foi pago
+                    if (diff === 0 && !notifiedDueLoans.current.has(inst.id)) {
+                        countLateToday++;
+                        todayLoansIds.push(inst.id);
+                        notifiedDueLoans.current.add(inst.id);
+                        clientName = loan.debtorName;
+                    }
                 });
             });
 
@@ -35,7 +47,12 @@ export const useAppNotifications = (loans: Loan[], sources: CapitalSource[], act
                     "🔴 Cobranças Pendentes", 
                     `Você tem ${countLateToday} contrato(s) vencendo hoje!`
                 );
-                showToast(`${countLateToday} parcelas vencem hoje. Alerta sonoro emitido.`, 'warning');
+                
+                const msg = countLateToday > 1 
+                    ? `Atenção! Há ${countLateToday} empréstimos vencendo hoje.` 
+                    : `Atenção! Há um empréstimo vencendo hoje - Cliente: ${clientName}.`;
+                
+                showToast(msg, 'warning');
             }
         }
 
@@ -68,11 +85,11 @@ export const useAppNotifications = (loans: Loan[], sources: CapitalSource[], act
     useEffect(() => {
         if (!activeUser) return;
 
-        // Escaneia 3 segundos após carregar o app
-        const delay = setTimeout(runScan, 3000);
+        // Escaneia 5 segundos após carregar o app (dá tempo de carregar dados completos)
+        const delay = setTimeout(runScan, 5000);
 
-        // Repete o escaneamento a cada 5 minutos
-        checkTimer.current = setInterval(runScan, 300000);
+        // Repete o escaneamento a cada 10 minutos
+        checkTimer.current = setInterval(runScan, 600000);
 
         return () => {
             clearTimeout(delay);

@@ -5,22 +5,23 @@ import { getInstallmentStatusLogic } from '../../domain/finance/calculations';
 export const buildDashboardStats = (loans: Loan[], activeUser: UserProfile | null) => {
   const activeLoans = loans.filter(l => !l.isArchived);
   
+  // CAPITAL NA RUA: Soma apenas do Principal Restante (O que saiu do caixa e ainda não voltou)
   const totalLent = activeLoans.reduce((acc, l) => {
-      if (l.installments.every(i => i.status === LoanStatus.PAID)) return acc;
-      const loanPrincipal = l.installments.reduce((sum, i) => sum + (Number(i.principalRemaining) || 0), 0);
-      const loanInterest = l.installments.reduce((sum, i) => sum + (Number(i.interestRemaining) || 0), 0);
-      const totalDebt = loanPrincipal + loanInterest;
-      if (totalDebt < 0.10) return acc;
-      return acc + loanPrincipal;
+      // Se tiver acordo ativo, usa o valor negociado como base se quiser, mas o principal original é mais preciso contabilmente
+      // Para simplificar: Soma do principal_remaining de todas as parcelas pendentes
+      const loanPrincipalRemaining = l.installments.reduce((sum, i) => sum + (Number(i.principalRemaining) || 0), 0);
+      
+      // Se for < 0.10 considera zerado
+      if (loanPrincipalRemaining < 0.10) return acc;
+      
+      return acc + loanPrincipalRemaining;
   }, 0);
 
   const totalReceived = loans.reduce((acc, l) => acc + l.installments.reduce((sum, i) => sum + (Number(i.paidTotal) || 0), 0), 0);
   
+  // Lucro Projetado: Soma dos Juros + Multas pendentes
   const expectedProfit = activeLoans.reduce((acc, l) => {
-      if (l.installments.every(i => i.status === LoanStatus.PAID)) return acc;
-      const loanPrincipal = l.installments.reduce((sum, i) => sum + (Number(i.principalRemaining) || 0), 0);
       const loanInterest = l.installments.reduce((sum, i) => sum + (Number(i.interestRemaining) || 0), 0);
-      if ((loanPrincipal + loanInterest) < 0.10) return acc;
       const loanLateFee = l.installments.reduce((sum, i) => sum + (Number(i.lateFeeAccrued) || 0), 0);
       return acc + loanInterest + loanLateFee;
   }, 0);
