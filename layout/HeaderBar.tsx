@@ -2,6 +2,7 @@
 import React from 'react';
 import { TrendingUp, Plus, Loader2, LayoutGrid, Eye, EyeOff } from 'lucide-react';
 import { UserProfile } from '../types';
+import { Tooltip } from '../components/ui/Tooltip';
 
 interface HeaderBarProps {
   activeTab: string;
@@ -55,7 +56,14 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
            <button onClick={() => setActiveTab('CLIENTS')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'CLIENTS' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}>Clientes</button>
            <button onClick={() => setActiveTab('SOURCES')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'SOURCES' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}>Capital</button>
         </nav>
-        <button onClick={onNewLoan} className="hidden md:flex bg-blue-600 hover:bg-blue-500 text-white px-6 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-blue-600/30 active:scale-95 transition-all items-center justify-center gap-2"><Plus className="w-5 h-5" /> Novo Contrato</button>
+        
+        <div className="hidden md:block">
+            <Tooltip content="Adicionar novo registo" position="bottom">
+                <button onClick={onNewLoan} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-blue-600/30 active:scale-95 transition-all flex items-center justify-center gap-2">
+                    <Plus className="w-5 h-5" /> Novo Contrato
+                </button>
+            </Tooltip>
+        </div>
       </div>
     </header>
   );

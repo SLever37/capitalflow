@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { requestBrowserNotificationPermission } from '../../utils/notifications';
 import { asString } from '../../utils/safe';
+import { playNotificationSound } from '../../utils/notificationSound';
 
 type SavedProfile = {
   id: string;
@@ -11,23 +12,42 @@ type SavedProfile = {
 };
 
 /**
- * Resolve o nome do usuário com a prioridade exata solicitada:
- * nome_exibicao -> nome_operador -> nome_completo -> nome -> name -> email -> 'Usuário'
- * Agora usa asString para segurança contra nulos.
+ * Resolve o nome de EXIBIÇÃO de forma inteligente.
+ * Ignora termos genéricos como "Usuário" ou "Operador" se houver dados melhores.
  */
-const resolveUserName = (p: any): string => {
-  if (!p) return 'Usuário';
-  return (
-    asString(p.nome_exibicao) || 
-    asString(p.nome_operador) || 
-    asString(p.nome_empresa) || // Fallback
-    asString(p.nome_completo) || 
-    asString(p.nome) || 
-    asString(p.name) || 
-    asString(p.usuario_email) || 
-    asString(p.email) || 
-    'Usuário'
-  );
+const resolveSmartName = (p: any): string => {
+  if (!p) return 'Gestor';
+
+  const isGeneric = (s: string) => {
+      if (!s) return true;
+      const clean = s.toLowerCase().trim();
+      return ['usuário', 'usuario', 'user', 'operador', 'admin', 'gestor', 'undefined', 'null', ''].includes(clean);
+  };
+
+  // 1. Tenta Nome de Exibição (Prioridade Máxima do BD)
+  const display = asString(p.nome_exibicao);
+  if (display && !isGeneric(display)) return display;
+
+  // 2. Tenta Nome do Operador
+  const operator = asString(p.nome_operador);
+  if (operator && !isGeneric(operator)) return operator;
+
+  // 3. Tenta Nome da Empresa
+  const business = asString(p.nome_empresa);
+  if (business && !isGeneric(business)) return business;
+
+  // 4. Tenta Primeiro Nome Completo
+  const full = asString(p.nome_completo);
+  if (full && !isGeneric(full)) return full.split(' ')[0];
+
+  // 5. Tenta parte do E-mail (Sempre único e seguro)
+  const email = asString(p.usuario_email || p.email);
+  if (email && email.includes('@')) {
+      const prefix = email.split('@')[0];
+      return prefix.charAt(0).toUpperCase() + prefix.slice(1);
+  }
+
+  return 'Gestor';
 };
 
 export const useAuth = () => {
@@ -77,22 +97,26 @@ export const useAuth = () => {
     try {
       let profile: any = null;
 
-      // 1. Tenta via RPC (Garante retorno de todos os campos)
-      const { data, error: rpcError } = await supabase.rpc('login_user', {
-        login_input: user,
-        password_input: pass,
-      });
+      // 1. Tenta via RPC (Padrão e Mais Seguro)
+      try {
+        const { data, error: rpcError } = await supabase.rpc('login_user', {
+            login_input: user,
+            password_input: pass,
+        });
 
-      if (!rpcError && data && data.length > 0) {
-        profile = data[0];
+        if (!rpcError && data && data.length > 0) {
+            profile = data[0];
+        }
+      } catch (e) {
+        console.warn("RPC Login failed, falling back.", e);
       }
 
-      // 2. Fallback Manual com normalização caso a RPC falhe
+      // 2. Fallback Manual Seguro (Se RPC falhar ou retornar vazio)
       if (!profile) {
         const { data: fallbackData } = await supabase
           .from('perfis')
           .select('*')
-          .or(`usuario_email.ilike.${user},email.ilike.${user},nome_operador.ilike.${user},nome_exibicao.ilike.${user}`)
+          .or(`usuario_email.ilike.${user},email.ilike.${user},nome_operador.ilike.${user}`)
           .eq('senha_acesso', pass)
           .maybeSingle();
         
@@ -105,13 +129,16 @@ export const useAuth = () => {
         return;
       }
 
-      // LOGIN SUCESSO - Aplica hierarquia de nomes
+      // LOGIN SUCESSO - Resolve o nome imediatamente
+      playNotificationSound();
+      
       const profileId = profile.id;
-      const profileName = resolveUserName(profile);
+      const profileName = resolveSmartName(profile); 
       const profileEmail = asString(profile.usuario_email || profile.email || user);
 
       setActiveProfileId(profileId);
 
+      // Atualiza lista de perfis salvos
       const updatedSaved = [
         ...savedProfiles.filter((p) => p.id !== profileId),
         { id: profileId, name: profileName, email: profileEmail },
@@ -125,9 +152,9 @@ export const useAuth = () => {
       );
 
       showToast(`Bem-vindo, ${profileName}!`, 'success');
-    } catch (err) {
+    } catch (err: any) {
       console.error("Erro crítico no login:", err);
-      showToast('Erro de conexão com o banco.', 'error');
+      showToast('Erro de conexão: ' + (err.message || 'Desconhecido'), 'error');
     } finally {
       setIsLoading(false);
     }

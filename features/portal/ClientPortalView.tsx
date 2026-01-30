@@ -1,9 +1,11 @@
 
 import React, { useState } from 'react';
-import { ShieldCheck, RefreshCw, AlertCircle, Handshake, Upload, FileText, ExternalLink, Printer } from 'lucide-react';
+import { ShieldCheck, RefreshCw, AlertCircle, Handshake, Upload, FileText, ExternalLink, Printer, FileSignature, CheckCircle2, Lock } from 'lucide-react';
 import { openSystemPromissoriaPrint } from '../../utils/printHelpers';
 import { useClientPortalLogic } from './hooks/useClientPortalLogic';
 import { PortalLogin } from './components/PortalLogin';
+// Added missing import for formatMoney
+import { formatMoney } from '../../utils/formatters';
 
 export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) => {
     const {
@@ -12,12 +14,13 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
         loggedClient, byeName, selectedLoanId,
         loan, installments, portalSignals, isAgreementActive,
         intentId, intentType, receiptPreview,
-        handleLogin, handleLogout, handleSignalIntent, handleReceiptUpload
+        handleLogin, handleLogout, handleSignalIntent, handleReceiptUpload,
+        handleSignDocument, isSigning
     } = useClientPortalLogic(initialLoanId);
 
     const [isNoteOpen, setIsNoteOpen] = useState(false);
+    const [isLegalOpen, setIsLegalOpen] = useState(false);
 
-    // Loader de inicialização
     if (isLoading && !loan && !portalError) {
         return (
             <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
@@ -30,7 +33,6 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
         );
     }
 
-    // Safety fallback
     const visibleDocuments = (loan?.policies_snapshot?.customDocuments || []).filter((d: any) => d && d.visibleToClient);
 
     return (
@@ -43,7 +45,7 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
                         <ShieldCheck size={40} />
                     </div>
                     <h1 className="text-2xl font-black text-white uppercase tracking-tighter mb-1">Portal do Cliente</h1>
-                    <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest">Acesso Restrito ao Contrato</p>
+                    <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest">Ambiente Seguro & Auditado</p>
                 </div>
 
                 {portalError && (
@@ -77,22 +79,30 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
                             <p className="text-white font-black text-lg truncate leading-tight mb-3">{loggedClient.name}</p>
                             <div className="flex justify-between items-center text-[9px] text-slate-500 font-black uppercase border-t border-slate-800/50 pt-3">
                                 <span>ID: <strong className="text-blue-500">{loggedClient.client_number || '-'}</strong></span>
-                                <span>Código: <strong className="text-emerald-500">****</strong></span>
+                                <span className="flex items-center gap-1"><Lock size={8}/> Login Seguro</span>
                             </div>
-                            
-                            {portalSignals.length > 0 && (
-                                <div className="mt-4 p-3 rounded-xl bg-blue-600/10 border border-blue-500/20">
-                                    <p className="text-[9px] text-blue-400 font-black uppercase mb-1">Última Solicitação</p>
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-xs text-white font-bold">{portalSignals[0].status}</span>
-                                        <span className="text-[10px] text-slate-500">{new Date(portalSignals[0].created_at).toLocaleDateString()}</span>
-                                    </div>
-                                </div>
-                            )}
                         </div>
 
-                        {/* EXTRATO SIMPLIFICADO */}
-                        <div className="bg-slate-950/50 p-4 rounded-2xl border border-slate-800 max-h-48 overflow-y-auto custom-scrollbar">
+                        {/* ÁREA JURÍDICA (NOVO) */}
+                        <div className="bg-indigo-950/20 border border-indigo-500/30 p-4 rounded-2xl animate-in slide-in-from-bottom-2">
+                             <div className="flex justify-between items-center mb-3">
+                                <h3 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest flex items-center gap-2">
+                                    <FileSignature size={14}/> Formalização de Débito
+                                </h3>
+                                <span className="bg-indigo-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded">Pendência Legal</span>
+                             </div>
+                             <p className="text-[10px] text-slate-400 leading-relaxed mb-4">
+                                É necessário formalizar sua assinatura na <b>Confissão de Dívida</b> e <b>Nota Promissória</b> para manter seu contrato ativo e evitar medidas judiciais.
+                             </p>
+                             <button 
+                                onClick={() => setIsLegalOpen(true)}
+                                className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-black uppercase text-[10px] transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20"
+                             >
+                                Visualizar e Assinar Títulos
+                             </button>
+                        </div>
+
+                        <div className="bg-slate-950/50 p-4 rounded-2xl border border-slate-800 max-h-40 overflow-y-auto custom-scrollbar">
                             <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
                                 {isAgreementActive ? <><Handshake size={12} className="text-indigo-500"/> Acordo de Pagamento</> : 'Extrato do Contrato'}
                             </p>
@@ -113,29 +123,20 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
                             <button onClick={() => handleSignalIntent('PAGAR_PIX')} className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black uppercase text-xs transition-all shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2">
                                 Enviar Comprovante (PIX)
                             </button>
-                            <button onClick={() => handleSignalIntent('RENEGOCIAR')} className="w-full py-4 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl font-black uppercase text-xs transition-all flex items-center justify-center gap-2">
-                                <RefreshCw size={14}/> Solicitar Renegociação
-                            </button>
                         </div>
 
-                        {/* ÁREA DE UPLOAD E INFO */}
+                        {/* ÁREA DE UPLOAD */}
                         {intentId && (
                             <div className="bg-slate-950 border border-blue-500/30 rounded-2xl p-5 text-left animate-in slide-in-from-top-2">
-                                <p className="text-[10px] text-blue-400 mb-2 font-black uppercase tracking-widest">{intentType === 'PAGAR_PIX' ? 'Pagamento PIX' : 'Solicitação Ativa'}</p>
+                                <p className="text-[10px] text-blue-400 mb-2 font-black uppercase tracking-widest">Pagamento PIX Iniciado</p>
                                 {portalInfo && <p className="text-xs text-emerald-400 mb-4 font-bold bg-emerald-950/30 p-3 rounded-xl border border-emerald-500/20">{portalInfo}</p>}
-                                
-                                <div className="mt-2 pt-3 border-t border-slate-800">
-                                    <label className="block text-[10px] text-slate-500 uppercase font-black mb-2 flex items-center gap-2">
-                                        <Upload size={14} className="text-blue-500"/> Selecionar Comprovante
-                                    </label>
-                                    <input 
-                                        type="file" 
-                                        accept="image/*,application/pdf" 
-                                        className="text-xs text-slate-300 w-full file:bg-slate-800 file:border-none file:text-white file:px-4 file:py-2 file:rounded-lg file:mr-4 file:font-black file:uppercase file:text-[9px] cursor-pointer" 
-                                        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleReceiptUpload(f); }} 
-                                    />
-                                    {receiptPreview && <p className="text-[10px] text-emerald-500 mt-3 font-bold flex items-center gap-1"><ShieldCheck size={12}/> Arquivo pronto para envio.</p>}
-                                </div>
+                                <input 
+                                    type="file" 
+                                    accept="image/*,application/pdf" 
+                                    className="text-xs text-slate-300 w-full file:bg-slate-800 file:border-none file:text-white file:px-4 file:py-2 file:rounded-lg file:mr-4 file:font-black file:uppercase file:text-[9px] cursor-pointer" 
+                                    onChange={(e) => { const f = e.target.files?.[0]; if (f) handleReceiptUpload(f); }} 
+                                />
+                                {receiptPreview && <p className="text-[10px] text-emerald-500 mt-3 font-bold flex items-center gap-1"><CheckCircle2 size={12}/> Comprovante selecionado.</p>}
                             </div>
                         )}
 
@@ -146,6 +147,55 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
                             <button onClick={handleLogout} className="w-full py-3 text-slate-600 hover:text-rose-500 font-black uppercase text-[9px] transition-all">Sair do Portal</button>
                         </div>
 
+                        {/* MODAL JURÍDICO DO CLIENTE */}
+                        {isLegalOpen && (
+                            <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-in fade-in duration-300">
+                                <div className="bg-slate-900 p-6 rounded-[2.5rem] border border-indigo-500/30 max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl">
+                                    <div className="flex justify-between items-center mb-6">
+                                        <h2 className="text-white font-black uppercase text-sm tracking-widest flex items-center gap-2">
+                                            <Lock className="text-indigo-500" size={16}/> Formalização Digital
+                                        </h2>
+                                        <button onClick={() => setIsLegalOpen(false)} className="bg-slate-800 p-2 rounded-full text-slate-400"><RefreshCw size={18} className="rotate-45"/></button>
+                                    </div>
+
+                                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 mb-6 space-y-4">
+                                        <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800">
+                                            <p className="text-[10px] text-indigo-400 font-black uppercase mb-2">Título 1: Confissão de Dívida</p>
+                                            <p className="text-xs text-white leading-relaxed mb-3">Reconhecimento formal da dívida total, incluindo principal e juros. Serve como prova em execução judicial imediata.</p>
+                                            <button 
+                                                onClick={() => handleSignDocument('CONFISSAO')}
+                                                disabled={isSigning}
+                                                className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold uppercase text-[10px] flex items-center justify-center gap-2"
+                                            >
+                                                {isSigning ? <RefreshCw className="animate-spin" size={14}/> : <><FileSignature size={14}/> Assinar Eletronicamente</>}
+                                            </button>
+                                        </div>
+
+                                        <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800">
+                                            <p className="text-[10px] text-blue-400 font-black uppercase mb-2">Título 2: Nota Promissória</p>
+                                            <p className="text-xs text-white leading-relaxed mb-3">Promessa incondicional de pagamento no valor de face de <b>{formatMoney(loan.total_to_receive)}</b>.</p>
+                                            <button 
+                                                onClick={() => handleSignDocument('PROMISSORIA')}
+                                                disabled={isSigning}
+                                                className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold uppercase text-[10px] flex items-center justify-center gap-2"
+                                            >
+                                                {isSigning ? <RefreshCw className="animate-spin" size={14}/> : <><FileSignature size={14}/> Assinar Eletronicamente</>}
+                                            </button>
+                                        </div>
+
+                                        <div className="bg-indigo-900/10 border border-indigo-500/20 p-4 rounded-xl">
+                                            <p className="text-[9px] text-indigo-300 leading-relaxed font-medium">
+                                                <b>Nota Legal:</b> Ao assinar, você concorda com a validade jurídica deste ato conforme Lei 14.063/2020. O sistema registrará seu IP <b>(auditado)</b> e dados de acesso como prova de autoria.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    
+                                    <button onClick={() => setIsLegalOpen(false)} className="w-full py-4 bg-slate-800 text-white rounded-2xl font-black uppercase text-[10px]">Fechar</button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* MODAL DOCUMENTOS */}
                         {isNoteOpen && (
                             <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-6 z-50 animate-in fade-in duration-200">
                                 <div className="bg-slate-900 p-8 rounded-[2.5rem] border border-slate-800 max-w-md w-full shadow-2xl">
@@ -167,7 +217,7 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
                                             ))
                                         )}
                                         <button onClick={() => openSystemPromissoriaPrint({ clientName: loggedClient.name, loanId: selectedLoanId, principal: Number(loan?.principal), interestRate: loan?.interest_rate })} className="flex items-center justify-center gap-3 w-full py-4 bg-slate-950 text-blue-500 border border-blue-500/20 rounded-2xl mt-4 text-[10px] font-black uppercase hover:bg-blue-600 hover:text-white transition-all">
-                                            <Printer size={16}/> Imprimir Promissória
+                                            <Printer size={16}/> Imprimir Via de Segurança
                                         </button>
                                     </div>
                                 </div>

@@ -7,22 +7,39 @@ import { mapLoanFromDB } from '../services/adapters/dbAdapters';
 import { asString, asNumber } from '../utils/safe';
 
 /**
- * Resolve o nome do usuário com a prioridade exata solicitada.
- * Utiliza asString para garantir que nunca retorne undefined/null.
+ * Resolve o nome de EXIBIÇÃO de forma inteligente.
+ * Sincronizado com useAuth.ts
  */
-const resolveUserName = (p: any): string => {
-  if (!p) return 'Usuário';
-  return (
-    asString(p.nome_exibicao) || 
-    asString(p.nome_operador) || 
-    asString(p.nome_empresa) || // Fallback útil se operador estiver vazio
-    asString(p.nome_completo) || 
-    asString(p.nome) || 
-    asString(p.name) || 
-    asString(p.usuario_email) || 
-    asString(p.email) || 
-    'Usuário'
-  );
+const resolveSmartName = (p: any): string => {
+  if (!p) return 'Gestor';
+
+  const isGeneric = (s: string) => {
+      if (!s) return true;
+      const clean = s.toLowerCase().trim();
+      return ['usuário', 'usuario', 'user', 'operador', 'admin', 'gestor', 'undefined', 'null', ''].includes(clean);
+  };
+
+  if (p.nome_exibicao && !isGeneric(p.nome_exibicao)) return p.nome_exibicao;
+
+  const candidates = [
+      asString(p.nome_operador),
+      asString(p.nome_empresa),
+      asString(p.nome_completo).split(' ')[0],
+      asString(p.nome),
+      asString(p.name)
+  ];
+
+  for (const c of candidates) {
+      if (c && !isGeneric(c)) return c;
+  }
+
+  const email = asString(p.usuario_email || p.email);
+  if (email && email.includes('@')) {
+      const prefix = email.split('@')[0];
+      return prefix.charAt(0).toUpperCase() + prefix.slice(1);
+  }
+
+  return 'Gestor';
 };
 
 export const useAppState = (activeProfileId: string | null) => {
@@ -42,8 +59,6 @@ export const useAppState = (activeProfileId: string | null) => {
   const [clientSearchTerm, setClientSearchTerm] = useState('');
   
   const [profileEditForm, setProfileEditForm] = useState<UserProfile | null>(null);
-  
-  // Controle de erros do heartbeat para evitar loops
   const heartbeatFailures = useRef(0);
 
   const fetchFullData = useCallback(async (profileId: string) => {
@@ -52,9 +67,10 @@ export const useAppState = (activeProfileId: string | null) => {
       setIsLoadingData(true);
       setLoadError(null);
       
+      // MODO DEMO
       if (profileId === 'DEMO') {
           setActiveUser({
-              id: 'DEMO', name: 'Usuário Demo', fullName: 'Operador Demonstração Completo', email: 'demo@app.com', totalAvailableCapital: 100000, interestBalance: 5000,
+              id: 'DEMO', name: 'Usuário Demo', fullName: 'Operador Demonstração', email: 'demo@app.com', totalAvailableCapital: 100000, interestBalance: 5000,
               photo: undefined, businessName: 'Demo Capital', accessLevel: 2, createdAt: new Date().toISOString(),
               brandColor: '#2563eb', defaultInterestRate: 30, defaultFinePercent: 2, defaultDailyInterestPercent: 1, targetCapital: 150000, targetProfit: 20000
           });
@@ -63,57 +79,80 @@ export const useAppState = (activeProfileId: string | null) => {
       }
 
       try {
-          const { data: profile, error: profileError } = await supabase
-            .from('perfis')
-            .select('*')
-            .eq('id', profileId)
-            .maybeSingle();
-          
-          if (profileError) throw profileError;
+          let profileData: any = null;
 
-          // GUARD ANTI-TELA BRANCA: Se ID de sessão existe mas o perfil sumiu do banco, reseta o app
-          if (!profile) {
-              console.warn("Sessão inválida ou perfil removido. Redirecionando...");
+          // 1. Tenta usar rpc_me (Preferencial)
+          // Isso retorna (id, email, nome_exibicao, perfil, dono_id) se o usuário estiver autenticado no Supabase
+          try {
+              const { data: rpcData, error: rpcError } = await supabase.rpc('rpc_me');
+              if (!rpcError && rpcData) {
+                  // Se rpc_me retornar uma lista, pega o primeiro
+                  const me = Array.isArray(rpcData) ? rpcData[0] : rpcData;
+                  if (me && me.id === profileId) { // Garante que é o mesmo ID da sessão local
+                      profileData = me;
+                  }
+              }
+          } catch (e) {
+              console.warn("rpc_me failed or not available:", e);
+          }
+
+          // 2. Fallback: Busca direta na tabela (Caso rpc_me falhe ou auth customizada)
+          if (!profileData) {
+              const { data: tableData, error: tableError } = await supabase
+                .from('perfis')
+                .select('*')
+                .eq('id', profileId)
+                .maybeSingle();
+              
+              if (tableError) throw tableError;
+              profileData = tableData;
+          }
+
+          if (!profileData) {
+              console.warn("Perfil não encontrado. Encerrando sessão.");
               localStorage.removeItem('cm_session');
               window.location.reload();
               return;
           }
 
-          // Mapeamento Robusto: Garante distinção entre Nome Curto (Operador) e Completo
+          // MAPEAMENTO INTELIGENTE DE USUÁRIO
+          const smartName = resolveSmartName(profileData);
+          
           const u: UserProfile = {
-              id: asString(profile.id),
-              name: resolveUserName(profile),
-              fullName: asString(profile.nome_completo) || asString(profile.nome_operador), // Completo ou fallback p/ Operador
-              email: asString(profile.usuario_email || profile.email),
-              businessName: asString(profile.nome_empresa),
-              document: asString(profile.document),
-              phone: asString(profile.phone),
-              address: asString(profile.address),
-              addressNumber: asString(profile.address_number),
-              neighborhood: asString(profile.neighborhood),
-              city: asString(profile.city),
-              state: asString(profile.state),
-              zipCode: asString(profile.zip_code),
-              pixKey: asString(profile.pix_key),
-              photo: profile.avatar_url,
-              password: profile.senha_acesso,
-              recoveryPhrase: profile.recovery_phrase,
-              accessLevel: asNumber(profile.access_level, 2),
-              totalAvailableCapital: asNumber(profile.total_available_capital),
-              interestBalance: asNumber(profile.interest_balance),
-              createdAt: asString(profile.created_at),
-              brandColor: asString(profile.brand_color, '#2563eb'),
-              logoUrl: profile.logo_url,
-              defaultInterestRate: asNumber(profile.default_interest_rate, 30),
-              defaultFinePercent: asNumber(profile.default_fine_percent, 2),
-              defaultDailyInterestPercent: asNumber(profile.default_daily_interest_percent, 1),
-              targetCapital: asNumber(profile.target_capital),
-              targetProfit: asNumber(profile.target_profit)
+              id: asString(profileData.id),
+              name: smartName,
+              fullName: asString(profileData.nome_completo || profileData.nome_operador),
+              email: asString(profileData.usuario_email || profileData.email),
+              businessName: asString(profileData.nome_empresa),
+              document: asString(profileData.document),
+              phone: asString(profileData.phone),
+              address: asString(profileData.address),
+              addressNumber: asString(profileData.address_number),
+              neighborhood: asString(profileData.neighborhood),
+              city: asString(profileData.city),
+              state: asString(profileData.state),
+              zipCode: asString(profileData.zip_code),
+              pixKey: asString(profileData.pix_key),
+              photo: profileData.avatar_url,
+              password: profileData.senha_acesso,
+              recoveryPhrase: profileData.recovery_phrase,
+              accessLevel: asNumber(profileData.access_level || profileData.perfil, 2), // Suporte a coluna 'perfil' do rpc_me
+              totalAvailableCapital: asNumber(profileData.total_available_capital),
+              interestBalance: asNumber(profileData.interest_balance),
+              createdAt: asString(profileData.created_at),
+              brandColor: asString(profileData.brand_color, '#2563eb'),
+              logoUrl: profileData.logo_url,
+              defaultInterestRate: asNumber(profileData.default_interest_rate, 30),
+              defaultFinePercent: asNumber(profileData.default_fine_percent, 2),
+              defaultDailyInterestPercent: asNumber(profileData.default_daily_interest_percent, 1),
+              targetCapital: asNumber(profileData.target_capital),
+              targetProfit: asNumber(profileData.target_profit)
           };
           
           setActiveUser(u);
           setProfileEditForm(u);
 
+          // Carrega dados relacionados
           const [clientsRes, sourcesRes, loansRes] = await Promise.all([
               supabase.from('clientes').select('*').eq('profile_id', profileId),
               supabase.from('fontes').select('*').eq('profile_id', profileId),
@@ -160,8 +199,7 @@ export const useAppState = (activeProfileId: string | null) => {
 
       } catch (error: any) {
           console.error("Falha ao sincronizar dados:", error);
-          setLoadError(error.message);
-          // Se for erro de autenticidade (Sessão corrompida no Android), desloga limpo
+          setLoadError(error.message || "Erro de conexão.");
           if (error.message && (error.message.includes('401') || error.message.includes('permission denied'))) {
               localStorage.removeItem('cm_session');
               window.location.reload();
@@ -173,8 +211,7 @@ export const useAppState = (activeProfileId: string | null) => {
 
   const fetchAllUsers = useCallback(async () => {
      const { data, error } = await supabase.from('perfis').select('*').order('last_active_at', { ascending: false, nullsFirst: false });
-     if (error) console.error("Admin fetch error:", error);
-     if (data) setAllUsers(data);
+     if (!error && data) setAllUsers(data);
   }, []);
 
   useEffect(() => {
@@ -182,21 +219,20 @@ export const useAppState = (activeProfileId: string | null) => {
       fetchFullData(activeProfileId);
     } else {
         setActiveUser(null);
+        setIsLoadingData(false);
     }
   }, [activeProfileId, fetchFullData]);
 
-  // HEARTBEAT SEGURO - Se falhar 3x, desiste para não travar o app
+  // Heartbeat com proteção contra falhas
   useEffect(() => {
       if (!activeUser || activeUser.id === 'DEMO') return;
       
       const updateHeartbeat = async () => {
-          if (heartbeatFailures.current > 3) return; // Circuit breaker
-          
+          if (heartbeatFailures.current > 3) return;
           try {
             await supabase.from('perfis').update({ last_active_at: new Date().toISOString() }).eq('id', activeUser.id);
-            heartbeatFailures.current = 0; // Reset sucesso
+            heartbeatFailures.current = 0;
           } catch (e) {
-            console.warn("Heartbeat falhou (ignorado):", e);
             heartbeatFailures.current += 1;
           }
       };

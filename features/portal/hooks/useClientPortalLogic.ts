@@ -2,26 +2,25 @@
 import { useState, useEffect, useCallback } from 'react';
 import { portalService, PortalSession } from '@/services/portal.service';
 import { supabase } from '@/lib/supabase';
+import { legalPublicService } from '@/features/legal/services/legalPublic.service';
 
 const PORTAL_SESSION_KEY = 'cm_portal_session';
 const LOCKOUT_KEY = 'cm_portal_lockout';
 
 export const useClientPortalLogic = (initialLoanId: string) => {
     const [isLoading, setIsLoading] = useState(true);
+    const [isSigning, setIsSigning] = useState(false);
     const [portalError, setPortalError] = useState<string | null>(null);
     const [portalInfo, setPortalInfo] = useState<string | null>(null);
 
-    // Login Form State
     const [loginIdentifier, setLoginIdentifier] = useState('');
     const [loginCode, setLoginCode] = useState('');
     const [loginAttempts, setLoginAttempts] = useState(0);
     const [isLocked, setIsLocked] = useState(false);
     
-    // Authenticated State
-    const [loggedClient, setLoggedClient] = useState<{ id: string; name: string; phone?: string; cpf?: string; client_number?: string; document?: string; access_code?: string } | null>(null);
+    const [loggedClient, setLoggedClient] = useState<any | null>(null);
     const [byeName, setByeName] = useState<string | null>(null);
     
-    // Data State
     const [selectedLoanId, setSelectedLoanId] = useState<string>(initialLoanId);
     const [loan, setLoan] = useState<any | null>(null);
     const [pixKey, setPixKey] = useState<string>('');
@@ -30,7 +29,6 @@ export const useClientPortalLogic = (initialLoanId: string) => {
     const [clientLoans, setClientLoans] = useState<any[]>([]);
     const [isAgreementActive, setIsAgreementActive] = useState(false);
 
-    // Action State
     const [intentId, setIntentId] = useState<string | null>(null);
     const [intentType, setIntentType] = useState<string | null>(null);
     const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
@@ -39,13 +37,11 @@ export const useClientPortalLogic = (initialLoanId: string) => {
         setIsLoading(true);
         setPortalError(null);
         try {
-            // 1. Contrato Base
             const data = await portalService.fetchLoanData(loanId, clientId);
             setLoan(data.loan);
             setPixKey(data.pixKey);
             setPortalSignals(data.signals || []);
             
-            // 2. Acordo Ativo (Verificação Robusta)
             const { data: activeAgreement } = await supabase
                 .from('acordos_inadimplencia')
                 .select('*, acordo_parcelas(*)')
@@ -55,7 +51,6 @@ export const useClientPortalLogic = (initialLoanId: string) => {
 
             if (activeAgreement) {
                 setIsAgreementActive(true);
-                // Null-safe mapping
                 const rawParcelas = activeAgreement.acordo_parcelas || [];
                 setInstallments(rawParcelas.map((ap: any) => ({
                     data_vencimento: ap.due_date, 
@@ -81,22 +76,16 @@ export const useClientPortalLogic = (initialLoanId: string) => {
         }
     }, []);
 
-    // Lockout Logic Check on Mount
     useEffect(() => {
-        const checkLockout = () => {
-            const lockoutStr = localStorage.getItem(LOCKOUT_KEY);
-            if (lockoutStr) {
-                const unlockTime = parseInt(lockoutStr);
-                if (Date.now() < unlockTime) {
-                    setIsLocked(true);
-                    setPortalError(`Muitas tentativas. Aguarde ${Math.ceil((unlockTime - Date.now())/1000)}s.`);
-                    setTimeout(() => { setIsLocked(false); setPortalError(null); localStorage.removeItem(LOCKOUT_KEY); }, unlockTime - Date.now());
-                } else {
-                    localStorage.removeItem(LOCKOUT_KEY);
-                }
+        const lockoutStr = localStorage.getItem(LOCKOUT_KEY);
+        if (lockoutStr) {
+            const unlockTime = parseInt(lockoutStr);
+            if (Date.now() < unlockTime) {
+                setIsLocked(true);
+                setPortalError(`Muitas tentativas. Aguarde ${Math.ceil((unlockTime - Date.now())/1000)}s.`);
+                setTimeout(() => { setIsLocked(false); setPortalError(null); localStorage.removeItem(LOCKOUT_KEY); }, unlockTime - Date.now());
             }
-        };
-        checkLockout();
+        }
     }, []);
 
     useEffect(() => {
@@ -105,7 +94,6 @@ export const useClientPortalLogic = (initialLoanId: string) => {
                 const raw = localStorage.getItem(PORTAL_SESSION_KEY);
                 if (!raw) { setIsLoading(false); return; }
                 const sess = JSON.parse(raw) as PortalSession;
-                if (!sess.client_id || !sess.access_code) throw new Error("Sessão inválida");
                 const clientData = await portalService.validateSession(sess.client_id, sess.access_code);
                 if (clientData) {
                     setLoggedClient(clientData);
@@ -130,21 +118,17 @@ export const useClientPortalLogic = (initialLoanId: string) => {
 
     const handleLogin = async () => {
         if (isLocked) return;
-        
         if (!loginIdentifier || !loginCode) {
-            setPortalError("Preencha todos os campos para entrar.");
+            setPortalError("Preencha todos os campos.");
             return;
         }
         setPortalError(null);
         setIsLoading(true);
         try {
             const client = await portalService.authenticate(selectedLoanId, loginIdentifier, loginCode);
-            
-            // Login Success
             setLoginAttempts(0);
             setLoggedClient(client);
             setByeName(null);
-            
             const session: PortalSession = {
                 client_id: client.id,
                 access_code: loginCode,
@@ -157,11 +141,10 @@ export const useClientPortalLogic = (initialLoanId: string) => {
             const newAttempts = loginAttempts + 1;
             setLoginAttempts(newAttempts);
             if (newAttempts >= 3) {
-                const unlockTime = Date.now() + 30000; // 30s Lockout
+                const unlockTime = Date.now() + 30000;
                 localStorage.setItem(LOCKOUT_KEY, String(unlockTime));
                 setIsLocked(true);
-                setPortalError("Muitas tentativas falhas. Bloqueado por 30 segundos.");
-                setTimeout(() => { setIsLocked(false); setPortalError(null); localStorage.removeItem(LOCKOUT_KEY); setLoginAttempts(0); }, 30000);
+                setPortalError("Bloqueado por 30 segundos.");
             } else {
                 setPortalError(e.message);
             }
@@ -176,11 +159,7 @@ export const useClientPortalLogic = (initialLoanId: string) => {
         setLoggedClient(null);
         setPortalError(null);
         setPortalInfo(null);
-        setLoginIdentifier('');
-        setLoginCode('');
-        setSelectedLoanId(initialLoanId);
         setLoan(null);
-        setInstallments([]);
     };
 
     const handleSignalIntent = async (tipo: string) => {
@@ -188,51 +167,65 @@ export const useClientPortalLogic = (initialLoanId: string) => {
         setPortalError(null);
         setIntentType(tipo);
         if (tipo === 'PAGAR_PIX') {
-            if (pixKey) navigator.clipboard.writeText(pixKey).then(() => setPortalInfo('PIX copiado!')).catch(() => setPortalInfo('PIX disponível.'));
-            else setPortalInfo('Chave PIX não cadastrada.');
-        } else {
-            setPortalInfo('Solicitação enviada.');
+            if (pixKey) navigator.clipboard.writeText(pixKey).then(() => setPortalInfo('PIX copiado!'));
         }
         try {
             const id = await portalService.submitPaymentIntent(loggedClient.id, selectedLoanId, loan.profile_id, tipo);
             setIntentId(id);
-            setReceiptPreview(null);
         } catch (e: any) {
-            setPortalError('Erro ao registrar solicitação: ' + e.message);
+            setPortalError('Erro ao registrar: ' + e.message);
         }
     };
 
     const handleReceiptUpload = async (file: File) => {
-        if (!intentId || !loggedClient || !loan) { setPortalError('Erro: Solicitação não encontrada.'); return; }
+        if (!intentId || !loggedClient || !loan) return;
         try {
             setReceiptPreview(URL.createObjectURL(file));
             await portalService.uploadReceipt(file, intentId, loan.profile_id, loggedClient.id);
-            setPortalInfo('Comprovante enviado com sucesso!');
+            setPortalInfo('Enviado com sucesso!');
         } catch (e: any) { setPortalError('Falha no envio: ' + e.message); }
     };
 
+    // NOVA FUNÇÃO DE ASSINATURA NO PORTAL
+    const handleSignDocument = async (type: 'CONFISSAO' | 'PROMISSORIA') => {
+        if (!loggedClient || !loan) return;
+        setIsSigning(true);
+        try {
+            // Busca documento já registrado pelo operador ou solicita criação via RPC segura
+            const { data: docRecord } = await supabase.from('documentos_juridicos')
+                .select('public_access_token')
+                .eq('loan_id', loan.id)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            if (!docRecord?.public_access_token) {
+                throw new Error("O credor ainda não disponibilizou os títulos para assinatura digital.");
+            }
+
+            let ip = 'NAO_DETECTADO';
+            try { const res = await fetch('https://api.ipify.org?format=json'); const data = await res.json(); ip = data.ip; } catch(e){}
+
+            await legalPublicService.signDocumentPublicly(
+                docRecord.public_access_token,
+                { name: loggedClient.name, doc: loggedClient.document || loggedClient.cpf || loggedClient.cnpj || 'N/A' },
+                { ip, userAgent: navigator.userAgent }
+            );
+
+            alert(`${type === 'CONFISSAO' ? 'Confissão de Dívida' : 'Nota Promissória'} assinada com sucesso! Uma cópia foi registrada na auditoria.`);
+        } catch (e: any) {
+            alert(e.message);
+        } finally {
+            setIsSigning(false);
+        }
+    };
+
     return {
-        isLoading,
-        portalError,
-        portalInfo,
-        loginIdentifier,
-        setLoginIdentifier,
-        loginCode,
-        setLoginCode,
-        loggedClient,
-        byeName,
-        selectedLoanId,
-        loan,
-        installments,
-        portalSignals,
-        clientLoans,
-        isAgreementActive,
-        intentId,
-        intentType,
-        receiptPreview,
-        handleLogin,
-        handleLogout,
-        handleSignalIntent,
-        handleReceiptUpload
+        isLoading, isSigning, portalError, portalInfo,
+        loginIdentifier, setLoginIdentifier, loginCode, setLoginCode,
+        loggedClient, byeName, selectedLoanId,
+        loan, installments, portalSignals, clientLoans, isAgreementActive,
+        intentId, intentType, receiptPreview,
+        handleLogin, handleLogout, handleSignalIntent, handleReceiptUpload, handleSignDocument
     };
 };

@@ -4,6 +4,7 @@ import { ArrowLeft, Printer, Landmark, Scale, Calendar } from 'lucide-react';
 import { Loan, UserProfile } from '../../../types';
 import { formatMoney } from '../../../utils/formatters';
 import { DocumentTemplates } from '../templates/DocumentTemplates';
+import { Tooltip } from '../../../components/ui/Tooltip';
 
 interface NotaPromissoriaViewProps {
     loans: Loan[];
@@ -17,7 +18,8 @@ export const NotaPromissoriaView: React.FC<NotaPromissoriaViewProps> = ({ loans,
     const handlePrint = (loan: Loan) => {
         if (!activeUser) return;
         const html = DocumentTemplates.notaPromissoria({
-            amount: loan.principal,
+            // Alterado de loan.principal para loan.totalToReceive (Capital + Juros)
+            amount: loan.totalToReceive,
             creditorName: activeUser.fullName || activeUser.businessName || activeUser.name,
             creditorDoc: activeUser.document,
             debtorName: loan.debtorName,
@@ -61,15 +63,17 @@ export const NotaPromissoriaView: React.FC<NotaPromissoriaViewProps> = ({ loans,
                         
                         <div className="mt-auto pt-4 border-t border-slate-800 flex items-center justify-between">
                             <div>
-                                <p className="text-[9px] text-slate-500 uppercase font-black">Capital Base</p>
-                                <p className="text-lg font-black text-white">{formatMoney(loan.principal)}</p>
+                                <p className="text-[9px] text-slate-500 uppercase font-black">Valor do Título</p>
+                                <p className="text-lg font-black text-white">{formatMoney(loan.totalToReceive)}</p>
                             </div>
-                            <button 
-                                onClick={() => handlePrint(loan)}
-                                className="px-5 py-3 bg-slate-800 text-blue-400 hover:text-white hover:bg-blue-600 rounded-2xl text-[10px] font-black uppercase transition-all flex items-center gap-2"
-                            >
-                                <Printer size={16}/> Imprimir
-                            </button>
+                            <Tooltip content="Gerar documento para impressão" position="top">
+                                <button 
+                                    onClick={() => handlePrint(loan)}
+                                    className="px-5 py-3 bg-slate-800 text-blue-400 hover:text-white hover:bg-blue-600 rounded-2xl text-[10px] font-black uppercase transition-all flex items-center gap-2"
+                                >
+                                    <Printer size={16}/> Imprimir
+                                </button>
+                            </Tooltip>
                         </div>
                     </div>
                 ))}
