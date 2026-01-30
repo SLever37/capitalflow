@@ -1,4 +1,5 @@
 
+import { useMemo } from 'react';
 import { useLoanController } from './controllers/useLoanController';
 import { useClientController } from './controllers/useClientController';
 import { useSourceController } from './controllers/useSourceController';
@@ -27,23 +28,34 @@ export const useControllers = (
   profileEditForm: any,
   setProfileEditForm: any
 ) => {
-  const loanCtrl = useLoanController(activeUser, ui, sources, setSources, loans, setLoans, clients, setClients, fetchFullData, showToast);
-  const clientCtrl = useClientController(activeUser, ui, clients, setClients, fetchFullData, showToast);
-  const sourceCtrl = useSourceController(activeUser, ui, sources, setSources, setActiveUser, fetchFullData, showToast);
-  const profileCtrl = useProfileController(activeUser, ui, profileEditForm, setProfileEditForm, setActiveUser, setIsLoadingData, fetchFullData, handleLogout, showToast);
-  const adminCtrl = useAdminController(activeUser, ui, fetchAllUsers, showToast);
-  const paymentCtrl = usePaymentController(activeUser, ui, sources, loans, setLoans, setActiveUser, fetchFullData, showToast);
-  const fileCtrl = useFileController(ui, sources, showToast);
-  const aiCtrl = useAIController(loans, clients, ui, showToast);
+  // Memoizamos todos os controladores para evitar que App.tsx re-renderize 
+  // infinitamente ao passar funções estáveis para os filhos.
+  return useMemo(() => {
+    const loanCtrl = useLoanController(activeUser, ui, sources, setSources, loans, setLoans, clients, setClients, fetchFullData, showToast);
+    const clientCtrl = useClientController(activeUser, ui, clients, setClients, fetchFullData, showToast);
+    const sourceCtrl = useSourceController(activeUser, ui, sources, setSources, setActiveUser, fetchFullData, showToast);
+    const profileCtrl = useProfileController(activeUser, ui, profileEditForm, setProfileEditForm, setActiveUser, setIsLoadingData, fetchFullData, handleLogout, showToast);
+    const adminCtrl = useAdminController(activeUser, ui, fetchAllUsers, showToast);
+    const paymentCtrl = usePaymentController(activeUser, ui, sources, loans, setLoans, setActiveUser, fetchFullData, showToast);
+    const fileCtrl = useFileController(ui, sources, showToast);
+    const aiCtrl = useAIController(loans, clients, ui, showToast);
 
-  return {
-    loanCtrl,
-    clientCtrl,
-    sourceCtrl,
-    profileCtrl,
-    adminCtrl,
-    paymentCtrl,
-    fileCtrl,
-    aiCtrl
-  };
+    return {
+        loanCtrl,
+        clientCtrl,
+        sourceCtrl,
+        profileCtrl,
+        adminCtrl,
+        paymentCtrl,
+        fileCtrl,
+        aiCtrl
+    };
+  }, [
+      activeUser?.id, 
+      loans.length, 
+      clients.length, 
+      sources.length, 
+      ui.showNavHub, 
+      ui.activeModal?.type
+  ]);
 };

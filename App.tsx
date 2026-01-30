@@ -1,4 +1,5 @@
-import React, { useEffect, useRef } from 'react';
+
+import React, { useEffect, useRef, useMemo } from 'react';
 
 import { AppShell } from './layout/AppShell';
 import { NavHubController } from './layout/NavHubController';
@@ -63,14 +64,14 @@ export const App: React.FC = () => {
     setClientSearchTerm,
     profileEditForm,
     setProfileEditForm,
+    loadError
   } = useAppState(activeProfileId);
 
   const ui = useUiState();
   const { portalLoanId, legalSignToken } = usePortalRouting();
   usePersistedTab(activeTab, setActiveTab);
 
-  const { loanCtrl, clientCtrl, sourceCtrl, profileCtrl, adminCtrl, paymentCtrl, fileCtrl, aiCtrl } =
-    useControllers(
+  const controllers = useControllers(
       activeUser,
       ui,
       loans,
@@ -89,69 +90,73 @@ export const App: React.FC = () => {
       setProfileEditForm
     );
 
-  // --- SISTEMA DE NOTIFICAÇÕES INTELIGENTES (Contratos + Recursos) ---
+  const { loanCtrl, clientCtrl, sourceCtrl, profileCtrl, adminCtrl, paymentCtrl, fileCtrl, aiCtrl } = controllers;
+
+  // --- NOTIFICAÇÕES ---
   useAppNotifications(loans, sources, activeUser, showToast);
 
-  // --- MECANISMO ANTISSAÍDA ACIDENTAL ---
+  // --- GESTÃO DE VOLTAR (MOBILE) - Estabilizada ---
   const exitAttemptRef = useRef(false);
+  const uiRef = useRef(ui);
+  uiRef.current = ui;
 
   useEffect(() => {
+    // Previne que o efeito rode centenas de vezes ao digitar na busca
+    if (!activeUser && !portalLoanId && !legalSignToken) return;
+
     window.history.pushState(null, document.title, window.location.href);
 
-    const handlePopState = (event: PopStateEvent) => {
-      const closeIfOpen = (isOpen: boolean, closeFn: () => void) => {
-        if (isOpen) {
-          closeFn();
+    const handlePopState = () => {
+      const currentUi = uiRef.current;
+      
+      // 1. Fecha Modais
+      if (currentUi.activeModal) {
+          currentUi.closeModal();
           window.history.pushState(null, '', window.location.href);
-          return true;
-        }
-        return false;
-      };
+          return;
+      }
 
-      if (closeIfOpen(!!ui.activeModal, () => ui.closeModal())) return;
-      if (closeIfOpen(ui.showNavHub, () => ui.setShowNavHub(false))) return;
+      // 2. Fecha Hub
+      if (currentUi.showNavHub) {
+          currentUi.setShowNavHub(false);
+          window.history.pushState(null, '', window.location.href);
+          return;
+      }
 
-      if (activeTab !== 'DASHBOARD') {
+      // 3. Volta para Dashboard se estiver em outra tab
+      if (activeTab !== 'DASHBOARD' && !portalLoanId && !legalSignToken) {
         setActiveTab('DASHBOARD');
         window.history.pushState(null, '', window.location.href);
         return;
       }
 
+      // 4. Double-tap para sair
       if (exitAttemptRef.current) {
-        // deixa sair
+        // Deixa o navegador seguir o fluxo padrão de saída
       } else {
-        showToast('Pressione voltar novamente para sair.', 'info');
+        showToast('Pressione novamente para sair.', 'info');
         exitAttemptRef.current = true;
         window.history.pushState(null, '', window.location.href);
-
-        setTimeout(() => {
-          exitAttemptRef.current = false;
-        }, 2000);
+        setTimeout(() => { exitAttemptRef.current = false; }, 2000);
       }
     };
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [activeTab, ui, showToast, setActiveTab]);
+  }, [activeUser === null, !!portalLoanId, !!legalSignToken, activeTab]);
 
-  // ✅ Toast global para telas que NÃO usam AppShell (Login / Portal público / Assinatura pública)
+  // ✅ Toast global para telas públicas
   const shouldRenderGlobalToast = !activeUser || !!portalLoanId || !!legalSignToken;
 
   return (
     <>
       {shouldRenderGlobalToast && toast && (
         <div className="fixed bottom-6 right-6 z-[9999]">
-          <div
-            className={[
-              'rounded-2xl px-5 py-4 shadow-2xl border text-sm font-bold backdrop-blur-xl max-w-[360px]',
-              toast?.type === 'success'
-                ? 'bg-emerald-500/20 border-emerald-400/30 text-emerald-100'
-                : toast?.type === 'error'
-                ? 'bg-rose-500/20 border-rose-400/30 text-rose-100'
-                : toast?.type === 'warning'
-                ? 'bg-amber-500/20 border-amber-400/30 text-amber-100'
-                : 'bg-slate-500/20 border-slate-400/30 text-slate-100',
-            ].join(' ')}
+          <div className={`rounded-2xl px-5 py-4 shadow-2xl border text-sm font-bold backdrop-blur-xl max-w-[360px] animate-in slide-in-from-bottom-4 
+            ${toast.type === 'success' ? 'bg-emerald-500/20 border-emerald-400/30 text-emerald-100' : 
+              toast.type === 'error' ? 'bg-rose-500/20 border-rose-400/30 text-rose-100' : 
+              toast.type === 'warning' ? 'bg-amber-500/20 border-amber-400/30 text-amber-100' : 
+              'bg-slate-500/20 border-slate-400/30 text-slate-100'}`}
           >
             {toast.msg}
           </div>
@@ -164,6 +169,7 @@ export const App: React.FC = () => {
         activeProfileId={activeProfileId}
         activeUser={activeUser}
         isLoadingData={isLoadingData}
+        loadError={loadError}
         loginUser={loginUser}
         setLoginUser={setLoginUser}
         loginPassword={loginPassword}
@@ -183,42 +189,26 @@ export const App: React.FC = () => {
           activeUser={activeUser}
           isLoadingData={isLoadingData}
           onOpenNav={() => ui.setShowNavHub(true)}
-          onNewLoan={() => {
-            ui.setEditingLoan(null);
-            ui.openModal('LOAN_FORM');
-          }}
+          onNewLoan={() => { ui.setEditingLoan(null); ui.openModal('LOAN_FORM'); }}
           isStealthMode={ui.isStealthMode}
           toggleStealthMode={() => ui.setIsStealthMode(!ui.isStealthMode)}
           onOpenAssistant={() => ui.openModal('AI_ASSISTANT')}
         >
           {activeTab === 'DASHBOARD' && (
             <DashboardContainer
-              loans={loans}
-              sources={sources}
-              activeUser={activeUser}
-              mobileDashboardTab={mobileDashboardTab}
-              setMobileDashboardTab={setMobileDashboardTab}
-              statusFilter={statusFilter}
-              setStatusFilter={setStatusFilter}
-              searchTerm={searchTerm}
-              setSearchTerm={setSearchTerm}
-              ui={ui}
-              loanCtrl={loanCtrl}
-              fileCtrl={fileCtrl}
-              showToast={showToast}
+              loans={loans} sources={sources} activeUser={activeUser}
+              mobileDashboardTab={mobileDashboardTab} setMobileDashboardTab={setMobileDashboardTab}
+              statusFilter={statusFilter} setStatusFilter={setStatusFilter}
+              searchTerm={searchTerm} setSearchTerm={setSearchTerm}
+              ui={ui} loanCtrl={loanCtrl} fileCtrl={fileCtrl} showToast={showToast}
               onRefresh={() => fetchFullData(activeUser?.id || '')}
             />
           )}
 
           {activeTab === 'CLIENTS' && (
             <ClientsContainer
-              clients={clients}
-              clientSearchTerm={clientSearchTerm}
-              setClientSearchTerm={setClientSearchTerm}
-              clientCtrl={clientCtrl}
-              loanCtrl={loanCtrl}
-              showToast={showToast}
-              ui={ui}
+              clients={clients} clientSearchTerm={clientSearchTerm} setClientSearchTerm={setClientSearchTerm}
+              clientCtrl={clientCtrl} loanCtrl={loanCtrl} showToast={showToast} ui={ui}
             />
           )}
 
@@ -226,29 +216,17 @@ export const App: React.FC = () => {
 
           {activeTab === 'PROFILE' && activeUser && (
             <ProfileContainer
-              activeUser={activeUser}
-              clients={clients}
-              loans={loans}
-              sources={sources}
-              ui={ui}
-              profileCtrl={profileCtrl}
-              handleLogout={handleLogout}
-              showToast={showToast}
-              profileEditForm={profileEditForm}
-              setProfileEditForm={setProfileEditForm}
+              activeUser={activeUser} clients={clients} loans={loans} sources={sources}
+              ui={ui} profileCtrl={profileCtrl} handleLogout={handleLogout}
+              showToast={showToast} profileEditForm={profileEditForm} setProfileEditForm={setProfileEditForm}
               fileCtrl={fileCtrl}
             />
           )}
 
           {activeTab === 'LEGAL' && (
             <LegalContainer
-              loans={loans}
-              sources={sources}
-              activeUser={activeUser}
-              ui={ui}
-              loanCtrl={loanCtrl}
-              fileCtrl={fileCtrl}
-              showToast={showToast}
+              loans={loans} sources={sources} activeUser={activeUser}
+              ui={ui} loanCtrl={loanCtrl} fileCtrl={fileCtrl} showToast={showToast}
               onRefresh={() => fetchFullData(activeUser?.id || '')}
             />
           )}
@@ -256,23 +234,11 @@ export const App: React.FC = () => {
           {activeTab === 'MASTER' && activeUser?.accessLevel === 1 && <MasterContainer allUsers={allUsers} ui={ui} adminCtrl={adminCtrl} />}
 
           <ModalHostContainer
-            ui={ui}
-            activeUser={activeUser}
-            clients={clients}
-            sources={sources}
-            loans={loans}
-            isLoadingData={isLoadingData}
-            loanCtrl={loanCtrl}
-            clientCtrl={clientCtrl}
-            sourceCtrl={sourceCtrl}
-            paymentCtrl={paymentCtrl}
-            profileCtrl={profileCtrl}
-            adminCtrl={adminCtrl}
-            fileCtrl={fileCtrl}
-            aiCtrl={aiCtrl}
-            showToast={showToast}
-            fetchFullData={fetchFullData}
-            handleLogout={handleLogout}
+            ui={ui} activeUser={activeUser} clients={clients} sources={sources} loans={loans}
+            isLoadingData={isLoadingData} loanCtrl={loanCtrl} clientCtrl={clientCtrl}
+            sourceCtrl={sourceCtrl} paymentCtrl={paymentCtrl} profileCtrl={profileCtrl}
+            adminCtrl={adminCtrl} fileCtrl={fileCtrl} aiCtrl={aiCtrl}
+            showToast={showToast} fetchFullData={fetchFullData} handleLogout={handleLogout}
           />
 
           <NavHubController ui={ui} setActiveTab={setActiveTab} activeUser={activeUser} />

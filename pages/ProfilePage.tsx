@@ -1,6 +1,5 @@
-
 import React from 'react';
-import { User, Heart, LogOut, Camera, Download, History, Settings, RotateCcw, ShieldAlert, Users } from 'lucide-react';
+import { User, Heart, LogOut, Camera, Download, History, Settings, RotateCcw, ShieldAlert, Users, KeyRound, MessageSquare } from 'lucide-react';
 import { UserProfile, Loan } from '../types';
 import { maskPhone } from '../utils/formatters';
 import { useProfilePageLogic } from '../features/profile/hooks/useProfilePageLogic';
@@ -91,7 +90,18 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                                    <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-500">Telefone</label><input type="text" value={profileEditForm.phone} onChange={e => setProfileEditForm({...profileEditForm, phone: maskPhone(e.target.value)})} className="w-full bg-slate-950 p-4 rounded-xl border border-slate-800 text-white outline-none" /></div>
                                </div>
 
-                               <div className="mt-4 pt-4 border-t border-slate-800">
+                               <div className="mt-6 pt-6 border-t border-slate-800 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                   <div className="space-y-2">
+                                       <label className="text-[10px] font-black uppercase text-blue-500 flex items-center gap-2"><KeyRound size={12}/> Alterar Senha de Acesso</label>
+                                       <input type="password" value={profileEditForm.password || ''} onChange={e => setProfileEditForm({...profileEditForm, password: e.target.value})} className="w-full bg-slate-950 p-4 rounded-xl border border-slate-800 text-white outline-none focus:border-blue-500" placeholder="Nova Senha" />
+                                   </div>
+                                   <div className="space-y-2">
+                                       <label className="text-[10px] font-black uppercase text-indigo-500 flex items-center gap-2"><MessageSquare size={12}/> Frase de Segurança</label>
+                                       <input type="text" value={profileEditForm.recoveryPhrase || ''} onChange={e => setProfileEditForm({...profileEditForm, recoveryPhrase: e.target.value})} className="w-full bg-slate-950 p-4 rounded-xl border border-slate-800 text-white outline-none focus:border-indigo-500" placeholder="Dica p/ suporte" />
+                                   </div>
+                               </div>
+
+                               <div className="mt-6 pt-6 border-t border-slate-800">
                                    <h3 className="text-xs font-bold text-white mb-3 flex items-center gap-2">Endereço Jurídico <span className="text-[9px] text-slate-500 font-normal">(Para documentos)</span></h3>
                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                        <div className="md:col-span-3 space-y-2"><label className="text-[10px] font-black uppercase text-blue-500">Nome Completo (Jurídico)</label><input type="text" placeholder="Nome igual ao documento para assinaturas" value={profileEditForm.fullName || ''} onChange={e => setProfileEditForm({...profileEditForm, fullName: e.target.value})} className="w-full bg-slate-950 p-4 rounded-xl border border-blue-900/30 text-white outline-none focus:border-blue-500 transition-colors" /></div>

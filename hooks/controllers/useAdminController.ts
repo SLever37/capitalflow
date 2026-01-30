@@ -21,18 +21,43 @@ export const useAdminController = (
   const handleAdminResetPassword = async (user: any) => {
       if (!activeUser || activeUser.accessLevel !== 1) return;
       const newPass = prompt(`Digite a nova senha para ${user.nome_operador}:`);
-      if (newPass && newPass.trim().length > 0) {
-          const { error } = await supabase.from('perfis').update({ senha_acesso: newPass }).eq('id', user.id);
-          if (error) showToast("Erro ao redefinir senha.", "error"); else showToast("Senha redefinida com sucesso!", "success");
+      if (newPass !== null) {
+          const cleanPass = newPass.trim();
+          if (cleanPass.length < 4) {
+              showToast("A senha deve ter pelo menos 4 caracteres.", "error");
+              return;
+          }
+          const { error } = await supabase.from('perfis').update({ senha_acesso: cleanPass }).eq('id', user.id);
+          if (error) {
+              console.error("Admin Reset Error:", error);
+              showToast("Erro ao redefinir senha: " + error.message, "error");
+          } else {
+              showToast("Senha redefinida com sucesso!", "success");
+          }
       }
   };
 
   const handleMasterUpdateUser = async () => {
       if (!activeUser || !ui.masterEditUser || activeUser.accessLevel !== 1) return;
-      const updates: any = { nome_operador: ui.masterEditUser.nome_operador, nome_empresa: ui.masterEditUser.nome_empresa, pix_key: ui.masterEditUser.pix_key, access_level: ui.masterEditUser.access_level };
-      if (ui.masterEditUser.newPassword && ui.masterEditUser.newPassword.trim().length > 0) updates.senha_acesso = ui.masterEditUser.newPassword;
+      const updates: any = { 
+          nome_operador: ui.masterEditUser.nome_operador, 
+          nome_empresa: ui.masterEditUser.nome_empresa, 
+          pix_key: ui.masterEditUser.pix_key, 
+          access_level: ui.masterEditUser.access_level 
+      };
+      
+      if (ui.masterEditUser.newPassword && ui.masterEditUser.newPassword.trim().length > 0) {
+          updates.senha_acesso = ui.masterEditUser.newPassword.trim();
+      }
+      
       const { error } = await supabase.from('perfis').update(updates).eq('id', ui.masterEditUser.id);
-      if (error) { showToast("Erro ao atualizar usuário.", "error"); } else { showToast("Usuário atualizado!", "success"); ui.setMasterEditUser(null); fetchAllUsers(); }
+      if (error) { 
+          showToast("Erro ao atualizar usuário: " + error.message, "error"); 
+      } else { 
+          showToast("Usuário atualizado!", "success"); 
+          ui.setMasterEditUser(null); 
+          fetchAllUsers(); 
+      }
   };
 
   return {

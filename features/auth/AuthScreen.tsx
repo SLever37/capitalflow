@@ -30,46 +30,28 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     const [isProcessingCreate, setIsProcessingCreate] = useState(false);
 
     const handleCreateProfile = async () => {
-        // Validações de entrada
-        if (!newProfileForm.name.trim()) {
-            showToast("Por favor, preencha o Nome do Usuário.", "error");
+        if (!newProfileForm.name.trim()) { showToast("Por favor, preencha o Nome do Usuário.", "error"); return; }
+        if (!newProfileForm.email.trim()) { showToast("O campo E-mail é obrigatório.", "error"); return; }
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newProfileForm.email)) { showToast("Insira um endereço de e-mail válido.", "error"); return; }
+        if (!newProfileForm.businessName.trim()) { showToast("O Nome do Negócio é necessário.", "error"); return; }
+        if (!newProfileForm.password) { showToast("Crie uma senha de acesso.", "error"); return; }
+        
+        // CORREÇÃO: Permitir senhas de 4 dígitos
+        if (newProfileForm.password.length < 4) {
+            showToast("A senha deve ter no mínimo 4 caracteres.", "error");
             return;
         }
-        if (!newProfileForm.email.trim()) {
-            showToast("O campo E-mail é obrigatório.", "error");
-            return;
-        }
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newProfileForm.email)) {
-            showToast("Insira um endereço de e-mail válido.", "error");
-            return;
-        }
-        if (!newProfileForm.businessName.trim()) {
-            showToast("O Nome do Negócio é necessário.", "error");
-            return;
-        }
-        if (!newProfileForm.password) {
-            showToast("Crie uma senha de acesso.", "error");
-            return;
-        }
-        if (newProfileForm.password.length < 6) {
-            showToast("A senha deve ter no mínimo 6 caracteres.", "error");
-            return;
-        }
-        if (!newProfileForm.recoveryPhrase.trim()) {
-            showToast("Defina uma Frase de Recuperação para segurança.", "error");
-            return;
-        }
+        
+        if (!newProfileForm.recoveryPhrase.trim()) { showToast("Defina uma Frase de Recuperação para segurança.", "error"); return; }
         
         setIsProcessingCreate(true);
         try {
             const newId = generateUUID();
-            
-            // Inserção Direta na Tabela perfis (Modelo Custom Auth)
             const { error } = await supabase.from('perfis').insert([{
                 id: newId,
                 nome_operador: newProfileForm.name,
-                usuario_email: newProfileForm.email.trim(),
-                email: newProfileForm.email.trim(),
+                usuario_email: newProfileForm.email.trim().toLowerCase(), // Salva sempre em minúsculo
+                email: newProfileForm.email.trim().toLowerCase(),
                 nome_empresa: newProfileForm.businessName,
                 senha_acesso: newProfileForm.password.trim(),
                 recovery_phrase: newProfileForm.recoveryPhrase,
@@ -80,13 +62,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
             }]);
     
             if (error) { 
-                if (error.message.includes("Failed to fetch")) {
-                    showToast('Erro de conexão. Verifique a internet.', 'error');
-                } else if (error.code === '23505') { // Unique violation
-                    showToast('Este e-mail já está cadastrado.', 'error');
-                } else {
-                    showToast('Erro ao criar conta: ' + error.message, 'error');
-                }
+                showToast('Erro ao criar conta: ' + error.message, 'error');
             } else { 
                 showToast("Conta criada com sucesso! Faça login.", "success");
                 setIsCreatingProfile(false);
@@ -100,11 +76,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     };
     
     const handlePasswordRecovery = async () => {
-        if (!recoveryForm.email.trim()) {
-            showToast("Informe o e-mail cadastrado.", "error");
-            return;
-        }
-        // Como não usamos Supabase Auth, apenas exibimos mensagem de suporte ou lógica futura
+        if (!recoveryForm.email.trim()) { showToast("Informe o e-mail cadastrado.", "error"); return; }
         showToast("Recuperação automática indisponível. Contate o suporte via WhatsApp.", "info");
         handleHelpSupport('password');
         setIsRecoveringPassword(false);
@@ -112,10 +84,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     
     const handleHelpSupport = (type: 'password' | 'user') => {
         const number = "5592991148103";
-        let msg = "";
-        if(type === 'password') msg = "Olá, esqueci minha senha no CapitalFlow. Poderia me ajudar?";
-        if(type === 'user') msg = "Olá, esqueci meu usuário de login no CapitalFlow. Poderia me ajudar?";
-        
+        let msg = type === 'password' ? "Olá, esqueci minha senha no CapitalFlow. Poderia me ajudar?" : "Olá, esqueci meu usuário de login no CapitalFlow. Poderia me ajudar?";
         window.open(`https://wa.me/${number}?text=${encodeURIComponent(msg)}`, '_blank');
     };
 
@@ -127,9 +96,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     return (
         <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 md:p-6 relative">
             <div className="absolute top-6 right-6 z-50">
-                <button onClick={() => setShowHelpModal(true)} className="p-3 bg-slate-800/50 rounded-full text-slate-400 hover:text-white transition-all">
-                    <HelpCircle size={24}/>
-                </button>
+                <button onClick={() => setShowHelpModal(true)} className="p-3 bg-slate-800/50 rounded-full text-slate-400 hover:text-white transition-all"><HelpCircle size={24}/></button>
             </div>
             <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden flex flex-col justify-center animate-in zoom-in-95 duration-300">
                 <div className="absolute inset-0 bg-blue-600/5 blur-3xl rounded-full pointer-events-none"></div>
@@ -143,16 +110,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                         <div className="bg-slate-800/50 p-2 rounded-2xl border border-slate-700 flex items-center gap-2"><div className="p-3 bg-slate-800 rounded-xl"><User className="text-slate-400 w-5 h-5" /></div><input type="text" className="bg-transparent w-full text-white outline-none text-sm font-bold placeholder:font-normal" placeholder="E-mail ou Usuário" value={loginUser} onChange={e => setLoginUser(e.target.value)} /></div>
                         <div className="bg-slate-800/50 p-2 rounded-2xl border border-slate-700 flex items-center gap-2"><div className="p-3 bg-slate-800 rounded-xl"><KeyRound className="text-slate-400 w-5 h-5" /></div><input type="password" id="login-password" className="bg-transparent w-full text-white outline-none text-sm font-bold placeholder:font-normal" placeholder="Senha" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitLogin()} /></div>
                         <button onClick={submitLogin} disabled={isLoading} className="w-full py-4 bg-blue-600 text-white rounded-2xl text-xs font-black uppercase shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2">{isLoading ? <Loader2 className="animate-spin" /> : 'Entrar'}</button>
-                        
-                        <div className="flex gap-2">
-                             <button onClick={() => setIsCreatingProfile(true)} className="flex-1 py-3 bg-slate-800 text-slate-400 rounded-2xl text-[10px] font-black uppercase">Criar Conta</button>
-                             <button onClick={() => setIsRecoveringPassword(true)} className="flex-1 py-3 bg-slate-800 text-slate-400 rounded-2xl text-[10px] font-black uppercase">Recuperar</button>
-                        </div>
-
-                         <button onClick={handleDemoMode} className="w-full py-3 border border-dashed border-emerald-600/50 text-emerald-500 hover:bg-emerald-600/10 rounded-2xl text-[10px] font-black uppercase flex items-center justify-center gap-2 transition-all">
-                            <Beaker size={14} /> Modo Demonstração
-                        </button>
-
+                        <div className="flex gap-2"><button onClick={() => setIsCreatingProfile(true)} className="flex-1 py-3 bg-slate-800 text-slate-400 rounded-2xl text-[10px] font-black uppercase">Criar Conta</button><button onClick={() => setIsRecoveringPassword(true)} className="flex-1 py-3 bg-slate-800 text-slate-400 rounded-2xl text-[10px] font-black uppercase">Recuperar</button></div>
+                        <button onClick={handleDemoMode} className="w-full py-3 border border-dashed border-emerald-600/50 text-emerald-500 hover:bg-emerald-600/10 rounded-2xl text-[10px] font-black uppercase flex items-center justify-center gap-2 transition-all"><Beaker size={14} /> Modo Demonstração</button>
                         {savedProfiles.length > 0 && (
                             <div className="pt-4 border-t border-slate-800/50">
                                 <p className="text-[10px] text-slate-500 font-bold uppercase mb-2 text-center">Contas Conhecidas</p>
@@ -160,10 +119,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                                     {savedProfiles.map(p => (
                                         <div key={p.id} className="flex items-center gap-3 bg-slate-950 p-2 rounded-xl border border-slate-800 cursor-pointer hover:border-slate-600 transition-colors" onClick={() => handleSelectSavedProfile(p)}>
                                             <div className="w-8 h-8 rounded-lg bg-blue-900/30 flex items-center justify-center text-blue-400 font-black text-xs">{p.name.charAt(0).toUpperCase()}</div>
-                                            <div className="flex-1 overflow-hidden">
-                                                <p className="text-xs font-bold text-white truncate">{p.name}</p>
-                                                <p className="text-[10px] text-slate-500 truncate">{p.email}</p>
-                                            </div>
+                                            <div className="flex-1 overflow-hidden"><p className="text-xs font-bold text-white truncate">{p.name}</p><p className="text-[10px] text-slate-500 truncate">{p.email}</p></div>
                                             <button onClick={(e) => { e.stopPropagation(); handleRemoveSavedProfile(p.id); }} className="p-2 text-slate-600 hover:text-rose-500"><X size={14} /></button>
                                         </div>
                                     ))}
@@ -178,14 +134,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                         <input type="text" placeholder="Nome do Usuário" className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-white text-sm outline-none" value={newProfileForm.name} onChange={e => setNewProfileForm({...newProfileForm, name: e.target.value})} />
                         <input type="email" placeholder="E-mail para Login" className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-white text-sm outline-none" value={newProfileForm.email} onChange={e => setNewProfileForm({...newProfileForm, email: e.target.value})} />
                         <input type="text" placeholder="Nome do Negócio" className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-white text-sm outline-none" value={newProfileForm.businessName} onChange={e => setNewProfileForm({...newProfileForm, businessName: e.target.value})} />
-                        <input type="password" placeholder="Senha" className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-white text-sm outline-none" value={newProfileForm.password} onChange={e => setNewProfileForm({...newProfileForm, password: e.target.value})} />
+                        <input type="password" placeholder="Senha (Mín. 4 dígitos)" className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-white text-sm outline-none" value={newProfileForm.password} onChange={e => setNewProfileForm({...newProfileForm, password: e.target.value})} />
                         <input type="text" placeholder="Frase de Recuperação" className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-white text-sm outline-none" value={newProfileForm.recoveryPhrase} onChange={e => setNewProfileForm({...newProfileForm, recoveryPhrase: e.target.value})} />
-                        <div className="flex gap-3 pt-2">
-                            <button onClick={() => setIsCreatingProfile(false)} disabled={isProcessingCreate} className="flex-1 py-4 bg-slate-800 text-slate-400 rounded-2xl text-xs font-black uppercase">Cancelar</button>
-                            <button onClick={handleCreateProfile} disabled={isProcessingCreate} className="flex-1 py-4 bg-blue-600 text-white rounded-2xl text-xs font-black uppercase shadow-lg flex items-center justify-center gap-2">
-                                {isProcessingCreate ? <Loader2 className="animate-spin"/> : 'Criar'}
-                            </button>
-                        </div>
+                        <div className="flex gap-3 pt-2"><button onClick={() => setIsCreatingProfile(false)} disabled={isProcessingCreate} className="flex-1 py-4 bg-slate-800 text-slate-400 rounded-2xl text-xs font-black uppercase">Cancelar</button><button onClick={handleCreateProfile} disabled={isProcessingCreate} className="flex-1 py-4 bg-blue-600 text-white rounded-2xl text-xs font-black uppercase shadow-lg flex items-center justify-center gap-2">{isProcessingCreate ? <Loader2 className="animate-spin"/> : 'Criar'}</button></div>
                     </div>
                 )}
                 {isRecoveringPassword && (
@@ -196,25 +147,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                     </div>
                 )}
             </div>
-            
             {showHelpModal && (
                 <Modal onClose={() => setShowHelpModal(false)} title="Central de Ajuda">
                     <div className="space-y-4">
                         <p className="text-center text-slate-400 text-sm mb-4">Selecione o motivo do contato. O suporte é realizado exclusivamente por mensagem.</p>
-                        <button onClick={() => handleHelpSupport('password')} className="w-full p-4 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-between hover:bg-slate-800 transition-all group">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-slate-800 rounded-lg group-hover:bg-slate-700"><KeyRound className="text-blue-500" size={20}/></div>
-                                <span className="text-sm font-bold text-white">Esqueci a Senha</span>
-                            </div>
-                            <ChevronRight size={16} className="text-slate-500"/>
-                        </button>
-                        <button onClick={() => handleHelpSupport('user')} className="w-full p-4 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-between hover:bg-slate-800 transition-all group">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-slate-800 rounded-lg group-hover:bg-slate-700"><User className="text-emerald-500" size={20}/></div>
-                                <span className="text-sm font-bold text-white">Esqueci o Usuário</span>
-                            </div>
-                            <ChevronRight size={16} className="text-slate-500"/>
-                        </button>
+                        <button onClick={() => handleHelpSupport('password')} className="w-full p-4 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-between hover:bg-slate-800 transition-all group"><div className="flex items-center gap-3"><div className="p-2 bg-slate-800 rounded-lg group-hover:bg-slate-700"><KeyRound className="text-blue-500" size={20}/></div><span className="text-sm font-bold text-white">Esqueci a Senha</span></div><ChevronRight size={16} className="text-slate-500"/></button>
+                        <button onClick={() => handleHelpSupport('user')} className="w-full p-4 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-between hover:bg-slate-800 transition-all group"><div className="flex items-center gap-3"><div className="p-2 bg-slate-800 rounded-lg group-hover:bg-slate-700"><User className="text-emerald-500" size={20}/></div><span className="text-sm font-bold text-white">Esqueci o Usuário</span></div><ChevronRight size={16} className="text-slate-500"/></button>
                     </div>
                 </Modal>
             )}

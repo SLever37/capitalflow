@@ -1,7 +1,9 @@
+
 import { supabase } from '../../../lib/supabase';
 import { UserProfile } from '../../../types';
 import { generateUUID } from '../../../utils/generators';
 import { onlyDigits, maskDocument, maskPhone } from '../../../utils/formatters';
+import { asString, asNumber } from '../../../utils/safe';
 import * as XLSX from 'xlsx';
 
 type UpdatableProfileFields = Partial<Omit<UserProfile, 'id' | 'createdAt' | 'totalAvailableCapital' | 'interestBalance'>>;
@@ -34,31 +36,38 @@ export const operatorProfileService = {
 
         const curatedData = this.curateProfileData(data);
 
+        // Mapeamento explícito para o banco (snake_case)
+        const updatePayload: any = {
+            nome_operador: curatedData.name, // Nome Curto
+            nome_completo: curatedData.fullName, // Nome Completo
+            nome_empresa: curatedData.businessName,
+            document: curatedData.document,
+            phone: curatedData.phone,
+            address: curatedData.address,
+            address_number: (curatedData as any).addressNumber,
+            neighborhood: (curatedData as any).neighborhood,
+            city: (curatedData as any).city,
+            state: (curatedData as any).state,
+            zip_code: (curatedData as any).zipCode,
+            pix_key: curatedData.pixKey,
+            avatar_url: curatedData.photo,
+            brand_color: curatedData.brandColor,
+            logo_url: curatedData.logoUrl,
+            default_interest_rate: curatedData.defaultInterestRate,
+            default_fine_percent: curatedData.defaultFinePercent,
+            default_daily_interest_percent: curatedData.defaultDailyInterestPercent,
+            target_capital: curatedData.targetCapital,
+            target_profit: curatedData.targetProfit,
+            last_active_at: new Date().toISOString()
+        };
+
+        // Inclui senha e frase se fornecidas
+        if (curatedData.password) updatePayload.senha_acesso = curatedData.password;
+        if (curatedData.recoveryPhrase) updatePayload.recovery_phrase = curatedData.recoveryPhrase;
+
         const { data: updated, error } = await supabase
             .from('perfis')
-            .update({
-                nome_operador: curatedData.name,
-                nome_completo: curatedData.fullName,
-                nome_empresa: curatedData.businessName,
-                document: curatedData.document,
-                phone: curatedData.phone,
-                address: curatedData.address,
-                address_number: (curatedData as any).addressNumber,
-                neighborhood: (curatedData as any).neighborhood,
-                city: (curatedData as any).city,
-                state: (curatedData as any).state,
-                zip_code: (curatedData as any).zipCode,
-                pix_key: curatedData.pixKey,
-                avatar_url: curatedData.photo,
-                brand_color: curatedData.brandColor,
-                logo_url: curatedData.logoUrl,
-                default_interest_rate: curatedData.defaultInterestRate,
-                default_fine_percent: curatedData.defaultFinePercent,
-                default_daily_interest_percent: curatedData.defaultDailyInterestPercent,
-                target_capital: curatedData.targetCapital,
-                target_profit: curatedData.targetProfit,
-                last_active_at: new Date().toISOString()
-            })
+            .update(updatePayload)
             .eq('id', profileId)
             .select()
             .single();
@@ -119,14 +128,14 @@ export const operatorProfileService = {
         const cleanDoc = onlyDigits(raw.document || '');
         const cleanPhone = onlyDigits(raw.phone || '');
         return {
-            name: (raw.name || 'Operador').trim().substring(0, 100),
-            fullName: (raw.fullName || '').trim().substring(0, 200),
-            businessName: (raw.businessName || 'Minha Empresa').trim().substring(0, 100),
+            name: asString(raw.name, 'Operador').trim().substring(0, 100),
+            fullName: asString(raw.fullName).trim().substring(0, 200),
+            businessName: asString(raw.businessName, 'Minha Empresa').trim().substring(0, 100),
             document: cleanDoc ? maskDocument(cleanDoc) : '000.000.000-00',
             phone: cleanPhone ? maskPhone(cleanPhone) : '00000000000',
-            address: (raw.address || '').substring(0, 200),
-            addressNumber: (raw.addressNumber || '').substring(0, 20),
-            pixKey: (raw.pixKey || '').substring(0, 100),
+            address: asString(raw.address).substring(0, 200),
+            addressNumber: asString(raw.addressNumber).substring(0, 20),
+            pixKey: asString(raw.pixKey).substring(0, 100),
             photo: raw.photo,
             brandColor: raw.brandColor || '#2563eb',
             logoUrl: raw.logoUrl,
@@ -135,44 +144,46 @@ export const operatorProfileService = {
             defaultDailyInterestPercent: Math.abs(Number(raw.defaultDailyInterestPercent) || 1),
             targetCapital: Math.abs(Number(raw.targetCapital) || 0),
             targetProfit: Math.abs(Number(raw.targetProfit) || 0),
-            neighborhood: (raw.neighborhood || '').substring(0, 100),
-            city: (raw.city || '').substring(0, 100),
-            state: (raw.state || '').substring(0, 2).toUpperCase(),
-            zipCode: onlyDigits(raw.zipCode || '').substring(0, 8)
+            neighborhood: asString(raw.neighborhood).substring(0, 100),
+            city: asString(raw.city).substring(0, 100),
+            state: asString(raw.state).substring(0, 2).toUpperCase(),
+            zipCode: onlyDigits(asString(raw.zipCode)).substring(0, 8),
+            password: raw.password,
+            recoveryPhrase: raw.recoveryPhrase
         } as any;
     },
 
     mapToUserProfile(dbProfile: any): UserProfile {
         if (!dbProfile) throw new Error("Dados de perfil nulos no mapeamento.");
         return {
-            id: dbProfile.id,
-            name: dbProfile.nome_operador,
-            fullName: dbProfile.nome_completo || '',
-            email: dbProfile.usuario_email,
-            businessName: dbProfile.nome_empresa,
-            document: dbProfile.document,
-            phone: dbProfile.phone,
-            address: dbProfile.address,
-            addressNumber: dbProfile.address_number || '',
-            neighborhood: dbProfile.neighborhood,
-            city: dbProfile.city,
-            state: dbProfile.state,
-            zipCode: dbProfile.zip_code,
-            pixKey: dbProfile.pix_key,
+            id: asString(dbProfile.id),
+            name: asString(dbProfile.nome_operador, 'Operador'),
+            fullName: asString(dbProfile.nome_completo),
+            email: asString(dbProfile.usuario_email),
+            businessName: asString(dbProfile.nome_empresa),
+            document: asString(dbProfile.document),
+            phone: asString(dbProfile.phone),
+            address: asString(dbProfile.address),
+            addressNumber: asString(dbProfile.address_number),
+            neighborhood: asString(dbProfile.neighborhood),
+            city: asString(dbProfile.city),
+            state: asString(dbProfile.state),
+            zipCode: asString(dbProfile.zip_code),
+            pixKey: asString(dbProfile.pix_key),
             photo: dbProfile.avatar_url,
             password: dbProfile.senha_acesso,
             recoveryPhrase: dbProfile.recovery_phrase,
-            accessLevel: dbProfile.access_level,
-            totalAvailableCapital: Number(dbProfile.total_available_capital) || 0,
-            interestBalance: Number(dbProfile.interest_balance) || 0,
-            createdAt: dbProfile.created_at,
-            brandColor: dbProfile.brand_color,
+            accessLevel: asNumber(dbProfile.access_level),
+            totalAvailableCapital: asNumber(dbProfile.total_available_capital),
+            interestBalance: asNumber(dbProfile.interest_balance),
+            createdAt: asString(dbProfile.created_at),
+            brandColor: asString(dbProfile.brand_color),
             logoUrl: dbProfile.logo_url,
-            defaultInterestRate: Number(dbProfile.default_interest_rate),
-            defaultFinePercent: Number(dbProfile.default_fine_percent),
-            defaultDailyInterestPercent: Number(dbProfile.default_daily_interest_percent),
-            targetCapital: Number(dbProfile.target_capital),
-            targetProfit: Number(dbProfile.target_profit)
+            defaultInterestRate: asNumber(dbProfile.default_interest_rate),
+            defaultFinePercent: asNumber(dbProfile.default_fine_percent),
+            defaultDailyInterestPercent: asNumber(dbProfile.default_daily_interest_percent),
+            targetCapital: asNumber(dbProfile.target_capital),
+            targetProfit: asNumber(dbProfile.target_profit)
         };
     },
 

@@ -17,29 +17,36 @@ export const usePaymentManagerState = ({ data, paymentType, setPaymentType, avAm
     const [manualDateStr, setManualDateStr] = useState('');
     const [subMode, setSubMode] = useState<'DAYS' | 'AMORTIZE'>('DAYS');
 
-    // Cálculo do valor diário teórico para Fixed Term
+    // Cálculos blindados contra NaN
     const fixedTermData = useMemo(() => {
-        if (data?.loan?.billingCycle === 'DAILY_FIXED_TERM') {
-            const start = parseDateOnlyUTC(data.loan.startDate);
-            const due = parseDateOnlyUTC(data.inst.dueDate);
-            const days = Math.round((due.getTime() - start.getTime()) / 86400000);
-            const safeDays = days > 0 ? days : 1; 
-            const dailyVal = (data.loan.totalToReceive || 0) / safeDays;
+        if (data?.loan?.billingCycle === 'DAILY_FIXED_TERM' && data.inst) {
+            try {
+                const start = parseDateOnlyUTC(data.loan.startDate);
+                const due = parseDateOnlyUTC(data.inst.dueDate);
+                
+                const startMs = start.getTime();
+                const dueMs = due.getTime();
+                
+                if (isNaN(startMs) || isNaN(dueMs)) throw new Error("Datas inválidas");
 
-            // Calcular o "Pago Até" Atual e Dias Pagos
-            const currentDebt = (Number(data.inst.principalRemaining) || 0) + (Number(data.inst.interestRemaining) || 0);
-            const amountPaid = Math.max(0, (data.loan.totalToReceive || 0) - currentDebt);
-            
-            // Adiciona tolerância (0.1) para evitar que dízimas periódicas ocultem o último dia
-            const paidDays = dailyVal > 0 ? Math.floor((amountPaid + 0.1) / dailyVal) : 0;
-            const paidUntil = addDaysUTC(start, paidDays);
+                const days = Math.round((dueMs - startMs) / 86400000);
+                const safeDays = days > 0 ? days : 1; 
+                const dailyVal = (data.loan.totalToReceive || 0) / safeDays;
 
-            return { dailyVal, paidUntil, totalDays: safeDays, paidDays, currentDebt };
+                const currentDebt = (Number(data.inst.principalRemaining) || 0) + (Number(data.inst.interestRemaining) || 0);
+                const amountPaid = Math.max(0, (data.loan.totalToReceive || 0) - currentDebt);
+                
+                const paidDays = dailyVal > 0 ? Math.floor((amountPaid + 0.1) / dailyVal) : 0;
+                const paidUntil = addDaysUTC(start, paidDays);
+
+                return { dailyVal, paidUntil, totalDays: safeDays, paidDays, currentDebt };
+            } catch (e) {
+                console.error("Erro no cálculo FixedTerm:", e);
+            }
         }
         return { dailyVal: 0, paidUntil: todayDateOnlyUTC(), totalDays: 0, paidDays: 0, currentDebt: 0 };
-    }, [data?.loan?.id, data?.inst?.id]); // Otimização: Recalcula apenas se o contrato mudar
+    }, [data?.loan?.id, data?.inst?.id]);
 
-    // Inicialização segura - Executa apenas quando o ID do empréstimo muda
     useEffect(() => {
         if (data) {
             if (data.loan.billingCycle === 'DAILY_FREE' || data.loan.billingCycle === ('DAILY_FIXED' as any)) {
@@ -48,14 +55,14 @@ export const usePaymentManagerState = ({ data, paymentType, setPaymentType, avAm
                 setSubMode('DAYS');
             } else if (data.loan.billingCycle === 'DAILY_FIXED_TERM') {
                 setPaymentType('RENEW_AV');
-                // Sugere o valor da diária se o campo estiver vazio
-                // Usa cálculo local para evitar dependência cíclica com fixedTermData
+                
+                // Cálculo estável para sugestão de valor
                 const start = parseDateOnlyUTC(data.loan.startDate);
                 const due = parseDateOnlyUTC(data.inst.dueDate);
                 const days = Math.max(1, Math.round((due.getTime() - start.getTime()) / 86400000));
                 const dailyVal = (data.loan.totalToReceive || 0) / days;
                 
-                if (dailyVal > 0) {
+                if (dailyVal > 0 && !isNaN(dailyVal)) {
                     setAvAmount(dailyVal.toFixed(2));
                 }
             } else {
@@ -67,7 +74,7 @@ export const usePaymentManagerState = ({ data, paymentType, setPaymentType, avAm
             }
             setCustomAmount('');
         }
-    }, [data?.loan?.id, data?.inst?.id]); // Dependência CRÍTICA: Apenas IDs para evitar reset durante digitação
+    }, [data?.loan?.id, data?.inst?.id]);
 
     return {
         customAmount, setCustomAmount,

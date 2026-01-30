@@ -5,32 +5,22 @@ import { getInstallmentStatusLogic } from '../../domain/finance/calculations';
 export const buildDashboardStats = (loans: Loan[], activeUser: UserProfile | null) => {
   const activeLoans = loans.filter(l => !l.isArchived);
   
-  // Cálculo de Capital na Rua com filtro de resíduos (Tolerância R$ 0.10)
   const totalLent = activeLoans.reduce((acc, l) => {
-      // Se todas as parcelas estão pagas, ignora
       if (l.installments.every(i => i.status === LoanStatus.PAID)) return acc;
-
       const loanPrincipal = l.installments.reduce((sum, i) => sum + (Number(i.principalRemaining) || 0), 0);
       const loanInterest = l.installments.reduce((sum, i) => sum + (Number(i.interestRemaining) || 0), 0);
       const totalDebt = loanPrincipal + loanInterest;
-
-      // Se a dívida total for menor que 10 centavos, considera quitado/resíduo e não soma
       if (totalDebt < 0.10) return acc;
-
       return acc + loanPrincipal;
   }, 0);
 
   const totalReceived = loans.reduce((acc, l) => acc + l.installments.reduce((sum, i) => sum + (Number(i.paidTotal) || 0), 0), 0);
   
-  // Lucro Projetado também deve ignorar resíduos
   const expectedProfit = activeLoans.reduce((acc, l) => {
       if (l.installments.every(i => i.status === LoanStatus.PAID)) return acc;
-      
       const loanPrincipal = l.installments.reduce((sum, i) => sum + (Number(i.principalRemaining) || 0), 0);
       const loanInterest = l.installments.reduce((sum, i) => sum + (Number(i.interestRemaining) || 0), 0);
-      
       if ((loanPrincipal + loanInterest) < 0.10) return acc;
-
       const loanLateFee = l.installments.reduce((sum, i) => sum + (Number(i.lateFeeAccrued) || 0), 0);
       return acc + loanInterest + loanLateFee;
   }, 0);
@@ -53,6 +43,11 @@ export const buildDashboardStats = (loans: Loan[], activeUser: UserProfile | nul
   }
   
   loans.forEach(l => l.ledger.forEach(t => {
+      // VALIDAÇÃO DE DATA SEGURA
+      if (!t.date || t.date.length < 7) return;
+      const d = new Date(t.date);
+      if (isNaN(d.getTime())) return;
+
       const key = t.date.slice(0, 7); 
       if (monthlyDataMap[key]) {
           if (t.type === 'LEND_MORE') monthlyDataMap[key].Saidas += t.amount;

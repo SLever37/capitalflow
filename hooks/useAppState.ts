@@ -1,10 +1,29 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { Loan, Client, CapitalSource, UserProfile } from '../types';
 import { maskPhone, maskDocument } from '../utils/formatters';
 import { mapLoanFromDB } from '../services/adapters/dbAdapters';
 import { asString, asNumber } from '../utils/safe';
+
+/**
+ * Resolve o nome do usuário com a prioridade exata solicitada.
+ * Utiliza asString para garantir que nunca retorne undefined/null.
+ */
+const resolveUserName = (p: any): string => {
+  if (!p) return 'Usuário';
+  return (
+    asString(p.nome_exibicao) || 
+    asString(p.nome_operador) || 
+    asString(p.nome_empresa) || // Fallback útil se operador estiver vazio
+    asString(p.nome_completo) || 
+    asString(p.nome) || 
+    asString(p.name) || 
+    asString(p.usuario_email) || 
+    asString(p.email) || 
+    'Usuário'
+  );
+};
 
 export const useAppState = (activeProfileId: string | null) => {
   const [activeUser, setActiveUser] = useState<UserProfile | null>(null);
@@ -14,6 +33,7 @@ export const useAppState = (activeProfileId: string | null) => {
   const [allUsers, setAllUsers] = useState<any[]>([]);
 
   const [isLoadingData, setIsLoadingData] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   
   const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'CLIENTS' | 'SOURCES' | 'PROFILE' | 'MASTER' | 'LEGAL'>('DASHBOARD');
   const [mobileDashboardTab, setMobileDashboardTab] = useState<'CONTRACTS' | 'BALANCE'>('CONTRACTS');
@@ -22,11 +42,15 @@ export const useAppState = (activeProfileId: string | null) => {
   const [clientSearchTerm, setClientSearchTerm] = useState('');
   
   const [profileEditForm, setProfileEditForm] = useState<UserProfile | null>(null);
+  
+  // Controle de erros do heartbeat para evitar loops
+  const heartbeatFailures = useRef(0);
 
   const fetchFullData = useCallback(async (profileId: string) => {
-      if (!profileId) return;
+      if (!profileId || profileId === 'null') return;
       
       setIsLoadingData(true);
+      setLoadError(null);
       
       if (profileId === 'DEMO') {
           setActiveUser({
@@ -39,24 +63,28 @@ export const useAppState = (activeProfileId: string | null) => {
       }
 
       try {
-          // 1. Perfil (PASSO CRÍTICO)
-          const { data: profile, error: profileError } = await supabase.from('perfis').select('*').eq('id', profileId).single();
+          const { data: profile, error: profileError } = await supabase
+            .from('perfis')
+            .select('*')
+            .eq('id', profileId)
+            .maybeSingle();
           
-          if (profileError || !profile) {
-              console.error("Erro ao carregar perfil:", profileError);
-              if (profileError?.code === 'PGRST116') {
-                  localStorage.removeItem('cm_session');
-                  window.location.reload();
-                  return;
-              }
-              throw new Error("Perfil não encontrado.");
+          if (profileError) throw profileError;
+
+          // GUARD ANTI-TELA BRANCA: Se ID de sessão existe mas o perfil sumiu do banco, reseta o app
+          if (!profile) {
+              console.warn("Sessão inválida ou perfil removido. Redirecionando...");
+              localStorage.removeItem('cm_session');
+              window.location.reload();
+              return;
           }
 
+          // Mapeamento Robusto: Garante distinção entre Nome Curto (Operador) e Completo
           const u: UserProfile = {
               id: asString(profile.id),
-              name: asString(profile.nome_operador, 'Sem Nome'),
-              fullName: asString(profile.nome_completo),
-              email: asString(profile.usuario_email),
+              name: resolveUserName(profile),
+              fullName: asString(profile.nome_completo) || asString(profile.nome_operador), // Completo ou fallback p/ Operador
+              email: asString(profile.usuario_email || profile.email),
               businessName: asString(profile.nome_empresa),
               document: asString(profile.document),
               phone: asString(profile.phone),
@@ -82,70 +110,62 @@ export const useAppState = (activeProfileId: string | null) => {
               targetCapital: asNumber(profile.target_capital),
               targetProfit: asNumber(profile.target_profit)
           };
+          
           setActiveUser(u);
           setProfileEditForm(u);
 
-          // 2. Carregamento de Dados Secundários (Try/Catch isolado)
-          try {
-              // 2.1 Clientes
-              const { data: clientsData } = await supabase.from('clientes').select('*').eq('profile_id', profileId);
-              if (clientsData) {
-                  setClients(clientsData.map((c: any) => ({
-                      id: asString(c.id),
-                      name: asString(c.name, 'Desconhecido'),
-                      phone: maskPhone(asString(c.phone)),
-                      document: maskDocument(asString(c.document || c.cpf || c.cnpj)),
-                      email: asString(c.email),
-                      address: asString(c.address),
-                      city: asString(c.city),
-                      state: asString(c.state),
-                      notes: asString(c.notes),
-                      createdAt: asString(c.created_at),
-                      accessCode: asString(c.access_code),
-                      clientNumber: asString(c.client_number),
-                      fotoUrl: asString(c.foto_url) // Mapeamento da foto_url para o frontend
-                  })));
-              }
+          const [clientsRes, sourcesRes, loansRes] = await Promise.all([
+              supabase.from('clientes').select('*').eq('profile_id', profileId),
+              supabase.from('fontes').select('*').eq('profile_id', profileId),
+              supabase.from('contratos').select(`
+                  *,
+                  parcelas (*),
+                  transacoes (*),
+                  sinalizacoes_pagamento (*),
+                  acordos_inadimplencia (*)
+              `).eq('profile_id', profileId)
+          ]);
 
-              // 2.2 Fontes
-              const { data: sourcesData } = await supabase.from('fontes').select('*').eq('profile_id', profileId);
-              if (sourcesData) {
-                  setSources(sourcesData.map((s: any) => ({
-                      id: asString(s.id),
-                      name: asString(s.name, 'Fonte Sem Nome'),
-                      type: s.type,
-                      balance: asNumber(s.balance)
-                  })));
-              }
-
-              // 2.3 Contratos e Acordos
-              const { data: loansData, error: loansError } = await supabase
-                  .from('contratos')
-                  .select(`
-                      *,
-                      parcelas (*),
-                      transacoes (*),
-                      sinalizacoes_pagamento (*),
-                      acordos_inadimplencia (
-                          id, loan_id, profile_id, status, tipo, total_base, total_negociado,
-                          num_parcelas, juros_mensal_percent, periodicidade, first_due_date, created_at, updated_at,
-                          acordo_parcelas (*)
-                      )
-                  `)
-                  .eq('profile_id', profileId);
-
-              if (loansData) {
-                  const mappedLoans = loansData.map((l: any) => mapLoanFromDB(l, []));
-                  setLoans(mappedLoans);
-              } else if (loansError) {
-                  console.warn("Erro ao buscar contratos:", loansError.message);
-              }
-          } catch (secondaryError) {
-              console.warn("Falha ao carregar dados secundários:", secondaryError);
+          if (clientsRes.data) {
+              setClients(clientsRes.data.map((c: any) => ({
+                  id: asString(c.id),
+                  name: asString(c.name, 'Desconhecido'),
+                  phone: maskPhone(asString(c.phone)),
+                  document: maskDocument(asString(c.document || c.cpf || c.cnpj)),
+                  email: asString(c.email),
+                  address: asString(c.address),
+                  city: asString(c.city),
+                  state: asString(c.state),
+                  notes: asString(c.notes),
+                  createdAt: asString(c.created_at),
+                  accessCode: asString(c.access_code),
+                  clientNumber: asString(c.client_number),
+                  fotoUrl: asString(c.foto_url)
+              })));
           }
 
-      } catch (error) {
-          console.error("Erro crítico ao carregar perfil:", error);
+          if (sourcesRes.data) {
+              setSources(sourcesRes.data.map((s: any) => ({
+                  id: asString(s.id),
+                  name: asString(s.name, 'Fonte'),
+                  type: s.type,
+                  balance: asNumber(s.balance)
+              })));
+          }
+
+          if (loansRes.data) {
+              const mappedLoans = loansRes.data.map((l: any) => mapLoanFromDB(l, clientsRes.data || []));
+              setLoans(mappedLoans);
+          }
+
+      } catch (error: any) {
+          console.error("Falha ao sincronizar dados:", error);
+          setLoadError(error.message);
+          // Se for erro de autenticidade (Sessão corrompida no Android), desloga limpo
+          if (error.message && (error.message.includes('401') || error.message.includes('permission denied'))) {
+              localStorage.removeItem('cm_session');
+              window.location.reload();
+          }
       } finally {
           setIsLoadingData(false);
       }
@@ -160,14 +180,27 @@ export const useAppState = (activeProfileId: string | null) => {
   useEffect(() => {
     if (activeProfileId) {
       fetchFullData(activeProfileId);
+    } else {
+        setActiveUser(null);
     }
   }, [activeProfileId, fetchFullData]);
 
+  // HEARTBEAT SEGURO - Se falhar 3x, desiste para não travar o app
   useEffect(() => {
       if (!activeUser || activeUser.id === 'DEMO') return;
+      
       const updateHeartbeat = async () => {
-          await supabase.from('perfis').update({ last_active_at: new Date().toISOString() }).eq('id', activeUser.id);
+          if (heartbeatFailures.current > 3) return; // Circuit breaker
+          
+          try {
+            await supabase.from('perfis').update({ last_active_at: new Date().toISOString() }).eq('id', activeUser.id);
+            heartbeatFailures.current = 0; // Reset sucesso
+          } catch (e) {
+            console.warn("Heartbeat falhou (ignorado):", e);
+            heartbeatFailures.current += 1;
+          }
       };
+      
       updateHeartbeat();
       const interval = setInterval(updateHeartbeat, 120000); 
       return () => clearInterval(interval);
@@ -186,6 +219,7 @@ export const useAppState = (activeProfileId: string | null) => {
     activeUser, setActiveUser,
     allUsers, fetchAllUsers,
     isLoadingData, setIsLoadingData,
+    loadError,
     fetchFullData,
     activeTab, setActiveTab,
     mobileDashboardTab, setMobileDashboardTab,
