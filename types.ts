@@ -216,11 +216,11 @@ export interface Loan {
   finePercent: number;
   dailyInterestPercent: number;
 
-  // ✅ Custos de Captação (Funding) — nomes iguais ao banco (snake_case)
-  funding_total_payable?: number;
-  funding_cost?: number;
-  funding_provider?: string;
-  funding_fee_percent?: number;
+  // ✅ Custos de Captação (Funding)
+  fundingTotalPayable?: number;
+  fundingCost?: number;
+  fundingProvider?: string;
+  fundingFeePercent?: number;
 
   policiesSnapshot?: LoanPolicy;
   startDate: string;

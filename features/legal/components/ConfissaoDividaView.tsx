@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ArrowLeft, Scroll, UserCheck, ShieldCheck, Link as LinkIcon, FileSignature, Users, Copy, Check } from 'lucide-react';
+import { ArrowLeft, Scroll, UserCheck, ShieldCheck, Link as LinkIcon, FileSignature, Users, Copy, Check, User, MapPin } from 'lucide-react';
 import { Loan, UserProfile } from '../../../types';
 import { formatMoney } from '../../../utils/formatters';
 import { DocumentTemplates } from '../templates/DocumentTemplates';
@@ -15,6 +15,11 @@ interface ConfissaoDividaViewProps {
 export const ConfissaoDividaView: React.FC<ConfissaoDividaViewProps> = ({ loans, activeUser, onBack, showToast }) => {
     const [selectedLoan, setSelectedLoan] = useState<Loan | null>(null);
     
+    // Estados para Credor (Editável no momento da geração - Puxa do Perfil Jurídico)
+    const [creditorName, setCreditorName] = useState(activeUser?.fullName || activeUser?.businessName || activeUser?.name || '');
+    const [creditorDoc, setCreditorDoc] = useState(activeUser?.document || '');
+    const [creditorAddress, setCreditorAddress] = useState(activeUser?.address || '');
+
     // Estados para Testemunhas
     const [witness1Name, setWitness1Name] = useState('');
     const [witness1Doc, setWitness1Doc] = useState('');
@@ -26,12 +31,12 @@ export const ConfissaoDividaView: React.FC<ConfissaoDividaViewProps> = ({ loans,
     const handlePrint = () => {
         if (!selectedLoan || !activeUser) return;
         
-        // Passa as testemunhas explicitamente para o template
+        // Passa as testemunhas e dados do credor explicitamente para o template
         const html = DocumentTemplates.confissaoDivida({
             loanId: selectedLoan.id,
-            creditorName: activeUser.fullName || activeUser.businessName || activeUser.name,
-            creditorDoc: activeUser.document,
-            creditorAddress: activeUser.address || 'Endereço não informado',
+            creditorName: creditorName.toUpperCase(),
+            creditorDoc: creditorDoc,
+            creditorAddress: creditorAddress || 'Endereço não informado',
             debtorName: selectedLoan.debtorName,
             debtorDoc: selectedLoan.debtorDocument,
             debtorAddress: selectedLoan.debtorAddress,
@@ -103,13 +108,39 @@ export const ConfissaoDividaView: React.FC<ConfissaoDividaViewProps> = ({ loans,
                 </div>
 
                 <div className="bg-slate-900 border border-slate-800 p-6 rounded-[2rem] space-y-6">
-                    <h3 className="text-sm font-bold text-white uppercase tracking-widest border-b border-slate-800 pb-3">2. Testemunhas & Links</h3>
+                    <h3 className="text-sm font-bold text-white uppercase tracking-widest border-b border-slate-800 pb-3">2. Dados do Documento</h3>
                     
                     <div className="space-y-4">
+                        
+                        {/* CREDOR */}
+                        <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                             <div className="flex items-center gap-2 text-blue-400 mb-3">
+                                <User size={16}/>
+                                <span className="text-[10px] font-black uppercase">Seus Dados (Credor)</span>
+                             </div>
+                             <div className="space-y-3">
+                                <div>
+                                    <label className="text-[9px] text-slate-500 font-bold ml-1 block mb-1">Nome Completo (Conforme Perfil)</label>
+                                    <input className="w-full bg-slate-900 border border-slate-800 p-2.5 rounded-lg text-xs text-white outline-none focus:border-blue-500" value={creditorName} onChange={e => setCreditorName(e.target.value)} />
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="text-[9px] text-slate-500 font-bold ml-1 block mb-1">CPF / CNPJ</label>
+                                        <input className="w-full bg-slate-900 border border-slate-800 p-2.5 rounded-lg text-xs text-white outline-none focus:border-blue-500" value={creditorDoc} onChange={e => setCreditorDoc(e.target.value)} />
+                                    </div>
+                                    <div>
+                                        <label className="text-[9px] text-slate-500 font-bold ml-1 block mb-1">Endereço Completo</label>
+                                        <input className="w-full bg-slate-900 border border-slate-800 p-2.5 rounded-lg text-xs text-white outline-none focus:border-blue-500" value={creditorAddress} onChange={e => setCreditorAddress(e.target.value)} placeholder="Rua, Nº, Bairro, Cidade-UF" />
+                                    </div>
+                                </div>
+                             </div>
+                        </div>
+
+                        {/* TESTEMUNHAS */}
                         <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
                              <div className="flex items-center gap-2 text-indigo-400 mb-2">
                                 <Users size={16}/>
-                                <span className="text-[10px] font-black uppercase">Testemunhas (Para validade executiva)</span>
+                                <span className="text-[10px] font-black uppercase">Testemunhas (Recomendado)</span>
                              </div>
                              
                              {/* Testemunha 1 */}
