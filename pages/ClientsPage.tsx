@@ -57,7 +57,8 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({
             <button onClick={() => startDictation(setClientSearchTerm, (msg) => showToast(msg, 'error'))} className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 hover:text-white hover:border-slate-600 transition-colors text-xs font-black uppercase" title="Buscar por voz" type="button">🎙</button>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* GRID RESPONSIVA AJUSTADA: sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {filteredClients.map(client => (
                 <div 
                     key={client.id} 

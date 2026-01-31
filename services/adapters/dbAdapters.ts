@@ -1,4 +1,3 @@
-
 import { Loan, LoanStatus, Agreement, AgreementStatus } from '../../types';
 import { maskPhone } from '../../utils/formatters';
 import { asArray, asNumber, asString, safeDateString } from '../../utils/safe';
@@ -78,7 +77,8 @@ export const mapLoanFromDB = (l: any, clientsData: any[] = []): Loan => {
         sourceId: t.source_id,
         installmentId: t.installment_id,
         agreementId: t.agreement_id,
-        notes: asString(t.notes)
+        notes: asString(t.notes),
+        category: asString(t.category) as any
     }));
 
     const signals = rawSinais.map((s: any) => ({
@@ -113,7 +113,7 @@ export const mapLoanFromDB = (l: any, clientsData: any[] = []): Loan => {
     return {
         id: asString(l.id, '', 'id'),
         clientId: asString(l.client_id),
-        profile_id: asString(l.profile_id), // Mapeamento adicionado
+        profile_id: asString(l.profile_id), 
         debtorName: asString(l.debtor_name, 'Cliente Desconhecido'),
         debtorPhone: maskPhone(asString(phone, '00000000000')),
         debtorDocument: l.debtor_document,
@@ -126,6 +126,13 @@ export const mapLoanFromDB = (l: any, clientsData: any[] = []): Loan => {
         interestRate: asNumber(l.interest_rate),
         finePercent: asNumber(l.fine_percent),
         dailyInterestPercent: asNumber(l.daily_interest_percent),
+        
+        // Mapeamento de Funding
+        fundingTotalPayable: asNumber(l.funding_total_payable),
+        fundingCost: asNumber(l.funding_cost),
+        fundingProvider: asString(l.funding_provider),
+        fundingFeePercent: asNumber(l.funding_fee_percent),
+
         billingCycle: asString(l.billing_cycle, 'MONTHLY') as any,
         amortizationType: asString(l.amortization_type, 'JUROS') as any,
         startDate: safeDateString(l.start_date),

@@ -94,6 +94,11 @@ export const contractsService = {
     const principal = Number(loan.principal) || 0;
     const interestRate = Number(loan.interestRate) || 0;
 
+    // Validação de Funding (Cartão)
+    if (loan.fundingTotalPayable && loan.fundingTotalPayable < principal) {
+        throw new Error("O valor total a pagar no cartão não pode ser menor que o valor do empréstimo.");
+    }
+
     // --- LÓGICA DE SALDO ATÔMICA (Deltas) ---
     const rollbackOperations: Array<() => Promise<void>> = [];
 
@@ -149,7 +154,12 @@ export const contractsService = {
           principal, interest_rate: interestRate, fine_percent: Number(loan.finePercent) || 0, 
           daily_interest_percent: Number(loan.dailyInterestPercent) || 0, billing_cycle: loan.billingCycle || 'MONTHLY', 
           amortization_type: 'JUROS', start_date: loan.startDate, preferred_payment_method: loan.preferredPaymentMethod, 
-          pix_key: loan.pixKey, notes: loan.notes, guarantee_description: loan.guaranteeDescription, is_archived: loan.isArchived || false
+          pix_key: loan.pixKey, notes: loan.notes, guarantee_description: loan.guaranteeDescription, is_archived: loan.isArchived || false,
+          // Funding Fields
+          funding_total_payable: loan.fundingTotalPayable || null,
+          funding_cost: loan.fundingCost || null,
+          funding_provider: loan.fundingProvider || null,
+          funding_fee_percent: loan.fundingFeePercent || null
         };
 
         if (!editingLoan) contractData.created_at = new Date().toISOString();
@@ -171,6 +181,33 @@ export const contractsService = {
         await supabase.from('parcelas').delete().eq('loan_id', loan.id);
         const { error: instError } = await supabase.from('parcelas').insert(installmentsPayload);
         if (instError) throw new Error("Erro ao gerar parcelas: " + instError.message);
+
+        // REGISTRO DE CUSTO DE CAPTAÇÃO (LEDGER)
+        if (loan.fundingCost && loan.fundingCost > 0) {
+            // Remove registro anterior se for edição para evitar duplicidade
+            if (editingLoan) {
+                await supabase.from('transacoes')
+                    .delete()
+                    .eq('loan_id', loan.id)
+                    .eq('type', 'CUSTO_CAPTACAO');
+            }
+
+            // Insere novo custo (Valor negativo no ledger indica saída/custo)
+            await supabase.from('transacoes').insert([{ 
+                id: generateUUID(), 
+                loan_id: loan.id, 
+                profile_id: activeUser.id, 
+                source_id: finalSourceId, 
+                date: new Date().toISOString(), 
+                type: 'CUSTO_CAPTACAO', 
+                amount: -Math.abs(loan.fundingCost), // Negativo pois é custo
+                principal_delta: 0, 
+                interest_delta: 0, 
+                late_fee_delta: 0, 
+                category: 'DESPESA_FINANCEIRA',
+                notes: `Custo de Captação (${loan.fundingProvider || 'Cartão'}): R$ ${loan.fundingCost.toFixed(2)}`
+            }]);
+        }
 
         // Auditoria simplificada e Registro de Saída
         if (editingLoan) {

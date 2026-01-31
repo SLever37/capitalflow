@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from "react";
+import PixDepositModal from "../components/modals/PixDepositModal";
+import { CapitalSource } from "../types";
 import { Plus } from 'lucide-react';
-import { CapitalSource } from '../types';
 import { Modal } from '../components/ui/Modal';
 import { SourceCard } from '../components/cards/SourceCard';
 
@@ -50,7 +51,8 @@ export const SourcesPage: React.FC<SourcesPageProps> = ({
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* GRID RESPONSIVA AJUSTADA: sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
         {sources.map(source => (
           <SourceCard
             key={source.id}

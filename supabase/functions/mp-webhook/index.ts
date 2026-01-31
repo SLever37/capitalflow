@@ -43,7 +43,6 @@ serve(async (req) => {
     if (!paymentId) return json({ ok: false, error: "Missing payment id" }, 400);
 
     // 1. Buscar detalhes atualizados no Mercado Pago
-    // Importante: Não confiar apenas no body do webhook, buscar a fonte da verdade
     const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
       headers: { Authorization: `Bearer ${MP_ACCESS_TOKEN}` },
     });
@@ -111,10 +110,8 @@ serve(async (req) => {
             p_category: 'RECEITA'
         };
 
+        // --- CÁLCULO FINANCEIRO DO CONTRATO ---
         if (paymentType === 'FULL') {
-            // === QUITAÇÃO ===
-            // Principal Devolvido = Principal Restante
-            // Lucro = O que pagou a mais que o principal (Juros + Multa)
             const principal = Number(inst.principal_remaining);
             const profit = Math.max(0, amountPaid - principal);
 
@@ -125,11 +122,11 @@ serve(async (req) => {
                 p_principal_returned: principal,
                 p_principal_delta: principal,
                 p_interest_delta: profit,
-                p_late_fee_delta: 0, // Simplificação: joga tudo em juros/lucro
+                p_late_fee_delta: 0, 
                 
                 // Zera tudo
-                p_new_start_date: loan.start_date, // Mantém original
-                p_new_due_date: inst.due_date,     // Mantém original
+                p_new_start_date: loan.start_date, 
+                p_new_due_date: inst.due_date,
                 p_new_principal_remaining: 0,
                 p_new_interest_remaining: 0,
                 p_new_scheduled_principal: 0,
@@ -138,21 +135,15 @@ serve(async (req) => {
             };
 
         } else {
-            // === RENOVAÇÃO (Pagar Juros) ===
-            // Lucro = Tudo o que pagou (pois é juros)
-            // Principal Devolvido = 0
-            
-            // Nova Data: Data Atual da Parcela + 30 dias (Padrão Giro)
             const currentDueDate = inst.due_date || loan.start_date;
             const newDate = addDays(currentDueDate, 30);
             
-            // Recalcula Juros do Próximo Mês
             const principalBase = Number(inst.principal_remaining);
             const nextInterest = principalBase * (Number(loan.interest_rate) / 100);
 
             rpcParams = {
                 ...rpcParams,
-                p_payment_type: 'PAYMENT_PARTIAL', // ou INTEREST_ONLY
+                p_payment_type: 'PAYMENT_PARTIAL',
                 p_profit_generated: amountPaid,
                 p_principal_returned: 0,
                 p_principal_delta: 0,
@@ -160,7 +151,7 @@ serve(async (req) => {
                 p_late_fee_delta: 0,
 
                 // Renova
-                p_new_start_date: currentDueDate, // Novo início é o vencimento antigo
+                p_new_start_date: currentDueDate, 
                 p_new_due_date: newDate,
                 p_new_principal_remaining: principalBase,
                 p_new_interest_remaining: nextInterest,
@@ -178,15 +169,50 @@ serve(async (req) => {
             return json({ ok: false, error: "Auto-process failed: " + rpcError.message });
         }
 
-        // D. Criar Notificação para o Operador (Sinalização Aprovada)
-        // Isso fará o sino notificar e aparecer no histórico
+        // =================================================================
+        // D. TAXA MP (1%) - Lançamento Automático de Custo
+        // =================================================================
+        const mpFee = amountPaid * 0.01;
+        
+        if (mpFee > 0) {
+            // 1. Registrar no Ledger (Transacoes) como Despesa
+            await supabase.from('transacoes').insert({
+                loan_id: loan.id,
+                profile_id: profileId,
+                source_id: sourceId,
+                date: new Date().toISOString(),
+                type: 'TAXA_MP',
+                amount: -mpFee, // Valor negativo (Saída/Custo)
+                principal_delta: 0,
+                interest_delta: 0,
+                late_fee_delta: 0,
+                category: 'DESPESA_FINANCEIRA',
+                notes: `Taxa Mercado Pago (1%): R$ ${mpFee.toFixed(2)}`
+            });
+
+            // 2. Deduzir do Lucro Líquido (Interest Balance) do Perfil
+            // A RPC process_payment_atomic já somou o lucro bruto. Agora subtraímos a taxa.
+            // Não alteramos o 'balance' da fonte pois o dinheiro líquido que entra lá já deveria ser descontado, 
+            // mas como a RPC assume valor cheio na fonte, podemos ajustar aqui ou assumir que a fonte recebe bruto e a taxa sai depois.
+            // Padrão CapitalFlow: InterestBalance é o lucro disponível. Taxa reduz lucro.
+            
+            // Ajuste manual de saldo de lucro
+            const { data: profile } = await supabase.from('perfis').select('interest_balance').eq('id', profileId).single();
+            if (profile) {
+                await supabase.from('perfis')
+                    .update({ interest_balance: (Number(profile.interest_balance) || 0) - mpFee })
+                    .eq('id', profileId);
+            }
+        }
+
+        // E. Criar Notificação para o Operador
         await supabase.from('sinalizacoes_pagamento').insert({
             client_id: loan.client_id,
             loan_id: loan.id,
             profile_id: profileId,
             tipo_intencao: 'PAGAR_PIX',
-            status: 'APROVADO', // Já entra como aprovado pois o sistema processou
-            review_note: `Automação PIX: R$ ${amountPaid.toFixed(2)} recebidos.`,
+            status: 'APROVADO',
+            review_note: `Automação PIX: R$ ${amountPaid.toFixed(2)} recebidos. Taxa MP: R$ ${mpFee.toFixed(2)}.`,
             reviewed_at: new Date().toISOString()
         });
     }

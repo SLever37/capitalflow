@@ -27,6 +27,7 @@ export const InstallmentGrid: React.FC<InstallmentGridProps> = ({
     loan, orderedInstallments, fixedTermStats, isPaid, isZeroBalance, isFullyFinalized, showProgress, strategy, isDailyFree, isFixedTerm, onPayment, isStealthMode
 }) => {
     return (
+        // GRID RESPONSIVA: 1 coluna no mobile, 2 no tablet (sm), 3 no desktop (lg/xl)
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 items-stretch">
             {orderedInstallments.map((inst, i) => {
                 const st = getInstallmentStatusLogic(inst);

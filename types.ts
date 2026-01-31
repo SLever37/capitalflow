@@ -40,8 +40,8 @@ export interface Client {
 export interface LedgerEntry {
   id: string;
   date: string;
-  type: 'PAYMENT_FULL' | 'PAYMENT_PARTIAL' | 'PAYMENT_INTEREST_ONLY' | 'LEND_MORE' | 'WITHDRAW_PROFIT' | 'ADJUSTMENT' | 'ARCHIVE' | 'RESTORE' | 'REFUND_SOURCE_CHANGE' | 'AGREEMENT_PAYMENT';
-  category?: 'RECEITA' | 'INVESTIMENTO' | 'RECUPERACAO' | 'ESTORNO' | 'GERAL' | 'AUDIT';
+  type: 'PAYMENT_FULL' | 'PAYMENT_PARTIAL' | 'PAYMENT_INTEREST_ONLY' | 'LEND_MORE' | 'WITHDRAW_PROFIT' | 'ADJUSTMENT' | 'ARCHIVE' | 'RESTORE' | 'REFUND_SOURCE_CHANGE' | 'AGREEMENT_PAYMENT' | 'CUSTO_CAPTACAO' | 'TAXA_MP';
+  category?: 'RECEITA' | 'INVESTIMENTO' | 'RECUPERACAO' | 'ESTORNO' | 'GERAL' | 'AUDIT' | 'DESPESA_FINANCEIRA';
   amount: number;
   principalDelta: number;
   interestDelta: number;
@@ -201,6 +201,12 @@ export interface Loan {
   finePercent: number; 
   dailyInterestPercent: number; 
   
+  // Custos de Captação (Funding)
+  fundingTotalPayable?: number;
+  fundingCost?: number;
+  fundingProvider?: string;
+  fundingFeePercent?: number;
+
   policiesSnapshot?: LoanPolicy;
 
   startDate: string;

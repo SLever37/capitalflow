@@ -21,6 +21,10 @@ export interface LoanFormState {
   guaranteeDescription: string;
   startDate: string;
   skipWeekends?: boolean;
+  // Campos de Funding
+  fundingTotalPayable?: string;
+  fundingProvider?: string;
+  fundingFeePercent?: string;
 }
 
 export const mapFormToLoan = (
@@ -34,6 +38,17 @@ export const mapFormToLoan = (
   
   const principal = parseFloat(form.principal);
   const rate = parseFloat(form.interestRate);
+  
+  // Cálculo do Custo de Captação (Cartão)
+  let fundingTotalPayable = 0;
+  let fundingCost = 0;
+  
+  if (form.fundingTotalPayable) {
+      fundingTotalPayable = parseFloat(form.fundingTotalPayable);
+      if (!isNaN(fundingTotalPayable) && fundingTotalPayable > principal) {
+          fundingCost = fundingTotalPayable - principal;
+      }
+  }
   
   // --- GERAÇÃO VIA REGISTRY ---
   const strategy = modalityRegistry.get(form.billingCycle);
@@ -63,6 +78,13 @@ export const mapFormToLoan = (
     interestRate: rate,
     finePercent: parseFloat(form.finePercent) || 0,
     dailyInterestPercent: parseFloat(form.dailyInterestPercent) || 0,
+    
+    // Mapeamento de Funding
+    fundingTotalPayable: fundingTotalPayable || undefined,
+    fundingCost: fundingCost || undefined,
+    fundingProvider: form.fundingProvider || undefined,
+    fundingFeePercent: parseFloat(form.fundingFeePercent || '') || undefined,
+
     billingCycle: form.billingCycle,
     amortizationType: 'JUROS', 
     policiesSnapshot: { 

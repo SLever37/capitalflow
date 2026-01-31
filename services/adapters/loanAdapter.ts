@@ -1,4 +1,4 @@
-// services/adapters/loanAdapter.ts
+// src/services/adapters/loanAdapter.ts
 import { Agreement, AgreementInstallment, Installment, Loan, LoanStatus } from '../../types';
 import { asArray, asNumber, asString, safeDateString } from '../../utils/safe';
 
@@ -17,7 +17,9 @@ function normalizeAgreementStatus(statusRaw: unknown): 'ACTIVE' | 'PAID' | 'BROK
 /**
  * Normaliza status de parcela de acordo (banco) para padrão do frontend.
  */
-function normalizeAgreementInstallmentStatus(statusRaw: unknown): 'PENDING' | 'PAID' | 'LATE' | 'PARTIAL' {
+function normalizeAgreementInstallmentStatus(
+  statusRaw: unknown
+): 'PENDING' | 'PAID' | 'LATE' | 'PARTIAL' {
   const s = asString(statusRaw).toUpperCase().trim();
   if (!s) return 'PENDING';
   if (s === 'PENDENTE') return 'PENDING';
@@ -106,7 +108,7 @@ export function mapLoanFromDB(
       paidInterest: asNumber(inst?.paid_interest ?? inst?.paidInterest),
       paidLateFee: asNumber(inst?.paid_late_fee ?? inst?.paidLateFee),
       paidTotal: asNumber(inst?.paid_total ?? inst?.paidTotal),
-      status: status,
+      status,
       paidDate: safeDateString(inst?.paid_date ?? inst?.paidDate),
       paidAmount: asNumber(inst?.paid_amount ?? inst?.paidAmount),
       logs: asArray(inst?.logs),
@@ -123,7 +125,7 @@ export function mapLoanFromDB(
   const loan: Loan = {
     id: asString(l?.id),
 
-    // ✅ NOVO: necessário para o PIX/Portal (Realtime/RLS e criação de charge)
+    // ✅ necessário p/ PIX/Portal (Realtime/RLS e criação de charge)
     profile_id: asString(l?.profile_id ?? l?.profileId),
 
     clientId: asString(l?.client_id ?? l?.clientId),
@@ -131,29 +133,52 @@ export function mapLoanFromDB(
     debtorPhone: asString(l?.debtor_phone ?? l?.debtorPhone),
     debtorDocument: asString(l?.debtor_document ?? l?.debtorDocument),
     debtorAddress: asString(l?.debtor_address ?? l?.debtorAddress),
+
     sourceId: asString(l?.source_id ?? l?.sourceId),
-    preferredPaymentMethod: asString(l?.preferred_payment_method ?? l?.preferredPaymentMethod, 'PIX') as any,
+    preferredPaymentMethod: asString(
+      l?.preferred_payment_method ?? l?.preferredPaymentMethod,
+      'PIX'
+    ) as any,
     pixKey: asString(l?.pix_key ?? l?.pixKey),
+
     billingCycle: asString(l?.billing_cycle ?? l?.billingCycle) as any,
     amortizationType: asString(l?.amortization_type ?? l?.amortizationType, 'JUROS') as any,
+
     principal: asNumber(l?.principal),
+
+    // ✅ NOVO: custo de captação (cartão)
+    funding_total_payable: asNumber(l?.funding_total_payable ?? l?.fundingTotalPayable),
+    funding_cost: asNumber(l?.funding_cost ?? l?.fundingCost),
+    funding_provider: asString(l?.funding_provider ?? l?.fundingProvider),
+    funding_fee_percent: asNumber(l?.funding_fee_percent ?? l?.fundingFeePercent),
+
     interestRate: asNumber(l?.interest_rate ?? l?.interestRate),
     finePercent: asNumber(l?.fine_percent ?? l?.finePercent),
     dailyInterestPercent: asNumber(l?.daily_interest_percent ?? l?.dailyInterestPercent),
+
     policiesSnapshot: l?.policies_snapshot ?? l?.policiesSnapshot,
+
     startDate,
     createdAt: safeDateString(l?.created_at ?? l?.createdAt),
+
     installments,
+
     totalToReceive: asNumber(l?.total_to_receive ?? l?.totalToReceive),
+
     ledger: asArray(l?.ledger),
     paymentSignals: asArray(l?.paymentSignals ?? l?.sinalizacoes_pagamento),
+
     notes: asString(l?.notes),
+
     guaranteeDescription: asString(l?.guarantee_description ?? l?.guaranteeDescription),
+
     attachments: asArray(l?.attachments),
     documentPhotos: asArray(l?.documentPhotos),
     customDocuments: asArray(l?.customDocuments),
+
     isArchived: !!(l?.is_archived ?? l?.isArchived),
     skipWeekends: !!(l?.skip_weekends ?? l?.skipWeekends),
+
     activeAgreement,
   } as Loan;
 

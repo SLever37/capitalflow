@@ -1,7 +1,8 @@
 
-import React from 'react';
-import { Wallet, CalendarX, Clock } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { Wallet, CalendarX, Clock, CreditCard, AlertTriangle } from 'lucide-react';
 import { CapitalSource, LoanBillingModality } from '../../types';
+import { formatMoney } from '../../utils/formatters';
 
 interface LoanFormFinancialSectionProps {
   sources: CapitalSource[];
@@ -18,6 +19,23 @@ interface LoanFormFinancialSectionProps {
 export const LoanFormFinancialSection: React.FC<LoanFormFinancialSectionProps> = ({
   sources, formData, setFormData, isDailyModality, fixedDuration, setFixedDuration, autoDueDate, skipWeekends, setSkipWeekends
 }) => {
+  
+  const selectedSource = sources.find(s => s.id === formData.sourceId);
+  const isCardSource = selectedSource?.type === 'CARD';
+
+  // Cálculo de Custo em tempo real
+  const fundingCostDisplay = useMemo(() => {
+      const principal = parseFloat(formData.principal) || 0;
+      const totalPayable = parseFloat(formData.fundingTotalPayable) || 0;
+      if (totalPayable > principal) {
+          return {
+              cost: totalPayable - principal,
+              isValid: true
+          };
+      }
+      return { cost: 0, isValid: totalPayable === 0 }; // 0 é válido se não preenchido, mas se preenchido deve ser > principal
+  }, [formData.principal, formData.fundingTotalPayable]);
+
   return (
     <div className="space-y-4 sm:space-y-6">
       <h3 className="text-[10px] font-black uppercase tracking-widest text-purple-500 flex items-center gap-2"><Wallet className="w-4 h-4" /> Condições</h3>
@@ -118,9 +136,73 @@ export const LoanFormFinancialSection: React.FC<LoanFormFinancialSectionProps> =
         <div className="space-y-2">
             <label className="text-[9px] text-slate-500 font-black uppercase ml-2">Fonte de Capital</label>
             <select value={formData.sourceId} onChange={e => setFormData({...formData, sourceId: e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-white text-sm outline-none">
-              {sources.map(s => <option key={s.id} value={s.id}>{s.name} (R$ {s.balance.toLocaleString()})</option>)}
+              {sources.map(s => <option key={s.id} value={s.id}>{s.name} ({s.type === 'CARD' ? 'Crédito' : `R$ ${s.balance.toLocaleString()}`})</option>)}
             </select>
         </div>
+
+        {/* --- CUSTO DE CAPTAÇÃO (CARTÃO) --- */}
+        {isCardSource && (
+            <div className="bg-rose-950/20 border border-rose-500/30 p-4 rounded-2xl space-y-4 animate-in slide-in-from-right">
+                <div className="flex items-center gap-2 text-rose-400 mb-2">
+                    <CreditCard size={16}/>
+                    <span className="text-[10px] font-black uppercase tracking-widest">Custo de Captação (Cartão)</span>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                        <label className="text-[9px] text-rose-300/70 font-black uppercase ml-2">Total a Pagar na Fatura</label>
+                        <input 
+                            type="number" 
+                            step="0.01" 
+                            placeholder="Ex: 1200.00"
+                            value={formData.fundingTotalPayable || ''} 
+                            onChange={e => setFormData({...formData, fundingTotalPayable: e.target.value})} 
+                            className="w-full bg-slate-900 border border-rose-500/30 rounded-2xl px-5 py-4 text-white font-bold focus:border-rose-500 outline-none" 
+                        />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-[9px] text-rose-300/70 font-black uppercase ml-2">Custo Calculado</label>
+                        <div className="w-full bg-slate-950/50 border border-rose-500/10 rounded-2xl px-5 py-4 text-rose-400 font-bold flex items-center justify-between">
+                            <span>R$ {formatMoney(fundingCostDisplay.cost)}</span>
+                            {fundingCostDisplay.cost > 0 && <span className="text-[8px] bg-rose-500/20 px-1.5 py-0.5 rounded uppercase">Custo</span>}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                        <label className="text-[9px] text-rose-300/70 font-black uppercase ml-2">Operadora / Maquininha</label>
+                        <input 
+                            type="text" 
+                            placeholder="Ex: InfinitePay"
+                            value={formData.fundingProvider || ''} 
+                            onChange={e => setFormData({...formData, fundingProvider: e.target.value})} 
+                            className="w-full bg-slate-900 border border-rose-500/30 rounded-2xl px-5 py-4 text-white text-sm outline-none" 
+                        />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-[9px] text-rose-300/70 font-black uppercase ml-2">Taxa (%)</label>
+                        <input 
+                            type="number" 
+                            step="0.01"
+                            placeholder="Ex: 12.5"
+                            value={formData.fundingFeePercent || ''} 
+                            onChange={e => setFormData({...formData, fundingFeePercent: e.target.value})} 
+                            className="w-full bg-slate-900 border border-rose-500/30 rounded-2xl px-5 py-4 text-white text-sm outline-none" 
+                        />
+                    </div>
+                </div>
+
+                {formData.fundingTotalPayable && parseFloat(formData.fundingTotalPayable) < parseFloat(formData.principal) && (
+                    <div className="flex items-start gap-2 bg-rose-500/10 p-3 rounded-xl">
+                        <AlertTriangle size={16} className="text-rose-500 shrink-0 mt-0.5"/>
+                        <p className="text-[10px] text-rose-300 leading-tight">
+                            <b>Erro:</b> O total a pagar na fatura não pode ser menor que o valor entregue ao cliente (Principal).
+                        </p>
+                    </div>
+                )}
+            </div>
+        )}
       </div>
     </div>
   );

@@ -57,7 +57,8 @@ export const LoanForm: React.FC<LoanFormProps> = (props) => {
         )}
         
         <form onSubmit={handleSubmit} className="space-y-6 sm:space-y-10">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-10">
+          {/* Ajuste de grid: sm:grid-cols-2 (Tablet) para usar melhor o espaço */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-10">
             
             {/* COLUNA 1: CLIENTE */}
             <LoanFormClientSection 
