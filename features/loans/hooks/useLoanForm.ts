@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Loan, LoanBillingModality, Client, CapitalSource, UserProfile, LoanDocument } from '@/types';
-import { maskPhone, maskDocument, normalizeBrazilianPhone } from '@/utils/formatters';
-import { generateUUID } from '@/utils/generators';
-import { supabase } from '@/lib/supabase';
+import { Loan, LoanBillingModality, Client, CapitalSource, UserProfile, LoanDocument } from '../../../types';
+import { maskPhone, maskDocument, normalizeBrazilianPhone } from '../../../utils/formatters';
+import { generateUUID } from '../../../utils/generators';
+import { supabase } from '../../../lib/supabase';
 import { validateLoanForm } from '../domain/loanForm.validators';
 import { mapFormToLoan, LoanFormState } from '../domain/loanForm.mapper';
 import { calculateAutoDueDate } from '../domain/loanForm.preview';

@@ -3,7 +3,7 @@ import React from 'react';
 import {
   Phone, Calendar, ShieldAlert, FileEdit, MessageSquare, RotateCcw,
   Archive, Trash2, History, CheckCircle2,
-  Link as LinkIcon, Upload, Handshake
+  Link as LinkIcon, Upload, Handshake, Eye, Check, X
 } from 'lucide-react';
 import { Loan, CapitalSource, LedgerEntry, Agreement, AgreementInstallment, UserProfile, Installment } from '../../types';
 import { formatBRDate } from '../../utils/dateHelpers';
@@ -45,7 +45,7 @@ export const LoanCard: React.FC<LoanCardProps> = ({
   loan, sources, isExpanded, activeUser, onToggleExpand, onEdit, onMessage, onArchive,
   onRestore, onDelete, onNote, onPayment, onPortalLink, onUploadPromissoria,
   onUploadDoc, onViewPromissoria, onViewDoc, onReverseTransaction,
-  onRenegotiate, onAgreementPayment, onRefresh, isStealthMode
+  onRenegotiate, onAgreementPayment, onRefresh, onReviewSignal, onOpenComprovante, isStealthMode
 }) => {
   const {
     strategy,
@@ -79,9 +79,10 @@ export const LoanCard: React.FC<LoanCardProps> = ({
   } : null;
 
   const debtorNameSafe = asString(loan.debtorName, 'Sem Nome');
-  const debtorInitial = debtorNameSafe[0] || '?';
+  
+  // Sinalizações Pendentes
+  const pendingSignals = (loan.paymentSignals || []).filter(s => s.status === 'PENDENTE');
 
-  // Ícone ou Foto do Cliente
   const renderAvatar = () => {
       if (loan.clientAvatarUrl) {
           return (
@@ -94,7 +95,7 @@ export const LoanCard: React.FC<LoanCardProps> = ({
       }
       return (
           <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center font-black text-lg sm:text-xl transition-all flex-shrink-0 ${iconStyle}`}>
-            {isCritical && !hasActiveAgreement ? <ShieldAlert size={24} /> : isFullyFinalized ? <CheckCircle2 size={24}/> : debtorInitial}
+            {isCritical && !hasActiveAgreement ? <ShieldAlert size={24} /> : isFullyFinalized ? <CheckCircle2 size={24}/> : debtorNameSafe[0]}
           </div>
       );
   };
@@ -113,6 +114,7 @@ export const LoanCard: React.FC<LoanCardProps> = ({
                 {debtorNameSafe}
                 {isFullyFinalized && <span className="bg-emerald-500 text-emerald-950 text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider">Finalizado</span>}
                 {hasActiveAgreement && <span className="bg-indigo-500 text-white text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider">Em Acordo</span>}
+                {pendingSignals.length > 0 && <span className="bg-amber-500 text-amber-950 text-[9px] px-2 py-0.5 rounded-full font-black uppercase animate-bounce">Novo Comprovante</span>}
             </h3>
 
             <div className="flex flex-wrap gap-2 mt-1 sm:mt-2">
@@ -178,6 +180,36 @@ export const LoanCard: React.FC<LoanCardProps> = ({
 
       {isExpanded && (
         <div className="mt-8 sm:mt-10 space-y-6 sm:space-y-8 animate-in slide-in-from-top-4 duration-500" onClick={e => e.stopPropagation()}>
+          
+          {/* SINALIZAÇÕES DO PORTAL (NOVO) */}
+          {pendingSignals.length > 0 && (
+              <div className="bg-amber-500/10 border border-amber-500/30 p-5 rounded-3xl animate-in fade-in zoom-in-95">
+                  <h4 className="text-[10px] font-black uppercase text-amber-500 flex items-center gap-2 mb-4 tracking-widest">
+                      <ShieldAlert size={14}/> Solicitações do Portal do Cliente
+                  </h4>
+                  <div className="space-y-3">
+                      {pendingSignals.map(signal => (
+                          <div key={signal.id} className="bg-slate-900 border border-slate-800 p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                              <div className="flex items-center gap-4">
+                                  <div className="p-3 bg-amber-500/10 text-amber-500 rounded-xl"><LinkIcon size={20}/></div>
+                                  <div>
+                                      <p className="text-xs font-bold text-white uppercase">{signal.type === 'PAGAR_PIX' ? 'Pagamento via PIX' : 'Intenção de Pagamento'}</p>
+                                      <p className="text-[10px] text-slate-500">{new Date(signal.date).toLocaleString('pt-BR')}</p>
+                                  </div>
+                              </div>
+                              <div className="flex items-center gap-2 w-full sm:w-auto">
+                                  {signal.comprovanteUrl && (
+                                      <button onClick={() => onOpenComprovante(signal.comprovanteUrl!)} className="p-2 bg-slate-800 text-blue-400 hover:text-white rounded-lg transition-all" title="Ver Comprovante"><Eye size={16}/></button>
+                                  )}
+                                  <button onClick={() => onReviewSignal(signal.id!, 'APROVADO')} className="flex-1 sm:flex-none px-4 py-2 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase flex items-center gap-1 hover:bg-emerald-500 transition-all"><Check size={14}/> Aprovar</button>
+                                  <button onClick={() => onReviewSignal(signal.id!, 'NEGADO')} className="flex-1 sm:flex-none px-4 py-2 bg-rose-600/20 text-rose-500 rounded-xl text-[10px] font-black uppercase flex items-center gap-1 hover:bg-rose-600 hover:text-white transition-all"><X size={14}/> Recusar</button>
+                              </div>
+                          </div>
+                      ))}
+                  </div>
+              </div>
+          )}
+
           <div className="bg-slate-950/50 p-5 rounded-3xl border border-slate-800">
             <div className="flex justify-between items-center mb-4">
               <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">

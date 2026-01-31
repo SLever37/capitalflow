@@ -113,11 +113,12 @@ export const mapLoanFromDB = (l: any, clientsData: any[] = []): Loan => {
     return {
         id: asString(l.id, '', 'id'),
         clientId: asString(l.client_id),
+        profile_id: asString(l.profile_id), // Mapeamento adicionado
         debtorName: asString(l.debtor_name, 'Cliente Desconhecido'),
         debtorPhone: maskPhone(asString(phone, '00000000000')),
         debtorDocument: l.debtor_document,
         debtorAddress: l.debtor_address,
-        clientAvatarUrl: l.cliente_foto_url, // Mapeamento da foto do contrato
+        clientAvatarUrl: l.cliente_foto_url,
         sourceId: asString(l.source_id),
         preferredPaymentMethod: asString(l.preferred_payment_method, 'PIX') as any,
         pixKey: l.pix_key,

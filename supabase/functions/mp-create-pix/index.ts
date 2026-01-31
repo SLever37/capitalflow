@@ -1,73 +1,122 @@
+
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
 declare const Deno: any;
 
 serve(async (req) => {
   try {
+    // CORS e Método
+    if (req.method === "OPTIONS") {
+      return new Response("ok", { headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" } });
+    }
+    
     if (req.method !== "POST") {
       return new Response("Method Not Allowed", { status: 405 });
     }
 
     const body = await req.json();
+    const { amount, payer_name, payer_email, payer_doc, loan_id, installment_id, payment_type, profile_id, source_id } = body;
 
-    // Mercado Pago manda vários tipos de evento
-    if (body.type !== "payment") {
-      return new Response(JSON.stringify({ ignored: true }), { status: 200 });
+    // Validação Básica
+    if (!amount || amount <= 0) {
+      return new Response(JSON.stringify({ ok: false, error: "Valor inválido" }), { status: 400 });
     }
 
-    const paymentId = body.data?.id;
-    if (!paymentId) {
-      return new Response("Missing payment id", { status: 400 });
+    const MP_ACCESS_TOKEN = Deno.env.get("MP_ACCESS_TOKEN");
+    if (!MP_ACCESS_TOKEN) {
+      return new Response(JSON.stringify({ ok: false, error: "MP_ACCESS_TOKEN não configurado" }), { status: 500 });
     }
 
-    // Buscar pagamento no Mercado Pago
-    const mpRes = await fetch(
-      `https://api.mercadopago.com/v1/payments/${paymentId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${Deno.env.get("MP_ACCESS_TOKEN")}`,
-        },
+    // 1. Gerar UUID de referência externa
+    const external_reference = crypto.randomUUID();
+
+    // 2. Montar Payload para o Mercado Pago
+    const mpPayload = {
+      transaction_amount: Number(amount),
+      description: `Pagamento Contrato ${loan_id?.slice(0,8)} - ${payment_type}`,
+      payment_method_id: "pix",
+      external_reference,
+      payer: {
+        email: payer_email || "cliente@capitalflow.app",
+        first_name: payer_name || "Cliente",
+        identification: payer_doc ? {
+          type: payer_doc.length > 11 ? "CNPJ" : "CPF",
+          number: payer_doc.replace(/\D/g, "")
+        } : undefined
+      },
+      // Metadados que voltarão no Webhook
+      metadata: {
+        loan_id,
+        installment_id,
+        payment_type,
+        profile_id,
+        source_id
       }
-    );
+    };
 
-    const payment = await mpRes.json();
+    // 3. Chamar API do Mercado Pago
+    const mpRes = await fetch("https://api.mercadopago.com/v1/payments", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${MP_ACCESS_TOKEN}`,
+        "Content-Type": "application/json",
+        "X-Idempotency-Key": external_reference
+      },
+      body: JSON.stringify(mpPayload)
+    });
 
-    const providerStatus = payment.status;
-    const externalReference = payment.external_reference;
+    const mpData = await mpRes.json();
 
-    // Atualiza cobrança no Supabase
-    const supabaseRes = await fetch(
-      `${Deno.env.get("SUPABASE_URL")}/rest/v1/payment_charges?provider_payment_id=eq.${paymentId}`,
-      {
-        method: "PATCH",
-        headers: {
-          apikey: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-          Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          provider_status: providerStatus,
-          status: providerStatus === "approved" ? "PAID" : "PENDING",
-          paid_at: providerStatus === "approved" ? new Date().toISOString() : null,
-          updated_at: new Date().toISOString(),
-          raw_provider_payload: payment,
-        }),
-      }
-    );
-
-    if (!supabaseRes.ok) {
-      const err = await supabaseRes.text();
-      throw new Error(err);
+    if (!mpRes.ok) {
+      console.error("Erro MP:", mpData);
+      return new Response(JSON.stringify({ ok: false, error: mpData.message || "Erro no Mercado Pago" }), { status: 500 });
     }
 
-    return new Response(
-      JSON.stringify({ ok: true, providerStatus }),
-      { status: 200 }
-    );
-  } catch (err) {
-    return new Response(
-      JSON.stringify({ ok: false, error: String(err) }),
-      { status: 500 }
-    );
+    const qr_code = mpData.point_of_interaction?.transaction_data?.qr_code;
+    const qr_code_base64 = mpData.point_of_interaction?.transaction_data?.qr_code_base64;
+    const paymentId = String(mpData.id);
+
+    // 4. Salvar registro na tabela payment_charges (Supabase)
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+    await fetch(`${SUPABASE_URL}/rest/v1/payment_charges`, {
+      method: "POST",
+      headers: {
+        "apikey": SUPABASE_KEY!,
+        "Authorization": `Bearer ${SUPABASE_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        charge_id: external_reference, // Usamos nosso UUID como ID interno
+        provider_payment_id: paymentId,
+        loan_id,
+        installment_id,
+        profile_id,
+        amount,
+        payment_type, // RENEW_INTEREST, FULL, LEND_MORE
+        status: "PENDING",
+        provider_status: mpData.status,
+        qr_code,
+        qr_code_base64,
+        created_at: new Date().toISOString()
+      })
+    });
+
+    return new Response(JSON.stringify({
+      ok: true,
+      charge_id: external_reference,
+      provider_payment_id: paymentId,
+      status: mpData.status,
+      qr_code,
+      qr_code_base64,
+      external_reference
+    }), { 
+      status: 200, 
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } 
+    });
+
+  } catch (err: any) {
+    return new Response(JSON.stringify({ ok: false, error: err.message }), { status: 500 });
   }
 });

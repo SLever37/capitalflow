@@ -17,9 +17,31 @@ export const generateConfissaoDividaHTML = (data: LegalDocumentParams, docId?: s
         `)
         .join('');
 
-    // Preenche testemunhas se disponíveis
-    const witness1 = signatures?.find(s => s.signer_email?.includes('Operador')) || { signer_name: '_______________________________', signer_document: '' };
-    const witness2 = signatures?.find(s => s.signer_email?.includes('System')) || { signer_name: '_______________________________', signer_document: '' };
+    // Busca dados de assinatura se disponíveis
+    const debtorSig = signatures?.find(s => s.signer_name.toUpperCase() === vm.debtorName.toUpperCase() || s.signer_document === data.debtorDoc);
+    const creditorSig = signatures?.find(s => s.signer_name.toUpperCase() === vm.creditorName.toUpperCase());
+    
+    // Testemunhas preenchidas via Input ou Assinatura
+    const w1Name = data.witnesses?.[0]?.name || signatures?.find(s => s.role === 'TESTEMUNHA_1')?.signer_name || '_______________________________';
+    const w1Doc = data.witnesses?.[0]?.document || signatures?.find(s => s.role === 'TESTEMUNHA_1')?.signer_document || '';
+    const w1Sig = signatures?.find(s => s.role === 'TESTEMUNHA_1' || s.signer_name === w1Name);
+
+    const w2Name = data.witnesses?.[1]?.name || signatures?.find(s => s.role === 'TESTEMUNHA_2')?.signer_name || '_______________________________';
+    const w2Doc = data.witnesses?.[1]?.document || signatures?.find(s => s.role === 'TESTEMUNHA_2')?.signer_document || '';
+    const w2Sig = signatures?.find(s => s.role === 'TESTEMUNHA_2' || s.signer_name === w2Name);
+
+    const renderSignatureBlock = (name: string, role: string, sigData?: any, cpf?: string) => `
+        <div class="sign-box">
+            <div class="sig-area">
+                ${sigData ? `<div class="digital-mark">ASSINADO DIGITALMENTE<br/><span style="font-size:6pt">${sigData.assinatura_hash.substring(0,16)}...</span></div>` : ''}
+            </div>
+            <div class="line"></div>
+            <b>${name}</b><br>
+            ${role}<br>
+            ${cpf ? `<span style="font-size: 8pt;">CPF: ${cpf}</span>` : ''}
+            ${sigData ? `<br><span style="font-size: 7pt; color: #555;">Em: ${new Date(sigData.signed_at).toLocaleString()} | IP: ${sigData.ip_origem}</span>` : ''}
+        </div>
+    `;
 
     return `
     <!DOCTYPE html>
@@ -37,8 +59,11 @@ export const generateConfissaoDividaHTML = (data: LegalDocumentParams, docId?: s
             li { margin-bottom: 5px; text-indent: 1cm; }
             table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 10pt; }
             .header-box { border: 1px solid #000; padding: 10px; margin-bottom: 20px; font-size: 9pt; text-align: center; }
-            .signatures { margin-top: 60px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 40px; page-break-inside: avoid; }
-            .sign-box { width: 45%; text-align: center; border-top: 1px solid #000; padding-top: 5px; font-size: 10pt; margin-bottom: 30px; }
+            .signatures { margin-top: 40px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 30px; page-break-inside: avoid; }
+            .sign-box { width: 45%; text-align: center; font-size: 10pt; margin-bottom: 20px; position: relative; }
+            .sig-area { height: 50px; position: relative; display: flex; align-items: flex-end; justify-content: center; }
+            .digital-mark { font-family: 'Courier New', monospace; font-size: 8pt; color: #006400; border: 1px dashed #006400; padding: 2px 5px; background: rgba(0,255,0,0.05); transform: rotate(-2deg); }
+            .line { border-top: 1px solid #000; width: 100%; margin-top: 5px; margin-bottom: 5px; }
             .footer-legal { 
                 margin-top: 50px; 
                 border-top: 1px solid #000; 
@@ -57,7 +82,6 @@ export const generateConfissaoDividaHTML = (data: LegalDocumentParams, docId?: s
                 font-family: 'Courier New', Courier, monospace;
                 page-break-inside: avoid;
             }
-            .hash-tag { font-family: 'Courier New', monospace; font-weight: bold; background: #f0f0f0; padding: 2px 5px; }
             @media print { body { padding: 0; margin: 0; } .header-box { background-color: #fff !important; } }
         </style>
     </head>
@@ -115,32 +139,13 @@ export const generateConfissaoDividaHTML = (data: LegalDocumentParams, docId?: s
         <h2>6. DO FORO</h2>
         <p><b>CLÁUSULA SEXTA:</b> As partes elegem o foro da comarca de <b>${vm.city}</b> para dirimir quaisquer questões oriundas deste instrumento, renunciando a qualquer outro, por mais privilegiado que seja.</p>
 
-        <p style="text-align: center; margin-top: 40px; margin-bottom: 40px;">${vm.city}, ${vm.date}.</p>
+        <p style="text-align: center; margin-top: 40px; margin-bottom: 20px;">${vm.city}, ${vm.date}.</p>
 
         <div class="signatures">
-            <div class="sign-box">
-                <b>${vm.debtorName}</b><br>
-                DEVEDOR(A)<br>
-                <span style="font-size: 8pt;">Assinado Eletronicamente</span>
-            </div>
-
-            <div class="sign-box">
-                <b>${vm.creditorName}</b><br>
-                CREDOR(A)<br>
-                <span style="font-size: 8pt;">Assinado Eletronicamente</span>
-            </div>
-
-            <div class="sign-box">
-                <b>${witness1.signer_name}</b><br>
-                TESTEMUNHA 1 (Operador)<br>
-                <span style="font-size: 8pt;">CPF: ${witness1.signer_document || 'N/A'}</span>
-            </div>
-
-            <div class="sign-box">
-                <b>${witness2.signer_name}</b><br>
-                TESTEMUNHA 2 (Sistema)<br>
-                <span style="font-size: 8pt;">Hash: ${witness2.assinatura_hash ? witness2.assinatura_hash.substring(0,8) : 'N/A'}...</span>
-            </div>
+            ${renderSignatureBlock(vm.debtorName, 'DEVEDOR(A)', debtorSig, vm.debtorDoc)}
+            ${renderSignatureBlock(vm.creditorName, 'CREDOR(A)', creditorSig, vm.creditorDoc)}
+            ${renderSignatureBlock(w1Name, 'TESTEMUNHA 1', w1Sig, w1Doc)}
+            ${renderSignatureBlock(w2Name, 'TESTEMUNHA 2', w2Sig, w2Doc)}
         </div>
         
         <div class="manifesto-box">

@@ -1,8 +1,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { portalService, PortalSession } from '@/services/portal.service';
-import { supabase } from '@/lib/supabase';
-import { legalPublicService } from '@/features/legal/services/legalPublic.service';
+import { portalService, PortalSession } from '../../../services/portal.service';
+import { supabase } from '../../../lib/supabase';
+import { legalPublicService } from '../../legal/services/legalPublic.service';
 
 const PORTAL_SESSION_KEY = 'cm_portal_session';
 
@@ -237,6 +237,7 @@ export const useClientPortalLogic = (initialLoanId: string) => {
         loggedClient, byeName, selectedLoanId,
         loan, installments, portalSignals, isAgreementActive,
         intentId, intentType, receiptPreview,
-        handleLogin, handleLogout, handleSignalIntent, handleReceiptUpload, handleSignDocument
+        handleLogin, handleLogout, handleSignalIntent, handleReceiptUpload, handleSignDocument,
+        loadFullPortalData // Agora exposto para reload manual
     };
 };

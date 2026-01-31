@@ -1,3 +1,4 @@
+
 // services/pix.service.ts
 import { supabase } from "../lib/supabase";
 
@@ -7,10 +8,12 @@ export type PixChargeCreateInput = {
   payer_email?: string;
   payer_doc?: string | null;
 
-  acordo_id?: string | null;
-  acordo_parcela_id?: string | null;
+  // Metadados para automação do fluxo
+  source_id?: string | null; // Carteira de destino
   loan_id?: string | null;
   installment_id?: string | null;
+  payment_type?: 'RENEW_INTEREST' | 'FULL' | 'LEND_MORE'; // Tipo de baixa
+  profile_id?: string; // ID do operador (dono do contrato)
 };
 
 export type PixChargeCreateResponse = {

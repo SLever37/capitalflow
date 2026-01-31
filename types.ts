@@ -133,6 +133,11 @@ export interface Agreement {
 }
 
 // --- LEGAL TYPES (Módulo Jurídico) ---
+export interface LegalWitness {
+    name: string;
+    document: string;
+}
+
 export interface LegalDocumentParams {
     debtorName: string;
     debtorDoc: string;
@@ -151,6 +156,7 @@ export interface LegalDocumentParams {
     documentHash?: string;
     documentId?: string;
     timestamp?: string;
+    witnesses?: LegalWitness[]; // Novo campo para testemunhas
 }
 
 export interface LegalSignatureMetadata {
@@ -177,6 +183,7 @@ export interface LegalDocumentRecord {
 export interface Loan {
   id: string;
   clientId: string;
+  profile_id?: string; // Adicionado para referência do proprietário
   debtorName: string;
   debtorPhone: string;
   debtorDocument: string;

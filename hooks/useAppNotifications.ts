@@ -1,101 +1,110 @@
 
 import { useEffect, useRef } from 'react';
 import { Loan, LoanStatus, CapitalSource } from '../types';
-import { getDaysDiff } from '../utils/dateHelpers';
+import { getDaysDiff } from '../utils/dateHelpers'; 
 import { notificationService } from '../services/notification.service';
 import { getInstallmentStatusLogic } from '../domain/finance/calculations';
 
-export const useAppNotifications = (loans: Loan[], sources: CapitalSource[], activeUser: any, showToast: any) => {
+interface NotificationProps {
+    loans: Loan[];
+    sources: CapitalSource[];
+    activeUser: any;
+    showToast: any;
+    setActiveTab: (tab: any) => void;
+    setSelectedLoanId: (id: string | null) => void;
+    disabled?: boolean; // Nova propriedade para controle de contexto
+}
+
+export const useAppNotifications = ({ 
+    loans, sources, activeUser, showToast, setActiveTab, setSelectedLoanId, disabled
+}: NotificationProps) => {
     const checkTimer = useRef<any>(null);
-    const lastPendingSignalsCount = useRef(0);
+    const notifiedSignals = useRef<Set<string>>(new Set());
     const notifiedLowSources = useRef<Set<string>>(new Set());
     const notifiedDueLoans = useRef<Set<string>>(new Set());
 
     const runScan = async () => {
-        if (!activeUser) return;
+        // Bloqueio de Segurança: Se estiver desativado (Portal) ou sem usuário, não executa
+        if (disabled || !activeUser) return;
 
-        // 1. Pedir permissão de notificação nativa
         await notificationService.requestPermission();
 
-        // 2. Monitorar Contratos Vencendo/Atrasados
+        // 1. Monitorar Contratos Vencendo Hoje
         if (loans.length > 0) {
-            let countLateToday = 0;
-            const todayLoansIds: string[] = [];
-            let clientName = "";
-
             loans.forEach(loan => {
-                if (loan.isArchived) return; // Ignora arquivados
+                if (loan.isArchived) return;
                 
                 loan.installments.forEach(inst => {
                     const status = getInstallmentStatusLogic(inst);
-                    if (status === LoanStatus.PAID) return; // Ignora pagos
+                    if (status === LoanStatus.PAID) return;
                     
                     const diff = getDaysDiff(inst.dueDate);
                     
-                    // Alerta apenas se vence HOJE (0) e ainda não foi pago
+                    // Notifica apenas no dia do vencimento exato
                     if (diff === 0 && !notifiedDueLoans.current.has(inst.id)) {
-                        countLateToday++;
-                        todayLoansIds.push(inst.id);
                         notifiedDueLoans.current.add(inst.id);
-                        clientName = loan.debtorName;
+                        
+                        notificationService.notify(
+                            "🔴 Vencimento Hoje", 
+                            `O contrato de ${loan.debtorName} vence hoje. Clique para abrir.`,
+                            () => {
+                                setActiveTab('DASHBOARD');
+                                setSelectedLoanId(loan.id);
+                            }
+                        );
+                        
+                        showToast(`Vencimento hoje: ${loan.debtorName}`, 'warning');
                     }
                 });
             });
+        }
 
-            if (countLateToday > 0) {
+        // 2. Monitorar Sinais do Portal (Comprovantes Pendentes)
+        const pendingSignals = loans.flatMap(l => 
+            (l.paymentSignals || [])
+                .filter(s => s.status === 'PENDENTE')
+                .map(s => ({ ...s, loanId: l.id, debtorName: l.debtorName }))
+        );
+
+        pendingSignals.forEach(signal => {
+            if (signal.id && !notifiedSignals.current.has(signal.id)) {
+                notifiedSignals.current.add(signal.id);
+                
                 notificationService.notify(
-                    "🔴 Cobranças Pendentes", 
-                    `Você tem ${countLateToday} contrato(s) vencendo hoje!`
+                    "📩 Novo Comprovante",
+                    `${signal.debtorName} enviou um comprovante! Clique para conferir.`,
+                    () => {
+                        setActiveTab('DASHBOARD');
+                        setSelectedLoanId(signal.loanId);
+                    }
                 );
-                
-                const msg = countLateToday > 1 
-                    ? `Atenção! Há ${countLateToday} empréstimos vencendo hoje.` 
-                    : `Atenção! Há um empréstimo vencendo hoje - Cliente: ${clientName}.`;
-                
-                showToast(msg, 'warning');
+                showToast(`Novo comprovante de ${signal.debtorName}`, "success");
             }
-        }
+        });
 
-        // 3. Monitorar Sinais do Portal (Comprovantes)
-        const currentPendingSignals = loans.flatMap(l => l.paymentSignals || []).filter(s => s.status === 'PENDENTE').length;
-        if (currentPendingSignals > lastPendingSignalsCount.current) {
-            notificationService.notify(
-                "📩 Novo Comprovante",
-                "Um cliente enviou um comprovante agora pelo Portal!"
-            );
-            showToast("Nova sinalização de pagamento recebida!", "success");
-        }
-        lastPendingSignalsCount.current = currentPendingSignals;
-
-        // 4. Monitorar Baixo Capital (Recursos)
+        // 3. Monitorar Baixo Capital
         sources.forEach(source => {
             if (source.balance < 100 && !notifiedLowSources.current.has(source.id)) {
                 notificationService.notify(
                     "⚠️ Saldo Crítico",
-                    `A fonte "${source.name}" está com menos de R$ 100,00.`
+                    `A fonte "${source.name}" está com menos de R$ 100,00.`,
+                    () => setActiveTab('SOURCES')
                 );
                 showToast(`Fonte ${source.name} com saldo muito baixo!`, 'error');
                 notifiedLowSources.current.add(source.id);
-            } else if (source.balance >= 100) {
-                notifiedLowSources.current.delete(source.id);
             }
         });
     };
 
     useEffect(() => {
-        if (!activeUser) return;
-
-        // Escaneia 5 segundos após carregar o app (dá tempo de carregar dados completos)
-        const delay = setTimeout(runScan, 5000);
-
-        // Repete o escaneamento a cada 10 minutos
-        checkTimer.current = setInterval(runScan, 600000);
-
+        if (!activeUser || disabled) return;
+        const delay = setTimeout(runScan, 3000);
+        checkTimer.current = setInterval(runScan, 300000);
         return () => {
             clearTimeout(delay);
             if (checkTimer.current) clearInterval(checkTimer.current);
         };
-    }, [activeUser, loans.length, sources.length]);
+    }, [activeUser, loans.length, sources.length, disabled]);
 
     return { manualCheck: runScan };
 };

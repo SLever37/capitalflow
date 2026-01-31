@@ -122,6 +122,10 @@ export function mapLoanFromDB(
 
   const loan: Loan = {
     id: asString(l?.id),
+
+    // ✅ NOVO: necessário para o PIX/Portal (Realtime/RLS e criação de charge)
+    profile_id: asString(l?.profile_id ?? l?.profileId),
+
     clientId: asString(l?.client_id ?? l?.clientId),
     debtorName: asString(l?.debtor_name ?? l?.debtorName),
     debtorPhone: asString(l?.debtor_phone ?? l?.debtorPhone),

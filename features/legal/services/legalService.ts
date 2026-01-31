@@ -10,7 +10,7 @@ export const legalService = {
         return {
             debtorName: loan.debtorName,
             debtorDoc: loan.debtorDocument,
-            debtorPhone: loan.debtorPhone, // Mapeado
+            debtorPhone: loan.debtorPhone, 
             debtorAddress: loan.debtorAddress || 'Endereço não informado',
             creditorName: activeUser.fullName || activeUser.businessName || activeUser.name,
             creditorDoc: activeUser.document || 'Não informado',
@@ -21,7 +21,8 @@ export const legalService = {
             contractDate: new Date(loan.startDate).toLocaleDateString('pt-BR'),
             agreementDate: new Date(agreement.createdAt).toLocaleDateString('pt-BR'),
             city: activeUser.city || 'Manaus',
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            witnesses: [] // Inicializa vazio, será preenchido na UI se necessário
         };
     },
 
@@ -73,13 +74,6 @@ export const legalService = {
             if (profileId !== 'DEMO') throw new Error("Falha ao registrar documento jurídico no sistema.");
         }
 
-        // 4. REGISTRO AUTOMÁTICO DE TESTEMUNHAS (Art. 784, III, CPC)
-        // Testemunha 1: Operador (Credor)
-        // Testemunha 2: Sistema (Técnica)
-        if (profileId !== 'DEMO') {
-            await this.registerAutoWitnesses(docId, profileId, params.creditorName, hash);
-        }
-
         return {
             id: docId,
             agreementId,
@@ -89,47 +83,6 @@ export const legalService = {
             status: 'PENDING',
             createdAt: newDocPayload.created_at
         };
-    },
-
-    // Função interna para registrar testemunhas automaticamente
-    async registerAutoWitnesses(docId: string, profileId: string, creditorName: string, docHash: string) {
-        const w1Id = generateUUID();
-        const w2Id = generateUUID();
-        const now = new Date().toISOString();
-
-        // Hash simples para testemunhas (DocHash + Nome + Time)
-        const hashW1 = await generateSHA256(`${docHash}|${creditorName}|${now}`);
-        const hashW2 = await generateSHA256(`${docHash}|SYSTEM|${now}`);
-
-        const witnesses = [
-            {
-                id: w1Id,
-                document_id: docId,
-                profile_id: profileId,
-                signer_name: creditorName,
-                signer_document: "CPF/CNPJ do Perfil", // Pegar do perfil se disponível, mas aqui simplificamos
-                signer_email: "Operador Logado",
-                assinatura_hash: hashW1,
-                ip_origem: "127.0.0.1 (Local)", // Idealmente pegar IP real
-                user_agent: "CapitalFlow Operator Console",
-                signed_at: now,
-                // Campo 'role' ou similar seria ideal, mas usaremos signer_email como marcador
-            },
-            {
-                id: w2Id,
-                document_id: docId,
-                profile_id: profileId,
-                signer_name: "CapitalFlow (Testemunha Técnica)",
-                signer_document: "N/A", 
-                signer_email: "System Audit",
-                assinatura_hash: hashW2,
-                ip_origem: "Server-Side",
-                user_agent: "CapitalFlow Automated Witness Bot v1.0",
-                signed_at: now
-            }
-        ];
-
-        await supabase.from('assinaturas_documento').insert(witnesses);
     },
 
     // Busca dados completos para Relatório Jurídico
@@ -167,7 +120,6 @@ export const legalService = {
         }
 
         // 2. RECALCULAR HASH DO SNAPSHOT (Prova de Integridade)
-        // Garante que o que está sendo assinado é exatamente o que foi acordado.
         const snapshotStr = createLegalSnapshot(currentDoc.snapshot);
         const recalculatedHash = await generateSHA256(snapshotStr);
 
@@ -203,7 +155,7 @@ export const legalService = {
                 metadata_assinatura: metadata
             })
             .eq('id', docId)
-            .eq('hash_sha256', recalculatedHash); // Trava extra de concorrência (Optimistic Locking)
+            .eq('hash_sha256', recalculatedHash);
 
         if (signError) {
             throw new Error("Erro ao registrar assinatura no banco de dados: " + signError.message);

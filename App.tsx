@@ -77,6 +77,10 @@ export const App: React.FC = () => {
   ui.setSortOption = setSortOption;
 
   const { portalLoanId, legalSignToken } = usePortalRouting();
+  
+  // Determina se estamos em modo público (Portal ou Assinatura)
+  const isPublicView = !!portalLoanId || !!legalSignToken;
+
   usePersistedTab(activeTab, setActiveTab);
 
   const controllers = useControllers(
@@ -101,7 +105,16 @@ export const App: React.FC = () => {
   const { loanCtrl, clientCtrl, sourceCtrl, profileCtrl, adminCtrl, paymentCtrl, fileCtrl, aiCtrl } = controllers;
 
   // --- NOTIFICAÇÕES ---
-  useAppNotifications(loans, sources, activeUser, showToast);
+  // CORREÇÃO: Desativa notificações se estiver em modo público
+  useAppNotifications({
+      loans, 
+      sources, 
+      activeUser, 
+      showToast, 
+      setActiveTab, 
+      setSelectedLoanId: ui.setSelectedLoanId,
+      disabled: isPublicView
+  });
 
   // --- GESTÃO DE VOLTAR (MOBILE) - Estabilizada ---
   const exitAttemptRef = useRef(false);
@@ -154,7 +167,7 @@ export const App: React.FC = () => {
   }, [activeUser === null, !!portalLoanId, !!legalSignToken, activeTab]);
 
   // ✅ Toast global para telas públicas
-  const shouldRenderGlobalToast = !activeUser || !!portalLoanId || !!legalSignToken;
+  const shouldRenderGlobalToast = !activeUser || isPublicView;
 
   return (
     <>

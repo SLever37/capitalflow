@@ -6,6 +6,7 @@ import { useClientPortalLogic } from './hooks/useClientPortalLogic';
 import { PortalLogin } from './components/PortalLogin';
 import { formatMoney } from '../../utils/formatters';
 import { DocumentTemplates } from '../legal/templates/DocumentTemplates';
+import { PortalPaymentModal } from './components/PortalPaymentModal'; // Importação do novo Modal
 
 export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) => {
     const {
@@ -15,12 +16,14 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
         loan, installments, portalSignals, isAgreementActive,
         intentId, intentType, receiptPreview,
         handleLogin, handleLogout, handleSignalIntent, handleReceiptUpload,
-        handleSignDocument, isSigning
+        handleSignDocument, isSigning,
+        loadFullPortalData // Agora exposto para reload manual
     } = useClientPortalLogic(initialLoanId);
 
     const [isNoteOpen, setIsNoteOpen] = useState(false);
     const [isLegalOpen, setIsLegalOpen] = useState(false);
     const [viewingDoc, setViewingDoc] = useState<{type: 'CONFISSAO' | 'PROMISSORIA', html: string} | null>(null);
+    const [showPaymentModal, setShowPaymentModal] = useState(false); // Controle do Modal de Pagamento
 
     // Lógica de Alerta Específico para o Cliente (Somente Prazos)
     const clientAlert = useMemo(() => {
@@ -132,6 +135,28 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
         );
     }
 
+    // Identifica parcela pendente para passar ao modal
+    const pendingInstallmentRaw = installments.find(i => i.status !== 'PAID');
+    
+    // Normaliza objeto para o formato Installment esperado pelos cálculos
+    const pendingInstallmentNormalized = pendingInstallmentRaw ? {
+        id: pendingInstallmentRaw.id || 'temp', 
+        dueDate: pendingInstallmentRaw.data_vencimento,
+        amount: pendingInstallmentRaw.valor_parcela,
+        principalRemaining: pendingInstallmentRaw.principal_remaining ?? pendingInstallmentRaw.valor_parcela,
+        interestRemaining: pendingInstallmentRaw.interest_remaining ?? 0,
+        lateFeeAccrued: pendingInstallmentRaw.late_fee_accrued ?? 0,
+        paidTotal: 0,
+        status: pendingInstallmentRaw.status as any,
+        scheduledPrincipal: 0, 
+        scheduledInterest: 0,
+        avApplied: 0,
+        paidPrincipal: 0, 
+        paidInterest: 0, 
+        paidLateFee: 0,
+        logs: []
+    } : null;
+
     return (
         <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
             <div className="bg-slate-900 border border-slate-800 rounded-[2.5rem] w-full max-w-md shadow-2xl relative overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
@@ -154,7 +179,7 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
 
                 <div className="px-6 py-6 space-y-5 overflow-y-auto custom-scrollbar max-h-[75vh]">
                     
-                    {/* ALERTA DE VENCIMENTO (Somente automático) */}
+                    {/* ALERTA DE VENCIMENTO */}
                     {clientAlert && clientAlert.type !== 'SUCCESS' && (
                         <div className={`p-4 rounded-2xl border flex items-start gap-3 shadow-lg ${
                             clientAlert.type === 'LATE' ? 'bg-rose-500/10 border-rose-500/30 shadow-rose-900/10' :
@@ -229,10 +254,33 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
                     </div>
 
                     <div className="grid grid-cols-1 gap-3">
-                        <button onClick={() => handleSignalIntent('PAGAR_PIX')} className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black uppercase text-xs transition-all shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2">
-                            Pagar via PIX
+                        <button 
+                            onClick={() => setShowPaymentModal(true)} // Abre o novo modal
+                            disabled={!pendingInstallmentNormalized || installments.every(i => i.status === 'PAID')}
+                            className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-black uppercase text-xs transition-all shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {installments.every(i => i.status === 'PAID') ? 'Contrato Quitado' : 'Pagar via PIX (Automático)'}
                         </button>
                     </div>
+
+                    {/* MODAL DE PAGAMENTO AUTOMATIZADO */}
+                    {showPaymentModal && pendingInstallmentNormalized && (
+                        <PortalPaymentModal 
+                            loan={loan}
+                            installment={pendingInstallmentNormalized as any}
+                            clientData={{
+                                name: loggedClient.name,
+                                doc: loggedClient.document || loggedClient.cpf || loggedClient.cnpj
+                            }}
+                            onClose={() => {
+                                setShowPaymentModal(false);
+                                // Recarrega dados ao fechar para garantir status atualizado
+                                if(selectedLoanId && loggedClient?.id) {
+                                    loadFullPortalData(selectedLoanId, loggedClient.id);
+                                }
+                            }}
+                        />
+                    )}
 
                     {/* MODAL JURÍDICO INTERNO */}
                     {isLegalOpen && (
