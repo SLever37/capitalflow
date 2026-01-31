@@ -1,4 +1,3 @@
-
 export enum LoanStatus {
   PENDING = 'PENDING',
   PAID = 'PAID',
@@ -40,38 +39,50 @@ export interface Client {
 export interface LedgerEntry {
   id: string;
   date: string;
-  type: 'PAYMENT_FULL' | 'PAYMENT_PARTIAL' | 'PAYMENT_INTEREST_ONLY' | 'LEND_MORE' | 'WITHDRAW_PROFIT' | 'ADJUSTMENT' | 'ARCHIVE' | 'RESTORE' | 'REFUND_SOURCE_CHANGE' | 'AGREEMENT_PAYMENT' | 'CUSTO_CAPTACAO' | 'TAXA_MP';
+  type:
+    | 'PAYMENT_FULL'
+    | 'PAYMENT_PARTIAL'
+    | 'PAYMENT_INTEREST_ONLY'
+    | 'LEND_MORE'
+    | 'WITHDRAW_PROFIT'
+    | 'ADJUSTMENT'
+    | 'ARCHIVE'
+    | 'RESTORE'
+    | 'REFUND_SOURCE_CHANGE'
+    | 'AGREEMENT_PAYMENT'
+    | 'CUSTO_CAPTACAO'
+    | 'TAXA_MP';
   category?: 'RECEITA' | 'INVESTIMENTO' | 'RECUPERACAO' | 'ESTORNO' | 'GERAL' | 'AUDIT' | 'DESPESA_FINANCEIRA';
   amount: number;
   principalDelta: number;
   interestDelta: number;
   lateFeeDelta: number;
-  sourceId?: string; 
+  sourceId?: string;
   installmentId?: string;
-  agreementId?: string; 
+  agreementId?: string;
   notes?: string;
 }
 
 export interface Installment {
   id: string;
   dueDate: string;
-  scheduledPrincipal: number; 
-  scheduledInterest: number;  
-  amount: number;             
+  scheduledPrincipal: number;
+  scheduledInterest: number;
+  amount: number;
   principalRemaining: number;
   interestRemaining: number;
-  lateFeeAccrued: number;     
-  avApplied: number;          
+  lateFeeAccrued: number;
+  avApplied: number;
   paidPrincipal: number;
   paidInterest: number;
   paidLateFee: number;
   paidTotal: number;
   status: LoanStatus;
   paidDate?: string;
-  paidAmount?: number; 
+  paidAmount?: number;
   logs?: string[];
-  renewalCount?: number; 
-  number?: number; 
+  renewalCount?: number;
+  number?: number;
 }
 
 export interface LoanPolicy {
@@ -107,134 +118,137 @@ export type AgreementType = 'PARCELADO_SEM_JUROS' | 'PARCELADO_COM_JUROS';
 export type AgreementStatus = 'ACTIVE' | 'ATIVO' | 'PAID' | 'BROKEN';
 
 export interface AgreementInstallment {
-    id: string;
-    agreementId: string;
-    number: number;
-    dueDate: string;
-    amount: number;
-    status: 'PENDING' | 'PAID' | 'PARTIAL' | 'LATE';
-    paidAmount: number;
-    paidDate?: string;
+  id: string;
+  agreementId: string;
+  number: number;
+  dueDate: string;
+  amount: number;
+  status: 'PENDING' | 'PAID' | 'PARTIAL' | 'LATE';
+  paidAmount: number;
+  paidDate?: string;
 }
 
 export interface Agreement {
-    id: string;
-    loanId: string;
-    type: AgreementType;
-    totalDebtAtNegotiation: number;
-    negotiatedTotal: number;
-    interestRate?: number; // Se houver
-    installmentsCount: number;
-    frequency: 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
-    startDate: string;
-    status: AgreementStatus;
-    createdAt: string;
-    installments: AgreementInstallment[];
+  id: string;
+  loanId: string;
+  type: AgreementType;
+  totalDebtAtNegotiation: number;
+  negotiatedTotal: number;
+  interestRate?: number; // Se houver
+  installmentsCount: number;
+  frequency: 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
+  startDate: string;
+  status: AgreementStatus;
+  createdAt: string;
+  installments: AgreementInstallment[];
 }
 
 // --- LEGAL TYPES (Módulo Jurídico) ---
 export interface LegalWitness {
-    name: string;
-    document: string;
+  name: string;
+  document: string;
 }
 
 export interface LegalDocumentParams {
-    debtorName: string;
-    debtorDoc: string;
-    debtorPhone?: string; 
-    debtorAddress: string;
-    creditorName: string;
-    creditorDoc: string;
-    creditorAddress?: string;
-    totalDebt: number;
-    originDescription: string; 
-    installments: AgreementInstallment[];
-    contractDate: string;
-    agreementDate: string;
-    city: string;
-    // Snapshot Integrity
-    documentHash?: string;
-    documentId?: string;
-    timestamp?: string;
-    witnesses?: LegalWitness[]; // Novo campo para testemunhas
+  debtorName: string;
+  debtorDoc: string;
+  debtorPhone?: string;
+  debtorAddress: string;
+  creditorName: string;
+  creditorDoc: string;
+  creditorAddress?: string;
+  totalDebt: number;
+  originDescription: string;
+  installments: AgreementInstallment[];
+  contractDate: string;
+  agreementDate: string;
+  city: string;
+  // Snapshot Integrity
+  documentHash?: string;
+  documentId?: string;
+  timestamp?: string;
+  witnesses?: LegalWitness[]; // Novo campo para testemunhas
 }
 
 export interface LegalSignatureMetadata {
-    ip: string;
-    user_agent: string;
-    signed_at: string;
-    method: 'ASSINATURA_ELETRONICA' | 'ICP_BRASIL' | 'MANUAL_REGISTER';
-    lei_base: string;
-    signer_name?: string;
-    signer_doc?: string;
+  ip: string;
+  user_agent: string;
+  signed_at: string;
+  method: 'ASSINATURA_ELETRONICA' | 'ICP_BRASIL' | 'MANUAL_REGISTER';
+  lei_base: string;
+  signer_name?: string;
+  signer_doc?: string;
 }
 
 export interface LegalDocumentRecord {
-    id: string;
-    agreementId: string;
-    type: 'CONFISSAO' | 'PROMISSORIA';
-    snapshot: LegalDocumentParams;
-    hashSHA256: string;
-    status: 'PENDING' | 'SIGNED';
-    signatureMetadata?: LegalSignatureMetadata;
-    createdAt: string;
+  id: string;
+  agreementId: string;
+  type: 'CONFISSAO' | 'PROMISSORIA';
+  snapshot: LegalDocumentParams;
+  hashSHA256: string;
+  status: 'PENDING' | 'SIGNED';
+  signatureMetadata?: LegalSignatureMetadata;
+  createdAt: string;
 }
 
 export interface Loan {
   id: string;
   clientId: string;
-  profile_id?: string; // Adicionado para referência do proprietário
+
+  // ✅ vem do banco (snake_case)
+  profile_id?: string;
+
   debtorName: string;
   debtorPhone: string;
   debtorDocument: string;
   debtorAddress?: string;
   clientAvatarUrl?: string; // Novo Campo
+
   sourceId: string;
   preferredPaymentMethod: PaymentMethod;
   pixKey?: string;
-  
+
   billingCycle: LoanBillingModality;
   amortizationType: 'PRICE' | 'BULLET' | 'JUROS';
 
   principal: number;
   interestRate: number;
-  finePercent: number; 
-  dailyInterestPercent: number; 
-  
-  // Custos de Captação (Funding)
-  fundingTotalPayable?: number;
-  fundingCost?: number;
-  fundingProvider?: string;
-  fundingFeePercent?: number;
+  finePercent: number;
+  dailyInterestPercent: number;
+
+  // ✅ Custos de Captação (Funding) — nomes iguais ao banco (snake_case)
+  funding_total_payable?: number;
+  funding_cost?: number;
+  funding_provider?: string;
+  funding_fee_percent?: number;
 
   policiesSnapshot?: LoanPolicy;
-
   startDate: string;
-  createdAt?: string; 
+  createdAt?: string;
   updatedAt?: string; // Novo campo para ordenação
+
   installments: Installment[];
   totalToReceive: number;
-  
-  ledger: LedgerEntry[]; 
-  paymentSignals?: PaymentSignal[];
 
+  ledger: LedgerEntry[];
+  paymentSignals?: PaymentSignal[];
   notes: string;
+
   guaranteeDescription?: string;
-  attachments?: string[]; 
-  documentPhotos?: string[]; 
-  customDocuments?: LoanDocument[]; 
+  attachments?: string[];
+  documentPhotos?: string[];
+  customDocuments?: LoanDocument[];
 
   isArchived?: boolean;
   skipWeekends?: boolean;
 
-  // New Link
-  activeAgreement?: Agreement; 
+  activeAgreement?: Agreement;
 }
 
 export interface UserProfile {
   id: string;
   name: string;
-  fullName?: string; 
+  fullName?: string;
   password?: string;
   recoveryPhrase?: string;
   accessLevel?: number;
@@ -251,11 +265,12 @@ export interface UserProfile {
   website?: string;
   photo?: string;
   pixKey?: string;
+
   totalAvailableCapital: number;
   interestBalance: number;
-  totalHistoricalInterest?: number; 
+  totalHistoricalInterest?: number;
   createdAt?: string;
-  
+
   brandColor?: string;
   logoUrl?: string;
   defaultInterestRate?: number;
@@ -263,7 +278,7 @@ export interface UserProfile {
   defaultDailyInterestPercent?: number;
   targetCapital?: number;
   targetProfit?: number;
-  
+
   // App Logic helpers
   lastActiveAt?: string;
 }

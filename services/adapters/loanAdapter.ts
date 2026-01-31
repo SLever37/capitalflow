@@ -1,4 +1,4 @@
-// src/services/adapters/loanAdapter.ts
+// services/adapters/loanAdapter.ts
 import { Agreement, AgreementInstallment, Installment, Loan, LoanStatus } from '../../types';
 import { asArray, asNumber, asString, safeDateString } from '../../utils/safe';
 
@@ -35,7 +35,6 @@ function normalizeAgreementInstallmentStatus(
 function normalizeLoanInstallmentStatus(statusRaw: unknown): LoanStatus {
   const s = asString(statusRaw).toUpperCase().trim();
   if (!s) return LoanStatus.PENDING;
-  // Mantém compatibilidade com enum do app quando aplicável
   if (s === 'PAID' || s === 'PAGO') return LoanStatus.PAID;
   if (s === 'OPEN' || s === 'ABERTO') return LoanStatus.PENDING;
   if (s === 'LATE' || s === 'ATRASADO') return LoanStatus.LATE;
@@ -82,6 +81,7 @@ export function agreementAdapter(rawAgreement: any, rawInstallments?: any[]): Ag
 
 /**
  * Mapeia Loan do formato retornado pelo Supabase para o shape usado no frontend.
+ * IMPORTANTE: saída SEMPRE em camelCase (igual types.ts).
  */
 export function mapLoanFromDB(
   rawLoan: any,
@@ -113,6 +113,7 @@ export function mapLoanFromDB(
       paidAmount: asNumber(inst?.paid_amount ?? inst?.paidAmount),
       logs: asArray(inst?.logs),
       renewalCount: asNumber(inst?.renewal_count ?? inst?.renewalCount),
+      number: asNumber(inst?.number ?? inst?.numero ?? inst?.n),
     } as Installment;
   });
 
@@ -122,10 +123,14 @@ export function mapLoanFromDB(
     ? agreementAdapter(rawAgreement, rawAgreementInstallments)
     : undefined;
 
+  // funding vindo do banco (snake_case) ou de payloads antigos (camelCase)
+  const fundingTotalPayable = asNumber(l?.funding_total_payable ?? l?.fundingTotalPayable);
+  const fundingCost = asNumber(l?.funding_cost ?? l?.fundingCost);
+
   const loan: Loan = {
     id: asString(l?.id),
 
-    // ✅ necessário p/ PIX/Portal (Realtime/RLS e criação de charge)
+    // necessário p/ PIX/Portal (Realtime/RLS e criação de charge)
     profile_id: asString(l?.profile_id ?? l?.profileId),
 
     clientId: asString(l?.client_id ?? l?.clientId),
@@ -146,11 +151,11 @@ export function mapLoanFromDB(
 
     principal: asNumber(l?.principal),
 
-    // ✅ NOVO: custo de captação (cartão)
-    funding_total_payable: asNumber(l?.funding_total_payable ?? l?.fundingTotalPayable),
-    funding_cost: asNumber(l?.funding_cost ?? l?.fundingCost),
-    funding_provider: asString(l?.funding_provider ?? l?.fundingProvider),
-    funding_fee_percent: asNumber(l?.funding_fee_percent ?? l?.fundingFeePercent),
+    // ✅ SAÍDA EM camelCase (igual types.ts)
+    fundingTotalPayable: fundingTotalPayable || undefined,
+    fundingCost: fundingCost || undefined,
+    fundingProvider: asString(l?.funding_provider ?? l?.fundingProvider),
+    fundingFeePercent: asNumber(l?.funding_fee_percent ?? l?.fundingFeePercent),
 
     interestRate: asNumber(l?.interest_rate ?? l?.interestRate),
     finePercent: asNumber(l?.fine_percent ?? l?.finePercent),
@@ -160,6 +165,7 @@ export function mapLoanFromDB(
 
     startDate,
     createdAt: safeDateString(l?.created_at ?? l?.createdAt),
+    updatedAt: safeDateString(l?.updated_at ?? l?.updatedAt),
 
     installments,
 
