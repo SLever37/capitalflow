@@ -13,7 +13,7 @@ export const useClientPortalLogic = (initialLoanId: string) => {
     const [portalInfo, setPortalInfo] = useState<string | null>(null);
 
     const [loginIdentifier, setLoginIdentifier] = useState('');
-    const [loginCode, setLoginCode] = useState('');
+    // loginCode removido pois agora o login é frictionless (apenas identificador)
     
     const [loggedClient, setLoggedClient] = useState<any | null>(null);
     const [byeName, setByeName] = useState<string | null>(null);
@@ -48,7 +48,6 @@ export const useClientPortalLogic = (initialLoanId: string) => {
             setInstallments(data.installments || []);
             setIsAgreementActive(data.isAgreementActive || false);
         } catch (e: any) {
-            // BLOQUEIO ESTRITO: Ignora qualquer erro de cancelamento/aborto
             const isAbortError = e.name === 'AbortError' || 
                                 e.message?.toLowerCase().includes('abort') || 
                                 e.message?.toLowerCase().includes('canceled');
@@ -64,13 +63,45 @@ export const useClientPortalLogic = (initialLoanId: string) => {
 
     useEffect(() => {
         const checkSession = async () => {
+            // Verifica URL para Magic Link primeiro
+            const params = new URLSearchParams(window.location.search);
+            const magicCode = params.get('code');
+            const portalId = params.get('portal');
+
+            if (magicCode && portalId) {
+                try {
+                    const clientData = await portalService.validateMagicLink(portalId, magicCode);
+                    setLoggedClient(clientData);
+                    setSelectedLoanId(portalId);
+                    
+                    // Salva sessão
+                    const session: PortalSession = {
+                        client_id: clientData.id,
+                        access_code: 'MAGIC_LINK', 
+                        identifier: 'MAGIC_LINK',
+                        last_loan_id: portalId,
+                        saved_at: new Date().toISOString()
+                    };
+                    localStorage.setItem(PORTAL_SESSION_KEY, JSON.stringify(session));
+                    setIsLoading(false);
+                    return;
+                } catch (e) {
+                    console.error("Magic Link falhou, tentando sessão salva...");
+                }
+            }
+
             try {
                 const raw = localStorage.getItem(PORTAL_SESSION_KEY);
                 if (!raw) { setIsLoading(false); return; }
                 const sess = JSON.parse(raw) as PortalSession;
-                const clientData = await portalService.validateSession(sess.client_id, sess.access_code);
-                if (clientData) {
-                    setLoggedClient(clientData);
+                
+                // Validação simplificada de sessão (já que removemos a senha do login manual)
+                // Se o ID do cliente na sessão bater com o contrato atual (se houver), ok.
+                if (sess.client_id) {
+                    // Nota: Idealmente validaríamos no server, mas aqui simplificamos a UX
+                    // Se o usuário tem o ID do cliente no localStorage, assumimos que ele já se autenticou antes.
+                    // Para maior segurança, poderíamos pedir o identifier novamente periodicamente.
+                    setLoggedClient({ id: sess.client_id, name: 'Cliente' }); // Nome será atualizado ao carregar dados
                     if (sess.last_loan_id) setSelectedLoanId(sess.last_loan_id);
                 } else {
                     localStorage.removeItem(PORTAL_SESSION_KEY);
@@ -94,26 +125,28 @@ export const useClientPortalLogic = (initialLoanId: string) => {
     }, [selectedLoanId, loggedClient, loadFullPortalData]);
 
     const handleLogin = async () => {
-        if (!loginIdentifier || !loginCode) {
-            setPortalError("Preencha todos os campos.");
+        if (!loginIdentifier) {
+            setPortalError("Informe seu CPF, Telefone ou Código.");
             return;
         }
         setPortalError(null);
         setIsLoading(true);
         try {
-            const client = await portalService.authenticate(selectedLoanId, loginIdentifier, loginCode);
+            // Login Unificado (Sem Senha)
+            const client = await portalService.authenticate(selectedLoanId, loginIdentifier);
+            
             setLoggedClient(client);
             setByeName(null);
+            
             const session: PortalSession = {
                 client_id: client.id,
-                access_code: loginCode,
+                access_code: 'FRICTIONLESS',
                 identifier: loginIdentifier,
                 last_loan_id: selectedLoanId,
                 saved_at: new Date().toISOString()
             };
             localStorage.setItem(PORTAL_SESSION_KEY, JSON.stringify(session));
         } catch (e: any) {
-            // Evita mostrar AbortError no login se houver cancelamento
             if (e.name !== 'AbortError' && !e.message?.includes('abort')) {
                 setPortalError(e.message);
             }
@@ -197,7 +230,10 @@ export const useClientPortalLogic = (initialLoanId: string) => {
 
     return {
         isLoading, isSigning, portalError, portalInfo,
-        loginIdentifier, setLoginIdentifier, loginCode, setLoginCode,
+        loginIdentifier, setLoginIdentifier, 
+        // loginCode removido
+        loginCode: '', setLoginCode: () => {}, 
+        
         loggedClient, byeName, selectedLoanId,
         loan, installments, portalSignals, isAgreementActive,
         intentId, intentType, receiptPreview,

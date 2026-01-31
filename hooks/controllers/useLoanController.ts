@@ -52,9 +52,19 @@ export const useLoanController = (
   };
 
   const handleGenerateLink = (loan: Loan) => { 
-      const url = `${window.location.origin}/?portal=${loan.id}`; 
+      // Busca o código de acesso do cliente vinculado
+      const client = clients.find(c => c.id === loan.clientId);
+      const accessCode = (client as any)?.access_code || (client as any)?.accessCode;
+      
+      let url = `${window.location.origin}/?portal=${loan.id}`;
+      
+      // Se tiver código, cria o Magic Link
+      if (accessCode) {
+          url += `&code=${accessCode}`;
+      }
+      
       navigator.clipboard.writeText(url); 
-      showToast("Link do Portal copiado!", "success"); 
+      showToast("Link Mágico do Portal copiado!", "success"); 
   };
 
   const openConfirmation = (config: any) => { 

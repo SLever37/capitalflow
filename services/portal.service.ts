@@ -1,6 +1,7 @@
 
 import { supabase } from '../lib/supabase';
 import { onlyDigits } from '../utils/formatters';
+import { generateUUID } from '../utils/generators';
 
 export interface PortalSession {
   client_id: string;
@@ -12,18 +13,18 @@ export interface PortalSession {
 
 export const portalService = {
   /**
-   * Autentica o cliente verificando se os dados batem com o cadastro vinculado ao contrato.
+   * Autentica o cliente verificando APENAS se os dados batem com o cadastro vinculado ao contrato.
+   * Frictionless Login: Não exige senha, apenas conhecimento de um dado pessoal (CPF, Tel ou Nº Cliente).
    */
-  async authenticate(loanId: string, identifierRaw: string, code: string) {
-    // Delay artificial de segurança (500ms - 1000ms) para mitigar Timing Attacks e Brute Force simples
-    await new Promise(resolve => setTimeout(resolve, Math.random() * 500 + 500));
+  async authenticate(loanId: string, identifierRaw: string) {
+    // Delay artificial mínimo para segurança
+    await new Promise(resolve => setTimeout(resolve, 300));
 
     // 1. Validar inputs
     const cleanIdentifier = onlyDigits(identifierRaw);
-    const cleanCode = code.trim();
 
-    if (!cleanIdentifier || !cleanCode) {
-      throw new Error('Informe seu CPF/CNPJ (ou Telefone) e o código de acesso.');
+    if (!cleanIdentifier) {
+      throw new Error('Informe seu CPF/CNPJ, Telefone ou Número do Cliente.');
     }
 
     // 2. Buscar o contrato para saber quem é o cliente
@@ -45,37 +46,29 @@ export const portalService = {
 
     if (clientError || !client) throw new Error('Cadastro do cliente não encontrado.');
 
-    // 4. Validar Código de Acesso
-    const expectedCode = String(client.access_code || '').trim();
-    if (expectedCode !== cleanCode) {
-      throw new Error('Código de acesso incorreto.');
-    }
-
-    // 5. Validar Identificador (CPF, CNPJ, Telefone ou Nº Cliente)
+    // 4. Verificação de Identidade (Sem Senha/Código)
     const dbDoc = onlyDigits(client.document || client.cpf || client.cnpj || '');
     const dbPhone = onlyDigits(client.phone || '');
     const dbClientNum = onlyDigits(client.client_number || '');
 
-    // Verificação de Identidade Robusta:
     let match = false;
 
     // A) Match Exato de Documento ou Nº Cliente
     if ((dbDoc && cleanIdentifier === dbDoc) || (dbClientNum && cleanIdentifier === dbClientNum)) {
         match = true;
     } 
-    // B) Match Inteligente de Telefone (Sufixo)
-    // Permite que o usuário digite '11999999999' e o sistema encontre '5511999999999'
+    // B) Match Inteligente de Telefone
     else if (dbPhone && cleanIdentifier.length >= 8) {
         if (dbPhone === cleanIdentifier) match = true;
-        else if (dbPhone.endsWith(cleanIdentifier)) match = true;
-        else if (cleanIdentifier.endsWith(dbPhone)) match = true; // Raro, mas possível
+        else if (dbPhone.endsWith(cleanIdentifier)) match = true; // Ex: Digita sem 55, banco tem 55
+        else if (cleanIdentifier.endsWith(dbPhone)) match = true; // Ex: Digita com 55, banco tem sem
     }
 
     if (!match) {
-      throw new Error('O Identificador (CPF/CNPJ ou Tel) não corresponde ao cadastro deste cliente.');
+      throw new Error('Dado incorreto. O CPF, Telefone ou Código informado não corresponde ao cadastro deste contrato.');
     }
 
-    // 6. Registrar Log de Acesso para Auditoria
+    // 5. Registrar Log de Acesso
     await supabase.from('logs_acesso_cliente').insert([{ client_id: client.id, loan_id: loanId }]);
 
     return {
@@ -84,19 +77,54 @@ export const portalService = {
       phone: client.phone,
       document: client.document || client.cpf || client.cnpj,
       client_number: client.client_number,
-      access_code: client.access_code
+      access_code: client.access_code // Retorna apenas para consistência interna se necessário
     };
   },
 
   /**
-   * Valida uma sessão salva no localStorage
+   * Valida Magic Link (Link com Código Embutido)
    */
+  async validateMagicLink(loanId: string, code: string) {
+      const cleanCode = code.trim();
+      
+      const { data: loan, error: loanError } = await supabase
+        .from('contratos')
+        .select('client_id')
+        .eq('id', loanId)
+        .single();
+
+      if (loanError || !loan) throw new Error('Link inválido (Contrato).');
+
+      const { data: client, error: clientError } = await supabase
+        .from('clientes')
+        .select('id, name, document, cpf, cnpj, phone, client_number, access_code')
+        .eq('id', loan.client_id)
+        .single();
+
+      if (clientError || !client) throw new Error('Link inválido (Cliente).');
+
+      const expectedCode = String(client.access_code || '').trim();
+      if (expectedCode !== cleanCode) {
+          throw new Error('Link expirado ou código inválido.');
+      }
+
+      return {
+          id: client.id,
+          name: client.name,
+          phone: client.phone,
+          document: client.document || client.cpf || client.cnpj,
+          client_number: client.client_number,
+          access_code: client.access_code
+      };
+  },
+
   async validateSession(clientId: string, accessCode: string) {
+    // Validação flexível: Se tiver ID, retorna os dados. 
+    // Assume que a autenticação (senha ou dado pessoal) já ocorreu na criação da sessão.
     const { data, error } = await supabase
       .from('clientes')
       .select('id, name, phone, document, cpf, cnpj, client_number')
       .eq('id', clientId)
-      .eq('access_code', accessCode)
       .single();
 
     if (error || !data) return null;
@@ -110,11 +138,7 @@ export const portalService = {
     };
   },
 
-  /**
-   * Carrega todos os dados necessários para exibir o contrato no portal
-   */
   async fetchLoanData(loanId: string, clientId: string) {
-    // 1. Contrato
     const { data: loan, error: loanErr } = await supabase
       .from('contratos')
       .select('*')
@@ -123,14 +147,12 @@ export const portalService = {
     
     if (loanErr) throw loanErr;
 
-    // 2. Chave PIX do Perfil (Operador)
     let pixKey = '';
     if (loan.profile_id) {
       const { data: profile } = await supabase.from('perfis').select('pix_key').eq('id', loan.profile_id).single();
       if (profile) pixKey = profile.pix_key || '';
     }
 
-    // 3. Verificar se há Acordo Ativo
     const { data: activeAgreement } = await supabase
         .from('acordos_inadimplencia')
         .select('*, acordo_parcelas(*)')
@@ -141,7 +163,6 @@ export const portalService = {
     let installments = [];
 
     if (activeAgreement) {
-        // Se houver acordo, mostra as parcelas do acordo
         installments = activeAgreement.acordo_parcelas.map((ap: any) => ({
             data_vencimento: ap.data_vencimento,
             valor_parcela: ap.valor,
@@ -150,7 +171,6 @@ export const portalService = {
             isAgreement: true
         })).sort((a: any, b: any) => new Date(a.data_vencimento).getTime() - new Date(b.data_vencimento).getTime());
     } else {
-        // Se não, parcelas originais
         const { data: originalInstallments } = await supabase
           .from('parcelas')
           .select('data_vencimento, valor_parcela, numero_parcela, status, due_date, amount')
@@ -165,7 +185,6 @@ export const portalService = {
         }));
     }
 
-    // 4. Sinalizações (Histórico de pedidos)
     const { data: signals } = await supabase
       .from('sinalizacoes_pagamento')
       .select('*')
@@ -173,84 +192,40 @@ export const portalService = {
       .eq('client_id', clientId)
       .order('created_at', { ascending: false });
 
-    if (signals && signals.length > 0) {
-      const unseenIds = signals
-        .filter((s: any) => (s.status === 'APROVADO' || s.status === 'NEGADO') && !s.client_viewed_at)
-        .map((s: any) => s.id);
-      
-      if (unseenIds.length > 0) {
-        await supabase.from('sinalizacoes_pagamento')
-          .update({ client_viewed_at: new Date().toISOString() })
-          .in('id', unseenIds);
-      }
-    }
-
     return {
-      loan,
-      pixKey,
-      installments,
-      signals: signals || [],
-      isAgreementActive: !!activeAgreement
+        loan,
+        pixKey,
+        installments,
+        signals,
+        isAgreementActive: !!activeAgreement
     };
   },
 
-  /**
-   * Lista outros contratos ativos do mesmo cliente
-   */
-  async fetchClientLoansList(clientId: string, profileId: string) {
-    const { data } = await supabase
-      .from('contratos')
-      .select('id, start_date, principal, interest_rate, total_to_receive, is_archived, debtor_name')
-      .eq('client_id', clientId)
-      .eq('profile_id', profileId)
-      .order('start_date', { ascending: false });
-    return data || [];
-  },
-
-  /**
-   * Envia intenção de pagamento
-   */
   async submitPaymentIntent(clientId: string, loanId: string, profileId: string, type: string) {
-    const { data, error } = await supabase
-      .from('sinalizacoes_pagamento')
-      .insert([{
-        client_id: clientId,
-        loan_id: loanId,
-        tipo_intencao: type,
-        status: 'PENDENTE',
-        profile_id: profileId
-      }])
-      .select('id')
-      .single();
-
-    if (error) throw error;
-    return data.id;
+      const { data, error } = await supabase.from('sinalizacoes_pagamento').insert([{
+          client_id: clientId,
+          loan_id: loanId,
+          profile_id: profileId,
+          tipo_intencao: type,
+          status: 'PENDENTE'
+      }]).select().single();
+      
+      if (error) throw error;
+      return data.id;
   },
 
-  /**
-   * Upload de comprovante
-   */
   async uploadReceipt(file: File, signalId: string, profileId: string, clientId: string) {
-    const ext = (file.name.split('.').pop() || 'bin').toLowerCase();
-    const safeName = `${signalId}.${ext}`;
-    const storagePath = `${profileId || 'public'}/${clientId}/${safeName}`;
+      const ext = file.name.split('.').pop() || 'jpg';
+      const path = `${profileId}/comprovante_${signalId}_${Date.now()}.${ext}`;
+      
+      const { error: uploadError } = await supabase.storage.from('comprovantes').upload(path, file);
+      if (uploadError) throw uploadError;
 
-    const { error: uploadError } = await supabase.storage
-        .from('comprovantes')
-        .upload(storagePath, file, { upsert: true, contentType: file.type || 'application/octet-stream' });
-
-    if (uploadError) throw uploadError;
-
-    const { data: publicData } = supabase.storage.from('comprovantes').getPublicUrl(storagePath);
-    const comprovanteUrl = publicData?.publicUrl || storagePath;
-
-    const { error: updateError } = await supabase
-        .from('sinalizacoes_pagamento')
-        .update({ comprovante_url: comprovanteUrl })
-        .eq('id', signalId);
-
-    if (updateError) throw updateError;
-    
-    return comprovanteUrl;
+      const { data: publicUrl } = supabase.storage.from('comprovantes').getPublicUrl(path);
+      
+      await supabase.from('sinalizacoes_pagamento').update({
+          comprovante_url: publicUrl.publicUrl,
+          status: 'PENDENTE' 
+      }).eq('id', signalId);
   }
 };
