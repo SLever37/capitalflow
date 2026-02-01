@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { HelpCircle, TrendingUp, User, KeyRound, Loader2, X, ChevronRight, Beaker } from 'lucide-react';
+import { HelpCircle, TrendingUp, User, KeyRound, Loader2, X, ChevronRight, Beaker, Eye, EyeOff } from 'lucide-react';
 import { Modal } from '../../components/ui/Modal';
 import { supabase } from '../../lib/supabase';
 import { generateUUID } from '../../utils/generators';
@@ -23,6 +23,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     savedProfiles, handleSelectSavedProfile, handleRemoveSavedProfile, showToast
 }) => {
     const [isCreatingProfile, setIsCreatingProfile] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
     const [newProfileForm, setNewProfileForm] = useState({ name: '', email: '', businessName: '', password: '', recoveryPhrase: '' });
     const [isRecoveringPassword, setIsRecoveringPassword] = useState(false);
     const [recoveryForm, setRecoveryForm] = useState({ email: '', phrase: '', newPassword: '' });
@@ -36,7 +37,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         if (!newProfileForm.businessName.trim()) { showToast("O Nome do Negócio é necessário.", "error"); return; }
         if (!newProfileForm.password) { showToast("Crie uma senha de acesso.", "error"); return; }
         
-        // CORREÇÃO: Permitir senhas de 4 dígitos
         if (newProfileForm.password.length < 4) {
             showToast("A senha deve ter no mínimo 4 caracteres.", "error");
             return;
@@ -50,7 +50,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
             const { error } = await supabase.from('perfis').insert([{
                 id: newId,
                 nome_operador: newProfileForm.name,
-                usuario_email: newProfileForm.email.trim().toLowerCase(), // Salva sempre em minúsculo
+                usuario_email: newProfileForm.email.trim().toLowerCase(),
                 email: newProfileForm.email.trim().toLowerCase(),
                 nome_empresa: newProfileForm.businessName,
                 senha_acesso: newProfileForm.password.trim(),
@@ -107,8 +107,35 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 </div>
                 {!isCreatingProfile && !isRecoveringPassword && (
                     <div className="space-y-6">
-                        <div className="bg-slate-800/50 p-2 rounded-2xl border border-slate-700 flex items-center gap-2"><div className="p-3 bg-slate-800 rounded-xl"><User className="text-slate-400 w-5 h-5" /></div><input type="text" className="bg-transparent w-full text-white outline-none text-sm font-bold placeholder:font-normal" placeholder="E-mail ou Usuário" value={loginUser} onChange={e => setLoginUser(e.target.value)} /></div>
-                        <div className="bg-slate-800/50 p-2 rounded-2xl border border-slate-700 flex items-center gap-2"><div className="p-3 bg-slate-800 rounded-xl"><KeyRound className="text-slate-400 w-5 h-5" /></div><input type="password" id="login-password" className="bg-transparent w-full text-white outline-none text-sm font-bold placeholder:font-normal" placeholder="Senha" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} onKeyDown={e => e.key === 'Enter' && submitLogin()} /></div>
+                        <div className="bg-slate-800/50 p-2 rounded-2xl border border-slate-700 flex items-center gap-2">
+                            <div className="p-3 bg-slate-800 rounded-xl">
+                                <User className="text-slate-400 w-5 h-5" />
+                            </div>
+                            <input type="text" className="bg-transparent w-full text-white outline-none text-sm font-bold placeholder:font-normal" placeholder="E-mail ou Usuário" value={loginUser} onChange={e => setLoginUser(e.target.value)} />
+                        </div>
+                        
+                        <div className="bg-slate-800/50 p-2 rounded-2xl border border-slate-700 flex items-center gap-2 relative">
+                            <div className="p-3 bg-slate-800 rounded-xl">
+                                <KeyRound className="text-slate-400 w-5 h-5" />
+                            </div>
+                            <input 
+                                type={showPassword ? "text" : "password"} 
+                                id="login-password" 
+                                className="bg-transparent w-full text-white outline-none text-sm font-bold placeholder:font-normal pr-10" 
+                                placeholder="Senha" 
+                                value={loginPassword} 
+                                onChange={e => setLoginPassword(e.target.value)} 
+                                onKeyDown={e => e.key === 'Enter' && submitLogin()} 
+                            />
+                            <button 
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-4 text-slate-500 hover:text-slate-300 transition-colors"
+                            >
+                                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
+                        </div>
+
                         <button onClick={submitLogin} disabled={isLoading} className="w-full py-4 bg-blue-600 text-white rounded-2xl text-xs font-black uppercase shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2">{isLoading ? <Loader2 className="animate-spin" /> : 'Entrar'}</button>
                         <div className="flex gap-2"><button onClick={() => setIsCreatingProfile(true)} className="flex-1 py-3 bg-slate-800 text-slate-400 rounded-2xl text-[10px] font-black uppercase">Criar Conta</button><button onClick={() => setIsRecoveringPassword(true)} className="flex-1 py-3 bg-slate-800 text-slate-400 rounded-2xl text-[10px] font-black uppercase">Recuperar</button></div>
                         <button onClick={handleDemoMode} className="w-full py-3 border border-dashed border-emerald-600/50 text-emerald-500 hover:bg-emerald-600/10 rounded-2xl text-[10px] font-black uppercase flex items-center justify-center gap-2 transition-all"><Beaker size={14} /> Modo Demonstração</button>

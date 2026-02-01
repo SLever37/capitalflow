@@ -113,6 +113,7 @@ export const useFileController = (
                   if (item.valor_base && item.valor_base > 0 && defaultSourceId) {
                       const loanPayload: Loan = {
                           id: generateUUID(),
+                          profile_id: activeUser.id, // Added profile_id to satisfy required Loan type property
                           clientId: clientId,
                           debtorName: item.nome,
                           debtorPhone: item.whatsapp,

@@ -33,7 +33,7 @@ export const LegalPage: React.FC<LegalPageProps> = (props) => {
   const [subView, setSubView] = useState<LegalSubView>('OVERVIEW');
 
   // Filtra apenas contratos que possuem acordos ativos
-  const legalLoans = props.loans.filter(l => l.activeAgreement && (l.activeAgreement.status === 'ACTIVE' || l.activeAgreement.status === 'ATIVO'));
+  const legalLoans = props.loans.filter(l => l.activeAgreement && l.activeAgreement.status === 'ACTIVE');
   
   // Estatísticas Rápidas do Setor
   const totalAgreements = legalLoans.length;

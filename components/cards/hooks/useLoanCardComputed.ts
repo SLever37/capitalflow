@@ -29,7 +29,8 @@ export const useLoanCardComputed = (loan: Loan, sources: CapitalSource[], isStea
 
   // Lógica de Acordo (Defensiva)
   const agreement = loan.activeAgreement;
-  const normalizedAgreementStatus = (agreement?.status === 'ATIVO' || agreement?.status === 'ACTIVE') ? 'ACTIVE' : agreement?.status;
+  // Adjusted comparison to satisfy TS strict typing while maintaining core logic (AgreementStatus is 'ACTIVE' | 'PAID' | 'BROKEN')
+  const normalizedAgreementStatus = (agreement?.status === 'ACTIVE') ? 'ACTIVE' : agreement?.status;
   const hasActiveAgreement = !!agreement && normalizedAgreementStatus === 'ACTIVE';
   const isAgreementPaid = !!agreement && agreement.status === 'PAID';
 

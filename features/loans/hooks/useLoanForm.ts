@@ -220,13 +220,15 @@ export const useLoanForm = ({ initialData, clients, sources, userProfile, onAdd,
 
     setIsSubmitting(true);
     try {
+        // Pass userProfile.id to mapFormToLoan to ensure Loan type compliance
         const loanPayload = mapFormToLoan(
             formData, 
             fixedDuration, 
             initialData || null, 
             attachments, 
             documentPhotos, 
-            customDocuments
+            customDocuments,
+            userProfile?.id || ''
         );
         loanPayload.skipWeekends = skipWeekends;
         

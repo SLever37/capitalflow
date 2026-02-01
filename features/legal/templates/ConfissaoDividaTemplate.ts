@@ -3,7 +3,7 @@ import { LegalDocumentParams } from "../../../types";
 import { formatMoney } from "../../../utils/formatters";
 import { buildConfissaoDividaVM } from "../viewModels/confissaoVM";
 
-export const generateConfissaoDividaHTML = (data: LegalDocumentParams, docId?: string, hash?: string, signatures?: any[]) => {
+export const generateConfissaoDividaHTML = (data: LegalDocumentParams, docId?: string, hash?: string, signatures: any[] = []) => {
     const vm = buildConfissaoDividaVM(data);
 
     const installmentsText = vm.installments
@@ -17,147 +17,85 @@ export const generateConfissaoDividaHTML = (data: LegalDocumentParams, docId?: s
         `)
         .join('');
 
-    // Busca dados de assinatura se disponíveis
-    const debtorSig = signatures?.find(s => s.signer_name.toUpperCase() === vm.debtorName.toUpperCase() || s.signer_document === data.debtorDoc);
-    const creditorSig = signatures?.find(s => s.signer_name.toUpperCase() === vm.creditorName.toUpperCase());
-    
-    // Testemunhas preenchidas via Input ou Assinatura
-    const w1Name = data.witnesses?.[0]?.name || signatures?.find(s => s.role === 'TESTEMUNHA_1')?.signer_name || '_______________________________';
-    const w1Doc = data.witnesses?.[0]?.document || signatures?.find(s => s.role === 'TESTEMUNHA_1')?.signer_document || '';
-    const w1Sig = signatures?.find(s => s.role === 'TESTEMUNHA_1' || s.signer_name === w1Name);
+    const findSig = (role: string) => signatures.find(s => s.role === role);
 
-    const w2Name = data.witnesses?.[1]?.name || signatures?.find(s => s.role === 'TESTEMUNHA_2')?.signer_name || '_______________________________';
-    const w2Doc = data.witnesses?.[1]?.document || signatures?.find(s => s.role === 'TESTEMUNHA_2')?.signer_document || '';
-    const w2Sig = signatures?.find(s => s.role === 'TESTEMUNHA_2' || s.signer_name === w2Name);
-
-    const renderSignatureBlock = (name: string, role: string, sigData?: any, cpf?: string) => `
-        <div class="sign-box">
-            <div class="sig-area">
-                ${sigData ? `<div class="digital-mark">ASSINADO DIGITALMENTE<br/><span style="font-size:6pt">${sigData.assinatura_hash.substring(0,16)}...</span></div>` : ''}
+    const renderSignature = (role: string, name: string, docLabel: string, docValue: string) => {
+        const sig = findSig(role);
+        return `
+            <div style="text-align: center; position: relative; min-height: 120px;">
+                <div style="height: 60px; display: flex; align-items: center; justify-content: center;">
+                    ${sig ? `
+                        <div style="border: 2px solid #059669; color: #059669; padding: 5px; font-family: monospace; font-weight: bold; font-size: 7pt; transform: rotate(-2deg); background: rgba(5, 150, 105, 0.05);">
+                            ASSINADO ELETRONICAMENTE<br/>
+                            ID: ${sig.id.substring(0,8)}<br/>
+                            DATA: ${new Date(sig.signed_at).toLocaleString('pt-BR')}<br/>
+                            IP: ${sig.ip_origem}
+                        </div>
+                    ` : '<div style="border-bottom: 1px solid #000; width: 80%; margin-bottom: 5px;"></div>'}
+                </div>
+                <div style="font-size: 9pt; margin-top: 5px;">
+                    <small style="text-transform: uppercase; font-weight: bold; color: #666;">${role.replace('_', ' ')}</small><br/>
+                    <b>${name.toUpperCase()}</b><br/>
+                    <small>${docLabel}: ${docValue || 'N/A'}</small>
+                </div>
             </div>
-            <div class="line"></div>
-            <b>${name}</b><br>
-            ${role}<br>
-            ${cpf ? `<span style="font-size: 8pt;">CPF: ${cpf}</span>` : ''}
-            ${sigData ? `<br><span style="font-size: 7pt; color: #555;">Em: ${new Date(sigData.signed_at).toLocaleString()} | IP: ${sigData.ip_origem}</span>` : ''}
-        </div>
-    `;
+        `;
+    };
 
     return `
     <!DOCTYPE html>
     <html lang="pt-BR">
     <head>
         <meta charset="UTF-8">
-        <title>Instrumento Particular de Confissão de Dívida</title>
         <style>
-            @page { size: A4; margin: 2.5cm 2cm 2.5cm 2cm; }
-            body { font-family: 'Times New Roman', Times, serif; line-height: 1.5; color: #000; max-width: 800px; margin: 0 auto; padding: 20px; font-size: 11pt; text-align: justify; background: #fff; }
-            h1 { text-align: center; font-size: 14pt; font-weight: bold; text-transform: uppercase; margin-bottom: 20px; margin-top: 0; border-bottom: 2px solid #000; padding-bottom: 10px; }
-            h2 { font-size: 11pt; font-weight: bold; text-transform: uppercase; margin-top: 20px; margin-bottom: 10px; background-color: #eee; padding: 5px; }
-            p { margin-bottom: 10px; text-indent: 1cm; }
-            ul { list-style-type: none; padding-left: 0; }
-            li { margin-bottom: 5px; text-indent: 1cm; }
-            table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 10pt; }
-            .header-box { border: 1px solid #000; padding: 10px; margin-bottom: 20px; font-size: 9pt; text-align: center; }
-            .signatures { margin-top: 40px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 30px; page-break-inside: avoid; }
-            .sign-box { width: 45%; text-align: center; font-size: 10pt; margin-bottom: 20px; position: relative; }
-            .sig-area { height: 50px; position: relative; display: flex; align-items: flex-end; justify-content: center; }
-            .digital-mark { font-family: 'Courier New', monospace; font-size: 8pt; color: #006400; border: 1px dashed #006400; padding: 2px 5px; background: rgba(0,255,0,0.05); transform: rotate(-2deg); }
-            .line { border-top: 1px solid #000; width: 100%; margin-top: 5px; margin-bottom: 5px; }
-            .footer-legal { 
-                margin-top: 50px; 
-                border-top: 1px solid #000; 
-                padding-top: 10px; 
-                font-size: 8pt; 
-                text-align: center; 
-                font-family: Arial, sans-serif;
-                color: #444;
-            }
-            .manifesto-box {
-                margin-top: 30px;
-                border: 1px dashed #666;
-                background-color: #f9f9f9;
-                padding: 10px;
-                font-size: 8pt;
-                font-family: 'Courier New', Courier, monospace;
-                page-break-inside: avoid;
-            }
-            @media print { body { padding: 0; margin: 0; } .header-box { background-color: #fff !important; } }
+            @page { size: A4; margin: 2.5cm; }
+            body { font-family: 'Times New Roman', serif; line-height: 1.5; color: #000; font-size: 11pt; padding: 0; margin: 0; }
+            .container { max-width: 800px; margin: auto; }
+            h1 { text-align: center; font-size: 14pt; border-bottom: 2px solid #000; padding-bottom: 10px; text-transform: uppercase; }
+            h2 { font-size: 12pt; background: #f3f4f6; padding: 5px 10px; margin-top: 20px; border-left: 4px solid #000; }
+            .signatures-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 50px; page-break-inside: avoid; }
+            .footer-info { margin-top: 50px; font-size: 8pt; color: #666; border-top: 1px dashed #ccc; padding-top: 10px; }
         </style>
     </head>
     <body>
-        <div class="header-box">
-            <strong>TÍTULO EXECUTIVO EXTRAJUDICIAL</strong><br>
-            (Artigo 784, inciso III, do Código de Processo Civil)
-        </div>
+        <div class="container">
+            <div style="text-align: center; font-size: 9pt; font-weight: bold; margin-bottom: 10px;">TÍTULO EXECUTIVO EXTRAJUDICIAL (Art. 784, III CPC)</div>
+            <h1>Confissão de Dívida e Compromisso de Pagamento</h1>
 
-        <h1>Instrumento Particular de Confissão de Dívida</h1>
+            <p><strong>CREDOR(A):</strong> ${vm.creditorName}, CPF/CNPJ: ${vm.creditorDoc}, com endereço em ${vm.creditorAddress}.</p>
+            <p><strong>DEVEDOR(A):</strong> ${vm.debtorName}, CPF/CNPJ: ${vm.debtorDoc}, residente em ${vm.debtorAddress}.</p>
 
-        <p>Pelo presente instrumento particular, de um lado:</p>
+            <h2>1. OBJETO E RECONHECIMENTO</h2>
+            <p>O(A) DEVEDOR(A) reconhece e confessa ser devedor(a) da importância de <strong>${vm.totalDebt}</strong>, referente à operação de crédito ID ${data.loanId.substring(0,8)}.</p>
 
-        <p><b>CREDOR(A):</b> <b>${vm.creditorName}</b>, inscrito(a) no CPF/CNPJ sob o nº ${vm.creditorDoc}, com endereço em ${vm.creditorAddress}.</p>
-        
-        <p>e de outro lado,</p>
-        
-        <p><b>DEVEDOR(A):</b> <b>${vm.debtorName}</b>, inscrito(a) no CPF/CNPJ sob o nº ${vm.debtorDoc}, telefone <b>${vm.debtorPhone}</b>, residente e domiciliado(a) em ${vm.debtorAddress}.</p>
-
-        <p>Têm entre si, justo e contratado, o presente termo, mediante as cláusulas e condições seguintes:</p>
-
-        <h2>1. DO RECONHECIMENTO DA DÍVIDA</h2>
-        <p><b>CLÁUSULA PRIMEIRA:</b> O <b>DEVEDOR</b> reconhece e confessa, de forma livre e consciente, irrevogável e irretratável, dever ao <b>CREDOR</b> a quantia líquida, certa e exigível de <b>${vm.totalDebt}</b>, referente à ${vm.originDescription}.</p>
-
-        <h2>2. DO PAGAMENTO</h2>
-        <p><b>CLÁUSULA SEGUNDA:</b> O valor confessado será pago em ${vm.installments.length} parcelas, conforme cronograma abaixo:</p>
-        
-        <table>
-            <thead>
-                <tr style="background-color: #ddd;">
-                    <th style="border: 1px solid #000; padding: 5px;">Parcela</th>
-                    <th style="border: 1px solid #000; padding: 5px;">Vencimento</th>
-                    <th style="border: 1px solid #000; padding: 5px;">Valor</th>
+            <h2>2. FORMA DE PAGAMENTO</h2>
+            <table style="width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 10pt;">
+                <tr style="background: #eee;">
+                    <th style="border: 1px solid #000; padding: 8px;">Parcela</th>
+                    <th style="border: 1px solid #000; padding: 8px;">Vencimento</th>
+                    <th style="border: 1px solid #000; padding: 8px;">Valor</th>
                 </tr>
-            </thead>
-            <tbody>
                 ${installmentsText}
-            </tbody>
-        </table>
+            </table>
 
-        <h2>3. DOS ENCARGOS E MORA</h2>
-        <p><b>CLÁUSULA TERCEIRA:</b> O inadimplemento de qualquer parcela na data aprazada constituirá o <b>DEVEDOR</b> em mora de pleno direito, independentemente de notificação, sujeitando-o ao pagamento de:</p>
-        <ul>
-            <li>a) Multa moratória de 10% (dez por cento) sobre o valor do débito;</li>
-            <li>b) Juros de mora de 1% (um por cento) ao mês;</li>
-            <li>c) Correção monetária pelo índice IGP-M/FGV.</li>
-        </ul>
+            <h2>3. VALIDADE DAS ASSINATURAS</h2>
+            <p>As partes concordam que as assinaturas eletrônicas realizadas neste portal possuem plena validade jurídica e eficácia executiva, nos termos da Medida Provisória nº 2.200-2/2001 e da Lei nº 14.063/2020.</p>
 
-        <h2>4. DO VENCIMENTO ANTECIPADO</h2>
-        <p><b>CLÁUSULA QUARTA:</b> Fica convencionado o <b>VENCIMENTO ANTECIPADO</b> de toda a dívida, tornando-a imediatamente exigível em sua totalidade, em caso de atraso superior a 10 (dez) dias no pagamento de qualquer parcela ou insolvência do DEVEDOR.</p>
+            <p style="text-align: center; margin-top: 30px;">${vm.city}, ${new Date().toLocaleDateString('pt-BR')}</p>
 
-        <h2>5. DA ASSINATURA ELETRÔNICA</h2>
-        <p><b>CLÁUSULA QUINTA:</b> As partes reconhecem expressamente a validade jurídica da assinatura eletrônica aposta neste instrumento, nos termos do art. 10, § 2º, da Medida Provisória nº 2.200-2/2001 e da Lei nº 14.063/2020. Declaram reconhecer como válidos e autênticos os meios de comprovação de autoria e integridade utilizados, incluindo o registro de IP, data, hora e o hash criptográfico SHA-256 gerado pelo sistema.</p>
+            <div class="signatures-grid">
+                ${renderSignature('CREDOR', vm.creditorName, 'DOC', vm.creditorDoc)}
+                ${renderSignature('DEVEDOR', vm.debtorName, 'DOC', vm.debtorDoc)}
+                ${renderSignature('TESTEMUNHA_1', data.witnesses?.[0]?.name || 'Testemunha 1', 'CPF', data.witnesses?.[0]?.document || '')}
+                ${renderSignature('TESTEMUNHA_2', data.witnesses?.[1]?.name || 'Testemunha 2', 'CPF', data.witnesses?.[1]?.document || '')}
+            </div>
 
-        <h2>6. DO FORO</h2>
-        <p><b>CLÁUSULA SEXTA:</b> As partes elegem o foro da comarca de <b>${vm.city}</b> para dirimir quaisquer questões oriundas deste instrumento, renunciando a qualquer outro, por mais privilegiado que seja.</p>
-
-        <p style="text-align: center; margin-top: 40px; margin-bottom: 20px;">${vm.city}, ${vm.date}.</p>
-
-        <div class="signatures">
-            ${renderSignatureBlock(vm.debtorName, 'DEVEDOR(A)', debtorSig, vm.debtorDoc)}
-            ${renderSignatureBlock(vm.creditorName, 'CREDOR(A)', creditorSig, vm.creditorDoc)}
-            ${renderSignatureBlock(w1Name, 'TESTEMUNHA 1', w1Sig, w1Doc)}
-            ${renderSignatureBlock(w2Name, 'TESTEMUNHA 2', w2Sig, w2Doc)}
-        </div>
-        
-        <div class="manifesto-box">
-            <strong>MANIFESTO DE ASSINATURA E INTEGRIDADE</strong><br/>
-            Este documento foi gerado e assinado digitalmente através da plataforma CapitalFlow.<br/>
-            <ul>
-                <li><strong>ID Único:</strong> ${docId || 'PENDENTE'}</li>
-                <li><strong>Hash SHA-256 (Conteúdo Original):</strong> ${hash || 'GERANDO...'}</li>
-                <li><strong>Carimbo de Tempo:</strong> ${new Date().toISOString()}</li>
-                <li><strong>Legislação:</strong> Lei 14.063/2020, MP 2.200-2/2001, CPC Art. 784 III.</li>
-            </ul>
-            <p style="margin:0; text-indent:0;">A integridade deste documento pode ser verificada recalculando o Hash SHA-256 do seu conteúdo JSON canônico.</p>
+            <div class="footer-info">
+                <strong>Protocolo de Integridade:</strong><br/>
+                ID Documento: ${docId || 'N/A'}<br/>
+                Hash Principal (SHA-256): ${hash || 'N/A'}<br/>
+                O registro eletrônico deste documento é imutável após a finalização das assinaturas.
+            </div>
         </div>
     </body>
     </html>

@@ -13,8 +13,6 @@ export const useClientPortalLogic = (initialLoanId: string) => {
     const [portalInfo, setPortalInfo] = useState<string | null>(null);
 
     const [loginIdentifier, setLoginIdentifier] = useState('');
-    // loginCode removido pois agora o login é frictionless (apenas identificador)
-    
     const [loggedClient, setLoggedClient] = useState<any | null>(null);
     const [byeName, setByeName] = useState<string | null>(null);
     
@@ -32,7 +30,6 @@ export const useClientPortalLogic = (initialLoanId: string) => {
     const abortControllerRef = useRef<AbortController | null>(null);
     
     const loadFullPortalData = useCallback(async (loanId: string, clientId: string) => {
-        // Cancela requisição anterior se houver
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
         }
@@ -63,7 +60,6 @@ export const useClientPortalLogic = (initialLoanId: string) => {
 
     useEffect(() => {
         const checkSession = async () => {
-            // Verifica URL para Magic Link primeiro
             const params = new URLSearchParams(window.location.search);
             const magicCode = params.get('code');
             const portalId = params.get('portal');
@@ -74,7 +70,6 @@ export const useClientPortalLogic = (initialLoanId: string) => {
                     setLoggedClient(clientData);
                     setSelectedLoanId(portalId);
                     
-                    // Salva sessão
                     const session: PortalSession = {
                         client_id: clientData.id,
                         access_code: 'MAGIC_LINK', 
@@ -86,7 +81,7 @@ export const useClientPortalLogic = (initialLoanId: string) => {
                     setIsLoading(false);
                     return;
                 } catch (e) {
-                    console.error("Magic Link falhou, tentando sessão salva...");
+                    console.error("Magic Link falhou.");
                 }
             }
 
@@ -94,14 +89,8 @@ export const useClientPortalLogic = (initialLoanId: string) => {
                 const raw = localStorage.getItem(PORTAL_SESSION_KEY);
                 if (!raw) { setIsLoading(false); return; }
                 const sess = JSON.parse(raw) as PortalSession;
-                
-                // Validação simplificada de sessão (já que removemos a senha do login manual)
-                // Se o ID do cliente na sessão bater com o contrato atual (se houver), ok.
                 if (sess.client_id) {
-                    // Nota: Idealmente validaríamos no server, mas aqui simplificamos a UX
-                    // Se o usuário tem o ID do cliente no localStorage, assumimos que ele já se autenticou antes.
-                    // Para maior segurança, poderíamos pedir o identifier novamente periodicamente.
-                    setLoggedClient({ id: sess.client_id, name: 'Cliente' }); // Nome será atualizado ao carregar dados
+                    setLoggedClient({ id: sess.client_id, name: 'Cliente' }); 
                     if (sess.last_loan_id) setSelectedLoanId(sess.last_loan_id);
                 } else {
                     localStorage.removeItem(PORTAL_SESSION_KEY);
@@ -132,9 +121,7 @@ export const useClientPortalLogic = (initialLoanId: string) => {
         setPortalError(null);
         setIsLoading(true);
         try {
-            // Login Unificado (Sem Senha)
             const client = await portalService.authenticate(selectedLoanId, loginIdentifier);
-            
             setLoggedClient(client);
             setByeName(null);
             
@@ -147,7 +134,7 @@ export const useClientPortalLogic = (initialLoanId: string) => {
             };
             localStorage.setItem(PORTAL_SESSION_KEY, JSON.stringify(session));
         } catch (e: any) {
-            if (e.name !== 'AbortError' && !e.message?.includes('abort')) {
+            if (e.name !== 'AbortError') {
                 setPortalError(e.message);
             }
         } finally {
@@ -197,30 +184,37 @@ export const useClientPortalLogic = (initialLoanId: string) => {
         if (!loggedClient || !loan || isSigning) return;
         setIsSigning(true);
         try {
-            const { data: docRecord } = await supabase.from('documentos_juridicos')
-                .select('public_access_token')
-                .eq('loan_id', loan.id)
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .maybeSingle();
+            // Busca token de acesso público via RPC de segurança
+            const { data: records, error: fetchError } = await supabase.rpc('get_documento_juridico_by_loan', { p_loan_id: loan.id });
 
-            if (!docRecord?.public_access_token) {
-                throw new Error("O credor ainda não disponibilizou os títulos para assinatura.");
+            if (fetchError || !records || records.length === 0) {
+                throw new Error("Nenhum título localizado para assinatura.");
+            }
+
+            // CORREÇÃO: Utiliza view_token conforme schema do banco
+            const token = records[0].view_token; 
+            
+            if (!token) {
+                throw new Error("Token de visualização não disponível no documento.");
             }
 
             let ip = 'DETECTANDO...';
             try { const res = await fetch('https://api.ipify.org?format=json'); const data = await res.json(); ip = data.ip; } catch(e){}
 
             await legalPublicService.signDocumentPublicly(
-                docRecord.public_access_token,
-                { name: loggedClient.name, doc: loggedClient.document || loggedClient.cpf || loggedClient.cnpj || 'N/A' },
+                token,
+                { 
+                    name: loggedClient.name, 
+                    doc: loggedClient.document || loggedClient.cpf || loggedClient.cnpj || 'N/A',
+                    role: 'DEVEDOR'
+                },
                 { ip, userAgent: navigator.userAgent }
             );
 
-            alert(`${type === 'CONFISSAO' ? 'Confissão de Dívida' : 'Nota Promissória'} assinada com sucesso! Uma cópia foi registrada.`);
+            alert(`${type === 'CONFISSAO' ? 'Confissão de Dívida' : 'Nota Promissória'} assinada com sucesso!`);
             loadFullPortalData(selectedLoanId, loggedClient.id);
         } catch (e: any) {
-            if (e.name !== 'AbortError' && !e.message?.includes('abort')) {
+            if (e.name !== 'AbortError') {
                 alert(e.message);
             }
         } finally {
@@ -231,13 +225,12 @@ export const useClientPortalLogic = (initialLoanId: string) => {
     return {
         isLoading, isSigning, portalError, portalInfo,
         loginIdentifier, setLoginIdentifier, 
-        // loginCode removido
         loginCode: '', setLoginCode: () => {}, 
-        
         loggedClient, byeName, selectedLoanId,
         loan, installments, portalSignals, isAgreementActive,
         intentId, intentType, receiptPreview,
+        pixKey,
         handleLogin, handleLogout, handleSignalIntent, handleReceiptUpload, handleSignDocument,
-        loadFullPortalData // Agora exposto para reload manual
+        loadFullPortalData 
     };
 };

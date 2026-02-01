@@ -1,13 +1,13 @@
 
 import { supabase } from '../../../lib/supabase';
-import { Agreement, Loan, UserProfile, LegalDocumentParams, LegalDocumentRecord, LegalSignatureMetadata } from '../../../types';
+import { Agreement, Loan, UserProfile, LegalDocumentParams, LegalDocumentRecord } from '../../../types';
 import { generateSHA256, createLegalSnapshot } from '../../../utils/crypto';
 import { generateUUID } from '../../../utils/generators';
 
 export const legalService = {
-    // Prepara o payload (Snapshot) para geração do documento
     prepareDocumentParams: (agreement: Agreement, loan: Loan, activeUser: UserProfile): LegalDocumentParams => {
         return {
+            loanId: loan.id,
             debtorName: loan.debtorName,
             debtorDoc: loan.debtorDocument,
             debtorPhone: loan.debtorPhone, 
@@ -15,31 +15,29 @@ export const legalService = {
             creditorName: activeUser.fullName || activeUser.businessName || activeUser.name,
             creditorDoc: activeUser.document || 'Não informado',
             creditorAddress: activeUser.address || `${activeUser.city || 'Manaus'} - ${activeUser.state || 'AM'}`,
+            amount: loan.principal,
             totalDebt: agreement.negotiatedTotal,
-            originDescription: `Instrumento particular de empréstimo (ID: ${loan.id.substring(0,8)}) iniciado em ${new Date(loan.startDate).toLocaleDateString('pt-BR')}, consolidado através do Acordo nº ${agreement.id.substring(0,8)}.`,
-            installments: agreement.installments,
+            originDescription: `Instrumento particular de crédito privado ID ${loan.id.substring(0,8)} consolidado via Acordo nº ${agreement.id.substring(0,8)}.`,
+            city: activeUser.city || 'Manaus',
+            state: activeUser.state || 'AM',
+            witnesses: (loan as any).witnesses || [], 
             contractDate: new Date(loan.startDate).toLocaleDateString('pt-BR'),
             agreementDate: new Date(agreement.createdAt).toLocaleDateString('pt-BR'),
-            city: activeUser.city || 'Manaus',
-            timestamp: new Date().toISOString(),
-            witnesses: [] // Inicializa vazio, será preenchido na UI se necessário
+            installments: agreement.installments,
+            timestamp: new Date().toISOString()
         };
     },
 
-    // Gera Hash, Salva Snapshot e Retorna Dados para Impressão
-    async generateAndRegisterDocument(agreementId: string, params: LegalDocumentParams, profileId: string): Promise<LegalDocumentRecord> {
-        // 1. Criar Snapshot Imutável (String JSON determinística)
+    async generateAndRegisterDocument(entityId: string, params: LegalDocumentParams, profileId: string): Promise<LegalDocumentRecord> {
         const snapshotStr = createLegalSnapshot(params);
-        
-        // 2. Gerar Hash SHA-256
         const hash = await generateSHA256(snapshotStr);
 
-        // 3. Persistir no Banco (Se já existir para este acordo com mesmo hash, retorna o existente)
-        const { data: existing } = await supabase
+        // Busca verificando integridade usando o nome de coluna correto: hash_sha256
+        const { data: existing, error: fetchError } = await supabase
             .from('documentos_juridicos')
             .select('*')
             .eq('hash_sha256', hash)
-            .single();
+            .maybeSingle();
 
         if (existing) {
             return {
@@ -49,116 +47,78 @@ export const legalService = {
                 snapshot: existing.snapshot,
                 hashSHA256: existing.hash_sha256,
                 status: existing.status_assinatura === 'ASSINADO' ? 'SIGNED' : 'PENDING',
-                signatureMetadata: existing.metadata_assinatura,
+                public_access_token: existing.public_access_token,
                 createdAt: existing.created_at
             };
         }
 
-        // Se não existe, cria novo
         const docId = generateUUID();
         const newDocPayload = {
             id: docId,
-            acordo_id: agreementId,
+            loan_id: params.loanId,
+            acordo_id: entityId === params.loanId ? null : entityId,
             profile_id: profileId,
             tipo: 'CONFISSAO',
             snapshot: params,
             hash_sha256: hash,
-            status: 'PENDENTE',
+            status_assinatura: 'PENDENTE',
+            public_access_token: generateUUID(),
             created_at: new Date().toISOString()
         };
 
         const { error } = await supabase.from('documentos_juridicos').insert(newDocPayload);
         
         if (error) {
-            console.error("Erro ao salvar documento jurídico:", error);
-            if (profileId !== 'DEMO') throw new Error("Falha ao registrar documento jurídico no sistema.");
+            console.error("Erro Supabase (Documento):", error);
+            throw new Error(`Falha na base de dados: ${error.message}`);
         }
 
         return {
             id: docId,
-            agreementId,
+            agreementId: entityId,
             type: 'CONFISSAO',
             snapshot: params,
             hashSHA256: hash,
             status: 'PENDING',
+            public_access_token: newDocPayload.public_access_token,
             createdAt: newDocPayload.created_at
         };
     },
 
-    // Busca dados completos para Relatório Jurídico
     async getFullAuditData(docId: string) {
-        const { data: doc } = await supabase.from('documentos_juridicos').select('*').eq('id', docId).single();
-        const { data: signatures } = await supabase.from('assinaturas_documento').select('*').eq('document_id', docId);
-        const { data: logs } = await supabase.from('logs_assinatura').select('*').eq('document_id', docId).order('timestamp', { ascending: true });
-
-        return { doc, signatures: signatures || [], logs: logs || [] };
+        const { data: doc, error: docError } = await supabase.from('documentos_juridicos').select('*').eq('id', docId).single();
+        if (docError || !doc) return { doc: null, signatures: [] };
+        const { data: signatures } = await supabase.from('assinaturas_documento').select('*').eq('document_id', doc.id);
+        return { doc, signatures: signatures || [] };
     },
 
-    // 🔒 VALIDAÇÃO DE INTEGRIDADE
-    async verifyIntegrity(doc: LegalDocumentRecord): Promise<boolean> {
-        const snapshotStr = createLegalSnapshot(doc.snapshot);
-        const recomputedHash = await generateSHA256(snapshotStr);
-        return recomputedHash === doc.hashSHA256;
-    },
+    async signDocument(docId: string, profileId: string, signerInfo: { name: string, doc: string }, role: string): Promise<void> {
+        let ip = '0.0.0.0';
+        try { const res = await fetch('https://api.ipify.org?format=json'); const d = await res.json(); ip = d.ip; } catch (e) {}
 
-    // ✍️ ASSINATURA ELETRÔNICA COM VALIDADE JURÍDICA (MP 2.200-2/2001)
-    async signDocument(docId: string, profileId: string, signerInfo?: { name: string, doc: string }): Promise<void> {
-        // 1. Obter documento atual do banco para garantir integridade
-        const { data: currentDoc, error: fetchError } = await supabase
-            .from('documentos_juridicos')
-            .select('*')
-            .eq('id', docId)
-            .eq('profile_id', profileId)
-            .single();
+        const timestamp = new Date().toISOString();
+        const payload = `${docId}|${signerInfo.doc}|${role}|${timestamp}`;
+        const hash = await generateSHA256(payload);
 
-        if (fetchError || !currentDoc) {
-            throw new Error("Documento não encontrado ou acesso negado.");
-        }
-
-        if (currentDoc.status_assinatura === 'ASSINADO') {
-            throw new Error("Este documento já foi assinado e é imutável.");
-        }
-
-        // 2. RECALCULAR HASH DO SNAPSHOT (Prova de Integridade)
-        const snapshotStr = createLegalSnapshot(currentDoc.snapshot);
-        const recalculatedHash = await generateSHA256(snapshotStr);
-
-        if (recalculatedHash !== currentDoc.hash_sha256) {
-            throw new Error("VIOLAÇÃO DE INTEGRIDADE: O conteúdo do documento diverge do hash original. A assinatura foi bloqueada.");
-        }
-
-        // 3. Coletar Metadados de Rastreabilidade (Autoria e Tempestividade)
-        let publicIp = 'IP_NAO_IDENTIFICADO';
-        try {
-            const ipResponse = await fetch('https://api.ipify.org?format=json');
-            const ipData = await ipResponse.json();
-            publicIp = ipData.ip;
-        } catch (e) {
-            console.warn("Falha ao obter IP público para auditoria.", e);
-        }
-
-        const metadata: LegalSignatureMetadata = {
-            ip: publicIp,
+        const { error: signError } = await supabase.from('assinaturas_documento').insert({
+            id: generateUUID(),
+            document_id: docId,
+            profile_id: profileId,
+            signer_name: signerInfo.name.toUpperCase(),
+            signer_document: signerInfo.doc,
+            role: role,
+            assinatura_hash: hash,
+            ip_origem: ip,
             user_agent: navigator.userAgent,
-            signed_at: new Date().toISOString(),
-            method: 'ASSINATURA_ELETRONICA',
-            lei_base: 'MP 2.200-2/2001, Lei 14.063/2020',
-            signer_name: signerInfo?.name || 'Operador do Sistema',
-            signer_doc: signerInfo?.doc || 'N/A'
-        };
-
-        // 4. Efetivar Assinatura (Atomic Update)
-        const { error: signError } = await supabase
-            .from('documentos_juridicos')
-            .update({ 
-                status_assinatura: 'ASSINADO',
-                metadata_assinatura: metadata
-            })
-            .eq('id', docId)
-            .eq('hash_sha256', recalculatedHash);
+            signed_at: timestamp
+        });
 
         if (signError) {
-            throw new Error("Erro ao registrar assinatura no banco de dados: " + signError.message);
+            console.error("Erro Supabase (Assinatura):", signError);
+            throw signError;
         }
+        
+        // Atualiza status do documento
+        await supabase.from('documentos_juridicos').update({ status_assinatura: 'EM_ASSINATURA' }).eq('id', docId);
     }
 };

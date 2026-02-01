@@ -27,13 +27,15 @@ export interface LoanFormState {
   fundingFeePercent?: string;
 }
 
+// Added profileId to signature to satisfy Loan type requirement
 export const mapFormToLoan = (
   form: LoanFormState,
   fixedDuration: string,
   initialData: Loan | null,
   attachments: string[],
   documentPhotos: string[],
-  customDocuments: LoanDocument[]
+  customDocuments: LoanDocument[],
+  profileId: string
 ): Loan => {
   
   const principal = parseFloat(form.principal);
@@ -66,6 +68,8 @@ export const mapFormToLoan = (
 
   return {
     id: initialData?.id || generateUUID(),
+    // Added profile_id to satisfy required property in Loan interface
+    profile_id: profileId,
     clientId: form.clientId, 
     debtorName: form.debtorName,
     debtorPhone: form.debtorPhone,

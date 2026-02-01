@@ -82,7 +82,9 @@ export const rebuildLoanStateFromLedger = (loan: Loan): Loan => {
     paidTotal: 0,
     status: LoanStatus.PENDING,
     logs: [] as string[],
-    renewalCount: 0 
+    renewalCount: 0,
+    // Fix: Added paidDate initialization to prevent TypeScript errors in downstream usage
+    paidDate: undefined as string | undefined
   }));
 
   const sortedLedger = [...(loan.ledger || [])].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
