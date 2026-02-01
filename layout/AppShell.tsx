@@ -1,6 +1,5 @@
-
 import React from 'react';
-import { AlertCircle, AlertTriangle, CheckCircle2, Mic } from 'lucide-react';
+import { AlertCircle, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { HeaderBar } from './HeaderBar';
 import { BottomNav } from './BottomNav';
 import { UserProfile } from '../types';
@@ -16,11 +15,10 @@ interface AppShellProps {
   onNewLoan: () => void;
   isStealthMode: boolean;
   toggleStealthMode: () => void;
-  onOpenAssistant?: () => void; 
 }
 
 export const AppShell: React.FC<AppShellProps> = ({ 
-  children, toast, activeTab, setActiveTab, activeUser, isLoadingData, onOpenNav, onNewLoan, isStealthMode, toggleStealthMode, onOpenAssistant
+  children, toast, activeTab, setActiveTab, activeUser, isLoadingData, onOpenNav, onNewLoan, isStealthMode, toggleStealthMode
 }) => {
   return (
     <div className="min-h-screen bg-slate-950 pb-28 md:pb-12 text-slate-100 font-sans selection:bg-blue-600/30 relative">
@@ -45,17 +43,6 @@ export const AppShell: React.FC<AppShellProps> = ({
       <main className="w-full max-w-[1920px] mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
         {children}
       </main>
-
-      {/* GLOBAL AI FAB */}
-      {onOpenAssistant && (
-          <button 
-            onClick={onOpenAssistant}
-            className="fixed z-[90] bottom-24 md:bottom-12 right-6 w-16 h-16 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full shadow-2xl shadow-blue-600/40 flex items-center justify-center text-white hover:scale-110 transition-transform active:scale-95 border-2 border-white/10"
-            title="Assistente IA"
-          >
-            <Mic size={28} />
-          </button>
-      )}
 
       <BottomNav 
         activeTab={activeTab} 

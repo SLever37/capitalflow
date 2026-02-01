@@ -1,5 +1,4 @@
-
-import React, { useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useRef } from 'react';
 
 import { AppShell } from './layout/AppShell';
 import { NavHubController } from './layout/NavHubController';
@@ -59,7 +58,7 @@ export const App: React.FC = () => {
     statusFilter,
     setStatusFilter,
     sortOption,
-    setSortOption, // New hook state
+    setSortOption,
     searchTerm,
     setSearchTerm,
     clientSearchTerm,
@@ -69,16 +68,11 @@ export const App: React.FC = () => {
     loadError
   } = useAppState(activeProfileId);
 
-  // Cast as any to allow property injection
   const ui = useUiState() as any;
-  
-  // INJECT SORT INTO UI CONTEXT FOR CONVENIENCE (Optional, but helps containers)
   ui.sortOption = sortOption;
   ui.setSortOption = setSortOption;
 
   const { portalLoanId, legalSignToken } = usePortalRouting();
-  
-  // Determina se estamos em modo público (Portal ou Assinatura)
   const isPublicView = !!portalLoanId || !!legalSignToken;
 
   usePersistedTab(activeTab, setActiveTab);
@@ -104,8 +98,6 @@ export const App: React.FC = () => {
 
   const { loanCtrl, clientCtrl, sourceCtrl, profileCtrl, adminCtrl, paymentCtrl, fileCtrl, aiCtrl } = controllers;
 
-  // --- NOTIFICAÇÕES ---
-  // CORREÇÃO: Desativa notificações se estiver em modo público
   useAppNotifications({
       loans, 
       sources, 
@@ -116,44 +108,33 @@ export const App: React.FC = () => {
       disabled: isPublicView
   });
 
-  // --- GESTÃO DE VOLTAR (MOBILE) - Estabilizada ---
   const exitAttemptRef = useRef(false);
   const uiRef = useRef(ui);
   uiRef.current = ui;
 
   useEffect(() => {
-    // Previne que o efeito rode centenas de vezes ao digitar na busca
     if (!activeUser && !portalLoanId && !legalSignToken) return;
 
     window.history.pushState(null, document.title, window.location.href);
 
     const handlePopState = () => {
       const currentUi = uiRef.current;
-      
-      // 1. Fecha Modais
       if (currentUi.activeModal) {
           currentUi.closeModal();
           window.history.pushState(null, '', window.location.href);
           return;
       }
-
-      // 2. Fecha Hub
       if (currentUi.showNavHub) {
           currentUi.setShowNavHub(false);
           window.history.pushState(null, '', window.location.href);
           return;
       }
-
-      // 3. Volta para Dashboard se estiver em outra tab
       if (activeTab !== 'DASHBOARD' && !portalLoanId && !legalSignToken) {
         setActiveTab('DASHBOARD');
         window.history.pushState(null, '', window.location.href);
         return;
       }
-
-      // 4. Double-tap para sair
       if (exitAttemptRef.current) {
-        // Deixa o navegador seguir o fluxo padrão de saída
       } else {
         showToast('Pressione novamente para sair.', 'info');
         exitAttemptRef.current = true;
@@ -166,7 +147,6 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('popstate', handlePopState);
   }, [activeUser === null, !!portalLoanId, !!legalSignToken, activeTab]);
 
-  // ✅ Toast global para telas públicas
   const shouldRenderGlobalToast = !activeUser || isPublicView;
 
   return (
@@ -213,7 +193,6 @@ export const App: React.FC = () => {
           onNewLoan={() => { ui.setEditingLoan(null); ui.openModal('LOAN_FORM'); }}
           isStealthMode={ui.isStealthMode}
           toggleStealthMode={() => ui.setIsStealthMode(!ui.isStealthMode)}
-          onOpenAssistant={() => ui.openModal('AI_ASSISTANT')}
         >
           {activeTab === 'DASHBOARD' && (
             <DashboardContainer
