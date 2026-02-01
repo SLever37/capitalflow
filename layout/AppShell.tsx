@@ -1,8 +1,9 @@
-import React from 'react';
-import { AlertCircle, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { AlertCircle, AlertTriangle, CheckCircle2, MessageSquare } from 'lucide-react';
 import { HeaderBar } from './HeaderBar';
 import { BottomNav } from './BottomNav';
 import { UserProfile } from '../types';
+import { supabase } from '../lib/supabase';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -15,11 +16,51 @@ interface AppShellProps {
   onNewLoan: () => void;
   isStealthMode: boolean;
   toggleStealthMode: () => void;
+  onOpenSupport?: () => void;
 }
 
 export const AppShell: React.FC<AppShellProps> = ({ 
-  children, toast, activeTab, setActiveTab, activeUser, isLoadingData, onOpenNav, onNewLoan, isStealthMode, toggleStealthMode
+  children, toast, activeTab, setActiveTab, activeUser, isLoadingData, onOpenNav, onNewLoan, isStealthMode, toggleStealthMode, onOpenSupport
 }) => {
+  const [unreadSupport, setUnreadSupport] = useState(0);
+
+  useEffect(() => {
+    if (!activeUser || activeUser.id === 'DEMO') return;
+    
+    const fetchUnread = async () => {
+        const { count } = await supabase
+            .from('mensagens_suporte')
+            .select('*', { count: 'exact', head: true })
+            .eq('profile_id', activeUser.id)
+            .eq('sender', 'CLIENT')
+            .eq('read', false);
+        setUnreadSupport(count || 0);
+    };
+
+    fetchUnread();
+
+    const channel = supabase.channel('support-notifications')
+        .on('postgres_changes', { 
+            event: 'INSERT', 
+            schema: 'public', 
+            table: 'mensagens_suporte', 
+            filter: `profile_id=eq.${activeUser.id}` 
+        }, (payload) => {
+            if (payload.new.sender === 'CLIENT') {
+                fetchUnread();
+            }
+        })
+        .on('postgres_changes', {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'mensagens_suporte',
+            filter: `profile_id=eq.${activeUser.id}`
+        }, () => fetchUnread())
+        .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [activeUser?.id]);
+
   return (
     <div className="min-h-screen bg-slate-950 pb-28 md:pb-12 text-slate-100 font-sans selection:bg-blue-600/30 relative">
       {toast && (
@@ -43,6 +84,22 @@ export const AppShell: React.FC<AppShellProps> = ({
       <main className="w-full max-w-[1920px] mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
         {children}
       </main>
+
+      {/* FAB SUPORTE OPERADOR */}
+      {activeUser && (
+          <button 
+            onClick={onOpenSupport}
+            className="fixed bottom-24 md:bottom-8 right-6 z-40 p-4 bg-blue-600 text-white rounded-full shadow-2xl shadow-blue-600/40 hover:scale-110 transition-all active:scale-95 group"
+          >
+              <MessageSquare size={24}/>
+              {unreadSupport > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[10px] font-black w-6 h-6 flex items-center justify-center rounded-full ring-4 ring-slate-950 animate-bounce">
+                      {unreadSupport}
+                  </span>
+              )}
+              <span className="absolute right-full mr-4 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-2xl">Suporte ao Cliente</span>
+          </button>
+      )}
 
       <BottomNav 
         activeTab={activeTab} 

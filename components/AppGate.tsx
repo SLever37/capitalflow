@@ -1,6 +1,5 @@
-
 import React from 'react';
-import { Loader2, AlertTriangle, Shield, RotateCcw, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { ClientPortalView } from '../features/portal/ClientPortalView';
 import { PublicLegalSignPage } from '../features/legal/components/PublicLegalSignPage';
 import { AuthScreen } from '../features/auth/AuthScreen';
@@ -34,11 +33,6 @@ export const AppGate: React.FC<AppGateProps> = ({
   showToast, setIsLoadingData, children, legalSignToken, toast
 }) => {
   
-  const handleEmergencyLogout = () => {
-    localStorage.removeItem('cm_session');
-    window.location.reload();
-  };
-
   const ToastOverlay = () => {
     if (!toast) return null;
     const bg = toast.type === 'error' ? 'bg-rose-600' : toast.type === 'warning' ? 'bg-amber-500 text-black' : 'bg-blue-600';
@@ -49,10 +43,11 @@ export const AppGate: React.FC<AppGateProps> = ({
     );
   };
 
+  // Vistas Públicas (Portal e Assinatura)
   if (legalSignToken) return <><ToastOverlay/><PublicLegalSignPage token={legalSignToken}/></>;
   if (portalLoanId) return <><ToastOverlay/><ClientPortalView initialLoanId={portalLoanId}/></>;
 
-  // Caso esteja tentando carregar uma sessão salva
+  // Sessão Detectada mas Dados Carregando
   if (activeProfileId && !activeUser && isLoadingData) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
@@ -64,7 +59,7 @@ export const AppGate: React.FC<AppGateProps> = ({
     );
   }
 
-  // Caso de Erro ou Sessão não encontrada/inválida
+  // Sem Sessão ou Usuário não Autenticado: Mostra Login Imediatamente
   if (!activeProfileId || !activeUser) {
     return (
       <>
@@ -83,5 +78,6 @@ export const AppGate: React.FC<AppGateProps> = ({
     );
   }
 
+  // Sessão Ativa: Mostra o Aplicativo
   return <>{children}</>;
 };
