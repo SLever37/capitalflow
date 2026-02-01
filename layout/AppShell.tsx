@@ -1,9 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, AlertTriangle, CheckCircle2, MessageSquare } from 'lucide-react';
 import { HeaderBar } from './HeaderBar';
 import { BottomNav } from './BottomNav';
 import { UserProfile } from '../types';
 import { supabase } from '../lib/supabase';
+import { playNotificationSound } from '../utils/notificationSound';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -47,6 +49,7 @@ export const AppShell: React.FC<AppShellProps> = ({
             filter: `profile_id=eq.${activeUser.id}` 
         }, (payload) => {
             if (payload.new.sender === 'CLIENT') {
+                playNotificationSound();
                 fetchUnread();
             }
         })
@@ -97,7 +100,7 @@ export const AppShell: React.FC<AppShellProps> = ({
                       {unreadSupport}
                   </span>
               )}
-              <span className="absolute right-full mr-4 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-2xl">Suporte ao Cliente</span>
+              <span className="absolute right-full mr-4 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-2xl">Atendimento Online</span>
           </button>
       )}
 

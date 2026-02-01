@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Loader2 } from 'lucide-react';
 import { ClientPortalView } from '../features/portal/ClientPortalView';
@@ -43,23 +44,20 @@ export const AppGate: React.FC<AppGateProps> = ({
     );
   };
 
-  // Vistas Públicas (Portal e Assinatura)
+  // Vistas Públicas
   if (legalSignToken) return <><ToastOverlay/><PublicLegalSignPage token={legalSignToken}/></>;
   if (portalLoanId) return <><ToastOverlay/><ClientPortalView initialLoanId={portalLoanId}/></>;
 
-  // Sessão Detectada mas Dados Carregando
+  // Se houver sessão mas dados ainda carregando (Splash rápido)
   if (activeProfileId && !activeUser && isLoadingData) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
-        <div className="text-center space-y-4 animate-in fade-in duration-500">
-          <Loader2 className="w-12 h-12 text-blue-500 animate-spin mx-auto" />
-          <p className="text-slate-500 font-black uppercase text-[10px] tracking-widest">Sincronizando Capital...</p>
-        </div>
+        <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
       </div>
     );
   }
 
-  // Sem Sessão ou Usuário não Autenticado: Mostra Login Imediatamente
+  // Sem Sessão: Tela de Login Imediata
   if (!activeProfileId || !activeUser) {
     return (
       <>
@@ -78,6 +76,5 @@ export const AppGate: React.FC<AppGateProps> = ({
     );
   }
 
-  // Sessão Ativa: Mostra o Aplicativo
   return <>{children}</>;
 };
