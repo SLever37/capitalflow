@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Paperclip, Mic, X, FileText, Loader2, Play, Pause, Check, CheckCheck } from 'lucide-react';
+import { Send, Paperclip, Mic, X, FileText, Loader2, Check, CheckCheck } from 'lucide-react';
 import { supportChatService, SupportMessage } from '../../services/supportChat.service';
 import { supabase } from '../../lib/supabase';
 import { playNotificationSound } from '../../utils/notificationSound';
@@ -23,14 +24,17 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({ loanId, profileId,
     const timerRef = useRef<any>(null);
 
     const loadMessages = async () => {
-        const data = await supportChatService.getMessages(loanId);
-        setMessages(data);
-        await supportChatService.markAsRead(loanId, senderType);
+        try {
+            const data = await supportChatService.getMessages(loanId);
+            setMessages(data);
+            await supportChatService.markAsRead(loanId, senderType);
+        } catch (e) {}
     };
 
     useEffect(() => {
         loadMessages();
-        const channel = supabase.channel(`chat-${loanId}`)
+        // Escuta em tempo real para este chat específico
+        const channel = supabase.channel(`chat-realtime-${loanId}`)
             .on('postgres_changes', { 
                 event: 'INSERT', 
                 schema: 'public', 
@@ -73,7 +77,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({ loanId, profileId,
             });
             setInputText('');
         } catch (e) {
-            alert("Erro ao enviar mensagem.");
+            alert("Falha no envio.");
         } finally {
             setIsUploading(false);
         }
@@ -94,14 +98,12 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({ loanId, profileId,
             setIsRecording(true);
             setRecordingTime(0);
             timerRef.current = setInterval(() => setRecordingTime(prev => prev + 1), 1000);
-        } catch (e) { alert("Microfone não autorizado."); }
+        } catch (e) { alert("Microfone não disponível."); }
     };
 
     const stopRecording = (cancel = false) => {
         if (timerRef.current) clearInterval(timerRef.current);
-        if (cancel) {
-            mediaRecorder.current!.onstop = () => {};
-        }
+        if (cancel) { mediaRecorder.current!.onstop = () => {}; }
         mediaRecorder.current?.stop();
         setIsRecording(false);
         setRecordingTime(0);
@@ -109,20 +111,14 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({ loanId, profileId,
 
     const renderContent = (m: SupportMessage) => {
         if (m.type === 'image') return <img src={m.file_url} className="max-w-full rounded-xl mb-1 cursor-pointer hover:opacity-90" onClick={() => window.open(m.file_url)}/>;
-        if (m.type === 'audio') return <audio controls src={m.file_url} className="max-w-full h-8 mb-1 scale-90 origin-left"/>;
-        if (m.type === 'file') return <a href={m.file_url} target="_blank" className="flex items-center gap-2 underline mb-1 font-bold"><FileText size={16}/> Documento</a>;
+        if (m.type === 'audio') return <audio controls src={m.file_url} className="max-w-full h-10 mb-1 scale-90 origin-left"/>;
+        if (m.type === 'file') return <a href={m.file_url} target="_blank" className="flex items-center gap-2 underline mb-1 font-bold text-[10px] text-blue-400 uppercase"><FileText size={14}/> Ver Documento</a>;
         return <p className="leading-relaxed">{m.text}</p>;
     };
 
     return (
-        <div className="flex flex-col h-full bg-slate-950/20">
+        <div className="flex flex-col h-full bg-slate-950/40">
             <div className="flex-1 p-4 overflow-y-auto custom-scrollbar space-y-4" ref={scrollRef}>
-                {messages.length === 0 && (
-                    <div className="h-full flex flex-col items-center justify-center opacity-20 text-center px-10">
-                        <Send size={48} className="mb-4"/>
-                        <p className="text-xs font-black uppercase tracking-widest">Inicie a conversa agora</p>
-                    </div>
-                )}
                 {messages.map(m => (
                     <div key={m.id} className={`flex ${m.sender === senderType ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[85%] p-3.5 rounded-2xl shadow-sm relative group ${m.sender === senderType ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-slate-800 text-slate-200 rounded-tl-none border border-slate-700'}`}>
@@ -136,49 +132,40 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({ loanId, profileId,
                 ))}
             </div>
 
-            <div className="p-4 bg-slate-900/50 border-t border-slate-800">
+            <div className="p-4 bg-slate-900 border-t border-slate-800">
                 {isRecording ? (
-                    <div className="flex items-center justify-between bg-rose-600 text-white p-3 rounded-2xl animate-in slide-in-from-bottom-2">
+                    <div className="flex items-center justify-between bg-rose-600 text-white p-3 rounded-2xl animate-pulse">
                         <div className="flex items-center gap-3">
-                            <div className="w-2 h-2 bg-white rounded-full animate-pulse"/>
-                            <span className="text-xs font-black uppercase tracking-widest">Gravando: {Math.floor(recordingTime/60)}:{(recordingTime%60).toString().padStart(2,'0')}</span>
+                            <div className="w-2 h-2 bg-white rounded-full animate-ping"/>
+                            <span className="text-[10px] font-black uppercase">Gravando: {Math.floor(recordingTime/60)}:{(recordingTime%60).toString().padStart(2,'0')}</span>
                         </div>
                         <div className="flex gap-2">
-                            <button onClick={() => stopRecording(true)} className="p-2 bg-rose-700 rounded-lg hover:bg-rose-800 transition-colors"><X size={16}/></button>
-                            <button onClick={() => stopRecording(false)} className="p-2 bg-white text-rose-600 rounded-lg hover:bg-slate-100 transition-colors"><Check size={16}/></button>
+                            <button onClick={() => stopRecording(true)} className="p-2 bg-rose-700 rounded-lg"><X size={14}/></button>
+                            <button onClick={() => stopRecording(false)} className="p-2 bg-white text-rose-600 rounded-lg"><Check size={14}/></button>
                         </div>
                     </div>
                 ) : (
                     <div className="flex gap-2 items-center">
-                        <label className="p-3 bg-slate-800 text-slate-400 rounded-xl cursor-pointer hover:text-white hover:bg-slate-700 transition-all">
+                        <label className="p-3 bg-slate-800 text-slate-400 rounded-xl cursor-pointer hover:text-white transition-all">
                             <Paperclip size={20}/>
                             <input type="file" className="hidden" onChange={e => e.target.files?.[0] && handleSend(e.target.files[0], e.target.files[0].type.startsWith('image/') ? 'image' : 'file')}/>
                         </label>
                         
-                        <div className="flex-1 relative">
-                            <input 
-                                type="text" 
-                                value={inputText} 
-                                onChange={e => setInputText(e.target.value)} 
-                                onKeyDown={e => e.key === 'Enter' && handleSend()} 
-                                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3.5 text-white text-xs outline-none focus:border-blue-500 transition-all" 
-                                placeholder={placeholder || "Escreva sua mensagem..."}
-                            />
-                        </div>
+                        <input 
+                            type="text" 
+                            value={inputText} 
+                            onChange={e => setInputText(e.target.value)} 
+                            onKeyDown={e => e.key === 'Enter' && handleSend()} 
+                            className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3.5 text-white text-xs outline-none focus:border-blue-500 transition-all" 
+                            placeholder={placeholder || "Sua mensagem..."}
+                        />
 
                         {inputText.trim() || isUploading ? (
-                            <button 
-                                onClick={() => handleSend()} 
-                                disabled={isUploading}
-                                className="p-3.5 bg-blue-600 text-white rounded-xl hover:bg-blue-500 transition-all shadow-lg disabled:opacity-50"
-                            >
+                            <button onClick={() => handleSend()} disabled={isUploading} className="p-3.5 bg-blue-600 text-white rounded-xl hover:bg-blue-500 transition-all shadow-lg">
                                 {isUploading ? <Loader2 className="animate-spin" size={20}/> : <Send size={20}/>}
                             </button>
                         ) : (
-                            <button 
-                                onClick={startRecording}
-                                className="p-3.5 bg-slate-800 text-slate-400 rounded-xl hover:text-white hover:bg-blue-600 transition-all"
-                            >
+                            <button onClick={startRecording} className="p-3.5 bg-slate-800 text-slate-400 rounded-xl hover:text-white hover:bg-blue-600 transition-all">
                                 <Mic size={20}/>
                             </button>
                         )}

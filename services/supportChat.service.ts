@@ -1,3 +1,4 @@
+
 import { supabase } from '../lib/supabase';
 import { generateUUID } from '../utils/generators';
 
@@ -14,6 +15,7 @@ export interface SupportMessage {
 }
 
 export const supportChatService = {
+    // Verifica se o operador teve atividade nos últimos 5 minutos
     async isOperatorOnline(profileId: string): Promise<boolean> {
         const { data } = await supabase
             .from('perfis')
@@ -24,7 +26,7 @@ export const supportChatService = {
         if (!data?.last_active_at) return false;
         const lastActive = new Date(data.last_active_at).getTime();
         const now = new Date().getTime();
-        return (now - lastActive) < 5 * 60 * 1000; // 5 minutos de tolerância
+        return (now - lastActive) < 5 * 60 * 1000;
     },
 
     async sendMessage(params: {
@@ -37,6 +39,7 @@ export const supportChatService = {
     }) {
         let fileUrl = '';
         
+        // Upload de Mídia (Áudio ou Imagem)
         if (params.file) {
             const ext = params.file.name.split('.').pop();
             const path = `chat/${params.loanId}/${Date.now()}.${ext}`;
@@ -60,17 +63,18 @@ export const supportChatService = {
         
         if (error) throw error;
 
-        // Auto-Resposta se for Cliente enviando e Operador estiver Offline
+        // LÓGICA DE AUTO-RESPOSTA
         if (params.sender === 'CLIENT') {
             const isOnline = await this.isOperatorOnline(params.profileId);
             if (!isOnline) {
-                await this.sendAutoReply(params.profileId, params.loanId);
+                // Delay pequeno para parecer natural
+                setTimeout(() => this.sendAutoReply(params.profileId, params.loanId), 2000);
             }
         }
     },
 
     async sendAutoReply(profileId: string, loanId: string) {
-        const autoText = "Olá! O gestor está offline no momento. O CapitalFlow processa pagamentos automaticamente via PIX 24h. As datas de vencimento estão fixadas no seu plano de pagamento no portal. Deixe sua dúvida e responderemos em breve!";
+        const autoText = "Olá! O suporte está offline no momento. Atendemos de Seg a Sex em horário comercial. Pagamentos via PIX são processados 24h automaticamente. Suas próximas datas de pagamento estão disponíveis no menu 'Plano de Pagamento' deste portal.";
         
         await supabase.from('mensagens_suporte').insert({
             id: generateUUID(),
