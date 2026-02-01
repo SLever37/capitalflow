@@ -1,42 +1,27 @@
-
 import { LegalDocumentParams } from "../../../types";
-import { formatMoney } from "../../../utils/formatters";
+import { formatMoney, numberToWordsBRL } from "../../../utils/formatters";
 import { buildConfissaoDividaVM } from "../viewModels/confissaoVM";
 
 export const generateConfissaoDividaHTML = (data: LegalDocumentParams, docId?: string, hash?: string, signatures: any[] = []) => {
     const vm = buildConfissaoDividaVM(data);
-
-    const installmentsText = vm.installments
-        .sort((a: any, b: any) => a.number - b.number)
-        .map((i: any) => `
-            <tr>
-                <td style="border: 1px solid #000; padding: 5px; text-align: center;">${i.number}</td>
-                <td style="border: 1px solid #000; padding: 5px; text-align: center;">${new Date(i.dueDate).toLocaleDateString('pt-BR')}</td>
-                <td style="border: 1px solid #000; padding: 5px; text-align: right;">${formatMoney(i.amount)}</td>
-            </tr>
-        `)
-        .join('');
-
     const findSig = (role: string) => signatures.find(s => s.role === role);
 
-    const renderSignature = (role: string, name: string, docLabel: string, docValue: string) => {
+    const renderSignatureBlock = (role: string, name: string, doc: string) => {
         const sig = findSig(role);
         return `
-            <div style="text-align: center; position: relative; min-height: 120px;">
-                <div style="height: 60px; display: flex; align-items: center; justify-content: center;">
-                    ${sig ? `
-                        <div style="border: 2px solid #059669; color: #059669; padding: 5px; font-family: monospace; font-weight: bold; font-size: 7pt; transform: rotate(-2deg); background: rgba(5, 150, 105, 0.05);">
-                            ASSINADO ELETRONICAMENTE<br/>
-                            ID: ${sig.id.substring(0,8)}<br/>
-                            DATA: ${new Date(sig.signed_at).toLocaleString('pt-BR')}<br/>
-                            IP: ${sig.ip_origem}
-                        </div>
-                    ` : '<div style="border-bottom: 1px solid #000; width: 80%; margin-bottom: 5px;"></div>'}
-                </div>
-                <div style="font-size: 9pt; margin-top: 5px;">
-                    <small style="text-transform: uppercase; font-weight: bold; color: #666;">${role.replace('_', ' ')}</small><br/>
-                    <b>${name.toUpperCase()}</b><br/>
-                    <small>${docLabel}: ${docValue || 'N/A'}</small>
+            <div style="text-align: center; padding: 15px; border: 1px solid #f1f5f9; border-radius: 8px; position: relative; min-height: 120px; display: flex; flex-direction: column; justify-content: flex-end;">
+                ${sig ? `
+                    <div style="position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: 85%; border: 2px solid #10b981; color: #10b981; padding: 5px; font-family: monospace; font-size: 7pt; font-weight: bold; background: rgba(16,185,129,0.05); text-transform: uppercase; line-height: 1.2;">
+                        Assinado Eletronicamente<br/>
+                        IP: ${sig.ip_origem}<br/>
+                        ${new Date(sig.signed_at).toLocaleString('pt-BR')}<br/>
+                        HASH: ${sig.assinatura_hash.substring(0,12)}
+                    </div>
+                ` : '<div style="width: 80%; border-bottom: 1px solid #334155; margin: 0 auto 10px auto;"></div>'}
+                <div style="font-size: 9pt; color: #1e293b;">
+                    <b style="text-transform: uppercase;">${name}</b><br/>
+                    <span style="color: #64748b; font-size: 8pt;">${role.replace('_', ' ')}</span><br/>
+                    <small style="color: #94a3b8;">DOC: ${doc || 'N/A'}</small>
                 </div>
             </div>
         `;
@@ -49,52 +34,69 @@ export const generateConfissaoDividaHTML = (data: LegalDocumentParams, docId?: s
         <meta charset="UTF-8">
         <style>
             @page { size: A4; margin: 2.5cm; }
-            body { font-family: 'Times New Roman', serif; line-height: 1.5; color: #000; font-size: 11pt; padding: 0; margin: 0; }
+            body { font-family: 'Times New Roman', Times, serif; line-height: 1.5; color: #1e293b; font-size: 11pt; padding: 0; margin: 0; }
             .container { max-width: 800px; margin: auto; }
-            h1 { text-align: center; font-size: 14pt; border-bottom: 2px solid #000; padding-bottom: 10px; text-transform: uppercase; }
-            h2 { font-size: 12pt; background: #f3f4f6; padding: 5px 10px; margin-top: 20px; border-left: 4px solid #000; }
-            .signatures-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 50px; page-break-inside: avoid; }
-            .footer-info { margin-top: 50px; font-size: 8pt; color: #666; border-top: 1px dashed #ccc; padding-top: 10px; }
+            .header-box { text-align: center; border: 2px solid #1e293b; padding: 20px; margin-bottom: 30px; }
+            h1 { font-size: 14pt; margin: 0; text-transform: uppercase; letter-spacing: 1px; }
+            h2 { font-size: 11pt; border-left: 4px solid #3b82f6; padding-left: 10px; margin: 25px 0 15px 0; text-transform: uppercase; color: #334155; }
+            .signatures-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 40px; page-break-inside: avoid; }
+            .compliance-footer { margin-top: 50px; font-size: 8pt; color: #94a3b8; border-top: 1px dashed #e2e8f0; padding-top: 10px; }
+            table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+            th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: left; }
+            th { background: #f8fafc; font-size: 9pt; text-transform: uppercase; }
         </style>
     </head>
     <body>
         <div class="container">
-            <div style="text-align: center; font-size: 9pt; font-weight: bold; margin-bottom: 10px;">TÍTULO EXECUTIVO EXTRAJUDICIAL (Art. 784, III CPC)</div>
-            <h1>Confissão de Dívida e Compromisso de Pagamento</h1>
+            <div class="header-box">
+                <h1>Instrumento Particular de Confissão de Dívida</h1>
+                <div style="font-size: 9pt; font-weight: bold; margin-top: 5px;">TÍTULO EXECUTIVO EXTRAJUDICIAL (Art. 784, III CPC)</div>
+            </div>
 
-            <p><strong>CREDOR(A):</strong> ${vm.creditorName}, CPF/CNPJ: ${vm.creditorDoc}, com endereço em ${vm.creditorAddress}.</p>
-            <p><strong>DEVEDOR(A):</strong> ${vm.debtorName}, CPF/CNPJ: ${vm.debtorDoc}, residente em ${vm.debtorAddress}.</p>
+            <p><strong>CREDOR(A):</strong> ${vm.creditorName}, inscrito no CPF/CNPJ sob nº ${vm.creditorDoc}, com sede/endereço em ${vm.creditorAddress}.</p>
+            <p><strong>DEVEDOR(A):</strong> ${vm.debtorName}, inscrito no CPF/CNPJ sob nº ${vm.debtorDoc}, residente em ${vm.debtorAddress}.</p>
 
-            <h2>1. OBJETO E RECONHECIMENTO</h2>
-            <p>O(A) DEVEDOR(A) reconhece e confessa ser devedor(a) da importância de <strong>${vm.totalDebt}</strong>, referente à operação de crédito ID ${data.loanId.substring(0,8)}.</p>
+            <h2>1. DO RECONHECIMENTO DA DÍVIDA</h2>
+            <p>Pelo presente instrumento, o(a) <strong>DEVEDOR(A)</strong> reconhece e confessa ser devedor(a) legítimo(a) da importância líquida e certa de <strong>${vm.totalDebt} (${numberToWordsBRL(data.totalDebt)})</strong>, correspondente ao montante total da operação ID ${data.loanId.substring(0,8)}.</p>
 
-            <h2>2. FORMA DE PAGAMENTO</h2>
-            <table style="width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 10pt;">
-                <tr style="background: #eee;">
-                    <th style="border: 1px solid #000; padding: 8px;">Parcela</th>
-                    <th style="border: 1px solid #000; padding: 8px;">Vencimento</th>
-                    <th style="border: 1px solid #000; padding: 8px;">Valor</th>
-                </tr>
-                ${installmentsText}
+            <h2>2. DO PLANO DE PAGAMENTO</h2>
+            <p>O montante acima confessado será liquidado mediante o seguinte cronograma de parcelas:</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Parcela</th>
+                        <th>Vencimento</th>
+                        <th>Valor Nominal</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    // Fix: cast installment item to any to avoid property access errors on unknown type (number, dueDate, amount)
+                    ${vm.installments.map((i: any) => `
+                        <tr>
+                            <td>${i.number || '—'}ª</td>
+                            <td>${new Date(i.dueDate).toLocaleDateString('pt-BR')}</td>
+                            <td>${formatMoney(i.amount)}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
             </table>
 
-            <h2>3. VALIDADE DAS ASSINATURAS</h2>
-            <p>As partes concordam que as assinaturas eletrônicas realizadas neste portal possuem plena validade jurídica e eficácia executiva, nos termos da Medida Provisória nº 2.200-2/2001 e da Lei nº 14.063/2020.</p>
+            <h2>3. DA EFICÁCIA EXECUTIVA E ASSINATURA</h2>
+            <p>Este documento constitui título executivo extrajudicial, apto para execução imediata em caso de inadimplemento. As partes elegem as assinaturas eletrônicas aqui colhidas como válidas e íntegras nos termos da MP 2.200-2/2001.</p>
 
             <p style="text-align: center; margin-top: 30px;">${vm.city}, ${new Date().toLocaleDateString('pt-BR')}</p>
 
             <div class="signatures-grid">
-                ${renderSignature('CREDOR', vm.creditorName, 'DOC', vm.creditorDoc)}
-                ${renderSignature('DEVEDOR', vm.debtorName, 'DOC', vm.debtorDoc)}
-                ${renderSignature('TESTEMUNHA_1', data.witnesses?.[0]?.name || 'Testemunha 1', 'CPF', data.witnesses?.[0]?.document || '')}
-                ${renderSignature('TESTEMUNHA_2', data.witnesses?.[1]?.name || 'Testemunha 2', 'CPF', data.witnesses?.[1]?.document || '')}
+                ${renderSignatureBlock('CREDOR', vm.creditorName, vm.creditorDoc)}
+                ${renderSignatureBlock('DEVEDOR', vm.debtorName, vm.debtorDoc)}
+                ${renderSignatureBlock('TESTEMUNHA_1', data.witnesses?.[0]?.name || 'Testemunha 1', data.witnesses?.[0]?.document || '')}
+                ${renderSignatureBlock('TESTEMUNHA_2', data.witnesses?.[1]?.name || 'Testemunha 2', data.witnesses?.[1]?.document || '')}
             </div>
 
-            <div class="footer-info">
-                <strong>Protocolo de Integridade:</strong><br/>
-                ID Documento: ${docId || 'N/A'}<br/>
-                Hash Principal (SHA-256): ${hash || 'N/A'}<br/>
-                O registro eletrônico deste documento é imutável após a finalização das assinaturas.
+            <div class="compliance-footer">
+                <strong>Protocolo CapitalFlow Compliance:</strong><br/>
+                ID Título: ${docId || 'S/N'} | Hash Integridade: ${hash || 'PENDENTE'}<br/>
+                Certificado de integridade gerado mediante carimbo de tempo forense e registro de IP de todos os signatários.
             </div>
         </div>
     </body>

@@ -4,7 +4,7 @@ import { Modal } from "../../../components/ui/Modal";
 import { Agreement, Loan, UserProfile, LegalDocumentRecord } from "../../../types";
 import { generateConfissaoDividaHTML } from "../templates/ConfissaoDividaTemplate";
 import { legalService } from "../services/legalService";
-import { Printer, Scale, FileSignature, Loader2, ShieldCheck, Check, FileText, Activity, Users, User, Copy, MessageSquare, Share2 } from "lucide-react";
+import { Printer, Scale, FileSignature, Loader2, ShieldCheck, Check, FileText, Activity, Users, User, Copy, MessageSquare, Link } from "lucide-react";
 import { LegalReportView } from './LegalReportView';
 
 interface LegalDocumentModalProps {
@@ -80,7 +80,7 @@ export const LegalDocumentModal: React.FC<LegalDocumentModalProps> = ({ agreemen
     const sendZapNotification = (role: string, name: string, index?: number) => {
         const url = getLinkForRole(role, index);
         const phone = role === 'DEVEDOR' ? loan.debtorPhone.replace(/\D/g, '') : '';
-        const text = `Olá *${name}*, solicito sua assinatura digital no Título Executivo ID ${docRecord?.id.substring(0,8)}. Acesse o link seguro: ${url}`;
+        const text = `Olá *${name}*, solicito sua assinatura digital no Título Executivo ID ${docRecord?.id.substring(0,8)}. Acesse o link seguro para assinar: ${url}`;
         window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(text)}`, '_blank');
     };
 
@@ -165,7 +165,7 @@ export const LegalDocumentModal: React.FC<LegalDocumentModalProps> = ({ agreemen
                                                 </div>
                                                 <div className="flex gap-2">
                                                     <button onClick={() => copyLink('TESTEMUNHA', idx)} className={`p-2 rounded-lg transition-all ${copiedKey === `TESTEMUNHA${idx}` ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-blue-400 hover:text-white'}`}>
-                                                        {copiedKey === `TESTEMUNHA${idx}` ? <Check size={16}/> : <Copy size={16}/>}
+                                                        {copiedKey === `TESTEMUNHA${idx}` ? <Check size={16}/> : <Link size={16}/>}
                                                     </button>
                                                 </div>
                                             </div>
@@ -175,7 +175,7 @@ export const LegalDocumentModal: React.FC<LegalDocumentModalProps> = ({ agreemen
                             </div>
                             <div className="p-4 bg-blue-900/10 border border-blue-500/20 rounded-2xl flex items-start gap-3">
                                 <ShieldCheck size={18} className="text-blue-500 shrink-0 mt-0.5"/>
-                                <p className="text-[10px] text-blue-300 leading-relaxed font-medium uppercase tracking-wider">Cada parte deve assinar individualmente através do link exclusivo. O carimbo de validade só aparece no documento após a confirmação técnica de cada parte via login e IP.</p>
+                                <p className="text-[10px] text-blue-300 leading-relaxed font-medium uppercase tracking-wider">Cada parte deve assinar individualmente através do link exclusivo gerado acima.</p>
                             </div>
                         </div>
                     ) : (
