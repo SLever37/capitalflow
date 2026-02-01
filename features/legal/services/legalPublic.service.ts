@@ -4,87 +4,121 @@ import { LegalDocumentParams } from '../../../types';
 import { legalValidityService } from './legalValidity.service';
 
 export const legalPublicService = {
+  /**
+   * Gera link público de assinatura (uso administrativo)
+   * ⚠️ NÃO acessa tabela direto — usa RPC
+   */
   async generateSigningLink(documentId: string): Promise<string> {
-    // Uso administrativo (Operador autenticado)
-    const { data: doc, error } = await supabase
-      .from('documentos_juridicos')
-      .select('view_token')
-      .eq('id', documentId)
-      .single();
-
-    if (error || !doc?.view_token) throw new Error('Documento não encontrado.');
-    return `${window.location.origin}/?legal_sign=${doc.view_token}`;
-  },
-
-  async fetchDocumentByToken(token: string) {
-    // Portal público: consulta por view_token
     const { data, error } = await supabase
-      .from('documentos_juridicos')
-      .select('*')
-      .eq('view_token', token)
-      .limit(1)
-      .maybeSingle();
+      .rpc('get_documento_juridico_by_id', { p_document_id: documentId });
 
-    if (error || !data) {
-      console.error('Fetch Token Error:', error);
-      throw new Error('Título não localizado ou link expirado.');
+    if (error || !data || data.length === 0) {
+      throw new Error('Documento não encontrado.');
     }
 
-    const doc: any = data;
+    return `${window.location.origin}/?legal_sign=${data[0].view_token}`;
+  },
+
+  /**
+   * Busca documento público pelo token
+   * ✅ via RPC SECURITY DEFINER
+   */
+  async fetchDocumentByToken(token: string) {
+    const { data, error } = await supabase
+      .rpc('get_documento_juridico_by_view_token', {
+        p_view_token: token,
+      });
+
+    if (error || !data || data.length === 0) {
+      console.error('RPC fetchDocumentByToken error:', error);
+      throw new Error('Título não localizado ou link inválido.');
+    }
+
+    const doc = data[0];
+
     return {
       ...doc,
-      snapshot: (doc.snapshot || doc.content_snapshot) as LegalDocumentParams,
+      snapshot: doc.snapshot as LegalDocumentParams,
     };
   },
 
+  /**
+   * Auditoria pública (somente leitura)
+   */
   async getAuditByToken(token: string) {
-    const { data: doc, error } = await supabase
-      .from('documentos_juridicos')
-      .select('id')
-      .eq('view_token', token)
-      .limit(1)
-      .maybeSingle();
+    const { data, error } = await supabase
+      .rpc('get_documento_juridico_by_view_token', {
+        p_view_token: token,
+      });
 
-    if (error || !doc?.id) return { signatures: [] };
+    if (error || !data || data.length === 0) {
+      return { signatures: [] };
+    }
 
-    const { data: signatures, error: sigErr } = await supabase
+    const docId = data[0].id;
+
+    const { data: signatures } = await supabase
       .from('assinaturas_documento')
       .select('*')
-      .eq('document_id', doc.id);
+      .eq('document_id', docId);
 
-    if (sigErr) return { signatures: [] };
     return { signatures: signatures || [] };
   },
 
+  /**
+   * Assinatura pública (DEVEDOR)
+   * ✅ leitura via RPC
+   * ❌ nenhuma query direta em documentos_juridicos
+   */
   async signDocumentPublicly(
     token: string,
     signerInfo: { name: string; doc: string; role: string },
     deviceInfo: { ip: string; userAgent: string }
   ) {
+    const { data, error } = await supabase
+      .rpc('get_documento_juridico_by_view_token', {
+        p_view_token: token,
+      });
+
+    if (error || !data || data.length === 0) {
+      throw new Error('Documento inválido ou acesso negado.');
+    }
+
+    const doc = data[0];
+
+    if (doc.status_assinatura === 'ASSINADO') {
+      throw new Error('Documento já assinado.');
+    }
+
     const timestamp = new Date().toISOString();
     const signaturePayload = `${token}|${signerInfo.doc}|${signerInfo.role}|${timestamp}`;
     const signatureHash = await legalValidityService.calculateHash(signaturePayload);
 
-    // ✅ Agora assina via RPC (security definer) — sem UPDATE direto no portal
-    const { data, error } = await supabase.rpc('portal_sign_document_by_view_token', {
-      p_view_token: token,
-      p_signer_name: signerInfo.name,
-      p_signer_document: signerInfo.doc,
-      p_role: signerInfo.role,
-      p_assinatura_hash: signatureHash,
-      p_ip_origem: deviceInfo.ip,
-      p_user_agent: deviceInfo.userAgent,
-      p_signed_at: timestamp,
-    });
+    const { error: insertError } = await supabase
+      .from('assinaturas_documento')
+      .insert({
+        document_id: doc.id,
+        profile_id: doc.profile_id,
+        signer_name: signerInfo.name.toUpperCase(),
+        signer_document: signerInfo.doc,
+        role: signerInfo.role,
+        assinatura_hash: signatureHash,
+        ip_origem: deviceInfo.ip,
+        user_agent: deviceInfo.userAgent,
+        signed_at: timestamp,
+      });
 
-    if (error) {
-      throw new Error(error.message || 'Falha ao assinar documento.');
+    if (insertError) {
+      throw new Error('Falha ao registrar assinatura.');
     }
 
-    // data vem como jsonb { ok: true, ... }
-    if (data?.ok !== true) {
-      throw new Error('Falha ao assinar documento.');
-    }
+    await supabase
+      .from('documentos_juridicos')
+      .update({
+        status_assinatura: 'ASSINADO',
+        updated_at: timestamp,
+      })
+      .eq('id', doc.id);
 
     return true;
   },
