@@ -1,5 +1,6 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
-import { ShieldCheck, RefreshCw, X, Building, MapPin, Gavel, MessageCircle, FileSignature, Lock, FileText } from 'lucide-react';
+import { ShieldCheck, RefreshCw, X, Building, MapPin, Gavel, MessageCircle, FileSignature, Lock, FileText, ChevronDown } from 'lucide-react';
 import { useClientPortalLogic } from './hooks/useClientPortalLogic';
 import { PortalLogin } from './components/PortalLogin';
 import { formatMoney } from '../../utils/formatters';
@@ -11,8 +12,8 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
     const {
         isLoading, isSigning, portalError,
         loginIdentifier, setLoginIdentifier,
-        loggedClient, selectedLoanId,
-        loan, installments, pixKey,
+        loggedClient, selectedLoanId, setSelectedLoanId,
+        loan, installments, pixKey, clientContracts,
         handleLogin, handleLogout, handleSignDocument,
         loadFullPortalData 
     } = useClientPortalLogic(initialLoanId);
@@ -96,6 +97,26 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
                     </button>
                 </div>
 
+                {/* SWITCHER DE CONTRATOS */}
+                {clientContracts.length > 1 && (
+                    <div className="px-6 pt-4">
+                        <div className="relative">
+                            <select 
+                                value={selectedLoanId}
+                                onChange={(e) => setSelectedLoanId(e.target.value)}
+                                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-xs font-bold uppercase outline-none focus:border-blue-500 appearance-none cursor-pointer"
+                            >
+                                {clientContracts.map((c) => (
+                                    <option key={c.id} value={c.id}>
+                                        Contrato {c.id.substring(0, 6).toUpperCase()} • {new Date(c.created_at || c.start_date).toLocaleDateString()}
+                                    </option>
+                                ))}
+                            </select>
+                            <ChevronDown size={14} className="absolute right-4 top-3.5 text-slate-500 pointer-events-none"/>
+                        </div>
+                    </div>
+                )}
+
                 <div className="px-6 py-6 space-y-6 overflow-y-auto custom-scrollbar max-h-[75vh]">
                     {creditorInfo && (
                         <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
@@ -113,6 +134,7 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
                     <div className="bg-slate-950 p-5 rounded-2xl border border-blue-900/30 text-center">
                         <p className="text-[10px] font-black text-slate-500 uppercase mb-1">Dívida Total Consolidada</p>
                         <p className="text-3xl font-black text-white">{formatMoney(totalJuridicoDevido)}</p>
+                        <p className="text-[9px] font-bold text-slate-600 uppercase mt-2">Ref. Contrato: {selectedLoanId.slice(0,8).toUpperCase()}</p>
                     </div>
 
                     <div className="bg-indigo-950/20 border border-indigo-500/30 p-5 rounded-2xl text-center">

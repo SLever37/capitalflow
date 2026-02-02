@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { HelpCircle, TrendingUp, User, KeyRound, Loader2, X, ChevronRight, Beaker, Eye, EyeOff, UserPlus, Phone, ShieldCheck, Mail } from 'lucide-react';
 import { Modal } from '../../components/ui/Modal';
@@ -26,17 +27,17 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     const [isCreatingProfile, setIsCreatingProfile] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     
-    // Novo Estado para Ativação de Membro
+    // Novo Estado para Ativação de Membro (Team System)
     const [inviteToken, setInviteToken] = useState<string | null>(null);
+    const [inviteData, setInviteData] = useState<any | null>(null);
     const [memberActivationForm, setMemberActivationForm] = useState({
-        name: '', // Pré-carregado
+        name: '',
         document: '',
         phone: '',
         email: '',
         password: '',
         confirmPassword: ''
     });
-    const [pendingProfileId, setPendingProfileId] = useState<string | null>(null);
 
     // Estados originais
     const [newProfileForm, setNewProfileForm] = useState({ name: '', email: '', businessName: '', password: '', recoveryPhrase: '' });
@@ -58,19 +59,21 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     const checkInviteToken = async (token: string) => {
         setIsProcessingCreate(true);
         try {
-            // Busca perfil que tenha este token na recovery_phrase (hack de armazenamento temporário)
+            // Busca convite na tabela team_invites
             const { data, error } = await supabase
-                .from('perfis')
-                .select('*')
-                .eq('recovery_phrase', `INVITE:${token}`)
+                .from('team_invites')
+                .select('*, teams(owner_profile_id, name)')
+                .eq('token', token)
+                .eq('is_active', true)
                 .single();
 
             if (error || !data) {
-                showToast("Link de convite inválido ou expirado.", "error");
+                showToast("Este link de convite é inválido ou já expirou.", "error");
                 setInviteToken(null);
             } else {
-                setPendingProfileId(data.id);
-                setMemberActivationForm(prev => ({ ...prev, name: data.nome_operador }));
+                setInviteData(data);
+                // Preenche o nome da equipe como referência se quiser, ou deixa em branco para o usuário preencher
+                showToast(`Convite validado para a equipe: ${data.teams?.name}`, "success");
             }
         } catch (e) {
             console.error(e);
@@ -81,37 +84,62 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     };
 
     const handleActivateMember = async () => {
-        if (!inviteToken || !pendingProfileId) return;
+        if (!inviteToken || !inviteData) return;
 
-        const { document, phone, email, password, confirmPassword } = memberActivationForm;
+        const { name, document, phone, email, password, confirmPassword } = memberActivationForm;
 
-        // Validações Rígidas
+        // Validações
+        if (!name.trim()) { showToast("Informe seu nome completo.", "error"); return; }
         if (!email.trim() || !email.includes('@')) { showToast("E-mail inválido.", "error"); return; }
-        if (!document || !isValidCPForCNPJ(document)) { showToast("CPF inválido. Verifique os números.", "error"); return; }
+        if (!document || !isValidCPForCNPJ(document)) { showToast("CPF inválido.", "error"); return; }
         if (!phone || phone.length < 14) { showToast("Telefone inválido.", "error"); return; }
         if (password.length < 6) { showToast("A senha deve ter no mínimo 6 caracteres.", "error"); return; }
         if (password !== confirmPassword) { showToast("As senhas não coincidem.", "error"); return; }
 
         setIsProcessingCreate(true);
         try {
-            // Atualiza o perfil placeholder com os dados reais do membro
-            const { error } = await supabase
-                .from('perfis')
-                .update({
-                    document: onlyDigits(document),
-                    phone: onlyDigits(phone),
-                    usuario_email: email.toLowerCase().trim(),
-                    email: email.toLowerCase().trim(), // Atualiza email principal
-                    senha_acesso: password,
-                    recovery_phrase: `ACTIVE:${new Date().toISOString()}`, // Invalida o token anterior
-                    last_active_at: new Date().toISOString()
-                })
-                .eq('id', pendingProfileId)
-                .eq('recovery_phrase', `INVITE:${inviteToken}`); // Trava de segurança extra
+            const newProfileId = generateUUID();
+            
+            // 1. Criar Perfil na tabela perfis (Como Membro)
+            // Vinculamos ao supervisor_id do dono da equipe para manter a hierarquia de dados
+            const { error: profileError } = await supabase.from('perfis').insert({
+                id: newProfileId,
+                supervisor_id: inviteData.teams.owner_profile_id, // Vínculo hierárquico
+                nome_operador: name.trim(),
+                nome_completo: name.trim(),
+                email: email.trim().toLowerCase(),
+                usuario_email: email.trim().toLowerCase(),
+                senha_acesso: password,
+                document: onlyDigits(document),
+                phone: onlyDigits(phone),
+                access_level: 2, // Nível Membro
+                interest_balance: 0,
+                total_available_capital: 0,
+                created_at: new Date().toISOString()
+            });
 
-            if (error) throw error;
+            if (profileError) throw new Error("Erro ao criar perfil: " + profileError.message);
 
-            showToast("Conta ativada com sucesso! Fazendo login...", "success");
+            // 2. Registrar vínculo na tabela team_members
+            const { error: memberError } = await supabase.from('team_members').insert({
+                team_id: inviteData.team_id,
+                profile_id: newProfileId, // FK para o perfil criado
+                linked_profile_id: newProfileId, // Redundância para facilitar queries
+                full_name: name.trim(),
+                cpf: onlyDigits(document),
+                username_or_email: email.trim().toLowerCase(),
+                role: 'MEMBER'
+            });
+
+            if (memberError) throw new Error("Erro ao vincular à equipe: " + memberError.message);
+
+            // 3. Invalidar o token de convite (Uso único)
+            await supabase
+                .from('team_invites')
+                .update({ is_active: false, revoked_at: new Date().toISOString() })
+                .eq('id', inviteData.id);
+
+            showToast("Conta ativada com sucesso! Entrando...", "success");
             
             // Auto-login
             setLoginUser(email);
@@ -120,10 +148,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 submitLogin();
                 // Limpa URL
                 window.history.replaceState({}, window.document.title, window.location.pathname);
-            }, 1000);
+            }, 1500);
 
         } catch (e: any) {
-            showToast("Erro na ativação: " + e.message, "error");
+            showToast(e.message, "error");
         } finally {
             setIsProcessingCreate(false);
         }
@@ -193,7 +221,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     };
 
     // TELA DE ATIVAÇÃO DE MEMBRO (CONVITE)
-    if (inviteToken && pendingProfileId) {
+    if (inviteToken && inviteData) {
         return (
             <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 md:p-6 relative">
                 <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden flex flex-col justify-center animate-in zoom-in-95 duration-300">
@@ -206,12 +234,20 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
 
                     <div className="space-y-4">
                         <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center">
-                            <p className="text-[10px] text-slate-500 uppercase font-black">Olá,</p>
-                            <p className="text-lg font-black text-white uppercase">{memberActivationForm.name}</p>
+                            <p className="text-[10px] text-slate-500 uppercase font-black">Você está entrando em:</p>
+                            <p className="text-lg font-black text-white uppercase">{inviteData.teams?.name || 'Equipe'}</p>
                         </div>
 
                         <div>
-                            <label className="text-[10px] font-black text-slate-500 uppercase ml-1 mb-1 block">Seu E-mail de Login</label>
+                            <label className="text-[10px] font-black text-slate-500 uppercase ml-1 mb-1 block">Seu Nome Completo</label>
+                            <div className="bg-slate-800/50 p-2 rounded-xl border border-slate-700 flex items-center gap-2">
+                                <User className="text-slate-400 w-4 h-4 ml-2" />
+                                <input type="text" className="bg-transparent w-full text-white outline-none text-sm font-bold" placeholder="Nome Sobrenome" value={memberActivationForm.name} onChange={e => setMemberActivationForm({...memberActivationForm, name: e.target.value})} />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="text-[10px] font-black text-slate-500 uppercase ml-1 mb-1 block">E-mail de Login</label>
                             <div className="bg-slate-800/50 p-2 rounded-xl border border-slate-700 flex items-center gap-2">
                                 <Mail className="text-slate-400 w-4 h-4 ml-2" />
                                 <input type="email" className="bg-transparent w-full text-white outline-none text-sm font-bold" placeholder="seu@email.com" value={memberActivationForm.email} onChange={e => setMemberActivationForm({...memberActivationForm, email: e.target.value})} />
@@ -219,7 +255,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                         </div>
 
                         <div>
-                            <label className="text-[10px] font-black text-slate-500 uppercase ml-1 mb-1 block">CPF (Apenas Números)</label>
+                            <label className="text-[10px] font-black text-slate-500 uppercase ml-1 mb-1 block">CPF</label>
                             <div className="bg-slate-800/50 p-2 rounded-xl border border-slate-700 flex items-center gap-2">
                                 <ShieldCheck className="text-slate-400 w-4 h-4 ml-2" />
                                 <input type="text" className="bg-transparent w-full text-white outline-none text-sm font-bold" placeholder="000.000.000-00" value={memberActivationForm.document} onChange={e => setMemberActivationForm({...memberActivationForm, document: maskDocument(e.target.value)})} />
@@ -252,7 +288,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                         </div>
 
                         <button onClick={handleActivateMember} disabled={isProcessingCreate} className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-xs font-black uppercase shadow-lg transition-all mt-4 flex items-center justify-center gap-2">
-                            {isProcessingCreate ? <Loader2 className="animate-spin" /> : 'Ativar Minha Conta'}
+                            {isProcessingCreate ? <Loader2 className="animate-spin" /> : 'Confirmar e Entrar'}
                         </button>
                     </div>
                 </div>

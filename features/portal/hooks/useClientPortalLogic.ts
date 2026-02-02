@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { portalService, PortalSession } from '../../../services/portal.service';
 import { supabase } from '../../../lib/supabase';
@@ -21,6 +22,9 @@ export const useClientPortalLogic = (initialLoanId: string) => {
   const [installments, setInstallments] = useState<any[]>([]);
   const [portalSignals, setPortalSignals] = useState<any[]>([]);
   const [isAgreementActive, setIsAgreementActive] = useState(false);
+  
+  // Lista de todos os contratos do cliente para o switcher
+  const [clientContracts, setClientContracts] = useState<any[]>([]);
 
   const [intentId, setIntentId] = useState<string | null>(null);
   const [intentType, setIntentType] = useState<string | null>(null);
@@ -36,12 +40,18 @@ export const useClientPortalLogic = (initialLoanId: string) => {
     setPortalError(null);
 
     try {
-      const data = await portalService.fetchLoanData(loanId, clientId);
-      setLoan(data.loan);
-      setPixKey(data.pixKey);
-      setPortalSignals(data.signals || []);
-      setInstallments(data.installments || []);
-      setIsAgreementActive(!!data.isAgreementActive);
+      const [loanData, contractsList] = await Promise.all([
+          portalService.fetchLoanData(loanId, clientId),
+          portalService.fetchClientContracts(clientId)
+      ]);
+
+      setLoan(loanData.loan);
+      setPixKey(loanData.pixKey);
+      setPortalSignals(loanData.signals || []);
+      setInstallments(loanData.installments || []);
+      setIsAgreementActive(!!loanData.isAgreementActive);
+      setClientContracts(contractsList);
+
     } catch (e: any) {
       if (e.name !== 'AbortError') {
         setPortalError('Falha ao sincronizar dados do contrato.');
@@ -243,6 +253,8 @@ export const useClientPortalLogic = (initialLoanId: string) => {
     loggedClient,
     byeName,
     selectedLoanId,
+    setSelectedLoanId, // Expose setter to switch loans
+    clientContracts, // Expose contracts list
     loan,
     installments,
     portalSignals,

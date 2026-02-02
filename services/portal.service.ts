@@ -201,6 +201,19 @@ export const portalService = {
     };
   },
 
+  // Busca todos os contratos ativos do cliente para permitir troca
+  async fetchClientContracts(clientId: string) {
+      const { data, error } = await supabase
+          .from('contratos')
+          .select('id, total_to_receive, start_date, created_at')
+          .eq('client_id', clientId)
+          .eq('is_archived', false)
+          .order('created_at', { ascending: false });
+      
+      if (error) return [];
+      return data || [];
+  },
+
   async submitPaymentIntent(clientId: string, loanId: string, profileId: string, type: string) {
       const { data, error } = await supabase.from('sinalizacoes_pagamento').insert([{
           client_id: clientId,

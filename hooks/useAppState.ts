@@ -9,6 +9,41 @@ import { asString, asNumber } from '../utils/safe';
 const DEFAULT_NAV: AppTab[] = ['DASHBOARD', 'CLIENTS', 'TEAM'];
 const DEFAULT_HUB: AppTab[] = ['SOURCES', 'LEGAL', 'PROFILE', 'MASTER'];
 
+// Helper de mapeamento para reutilização
+const mapProfileFromDB = (data: any): UserProfile => ({
+    id: data.id,
+    name: asString(data.nome_operador),
+    fullName: asString(data.nome_completo),
+    email: asString(data.usuario_email || data.email),
+    document: asString(data.document),
+    phone: asString(data.phone),
+    address: asString(data.address),
+    addressNumber: asString(data.address_number),
+    neighborhood: asString(data.neighborhood),
+    city: asString(data.city),
+    state: asString(data.state),
+    zipCode: asString(data.zip_code),
+    businessName: asString(data.nome_empresa),
+    accessLevel: asNumber(data.access_level),
+    interestBalance: asNumber(data.interest_balance),
+    totalAvailableCapital: asNumber(data.total_available_capital),
+    supervisor_id: data.supervisor_id,
+    pixKey: asString(data.pix_key),
+    photo: data.avatar_url,
+    brandColor: data.brand_color,
+    logoUrl: data.logo_url,
+    password: data.senha_acesso,
+    recoveryPhrase: data.recovery_phrase,
+    defaultInterestRate: asNumber(data.default_interest_rate),
+    defaultFinePercent: asNumber(data.default_fine_percent),
+    defaultDailyInterestPercent: asNumber(data.default_daily_interest_percent),
+    targetCapital: asNumber(data.target_capital),
+    targetProfit: asNumber(data.target_profit),
+    ui_nav_order: data.ui_nav_order || DEFAULT_NAV,
+    ui_hub_order: data.ui_hub_order || DEFAULT_HUB,
+    createdAt: data.created_at
+});
+
 export const useAppState = (activeProfileId: string | null) => {
   const [activeUser, setActiveUser] = useState<UserProfile | null>(null);
   const [loans, setLoans] = useState<Loan[]>([]);
@@ -42,46 +77,8 @@ export const useAppState = (activeProfileId: string | null) => {
           const { data: profileData, error: profileError } = await supabase.from('perfis').select('*').eq('id', profileId).single();
           if (profileError) throw profileError;
 
-          // Mapeamento completo dos campos do banco para a interface UserProfile
-          const u: UserProfile = {
-              id: profileData.id,
-              name: asString(profileData.nome_operador), // Nome de Acesso
-              fullName: asString(profileData.nome_completo), // Nome Completo
-              email: asString(profileData.usuario_email || profileData.email),
-              document: asString(profileData.document), // CPF/CNPJ
-              phone: asString(profileData.phone),
-              
-              // Endereço
-              address: asString(profileData.address),
-              addressNumber: asString(profileData.address_number),
-              neighborhood: asString(profileData.neighborhood),
-              city: asString(profileData.city),
-              state: asString(profileData.state),
-              zipCode: asString(profileData.zip_code),
-              
-              businessName: asString(profileData.nome_empresa),
-              accessLevel: asNumber(profileData.access_level),
-              interestBalance: asNumber(profileData.interest_balance),
-              totalAvailableCapital: asNumber(profileData.total_available_capital),
-              supervisor_id: profileData.supervisor_id,
-              pixKey: asString(profileData.pix_key),
-              photo: profileData.avatar_url,
-              brandColor: profileData.brand_color,
-              logoUrl: profileData.logo_url,
-              password: profileData.senha_acesso,
-              recoveryPhrase: profileData.recovery_phrase,
-              
-              // Configurações e Metas
-              defaultInterestRate: asNumber(profileData.default_interest_rate),
-              defaultFinePercent: asNumber(profileData.default_fine_percent),
-              defaultDailyInterestPercent: asNumber(profileData.default_daily_interest_percent),
-              targetCapital: asNumber(profileData.target_capital),
-              targetProfit: asNumber(profileData.target_profit),
-              
-              ui_nav_order: profileData.ui_nav_order || DEFAULT_NAV,
-              ui_hub_order: profileData.ui_hub_order || DEFAULT_HUB,
-              createdAt: profileData.created_at
-          };
+          // Mapeamento do Usuário Ativo
+          const u = mapProfileFromDB(profileData);
           
           setActiveUser(u);
           setProfileEditForm(u);
@@ -104,9 +101,14 @@ export const useAppState = (activeProfileId: string | null) => {
           if (sourcesRes.data) setSources(sourcesRes.data.map((s: any) => ({ ...s, balance: asNumber(s.balance) })));
           if (loansRes.data) setLoans(loansRes.data.map((l: any) => mapLoanFromDB(l, clientsRes.data || [])));
 
+          // Carregamento de Equipe (Se for Master)
           if (u.accessLevel === 1) {
-              const { data: staff } = await supabase.from('perfis').select('*').eq('supervisor_id', u.id);
-              if (staff) setStaffMembers(staff as any);
+              const { data: staffData } = await supabase.from('perfis').select('*').eq('supervisor_id', u.id);
+              if (staffData) {
+                  // AQUI ESTAVA O ERRO: Mapeamos o array de staff corretamente agora
+                  const mappedStaff = staffData.map(s => mapProfileFromDB(s));
+                  setStaffMembers(mappedStaff);
+              }
           }
 
       } catch (error: any) {
