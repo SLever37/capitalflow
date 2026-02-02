@@ -2,7 +2,7 @@
 import React from 'react';
 import { BarChart3, Banknote, CheckCircle2, Briefcase, PieChart as PieIcon, TrendingUp } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, LineChart, Line, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
-import { Loan, CapitalSource, LedgerEntry, Agreement, AgreementInstallment, SortOption } from '../types';
+import { Loan, CapitalSource, LedgerEntry, Agreement, AgreementInstallment, SortOption, UserProfile } from '../types';
 import { LoanCard } from '../components/cards/LoanCard';
 import { StatCard } from '../components/StatCard';
 import { ProfitCard } from '../components/cards/ProfitCard';
@@ -15,7 +15,10 @@ interface DashboardPageProps {
   sources: CapitalSource[];
   filteredLoans: Loan[];
   stats: any;
-  activeUser: any;
+  activeUser: UserProfile | null;
+  staffMembers: UserProfile[];
+  selectedStaffId: string;
+  onStaffChange: (id: string) => void;
   mobileDashboardTab: 'CONTRACTS' | 'BALANCE';
   setMobileDashboardTab: (val: 'CONTRACTS' | 'BALANCE') => void;
   statusFilter: 'TODOS' | 'ATRASADOS' | 'EM_DIA' | 'PAGOS' | 'ARQUIVADOS' | 'ATRASO_CRITICO';
@@ -50,11 +53,12 @@ interface DashboardPageProps {
 }
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({
-  loans, sources, filteredLoans, stats, activeUser, mobileDashboardTab, setMobileDashboardTab,
-  statusFilter, setStatusFilter, sortOption, setSortOption, searchTerm, setSearchTerm, selectedLoanId, setSelectedLoanId,
-  onEdit, onMessage, onArchive, onRestore, onDelete, onNote, onPayment, onPortalLink,
-  onUploadPromissoria, onUploadDoc, onViewPromissoria, onViewDoc, onReviewSignal, onOpenComprovante, onReverseTransaction,
-  setWithdrawModal, showToast, isStealthMode, onRenegotiate, onAgreementPayment, onRefresh
+  loans, sources, filteredLoans, stats, activeUser, staffMembers, selectedStaffId, onStaffChange,
+  mobileDashboardTab, setMobileDashboardTab, statusFilter, setStatusFilter, sortOption, setSortOption, 
+  searchTerm, setSearchTerm, selectedLoanId, setSelectedLoanId, onEdit, onMessage, onArchive, onRestore, 
+  onDelete, onNote, onPayment, onPortalLink, onUploadPromissoria, onUploadDoc, onViewPromissoria, 
+  onViewDoc, onReviewSignal, onOpenComprovante, onReverseTransaction, setWithdrawModal, showToast, 
+  isStealthMode, onRenegotiate, onAgreementPayment, onRefresh
 }) => {
   return (
     <div className="flex flex-col gap-6">
@@ -66,7 +70,16 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       <div className="flex flex-col lg:flex-row gap-6 sm:gap-8">
           <div className={`flex-1 space-y-6 sm:space-y-8 ${mobileDashboardTab === 'BALANCE' ? 'hidden md:block' : ''}`}>
               <DashboardAlerts loans={loans} sources={sources} />
-              <DashboardControls statusFilter={statusFilter} setStatusFilter={setStatusFilter} sortOption={sortOption} setSortOption={setSortOption} searchTerm={searchTerm} setSearchTerm={setSearchTerm} showToast={showToast} />
+              <DashboardControls 
+                statusFilter={statusFilter} setStatusFilter={setStatusFilter} 
+                sortOption={sortOption} setSortOption={setSortOption} 
+                searchTerm={searchTerm} setSearchTerm={setSearchTerm} 
+                showToast={showToast} 
+                isMaster={activeUser?.accessLevel === 1}
+                staffMembers={staffMembers}
+                selectedStaffId={selectedStaffId}
+                onStaffChange={onStaffChange}
+              />
 
               <div className="grid grid-cols-1 gap-4 sm:gap-5">
                   {filteredLoans.map(loan => (
@@ -94,7 +107,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                       <ResponsiveContainer width="100%" height="100%"><LineChart data={stats.lineChartData}><CartesianGrid strokeDasharray="3 3" stroke="#1e293b" /><XAxis dataKey="name" tick={{fontSize: 10, fill: '#64748b'}} axisLine={false} /><YAxis tick={{fontSize: 10, fill: '#64748b'}} axisLine={false} /><Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', fontSize: '10px' }} /><Line type="monotone" dataKey="Entradas" stroke="#10b981" strokeWidth={3} dot={{r: 4}} /><Line type="monotone" dataKey="Saidas" stroke="#f43f5e" strokeWidth={3} dot={{r: 4}} /></LineChart></ResponsiveContainer>
                   </div>
 
-                  {/* IA INTEGRADA AO BALANÇO (DESKTOP) */}
                   <AIBalanceInsight loans={loans} sources={sources} activeUser={activeUser} />
               </div>
           </aside>

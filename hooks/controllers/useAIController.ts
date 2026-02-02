@@ -42,7 +42,7 @@ export const useAIController = (
             
             const targetName = data.name.toLowerCase();
             const loan = loans.find(l => 
-                l.debtorName.toLowerCase().includes(targetName) && !l.isArchived
+                (l.debtorName || '').toLowerCase().includes(targetName) && !l.isArchived
             );
 
             if (loan) {

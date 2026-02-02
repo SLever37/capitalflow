@@ -83,10 +83,10 @@ export const useAuth = () => {
   ) => {
     setIsLoading(true);
 
-    const user = loginUser.trim();
+    const userInput = loginUser.trim();
     const pass = loginPassword.trim();
 
-    if (!user || !pass) {
+    if (!userInput || !pass) {
       showToast('Informe usuário e senha.', 'warning');
       setIsLoading(false);
       return;
@@ -97,29 +97,36 @@ export const useAuth = () => {
     try {
       let profile: any = null;
 
-      // 1. Tenta via RPC (Padrão e Mais Seguro)
+      // 1. Tenta via RPC (E-mail sempre em minúsculas para matching de login)
       try {
         const { data, error: rpcError } = await supabase.rpc('login_user', {
-            login_input: user,
-            password_input: pass,
+            p_email: userInput.toLowerCase(),
+            p_password: pass,
         });
 
-        if (!rpcError && data && data.length > 0) {
-            profile = data[0];
+        if (!rpcError && data) {
+            // Trata retorno tanto como array quanto como objeto único (resiliência)
+            profile = Array.isArray(data) ? data[0] : data;
         }
       } catch (e) {
         console.warn("RPC Login failed, falling back.", e);
       }
 
-      // 2. Fallback Manual Seguro (Se RPC falhar ou retornar vazio)
+      // 2. Fallback Manual Seguro (Caso a RPC falhe ou não encontre)
       if (!profile) {
-        const { data: fallbackData } = await supabase
+        // PostgREST exige aspas duplas em valores com caracteres especiais dentro do .or()
+        const { data: fallbackData, error: fallbackError } = await supabase
           .from('perfis')
           .select('*')
-          .or(`usuario_email.ilike.${user},email.ilike.${user},nome_operador.ilike.${user}`)
+          .or(`usuario_email.ilike."${userInput}",nome_operador.ilike."${userInput}"`)
           .eq('senha_acesso', pass)
           .maybeSingle();
         
+        if (fallbackError) {
+            console.error("Fallback Login Error:", fallbackError);
+            throw new Error("Erro técnico ao consultar perfil.");
+        }
+
         profile = fallbackData;
       }
 
@@ -134,7 +141,7 @@ export const useAuth = () => {
       
       const profileId = profile.id;
       const profileName = resolveSmartName(profile); 
-      const profileEmail = asString(profile.usuario_email || profile.email || user);
+      const profileEmail = asString(profile.usuario_email || profile.email || userInput);
 
       setActiveProfileId(profileId);
 

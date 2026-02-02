@@ -37,7 +37,7 @@ export const SystemModalsWrapper = () => {
                 <Modal onClose={closeModal} title="Selecionar Aba">
                     <div className="space-y-4">
                         <div className="grid grid-cols-1 gap-2">
-                            {ui.importSheets?.map((sheet: any) => (
+                            {(ui.importSheets || []).map((sheet: any) => (
                                 <button key={sheet.name} onClick={() => fileCtrl.startMapping(sheet)} className="w-full p-5 bg-slate-950 border border-slate-800 rounded-2xl text-left hover:border-blue-500 hover:bg-slate-900 transition-all font-black uppercase text-xs text-white flex justify-between items-center group">
                                     {sheet.name}
                                     <Table className="text-slate-700 group-hover:text-blue-500" size={16}/>
@@ -59,12 +59,12 @@ export const SystemModalsWrapper = () => {
                                         <p className="text-[10px] font-black text-blue-500 uppercase">{field.key.replace('_', ' ')}</p>
                                     </div>
                                     <select 
-                                        value={ui.importMapping[field.key] ?? ''} 
+                                        value={ui.importMapping?.[field.key] ?? ''} 
                                         onChange={e => ui.setImportMapping({...ui.importMapping, [field.key]: e.target.value === '' ? undefined : parseInt(e.target.value)})}
                                         className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-blue-500 min-w-[150px]"
                                     >
                                         <option value="">Ignorar</option>
-                                        {ui.importCurrentSheet?.headers.map((h: string, i: number) => (
+                                        {(ui.importCurrentSheet?.headers || []).map((h: string, i: number) => (
                                             <option key={i} value={i}>{h || `Coluna ${i + 1}`}</option>
                                         ))}
                                     </select>
@@ -83,8 +83,8 @@ export const SystemModalsWrapper = () => {
                 <Modal onClose={closeModal} title="Curadoria de Clientes">
                     <div className="space-y-4">
                         <div className="bg-slate-950 border border-slate-800 rounded-3xl overflow-hidden max-h-[400px] overflow-y-auto custom-scrollbar">
-                            {ui.importCandidates.map((c: any, i: number) => {
-                                const isSelected = ui.selectedImportIndices.includes(i);
+                            {(ui.importCandidates || []).map((c: any, i: number) => {
+                                const isSelected = ui.selectedImportIndices?.includes(i);
                                 return (
                                     <div key={i} className={`flex items-start gap-3 p-4 border-b border-slate-900 last:border-0 hover:bg-slate-900/50 transition-colors cursor-pointer ${c.status === 'ERRO' ? 'opacity-50' : ''}`} onClick={() => c.status !== 'ERRO' && (isSelected ? ui.setSelectedImportIndices(ui.selectedImportIndices.filter((x:any)=>x!==i)) : ui.setSelectedImportIndices([...ui.selectedImportIndices, i]))}>
                                         <div className={isSelected ? 'text-blue-500' : 'text-slate-700'}>{isSelected ? <CheckSquare size={20}/> : <Square size={20}/>}</div>
@@ -96,8 +96,8 @@ export const SystemModalsWrapper = () => {
                                 );
                             })}
                         </div>
-                        <button onClick={() => fileCtrl.executeImport(activeUser, clients, fetchFullData)} disabled={ui.selectedImportIndices.length === 0 || ui.isSaving} className="w-full py-5 bg-emerald-600 text-white font-black rounded-2xl uppercase">
-                            {ui.isSaving ? <Loader2 className="animate-spin mx-auto" /> : `Importar ${ui.selectedImportIndices.length} Clientes`}
+                        <button onClick={() => fileCtrl.executeImport(activeUser, clients, fetchFullData)} disabled={(ui.selectedImportIndices?.length || 0) === 0 || ui.isSaving} className="w-full py-5 bg-emerald-600 text-white font-black rounded-2xl uppercase">
+                            {ui.isSaving ? <Loader2 className="animate-spin mx-auto" /> : `Importar ${ui.selectedImportIndices?.length || 0} Clientes`}
                         </button>
                     </div>
                 </Modal>

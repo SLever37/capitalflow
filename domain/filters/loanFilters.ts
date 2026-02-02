@@ -39,7 +39,7 @@ const sortLoans = (loans: Loan[], sortOption: SortOption): Loan[] => {
     return [...loans].sort((a, b) => {
         switch (sortOption) {
             case 'NAME_ASC':
-                return a.debtorName.localeCompare(b.debtorName);
+                return (a.debtorName || '').localeCompare(b.debtorName || '');
             
             case 'CREATED_DESC': // Entrada Mais Recente
                 return new Date(b.createdAt || b.startDate).getTime() - new Date(a.createdAt || a.startDate).getTime();
@@ -69,7 +69,7 @@ export const filterLoans = (
   if (searchTerm) {
     const lower = searchTerm.toLowerCase();
     result = result.filter(l =>
-      l.debtorName.toLowerCase().includes(lower) ||
+      (l.debtorName || '').toLowerCase().includes(lower) ||
       String(l.debtorDocument || '').toLowerCase().includes(lower) ||
       String(l.debtorPhone || '').toLowerCase().includes(lower) ||
       String((l as any).debtorEmail || '').toLowerCase().includes(lower) ||

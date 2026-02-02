@@ -1,3 +1,4 @@
+
 import { useState, useRef, useCallback } from 'react';
 import { CapitalSource, Loan, Client, Installment, AgreementInstallment } from '../types';
 import { ModalType, ModalState } from '../contexts/ModalContext';
@@ -6,6 +7,7 @@ export const useUiState = () => {
   const [activeModal, setActiveModal] = useState<ModalState | null>(null);
   const [showNavHub, setShowNavHub] = useState(false);
   const [isStealthMode, setIsStealthMode] = useState(false);
+  const [mobileDashboardTab, setMobileDashboardTab] = useState<'CONTRACTS' | 'BALANCE'>('CONTRACTS');
 
   const openModal = useCallback((type: ModalType, payload?: any) => {
       setActiveModal({ type, payload });
@@ -81,6 +83,7 @@ export const useUiState = () => {
     activeModal, openModal, closeModal,
     showNavHub, setShowNavHub,
     isStealthMode, setIsStealthMode,
+    mobileDashboardTab, setMobileDashboardTab,
     noteText, setNoteText,
     noteModalLoan, setNoteModalLoan,
     editingSource, setEditingSource,

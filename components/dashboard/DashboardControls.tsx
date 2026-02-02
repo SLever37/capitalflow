@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { ShieldAlert, ArrowDownWideNarrow, Search, X } from 'lucide-react';
-import { SortOption } from '../../types';
+import { ShieldAlert, ArrowDownWideNarrow, Search, X, Users, User } from 'lucide-react';
+import { SortOption, UserProfile } from '../../types';
 
 interface DashboardControlsProps {
     statusFilter: string;
@@ -11,46 +11,61 @@ interface DashboardControlsProps {
     searchTerm: string;
     setSearchTerm: (val: string) => void;
     showToast: (msg: string, type?: any) => void;
+    staffMembers?: UserProfile[];
+    selectedStaffId: string;
+    onStaffChange: (id: string) => void;
+    isMaster: boolean;
 }
 
 export const DashboardControls: React.FC<DashboardControlsProps> = ({
-    statusFilter, setStatusFilter, sortOption, setSortOption, searchTerm, setSearchTerm, showToast
+    statusFilter, setStatusFilter, sortOption, setSortOption, searchTerm, setSearchTerm, showToast,
+    staffMembers = [], selectedStaffId, onStaffChange, isMaster
 }) => {
     const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
     const [isMobileSortOpen, setIsMobileSortOpen] = useState(false);
 
-    const toggleSearch = () => {
-        setIsMobileSearchOpen(!isMobileSearchOpen);
-        setIsMobileSortOpen(false);
-    };
-
-    const toggleSort = () => {
-        setIsMobileSortOpen(!isMobileSortOpen);
-        setIsMobileSearchOpen(false);
-    };
-
     return (
         <div className="flex flex-col gap-3">
-            {/* Linha Principal de Filtros e Ações Rápidas */}
+            {/* Seletor de Equipe (Apenas Master) */}
+            {isMaster && staffMembers.length > 0 && (
+                <div className="flex items-center gap-2 mb-2">
+                    <div className="p-2 bg-indigo-600 rounded-xl text-white shadow-lg shadow-indigo-600/20">
+                        <Users size={16}/>
+                    </div>
+                    <div className="flex-1">
+                        <select 
+                            value={selectedStaffId}
+                            onChange={e => onStaffChange(e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-[10px] font-black uppercase text-white outline-none focus:border-indigo-500 transition-all cursor-pointer"
+                        >
+                            <option value="ALL">Visualizar: Toda a Equipe</option>
+                            <option value="ONLY_MASTER">Visualizar: Meus Contratos</option>
+                            <optgroup label="Colaboradores">
+                                {staffMembers.map(s => (
+                                    <option key={s.id} value={s.id}>Operador: {s.name}</option>
+                                ))}
+                            </optgroup>
+                        </select>
+                    </div>
+                </div>
+            )}
+
             <div className="flex items-center gap-2">
-                
-                {/* Ícones de Ação (Apenas Mobile) */}
                 <div className="flex md:hidden gap-1.5 flex-shrink-0">
                     <button 
-                        onClick={toggleSearch}
+                        onClick={() => setIsMobileSearchOpen(!isMobileSearchOpen)}
                         className={`p-2.5 rounded-xl border transition-all ${isMobileSearchOpen ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-900 border-slate-800 text-slate-400'}`}
                     >
                         <Search size={18} />
                     </button>
                     <button 
-                        onClick={toggleSort}
+                        onClick={() => setIsMobileSortOpen(!isMobileSortOpen)}
                         className={`p-2.5 rounded-xl border transition-all ${isMobileSortOpen ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-900 border-slate-800 text-slate-400'}`}
                     >
                         <ArrowDownWideNarrow size={18} />
                     </button>
                 </div>
 
-                {/* Filtros de Status (Scroll Horizontal) */}
                 <div className="flex gap-2 overflow-x-auto no-scrollbar flex-1 py-1">
                     {['TODOS', 'ATRASADOS', 'ATRASO_CRITICO', 'EM_DIA', 'PAGOS', 'ARQUIVADOS'].map(filter => (
                         <button 
@@ -64,7 +79,6 @@ export const DashboardControls: React.FC<DashboardControlsProps> = ({
                     ))}
                 </div>
 
-                {/* Ordenação Desktop (Escondida no Mobile) */}
                 <div className="hidden md:flex items-center gap-2 bg-slate-900 border border-slate-800 p-1 rounded-xl min-w-fit">
                     <div className="px-3 text-slate-500"><ArrowDownWideNarrow size={16}/></div>
                     <select 
@@ -80,7 +94,6 @@ export const DashboardControls: React.FC<DashboardControlsProps> = ({
                 </div>
             </div>
 
-            {/* Area de Busca Expansível (Mobile) ou Fixa (Desktop) */}
             {(isMobileSearchOpen || window.innerWidth >= 768) && (
                 <div className={`bg-slate-900 border border-slate-800 p-2 rounded-2xl flex items-center gap-2 animate-in slide-in-from-top-2 duration-200 ${!isMobileSearchOpen ? 'hidden md:flex' : 'flex'}`}>
                     <Search className="text-slate-500 ml-2 flex-shrink-0" size={18}/>
@@ -92,34 +105,6 @@ export const DashboardControls: React.FC<DashboardControlsProps> = ({
                         onChange={e => setSearchTerm(e.target.value)} 
                         autoFocus={isMobileSearchOpen}
                     />
-                    {isMobileSearchOpen && (
-                        <button onClick={() => setIsMobileSearchOpen(false)} className="p-2 text-slate-500 hover:text-white">
-                            <X size={18}/>
-                        </button>
-                    )}
-                </div>
-            )}
-
-            {/* Area de Ordenação Expansível (Apenas Mobile) */}
-            {isMobileSortOpen && (
-                <div className="md:hidden bg-slate-900 border border-slate-800 p-4 rounded-2xl animate-in slide-in-from-top-2 duration-200">
-                    <label className="text-[9px] font-black uppercase text-slate-500 mb-2 block tracking-widest">Ordenar por:</label>
-                    <div className="grid grid-cols-2 gap-2">
-                        {[
-                            { val: 'DUE_DATE_ASC', label: 'Vencimento' },
-                            { val: 'NAME_ASC', label: 'Nome' },
-                            { val: 'CREATED_DESC', label: 'Mais Novo' },
-                            { val: 'UPDATED_DESC', label: 'Recente' }
-                        ].map(opt => (
-                            <button 
-                                key={opt.val}
-                                onClick={() => { setSortOption(opt.val as SortOption); setIsMobileSortOpen(false); }}
-                                className={`py-3 px-2 rounded-xl text-[10px] font-bold uppercase border transition-all ${sortOption === opt.val ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-950 border-slate-800 text-slate-400'}`}
-                            >
-                                {opt.label}
-                            </button>
-                        ))}
-                    </div>
                 </div>
             )}
         </div>

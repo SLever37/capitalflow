@@ -33,7 +33,7 @@ export const MasterPage: React.FC<MasterPageProps> = ({
                 </div>
             </div>
             <div className="space-y-3">
-                {allUsers.filter(u => u.nome_operador.toLowerCase().includes(sacSearch.toLowerCase()) || u.usuario_email.toLowerCase().includes(sacSearch.toLowerCase())).map(u => {
+                {allUsers.filter(u => (u.nome_operador || '').toLowerCase().includes(sacSearch.toLowerCase()) || (u.usuario_email || '').toLowerCase().includes(sacSearch.toLowerCase())).map(u => {
                     const userIsOnline = isOnline(u.last_active_at);
                     
                     return (

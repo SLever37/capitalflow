@@ -11,11 +11,11 @@ interface LegalReportViewProps {
 export const LegalReportView: React.FC<LegalReportViewProps> = ({ docRecord, fullAuditData }) => {
     if (!docRecord || !fullAuditData) return <div className="text-center p-10 text-slate-500">Carregando dados de auditoria...</div>;
 
-    const { doc, signatures, logs } = fullAuditData;
+    const { doc, signatures = [], logs = [] } = fullAuditData;
     
     // Verificações de Execução
-    const hasDebtorSign = signatures.some((s: any) => s.signer_name === doc.snapshot.debtorName);
-    const hasWitnesses = signatures.length >= 3; // Credor + 2 Testemunhas (uma é o sistema)
+    const hasDebtorSign = signatures.some((s: any) => s.signer_name === doc.snapshot?.debtorName);
+    const hasWitnesses = signatures.length >= 3; 
     const integrityCheck = doc.hash_sha256 ? true : false;
     
     const isReadyForExecution = hasDebtorSign && integrityCheck;
@@ -61,7 +61,7 @@ export const LegalReportView: React.FC<LegalReportViewProps> = ({ docRecord, ful
             <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6">
                 <h4 className="text-xs font-black uppercase text-emerald-500 mb-4 flex items-center gap-2"><ShieldCheck size={14}/> Assinaturas Registradas</h4>
                 <div className="space-y-3">
-                    {signatures.length === 0 ? <p className="text-xs text-slate-500 italic">Nenhuma assinatura registrada.</p> : signatures.map((s: any, idx: number) => (
+                    {signatures.length === 0 ? <p className="text-xs text-slate-500 italic">Nenhuma assinatura registrada.</p> : signatures.map((s: any) => (
                         <div key={s.id} className="flex justify-between items-center bg-slate-900 p-3 rounded-xl border border-slate-800">
                             <div>
                                 <p className="text-xs font-bold text-white">{s.signer_name}</p>
@@ -82,7 +82,7 @@ export const LegalReportView: React.FC<LegalReportViewProps> = ({ docRecord, ful
             <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6">
                 <h4 className="text-xs font-black uppercase text-purple-500 mb-4 flex items-center gap-2"><Activity size={14}/> Trilha de Auditoria (Logs)</h4>
                 <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar pr-2">
-                    {logs.map((log: any) => (
+                    {logs.length === 0 ? <p className="text-[10px] text-slate-600 italic">Nenhum log registrado.</p> : logs.map((log: any) => (
                         <div key={log.id} className="text-[10px] border-l-2 border-slate-800 pl-3 py-1">
                             <span className="text-slate-500 font-mono mr-2">{new Date(log.timestamp).toLocaleString()}</span>
                             <span className="text-white font-bold">{log.action}</span>

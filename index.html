@@ -14,42 +14,30 @@
             background-color: #0f172a;
             color: #f8fafc;
             -webkit-tap-highlight-color: transparent;
-            overscroll-behavior-y: none; /* Previne pull-to-refresh acidental */
-            overflow-x: hidden; /* Previne scroll horizontal */
+            overscroll-behavior-y: none;
+            overflow-x: hidden;
+            padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
         }
-        /* Otimização Mobile: Previne zoom ao focar inputs no iOS */
         @media (max-width: 640px) {
             input, select, textarea {
                 font-size: 16px !important; 
             }
         }
-        /* Custom Scrollbar */
         ::-webkit-scrollbar {
-            width: 8px;
+            width: 6px;
         }
         ::-webkit-scrollbar-track {
-            background: #1e293b;
+            background: transparent;
         }
         ::-webkit-scrollbar-thumb {
             background: #334155;
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #475569;
+            border-radius: 10px;
         }
         .no-scrollbar::-webkit-scrollbar {
             display: none;
         }
-        .no-scrollbar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
-        /* Safe Area for iPhones */
         .pb-safe {
             padding-bottom: env(safe-area-inset-bottom);
-        }
-        .pt-safe {
-            padding-top: env(safe-area-inset-top);
         }
     </style>
 <script type="importmap">

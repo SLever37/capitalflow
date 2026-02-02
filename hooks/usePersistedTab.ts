@@ -1,13 +1,14 @@
 
 import { useEffect } from 'react';
+import { AppTab } from '../types';
 
 export const usePersistedTab = (
-  activeTab: 'DASHBOARD' | 'CLIENTS' | 'SOURCES' | 'PROFILE' | 'MASTER' | 'LEGAL',
-  setActiveTab: (tab: 'DASHBOARD' | 'CLIENTS' | 'SOURCES' | 'PROFILE' | 'MASTER' | 'LEGAL') => void
+  activeTab: AppTab,
+  setActiveTab: (tab: AppTab) => void
 ) => {
   useEffect(() => {
     const lastTab = localStorage.getItem('cm_last_tab');
-    if (lastTab) setActiveTab(lastTab as any);
+    if (lastTab) setActiveTab(lastTab as AppTab);
   }, []);
 
   useEffect(() => {

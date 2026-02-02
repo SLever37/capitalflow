@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { ProfilePage } from '../pages/ProfilePage';
-import { UserProfile, Client, Loan, CapitalSource } from '../types';
+import { UserProfile, Client, Loan, CapitalSource, AppTab } from '../types';
 import { filesService } from '../services/files.service';
 
 interface ProfileContainerProps {
@@ -16,10 +16,13 @@ interface ProfileContainerProps {
   profileEditForm: UserProfile | null;
   setProfileEditForm: (val: UserProfile) => void;
   fileCtrl: any;
+  navOrder: AppTab[];
+  hubOrder: AppTab[];
+  saveNavConfig: (nav: AppTab[], hub: AppTab[]) => void;
 }
 
 export const ProfileContainer: React.FC<ProfileContainerProps> = ({
-  activeUser, clients, loans, sources, ui, profileCtrl, handleLogout, showToast, profileEditForm, setProfileEditForm, fileCtrl
+  activeUser, clients, loans, sources, ui, profileCtrl, handleLogout, showToast, profileEditForm, setProfileEditForm, fileCtrl, navOrder, hubOrder, saveNavConfig
 }) => {
   return (
     <ProfilePage 
@@ -43,6 +46,9 @@ export const ProfileContainer: React.FC<ProfileContainerProps> = ({
         handleImportExcel={fileCtrl.handleFilePick}
         profilePhotoInputRef={ui.profilePhotoInputRef}
         fileInputExcelRef={ui.fileInputExcelRef}
+        navOrder={navOrder}
+        hubOrder={hubOrder}
+        saveNavConfig={saveNavConfig}
     />
   );
 };

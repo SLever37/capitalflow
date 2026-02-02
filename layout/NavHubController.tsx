@@ -1,15 +1,16 @@
 
 import React from 'react';
 import { NavHub } from './NavHub';
-import { UserProfile } from '../types';
+import { UserProfile, AppTab } from '../types';
 
 interface NavHubControllerProps {
   ui: any;
   setActiveTab: (tab: any) => void;
   activeUser: UserProfile | null;
+  hubOrder: AppTab[];
 }
 
-export const NavHubController: React.FC<NavHubControllerProps> = ({ ui, setActiveTab, activeUser }) => {
+export const NavHubController: React.FC<NavHubControllerProps> = ({ ui, setActiveTab, activeUser, hubOrder }) => {
   const handleNavNavigate = (tab: string, modal?: string) => {
       setActiveTab(tab as any);
       ui.setShowNavHub(false);
@@ -25,6 +26,7 @@ export const NavHubController: React.FC<NavHubControllerProps> = ({ ui, setActiv
         onClose={() => ui.setShowNavHub(false)} 
         onNavigate={handleNavNavigate} 
         userLevel={activeUser?.accessLevel || 0} 
+        hubOrder={hubOrder}
     />
   );
 };

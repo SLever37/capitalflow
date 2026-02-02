@@ -59,9 +59,18 @@ export const legalService = {
 
   async getFullAuditData(docId: string) {
     const { data: doc } = await supabase.from('documentos_juridicos').select('*').eq('id', docId).single();
-    if (!doc) return { doc: null, signatures: [] };
-    const { data: signatures } = await supabase.from('assinaturas_documento').select('*').eq('document_id', doc.id).order('signed_at', { ascending: true });
-    return { doc, signatures: signatures || [] };
+    if (!doc) return { doc: null, signatures: [], logs: [] };
+    
+    const [signaturesRes, logsRes] = await Promise.all([
+      supabase.from('assinaturas_documento').select('*').eq('document_id', doc.id).order('signed_at', { ascending: true }),
+      supabase.from('logs_assinatura').select('*').eq('document_id', doc.id).order('timestamp', { ascending: true })
+    ]);
+
+    return { 
+      doc, 
+      signatures: signaturesRes.data || [], 
+      logs: logsRes.data || [] 
+    };
   },
 
   async signDocument(docId: string, profileId: string, signerInfo: { name: string; doc: string }, role: string): Promise<void> {

@@ -19,10 +19,11 @@ interface AppShellProps {
   isStealthMode: boolean;
   toggleStealthMode: () => void;
   onOpenSupport?: () => void;
+  navOrder: string[]; // Adicionado navOrder aqui
 }
 
 export const AppShell: React.FC<AppShellProps> = ({ 
-  children, toast, activeTab, setActiveTab, activeUser, isLoadingData, onOpenNav, onNewLoan, isStealthMode, toggleStealthMode, onOpenSupport
+  children, toast, activeTab, setActiveTab, activeUser, isLoadingData, onOpenNav, onNewLoan, isStealthMode, toggleStealthMode, onOpenSupport, navOrder
 }) => {
   const [unreadSupport, setUnreadSupport] = useState(0);
 
@@ -82,6 +83,7 @@ export const AppShell: React.FC<AppShellProps> = ({
         onNewLoan={onNewLoan}
         isStealthMode={isStealthMode}
         toggleStealthMode={toggleStealthMode}
+        navOrder={navOrder}
       />
 
       <main className="w-full max-w-[1920px] mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
@@ -109,6 +111,8 @@ export const AppShell: React.FC<AppShellProps> = ({
         setActiveTab={setActiveTab} 
         onOpenNav={onOpenNav} 
         onNewLoan={onNewLoan}
+        navOrder={navOrder}
+        primaryColor={activeUser?.brandColor}
       />
     </div>
   );

@@ -12,10 +12,10 @@ export interface SupportMessage {
     file_url?: string;
     created_at: string;
     read: boolean;
+    operator_id?: string; // Added operator_id
 }
 
 export const supportChatService = {
-    // Verifica se o operador teve atividade nos últimos 5 minutos
     async isOperatorOnline(profileId: string): Promise<boolean> {
         const { data } = await supabase
             .from('perfis')
@@ -26,20 +26,22 @@ export const supportChatService = {
         if (!data?.last_active_at) return false;
         const lastActive = new Date(data.last_active_at).getTime();
         const now = new Date().getTime();
+        // Operador considerado online se teve atividade nos últimos 5 minutos
         return (now - lastActive) < 5 * 60 * 1000;
     },
 
+    // Updated sendMessage signature to accept operator_id
     async sendMessage(params: {
         profileId: string, 
         loanId: string, 
         sender: 'CLIENT' | 'OPERATOR', 
         text: string,
+        operator_id?: string, // Added operator_id here
         file?: File,
         type?: 'text' | 'image' | 'audio' | 'file'
     }) {
         let fileUrl = '';
         
-        // Upload de Mídia (Áudio ou Imagem)
         if (params.file) {
             const ext = params.file.name.split('.').pop();
             const path = `chat/${params.loanId}/${Date.now()}.${ext}`;
@@ -54,6 +56,7 @@ export const supportChatService = {
             profile_id: params.profileId,
             loan_id: params.loanId,
             sender: params.sender,
+            operator_id: params.operator_id || null, // Persist operator_id
             text: params.text,
             type: params.type || 'text',
             file_url: fileUrl || null,
@@ -63,18 +66,18 @@ export const supportChatService = {
         
         if (error) throw error;
 
-        // LÓGICA DE AUTO-RESPOSTA
+        // LÓGICA DE BOT: Somente se for Cliente enviando e Operador estiver REALMENTE Offline
         if (params.sender === 'CLIENT') {
             const isOnline = await this.isOperatorOnline(params.profileId);
             if (!isOnline) {
-                // Delay pequeno para parecer natural
-                setTimeout(() => this.sendAutoReply(params.profileId, params.loanId), 2000);
+                // Pequeno delay para simular processamento do robô
+                setTimeout(() => this.sendAutoReply(params.profileId, params.loanId), 1500);
             }
         }
     },
 
     async sendAutoReply(profileId: string, loanId: string) {
-        const autoText = "Olá! O suporte está offline no momento. Atendemos de Seg a Sex em horário comercial. Pagamentos via PIX são processados 24h automaticamente. Suas próximas datas de pagamento estão disponíveis no menu 'Plano de Pagamento' deste portal.";
+        const autoText = `[AUTO] Olá! O operador está offline no momento, mas eu sou o assistente CapitalFlow. Nosso sistema processa pagamentos PIX 24h automaticamente. Para este contrato (#${loanId.slice(0,6).toUpperCase()}), você pode consultar os próximos vencimentos no menu 'Plano de Pagamento'. Deixe sua dúvida e retornaremos no horário comercial!`;
         
         await supabase.from('mensagens_suporte').insert({
             id: generateUUID(),

@@ -58,6 +58,8 @@ export const operatorProfileService = {
             default_daily_interest_percent: curatedData.defaultDailyInterestPercent,
             target_capital: curatedData.targetCapital,
             target_profit: curatedData.targetProfit,
+            ui_nav_order: curatedData.ui_nav_order,
+            ui_hub_order: curatedData.ui_hub_order,
             last_active_at: new Date().toISOString()
         };
 
@@ -144,6 +146,8 @@ export const operatorProfileService = {
             defaultDailyInterestPercent: Math.abs(Number(raw.defaultDailyInterestPercent) || 1),
             targetCapital: Math.abs(Number(raw.targetCapital) || 0),
             targetProfit: Math.abs(Number(raw.targetProfit) || 0),
+            ui_nav_order: raw.ui_nav_order,
+            ui_hub_order: raw.ui_hub_order,
             neighborhood: asString(raw.neighborhood).substring(0, 100),
             city: asString(raw.city).substring(0, 100),
             state: asString(raw.state).substring(0, 2).toUpperCase(),
@@ -183,7 +187,9 @@ export const operatorProfileService = {
             defaultFinePercent: asNumber(dbProfile.default_fine_percent),
             defaultDailyInterestPercent: asNumber(dbProfile.default_daily_interest_percent),
             targetCapital: asNumber(dbProfile.target_capital),
-            targetProfit: asNumber(dbProfile.target_profit)
+            targetProfit: asNumber(dbProfile.target_profit),
+            ui_nav_order: dbProfile.ui_nav_order,
+            ui_hub_order: dbProfile.ui_hub_order
         };
     },
 

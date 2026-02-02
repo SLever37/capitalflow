@@ -62,7 +62,7 @@ export const importService = {
     inferMapping(headers: string[]): Record<string, number> {
         const mapping: Record<string, number> = {};
         headers.forEach((h, idx) => {
-            const lower = h.toLowerCase();
+            const lower = String(h || '').toLowerCase();
             FIELD_MAPS.forEach(field => {
                 if (field.labels.some(l => lower.includes(l)) && mapping[field.key] === undefined) {
                     mapping[field.key] = idx;

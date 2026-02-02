@@ -1,10 +1,11 @@
+
 import { LegalDocumentParams } from "../../../types";
 import { formatMoney, numberToWordsBRL } from "../../../utils/formatters";
 import { buildConfissaoDividaVM } from "../viewModels/confissaoVM";
 
 export const generateConfissaoDividaHTML = (data: LegalDocumentParams, docId?: string, hash?: string, signatures: any[] = []) => {
     const vm = buildConfissaoDividaVM(data);
-    const findSig = (role: string) => signatures.find(s => s.role === role);
+    const findSig = (role: string) => (signatures || []).find(s => s.role === role);
 
     const renderSignatureBlock = (role: string, name: string, doc: string) => {
         const sig = findSig(role);
@@ -26,6 +27,14 @@ export const generateConfissaoDividaHTML = (data: LegalDocumentParams, docId?: s
             </div>
         `;
     };
+
+    const installmentsHtml = (vm.installments || []).map((i: any) => `
+        <tr>
+            <td>${i.number || '—'}ª</td>
+            <td>${new Date(i.dueDate).toLocaleDateString('pt-BR')}</td>
+            <td>${formatMoney(i.amount)}</td>
+        </tr>
+    `).join('');
 
     return `
     <!DOCTYPE html>
@@ -70,14 +79,7 @@ export const generateConfissaoDividaHTML = (data: LegalDocumentParams, docId?: s
                     </tr>
                 </thead>
                 <tbody>
-                    // Fix: cast installment item to any to avoid property access errors on unknown type (number, dueDate, amount)
-                    ${vm.installments.map((i: any) => `
-                        <tr>
-                            <td>${i.number || '—'}ª</td>
-                            <td>${new Date(i.dueDate).toLocaleDateString('pt-BR')}</td>
-                            <td>${formatMoney(i.amount)}</td>
-                        </tr>
-                    `).join('')}
+                    ${installmentsHtml}
                 </tbody>
             </table>
 
