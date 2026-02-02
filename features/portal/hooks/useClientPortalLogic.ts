@@ -40,6 +40,7 @@ export const useClientPortalLogic = (initialLoanId: string) => {
     setPortalError(null);
 
     try {
+      // 1. Carrega os dados do contrato selecionado E a lista completa de contratos deste cliente
       const [loanData, contractsList] = await Promise.all([
           portalService.fetchLoanData(loanId, clientId),
           portalService.fetchClientContracts(clientId)
@@ -62,12 +63,14 @@ export const useClientPortalLogic = (initialLoanId: string) => {
     }
   }, []);
 
+  // Inicialização da Sessão
   useEffect(() => {
     const checkSession = async () => {
       const params = new URLSearchParams(window.location.search);
       const magicCode = params.get('code');
       const portalId = params.get('portal');
 
+      // A) Magic Link
       if (magicCode && portalId) {
         try {
           const clientData = await portalService.validateMagicLink(portalId, magicCode);
@@ -83,28 +86,39 @@ export const useClientPortalLogic = (initialLoanId: string) => {
           };
 
           localStorage.setItem(PORTAL_SESSION_KEY, JSON.stringify(session));
-          setIsLoading(false);
-          return;
+          // Importante: Não setar isLoading false aqui, deixar o useEffect do selectedLoanId carregar os dados
+          return; 
         } catch {
           console.error('Magic Link inválido.');
         }
       }
 
+      // B) Sessão Salva (LocalStorage)
       try {
         const raw = localStorage.getItem(PORTAL_SESSION_KEY);
-        if (!raw) return;
+        if (!raw) {
+            setIsLoading(false);
+            return;
+        }
 
         const sess = JSON.parse(raw) as PortalSession;
+        
+        // Verifica se a sessão é válida e restaura dados mínimos do cliente
         if (sess.client_id) {
-          setLoggedClient({ id: sess.client_id, name: 'Cliente' });
-          if (sess.last_loan_id) setSelectedLoanId(sess.last_loan_id);
-        } else {
-          localStorage.removeItem(PORTAL_SESSION_KEY);
+            // Recupera nome do cliente para a UI inicial (será atualizado no loadFull)
+            const { data: clientCheck } = await supabase.from('clientes').select('id, name, document').eq('id', sess.client_id).single();
+            if (clientCheck) {
+                setLoggedClient(clientCheck);
+                if (sess.last_loan_id) setSelectedLoanId(sess.last_loan_id);
+            } else {
+                localStorage.removeItem(PORTAL_SESSION_KEY);
+            }
         }
       } catch {
         localStorage.removeItem(PORTAL_SESSION_KEY);
       } finally {
-        setIsLoading(false);
+        // Se não tiver selecionado contrato ainda, para o loading aqui
+        if (!selectedLoanId) setIsLoading(false);
       }
     };
 
@@ -112,6 +126,7 @@ export const useClientPortalLogic = (initialLoanId: string) => {
     return () => abortControllerRef.current?.abort();
   }, []);
 
+  // Trigger de Carregamento de Dados (Sempre que ID ou Cliente mudar)
   useEffect(() => {
     if (selectedLoanId && loggedClient) {
       loadFullPortalData(selectedLoanId, loggedClient.id);
@@ -128,10 +143,12 @@ export const useClientPortalLogic = (initialLoanId: string) => {
     setIsLoading(true);
 
     try {
+      // Autentica usando o contrato atual selecionado na URL (se houver) ou busca genérica se implementado
       const client = await portalService.authenticate(selectedLoanId, loginIdentifier);
       setLoggedClient(client);
       setByeName(null);
 
+      // Salva sessão
       const session: PortalSession = {
         client_id: client.id,
         access_code: 'FRICTIONLESS',
@@ -139,11 +156,11 @@ export const useClientPortalLogic = (initialLoanId: string) => {
         last_loan_id: selectedLoanId,
         saved_at: new Date().toISOString(),
       };
-
       localStorage.setItem(PORTAL_SESSION_KEY, JSON.stringify(session));
+      
+      // O useEffect do selectedLoanId vai disparar o loadFullPortalData
     } catch (e: any) {
       setPortalError(e.message);
-    } finally {
       setIsLoading(false);
     }
   };
@@ -154,6 +171,7 @@ export const useClientPortalLogic = (initialLoanId: string) => {
     setLoggedClient(null);
     setLoan(null);
     setPortalError(null);
+    setClientContracts([]); // Limpa lista
   };
 
   const handleSignalIntent = async (tipo: string) => {
@@ -243,6 +261,32 @@ export const useClientPortalLogic = (initialLoanId: string) => {
     }
   };
 
+  // Nova função para VISUALIZAR/BAIXAR documento antes de assinar
+  const handleViewDocument = async () => {
+      if (!loan) return;
+      try {
+          const { data: records, error } = await supabase.rpc(
+            'get_documento_juridico_by_loan',
+            { p_loan_id: loan.id }
+          );
+
+          if (error || !records?.length) {
+            alert('Documento ainda não gerado pelo gestor.');
+            return;
+          }
+
+          const token = records[0]?.view_token;
+          if (token) {
+              // Abre a página pública de assinatura que renderiza o PDF/HTML
+              const url = `${window.location.origin}/?legal_sign=${token}&role=DEVEDOR`;
+              window.open(url, '_blank');
+          }
+      } catch (e: any) {
+          console.error(e);
+          alert("Erro ao abrir documento.");
+      }
+  };
+
   return {
     isLoading,
     isSigning,
@@ -253,8 +297,8 @@ export const useClientPortalLogic = (initialLoanId: string) => {
     loggedClient,
     byeName,
     selectedLoanId,
-    setSelectedLoanId, // Expose setter to switch loans
-    clientContracts, // Expose contracts list
+    setSelectedLoanId,
+    clientContracts,
     loan,
     installments,
     portalSignals,
@@ -268,6 +312,7 @@ export const useClientPortalLogic = (initialLoanId: string) => {
     handleSignalIntent,
     handleReceiptUpload,
     handleSignDocument,
+    handleViewDocument,
     loadFullPortalData,
   };
 };

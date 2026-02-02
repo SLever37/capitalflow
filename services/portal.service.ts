@@ -211,7 +211,13 @@ export const portalService = {
           .order('created_at', { ascending: false });
       
       if (error) return [];
-      return data || [];
+      
+      // Mapeia para adicionar campos extras se necessário (ex: extrair código do ID se houver convenção)
+      return (data || []).map((c: any) => ({
+          ...c,
+          // Extrai os últimos 6 chars como código curto para display
+          code: c.id.substring(0, 6).toUpperCase()
+      }));
   },
 
   async submitPaymentIntent(clientId: string, loanId: string, profileId: string, type: string) {
