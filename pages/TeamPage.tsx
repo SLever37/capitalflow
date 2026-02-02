@@ -1,6 +1,5 @@
 
 import React, { useState } from 'react';
-// Added Users icon to the import list to fix the missing component error on line 92
 import { Briefcase, UserPlus, Link as LinkIcon, DollarSign, ArrowRight, User, Palette, Image as ImageIcon, CheckCircle2, ShieldCheck, Copy, Trash2, Loader2, Save, Users } from 'lucide-react';
 import { UserProfile, CapitalSource } from '../types';
 import { formatMoney } from '../utils/formatters';
@@ -22,14 +21,40 @@ export const TeamPage: React.FC<TeamPageProps> = ({ activeUser, staffMembers, so
     const [editingStaff, setEditingStaff] = useState<UserProfile | null>(null);
     const [isSaving, setIsSaving] = useState(false);
 
-    const handleCreateInvite = async () => {
-        if (!activeUser) return;
+    const handleCreateInvite = () => {
+        if (!activeUser) {
+            showToast("Erro: Perfil não identificado.", "error");
+            return;
+        }
+        
         const apport = parseFloat(inviteApport) || 0;
         const token = Math.random().toString(36).substring(2, 10).toUpperCase();
-        const url = `${window.location.origin}/register?invite=${token}&master=${activeUser.id}&apport=${apport}`;
+        
+        // Gera link apontando para a raiz com parâmetros de query para o AppGate interceptar se necessário
+        // (Assumindo que o AuthScreen ou AppGate processará '?invite=...')
+        const url = `${window.location.origin}/?invite=${token}&master=${activeUser.id}&apport=${apport}`;
+        
         setInviteLink(url);
         setIsCreatingInvite(false);
-        showToast("Link mágico gerado!", "success");
+        showToast("Link de convite gerado com sucesso!", "success");
+    };
+
+    const handleCopyLink = async () => {
+        if (!inviteLink) return;
+        try {
+            await navigator.clipboard.writeText(inviteLink);
+            showToast("Link copiado para a área de transferência!", "success");
+        } catch (err) {
+            // Fallback para input manual se clipboard falhar
+            const input = document.getElementById('invite-input') as HTMLInputElement;
+            if (input) {
+                input.select();
+                document.execCommand('copy');
+                showToast("Link copiado!", "success");
+            } else {
+                showToast("Erro ao copiar. Selecione e copie manualmente.", "error");
+            }
+        }
     };
 
     const handleSaveStaffBranding = async () => {
@@ -64,8 +89,8 @@ export const TeamPage: React.FC<TeamPageProps> = ({ activeUser, staffMembers, so
                     <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">Sua Equipe • Unidades Independentes</p>
                 </div>
                 <button 
-                    onClick={() => setIsCreatingInvite(true)}
-                    className="p-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-black uppercase text-[10px] flex items-center gap-2 shadow-lg"
+                    onClick={() => { setInviteLink(''); setInviteApport(''); setIsCreatingInvite(true); }}
+                    className="p-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-black uppercase text-[10px] flex items-center gap-2 shadow-lg transition-all active:scale-95"
                 >
                     <UserPlus size={16}/> Expandir Equipe
                 </button>
@@ -81,8 +106,14 @@ export const TeamPage: React.FC<TeamPageProps> = ({ activeUser, staffMembers, so
                         </div>
                     </div>
                     <div className="flex gap-2 w-full md:w-auto">
-                        <input readOnly value={inviteLink} className="flex-1 md:w-64 bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-[10px] text-slate-400 font-mono truncate" />
-                        <button onClick={() => { navigator.clipboard.writeText(inviteLink); showToast("Link copiado!"); }} className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-500 transition-all"><Copy size={16}/></button>
+                        <input 
+                            id="invite-input"
+                            readOnly 
+                            value={inviteLink} 
+                            className="flex-1 md:w-64 bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-[10px] text-slate-400 font-mono truncate outline-none focus:border-blue-500 transition-colors" 
+                            onClick={(e) => e.currentTarget.select()}
+                        />
+                        <button onClick={handleCopyLink} className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-500 transition-all shadow-lg active:scale-95"><Copy size={16}/></button>
                     </div>
                 </div>
             )}
@@ -90,7 +121,6 @@ export const TeamPage: React.FC<TeamPageProps> = ({ activeUser, staffMembers, so
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {staffMembers.length === 0 ? (
                     <div className="col-span-full py-24 text-center border-2 border-dashed border-slate-800 rounded-[3rem] opacity-40">
-                        {/* Users icon now correctly imported from lucide-react */}
                         <Users className="mx-auto text-slate-700 mb-4" size={48}/>
                         <p className="text-slate-500 font-black uppercase text-xs tracking-widest">Sua rede está vazia.</p>
                     </div>
@@ -125,17 +155,24 @@ export const TeamPage: React.FC<TeamPageProps> = ({ activeUser, staffMembers, so
 
             {/* Modal de Convite */}
             {isCreatingInvite && (
-                <div className="fixed inset-0 z-[100] bg-slate-950/98 flex items-center justify-center p-4">
-                    <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-[3rem] p-8 space-y-6 animate-in zoom-in-95">
+                <div className="fixed inset-0 z-[100] bg-slate-950/98 flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-[3rem] p-8 space-y-6 animate-in zoom-in-95 shadow-2xl">
                         <div className="text-center">
                             <div className="w-16 h-16 bg-blue-600/10 text-blue-500 rounded-2xl flex items-center justify-center mx-auto mb-4"><ShieldCheck size={32}/></div>
                             <h2 className="text-xl font-black text-white uppercase">Aporte Inicial</h2>
                             <p className="text-xs text-slate-500 mt-1">Quanto de fôlego esta unidade terá?</p>
                         </div>
-                        <input type="number" placeholder="R$ 0,00" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white font-black text-lg outline-none focus:border-blue-500" value={inviteApport} onChange={e => setInviteApport(e.target.value)} />
+                        <input 
+                            type="number" 
+                            placeholder="R$ 0,00" 
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white font-black text-lg outline-none focus:border-blue-500 transition-colors" 
+                            value={inviteApport} 
+                            onChange={e => setInviteApport(e.target.value)} 
+                            autoFocus
+                        />
                         <div className="flex gap-3">
-                            <button onClick={() => setIsCreatingInvite(false)} className="flex-1 py-4 bg-slate-800 text-white rounded-xl font-bold uppercase text-[10px]">Cancelar</button>
-                            <button onClick={handleCreateInvite} className="flex-1 py-4 bg-blue-600 text-white rounded-xl font-black uppercase text-[10px]">Gerar Link</button>
+                            <button onClick={() => setIsCreatingInvite(false)} className="flex-1 py-4 bg-slate-800 text-white rounded-xl font-bold uppercase text-[10px] hover:bg-slate-700 transition-all">Cancelar</button>
+                            <button onClick={handleCreateInvite} className="flex-1 py-4 bg-blue-600 text-white rounded-xl font-black uppercase text-[10px] hover:bg-blue-500 transition-all shadow-lg">Gerar Link</button>
                         </div>
                     </div>
                 </div>
@@ -143,17 +180,17 @@ export const TeamPage: React.FC<TeamPageProps> = ({ activeUser, staffMembers, so
 
             {/* Modal de Branding da Unidade */}
             {editingStaff && (
-                <div className="fixed inset-0 z-[100] bg-slate-950/98 flex items-center justify-center p-4">
-                    <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-[3rem] p-8 space-y-6 animate-in zoom-in-95 overflow-y-auto max-h-[90vh]">
+                <div className="fixed inset-0 z-[100] bg-slate-950/98 flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-[3rem] p-8 space-y-6 animate-in zoom-in-95 overflow-y-auto max-h-[90vh] shadow-2xl">
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="text-xl font-black text-white uppercase flex items-center gap-2"><Palette className="text-blue-500"/> Identidade da Unidade</h2>
-                            <button onClick={() => setEditingStaff(null)} className="p-2 text-slate-500 hover:text-white"><Trash2 size={20}/></button>
+                            <button onClick={() => setEditingStaff(null)} className="p-2 text-slate-500 hover:text-white rounded-full hover:bg-slate-800 transition-colors"><Trash2 size={20}/></button>
                         </div>
                         
                         <div className="space-y-4">
                             <div>
                                 <label className="text-[10px] font-black text-slate-500 uppercase ml-1 block mb-2">Nome da Unidade / Empresa</label>
-                                <input type="text" value={editingStaff.businessName} onChange={e => setEditingStaff({...editingStaff, businessName: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none" />
+                                <input type="text" value={editingStaff.businessName} onChange={e => setEditingStaff({...editingStaff, businessName: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:border-blue-500 transition-colors" />
                             </div>
                             
                             <div className="grid grid-cols-2 gap-4">
@@ -166,14 +203,14 @@ export const TeamPage: React.FC<TeamPageProps> = ({ activeUser, staffMembers, so
                                 </div>
                                 <div>
                                     <label className="text-[10px] font-black text-slate-500 uppercase ml-1 block mb-2">Saldo p/ Saque (R$)</label>
-                                    <input type="number" value={editingStaff.interestBalance} onChange={e => setEditingStaff({...editingStaff, interestBalance: parseFloat(e.target.value) || 0})} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none" />
+                                    <input type="number" value={editingStaff.interestBalance} onChange={e => setEditingStaff({...editingStaff, interestBalance: parseFloat(e.target.value) || 0})} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:border-blue-500 transition-colors" />
                                 </div>
                             </div>
 
                             <div>
                                 <label className="text-[10px] font-black text-slate-500 uppercase ml-1 block mb-2">URL da Logo (ou Base64)</label>
                                 <div className="flex gap-3">
-                                    <input type="text" value={editingStaff.logoUrl} onChange={e => setEditingStaff({...editingStaff, logoUrl: e.target.value})} className="flex-1 bg-slate-950 border border-slate-800 rounded-xl p-4 text-white text-xs outline-none" placeholder="https://..." />
+                                    <input type="text" value={editingStaff.logoUrl} onChange={e => setEditingStaff({...editingStaff, logoUrl: e.target.value})} className="flex-1 bg-slate-950 border border-slate-800 rounded-xl p-4 text-white text-xs outline-none focus:border-blue-500 transition-colors" placeholder="https://..." />
                                     <div className="w-14 h-14 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-center flex-shrink-0">
                                         {editingStaff.logoUrl ? <img src={editingStaff.logoUrl} className="w-full h-full object-contain p-1"/> : <ImageIcon className="text-slate-700"/>}
                                     </div>
@@ -183,7 +220,7 @@ export const TeamPage: React.FC<TeamPageProps> = ({ activeUser, staffMembers, so
 
                         <div className="flex gap-3 pt-4">
                             <button onClick={() => setEditingStaff(null)} className="flex-1 py-4 bg-slate-800 text-white rounded-xl font-bold uppercase text-[10px]">Descartar</button>
-                            <button onClick={handleSaveStaffBranding} disabled={isSaving} className="flex-1 py-4 bg-blue-600 text-white rounded-xl font-black uppercase text-[10px] flex items-center justify-center gap-2">
+                            <button onClick={handleSaveStaffBranding} disabled={isSaving} className="flex-1 py-4 bg-blue-600 text-white rounded-xl font-black uppercase text-[10px] flex items-center justify-center gap-2 hover:bg-blue-500 transition-all shadow-lg disabled:opacity-50">
                                 {isSaving ? <Loader2 className="animate-spin" size={16}/> : <><Save size={16}/> Salvar Branding</>}
                             </button>
                         </div>
