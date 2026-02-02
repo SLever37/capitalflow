@@ -25,10 +25,11 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
 
     const creditorInfo = useMemo(() => {
         if (!loan) return null;
+        // Usa os dados mapeados do serviço (join com perfis)
         return {
-            name: loan.creditor_name || loan.creditorName || 'Credor Registrado',
-            doc: loan.creditor_document || loan.creditorDoc || 'CPF não informado',
-            address: loan.creditor_address || loan.creditorAddress || 'Endereço Comercial'
+            name: loan.creditorName || 'Credor Responsável',
+            doc: loan.creditorDoc || '',
+            address: loan.creditorAddress || ''
         };
     }, [loan]);
 
@@ -186,7 +187,7 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
                         </button>
                     </div>
 
-                    {/* LISTA DE DOCUMENTOS DO CONTRATO (NOVO) */}
+                    {/* LISTA DE DOCUMENTOS DO CONTRATO */}
                     {activeDocuments.length > 0 && (
                         <div className="space-y-3">
                             <div className="flex items-center justify-between px-1">
@@ -251,13 +252,14 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
                         </div>
                     </div>
 
-                    {/* INFO CREDOR */}
+                    {/* INFO CREDOR (ATUALIZADO PARA MOSTRAR DADOS REAIS) */}
                     {creditorInfo && (
-                        <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800/50 flex items-center gap-3 opacity-60 hover:opacity-100 transition-opacity">
+                        <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800/50 flex items-center gap-3 opacity-90 hover:opacity-100 transition-opacity">
                             <div className="p-2 bg-slate-800 rounded-xl text-slate-400"><Building size={16}/></div>
-                            <div className="overflow-hidden">
+                            <div className="overflow-hidden flex-1">
                                 <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-0.5">Credor Responsável</p>
                                 <p className="text-[10px] text-white font-bold truncate">{creditorInfo.name}</p>
+                                {creditorInfo.doc && <p className="text-[8px] text-slate-600 truncate">{creditorInfo.doc}</p>}
                             </div>
                         </div>
                     )}
@@ -281,7 +283,7 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
 
             <PortalChatDrawer loan={loan} isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
 
-            {/* MODAL JURÍDICO ATUALIZADO */}
+            {/* MODAL JURÍDICO */}
             {isLegalOpen && (
                 <div className="fixed inset-0 bg-slate-950/98 backdrop-blur-md flex items-center justify-center p-4 z-[150]">
                     <div className="bg-slate-900 p-6 rounded-[2.5rem] border border-indigo-500/30 max-w-lg w-full shadow-2xl animate-in zoom-in-95">

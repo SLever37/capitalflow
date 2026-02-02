@@ -139,18 +139,38 @@ export const portalService = {
   },
 
   async fetchLoanData(loanId: string, clientId: string) {
+    // BUSCA COM JOIN NO PERFIL PARA PEGAR DADOS DO CREDOR
     const { data: loan, error: loanErr } = await supabase
       .from('contratos')
-      .select('*')
+      .select(`
+        *,
+        perfis:profile_id (
+            nome_empresa,
+            nome_operador,
+            document,
+            pix_key,
+            address,
+            city,
+            state
+        )
+      `)
       .eq('id', loanId)
       .single();
     
     if (loanErr) throw loanErr;
 
+    // Normaliza dados do credor
+    const creditorProfile = (loan as any).perfis;
+    const loanWithCreditor = {
+        ...loan,
+        creditorName: creditorProfile?.nome_empresa || creditorProfile?.nome_operador || 'Credor Registrado',
+        creditorDoc: creditorProfile?.document || '',
+        creditorAddress: creditorProfile?.address ? `${creditorProfile.address} - ${creditorProfile.city}/${creditorProfile.state}` : 'Endereço Comercial'
+    };
+
     let pixKey = '';
-    if (loan.profile_id) {
-      const { data: profile } = await supabase.from('perfis').select('pix_key').eq('id', loan.profile_id).single();
-      if (profile) pixKey = profile.pix_key || '';
+    if (creditorProfile?.pix_key) {
+        pixKey = creditorProfile.pix_key;
     }
 
     const { data: activeAgreement } = await supabase
@@ -193,7 +213,7 @@ export const portalService = {
       .order('created_at', { ascending: false });
 
     return {
-        loan,
+        loan: loanWithCreditor,
         pixKey,
         installments,
         signals,
@@ -205,7 +225,7 @@ export const portalService = {
   async fetchClientContracts(clientId: string) {
       const { data, error } = await supabase
           .from('contratos')
-          .select('id, total_to_receive, start_date, created_at')
+          .select('id, total_to_receive, start_date, created_at, principal')
           .eq('client_id', clientId)
           .eq('is_archived', false)
           .order('created_at', { ascending: false });

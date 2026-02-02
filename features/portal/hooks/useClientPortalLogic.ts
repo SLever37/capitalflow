@@ -32,12 +32,20 @@ export const useClientPortalLogic = (initialLoanId: string) => {
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  // Função principal de carregamento
   const loadFullPortalData = useCallback(async (loanId: string, clientId: string) => {
     if (abortControllerRef.current) abortControllerRef.current.abort();
     abortControllerRef.current = new AbortController();
 
     setIsLoading(true);
     setPortalError(null);
+
+    // Atualiza URL sem recarregar para consistência (Link na barra muda)
+    const newUrl = new URL(window.location.href);
+    if (newUrl.searchParams.get('portal') !== loanId) {
+        newUrl.searchParams.set('portal', loanId);
+        window.history.replaceState(null, '', newUrl.toString());
+    }
 
     try {
       // 1. Carrega os dados do contrato selecionado E a lista completa de contratos deste cliente
@@ -51,11 +59,13 @@ export const useClientPortalLogic = (initialLoanId: string) => {
       setPortalSignals(loanData.signals || []);
       setInstallments(loanData.installments || []);
       setIsAgreementActive(!!loanData.isAgreementActive);
+      
+      // Atualiza a lista de contratos para garantir que o dropdown não fique trancado
       setClientContracts(contractsList);
 
     } catch (e: any) {
       if (e.name !== 'AbortError') {
-        setPortalError('Falha ao sincronizar dados do contrato.');
+        setPortalError('Falha ao carregar contrato. Tente atualizar a página.');
         console.error('Portal Data Sync Error:', e);
       }
     } finally {
@@ -109,7 +119,13 @@ export const useClientPortalLogic = (initialLoanId: string) => {
             const { data: clientCheck } = await supabase.from('clientes').select('id, name, document').eq('id', sess.client_id).single();
             if (clientCheck) {
                 setLoggedClient(clientCheck);
-                if (sess.last_loan_id) setSelectedLoanId(sess.last_loan_id);
+                // Se houver um ID na URL, ele tem prioridade sobre o da sessão antiga
+                const currentUrlId = params.get('portal');
+                if (currentUrlId) {
+                    setSelectedLoanId(currentUrlId);
+                } else if (sess.last_loan_id) {
+                    setSelectedLoanId(sess.last_loan_id);
+                }
             } else {
                 localStorage.removeItem(PORTAL_SESSION_KEY);
             }
@@ -143,7 +159,7 @@ export const useClientPortalLogic = (initialLoanId: string) => {
     setIsLoading(true);
 
     try {
-      // Autentica usando o contrato atual selecionado na URL (se houver) ou busca genérica se implementado
+      // Autentica usando o contrato atual selecionado na URL
       const client = await portalService.authenticate(selectedLoanId, loginIdentifier);
       setLoggedClient(client);
       setByeName(null);
@@ -261,7 +277,6 @@ export const useClientPortalLogic = (initialLoanId: string) => {
     }
   };
 
-  // Nova função para VISUALIZAR/BAIXAR documento antes de assinar
   const handleViewDocument = async () => {
       if (!loan) return;
       try {
@@ -277,7 +292,6 @@ export const useClientPortalLogic = (initialLoanId: string) => {
 
           const token = records[0]?.view_token;
           if (token) {
-              // Abre a página pública de assinatura que renderiza o PDF/HTML
               const url = `${window.location.origin}/?legal_sign=${token}&role=DEVEDOR`;
               window.open(url, '_blank');
           }
