@@ -1,11 +1,11 @@
-
 import React, { useState, useEffect } from 'react';
-import { HelpCircle, TrendingUp, User, KeyRound, Loader2, X, ChevronRight, Beaker, Eye, EyeOff, UserPlus, Phone, ShieldCheck, Mail } from 'lucide-react';
+import { HelpCircle, TrendingUp, User, KeyRound, Loader2, X, ChevronRight, Beaker, Eye, EyeOff, UserPlus, Phone, ShieldCheck, Mail, Lock } from 'lucide-react';
 import { Modal } from '../../components/ui/Modal';
 import { supabase } from '../../lib/supabase';
 import { generateUUID } from '../../utils/generators';
 import { maskPhone, maskDocument, onlyDigits } from '../../utils/formatters';
 import { isValidCPForCNPJ } from '../../utils/validators';
+import { useAuth } from './useAuth';
 
 interface AuthScreenProps {
     loginUser: string;
@@ -24,10 +24,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     loginUser, setLoginUser, loginPassword, setLoginPassword, submitLogin, isLoading,
     savedProfiles, handleSelectSavedProfile, handleRemoveSavedProfile, showToast
 }) => {
+    const { submitTeamLogin } = useAuth();
+    
     const [isCreatingProfile, setIsCreatingProfile] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     
-    // Novo Estado para Ativação de Membro (Team System)
+    // Novo Estado para Ativação de Membro (Team System) - Mantido para aceitar convites
     const [inviteToken, setInviteToken] = useState<string | null>(null);
     const [inviteData, setInviteData] = useState<any | null>(null);
     const [memberActivationForm, setMemberActivationForm] = useState({
@@ -35,18 +37,15 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         document: '',
         phone: '',
         email: '',
-        password: '',
-        confirmPassword: ''
+        accessCode: '', // Substitui senha
     });
 
-    // Estados originais
     const [newProfileForm, setNewProfileForm] = useState({ name: '', email: '', businessName: '', password: '', recoveryPhrase: '' });
     const [isRecoveringPassword, setIsRecoveringPassword] = useState(false);
     const [recoveryForm, setRecoveryForm] = useState({ email: '', phrase: '', newPassword: '' });
     const [showHelpModal, setShowHelpModal] = useState(false);
     const [isProcessingCreate, setIsProcessingCreate] = useState(false);
 
-    // Efeito para detectar Token de Convite na URL
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const token = params.get('invite_token');
@@ -59,7 +58,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     const checkInviteToken = async (token: string) => {
         setIsProcessingCreate(true);
         try {
-            // Busca convite na tabela team_invites
             const { data, error } = await supabase
                 .from('team_invites')
                 .select('*, teams(owner_profile_id, name)')
@@ -72,7 +70,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 setInviteToken(null);
             } else {
                 setInviteData(data);
-                // Preenche o nome da equipe como referência se quiser, ou deixa em branco para o usuário preencher
                 showToast(`Convite validado para a equipe: ${data.teams?.name}`, "success");
             }
         } catch (e) {
@@ -86,33 +83,32 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     const handleActivateMember = async () => {
         if (!inviteToken || !inviteData) return;
 
-        const { name, document, phone, email, password, confirmPassword } = memberActivationForm;
+        const { name, document, phone, email, accessCode } = memberActivationForm;
 
-        // Validações
         if (!name.trim()) { showToast("Informe seu nome completo.", "error"); return; }
-        if (!email.trim() || !email.includes('@')) { showToast("E-mail inválido.", "error"); return; }
+        if (!email.trim() || !email.includes('@')) { showToast("E-mail inválido (usado apenas para notificações).", "error"); return; }
         if (!document || !isValidCPForCNPJ(document)) { showToast("CPF inválido.", "error"); return; }
         if (!phone || phone.length < 14) { showToast("Telefone inválido.", "error"); return; }
-        if (password.length < 6) { showToast("A senha deve ter no mínimo 6 caracteres.", "error"); return; }
-        if (password !== confirmPassword) { showToast("As senhas não coincidem.", "error"); return; }
+        if (!accessCode || accessCode.length < 4) { showToast("Crie um código de acesso com 4 dígitos.", "error"); return; }
 
         setIsProcessingCreate(true);
         try {
             const newProfileId = generateUUID();
+            const cleanDoc = onlyDigits(document);
+            const cleanPhone = onlyDigits(phone);
             
-            // 1. Criar Perfil na tabela perfis (Como Membro)
-            // Vinculamos ao supervisor_id do dono da equipe para manter a hierarquia de dados
             const { error: profileError } = await supabase.from('perfis').insert({
                 id: newProfileId,
-                supervisor_id: inviteData.teams.owner_profile_id, // Vínculo hierárquico
+                supervisor_id: inviteData.teams.owner_profile_id, 
                 nome_operador: name.trim(),
                 nome_completo: name.trim(),
                 email: email.trim().toLowerCase(),
                 usuario_email: email.trim().toLowerCase(),
-                senha_acesso: password,
-                document: onlyDigits(document),
-                phone: onlyDigits(phone),
-                access_level: 2, // Nível Membro
+                senha_acesso: 'NO_PASSWORD',
+                access_code: accessCode.trim(),
+                document: cleanDoc,
+                phone: cleanPhone,
+                access_level: 2, 
                 interest_balance: 0,
                 total_available_capital: 0,
                 created_at: new Date().toISOString()
@@ -120,35 +116,32 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
 
             if (profileError) throw new Error("Erro ao criar perfil: " + profileError.message);
 
-            // 2. Registrar vínculo na tabela team_members
             const { error: memberError } = await supabase.from('team_members').insert({
                 team_id: inviteData.team_id,
-                profile_id: newProfileId, // FK para o perfil criado
-                linked_profile_id: newProfileId, // Redundância para facilitar queries
+                profile_id: newProfileId, 
+                linked_profile_id: newProfileId,
                 full_name: name.trim(),
-                cpf: onlyDigits(document),
+                cpf: cleanDoc,
                 username_or_email: email.trim().toLowerCase(),
                 role: 'MEMBER'
             });
 
             if (memberError) throw new Error("Erro ao vincular à equipe: " + memberError.message);
 
-            // 3. Invalidar o token de convite (Uso único)
             await supabase
                 .from('team_invites')
                 .update({ is_active: false, revoked_at: new Date().toISOString() })
                 .eq('id', inviteData.id);
 
-            showToast("Conta ativada com sucesso! Entrando...", "success");
+            showToast("Conta ativada! Use seus dados para entrar.", "success");
             
-            // Auto-login
-            setLoginUser(email);
-            setLoginPassword(password);
-            setTimeout(() => {
-                submitLogin();
-                // Limpa URL
-                window.history.replaceState({}, window.document.title, window.location.pathname);
-            }, 1500);
+            await submitTeamLogin(
+                { document: cleanDoc, phone: cleanPhone, code: accessCode },
+                (loading) => setIsProcessingCreate(loading),
+                showToast
+            );
+            
+            window.history.replaceState({}, window.document.title, window.location.pathname);
 
         } catch (e: any) {
             showToast(e.message, "error");
@@ -182,7 +175,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 nome_empresa: newProfileForm.businessName,
                 senha_acesso: newProfileForm.password.trim(),
                 recovery_phrase: newProfileForm.recoveryPhrase,
-                access_level: 2, // Default
+                access_level: 2, 
                 total_available_capital: 0,
                 interest_balance: 0,
                 created_at: new Date().toISOString()
@@ -247,7 +240,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                         </div>
 
                         <div>
-                            <label className="text-[10px] font-black text-slate-500 uppercase ml-1 mb-1 block">E-mail de Login</label>
+                            <label className="text-[10px] font-black text-slate-500 uppercase ml-1 mb-1 block">E-mail (Opcional, para aviso)</label>
                             <div className="bg-slate-800/50 p-2 rounded-xl border border-slate-700 flex items-center gap-2">
                                 <Mail className="text-slate-400 w-4 h-4 ml-2" />
                                 <input type="email" className="bg-transparent w-full text-white outline-none text-sm font-bold" placeholder="seu@email.com" value={memberActivationForm.email} onChange={e => setMemberActivationForm({...memberActivationForm, email: e.target.value})} />
@@ -255,7 +248,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                         </div>
 
                         <div>
-                            <label className="text-[10px] font-black text-slate-500 uppercase ml-1 mb-1 block">CPF</label>
+                            <label className="text-[10px] font-black text-slate-500 uppercase ml-1 mb-1 block">CPF (Login)</label>
                             <div className="bg-slate-800/50 p-2 rounded-xl border border-slate-700 flex items-center gap-2">
                                 <ShieldCheck className="text-slate-400 w-4 h-4 ml-2" />
                                 <input type="text" className="bg-transparent w-full text-white outline-none text-sm font-bold" placeholder="000.000.000-00" value={memberActivationForm.document} onChange={e => setMemberActivationForm({...memberActivationForm, document: maskDocument(e.target.value)})} />
@@ -263,7 +256,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                         </div>
 
                         <div>
-                            <label className="text-[10px] font-black text-slate-500 uppercase ml-1 mb-1 block">WhatsApp</label>
+                            <label className="text-[10px] font-black text-slate-500 uppercase ml-1 mb-1 block">WhatsApp (Login)</label>
                             <div className="bg-slate-800/50 p-2 rounded-xl border border-slate-700 flex items-center gap-2">
                                 <Phone className="text-slate-400 w-4 h-4 ml-2" />
                                 <input type="tel" className="bg-transparent w-full text-white outline-none text-sm font-bold" placeholder="(00) 00000-0000" value={memberActivationForm.phone} onChange={e => setMemberActivationForm({...memberActivationForm, phone: maskPhone(e.target.value)})} />
@@ -271,20 +264,19 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                         </div>
 
                         <div>
-                            <label className="text-[10px] font-black text-slate-500 uppercase ml-1 mb-1 block">Crie sua Senha</label>
-                            <div className="bg-slate-800/50 p-2 rounded-xl border border-slate-700 flex items-center gap-2 relative">
-                                <KeyRound className="text-slate-400 w-4 h-4 ml-2" />
-                                <input type={showPassword ? "text" : "password"} className="bg-transparent w-full text-white outline-none text-sm font-bold pr-8" placeholder="Mínimo 6 caracteres" value={memberActivationForm.password} onChange={e => setMemberActivationForm({...memberActivationForm, password: e.target.value})} />
-                                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 text-slate-500 hover:text-white"><Eye size={14}/></button>
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="text-[10px] font-black text-slate-500 uppercase ml-1 mb-1 block">Confirme a Senha</label>
+                            <label className="text-[10px] font-black text-slate-500 uppercase ml-1 mb-1 block">Crie seu Código de Acesso (4 Dígitos)</label>
                             <div className="bg-slate-800/50 p-2 rounded-xl border border-slate-700 flex items-center gap-2">
-                                <KeyRound className="text-slate-400 w-4 h-4 ml-2" />
-                                <input type="password" className="bg-transparent w-full text-white outline-none text-sm font-bold" placeholder="Repita a senha" value={memberActivationForm.confirmPassword} onChange={e => setMemberActivationForm({...memberActivationForm, confirmPassword: e.target.value})} />
+                                <Lock className="text-slate-400 w-4 h-4 ml-2" />
+                                <input 
+                                    type="text" 
+                                    className="bg-transparent w-full text-white outline-none text-sm font-bold" 
+                                    placeholder="Ex: 1234" 
+                                    maxLength={6}
+                                    value={memberActivationForm.accessCode} 
+                                    onChange={e => setMemberActivationForm({...memberActivationForm, accessCode: onlyDigits(e.target.value)})} 
+                                />
                             </div>
+                            <p className="text-[9px] text-slate-500 ml-1 mt-1">Este código substitui a senha para login rápido.</p>
                         </div>
 
                         <button onClick={handleActivateMember} disabled={isProcessingCreate} className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-xs font-black uppercase shadow-lg transition-all mt-4 flex items-center justify-center gap-2">
@@ -296,6 +288,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         );
     }
 
+    // TELA DE LOGIN PRINCIPAL
     return (
         <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 md:p-6 relative">
             <div className="absolute top-6 right-6 z-50">
@@ -308,47 +301,43 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                     <h1 className="text-2xl font-black text-white uppercase tracking-tighter mb-1">Capital<span className="text-blue-500">Flow</span></h1>
                     <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Sincronizado na Nuvem</p>
                 </div>
+
                 {!isCreatingProfile && !isRecoveringPassword && (
                     <div className="space-y-6">
-                        <div className="bg-slate-800/50 p-2 rounded-2xl border border-slate-700 flex items-center gap-2">
-                            <div className="p-3 bg-slate-800 rounded-xl">
-                                <User className="text-slate-400 w-5 h-5" />
+                        <div className="space-y-4 animate-in fade-in">
+                            <div className="bg-slate-800/50 p-2 rounded-2xl border border-slate-700 flex items-center gap-2 focus-within:border-blue-500 transition-colors">
+                                <div className="p-3 bg-slate-800 rounded-xl"><User className="text-slate-400 w-5 h-5" /></div>
+                                <input type="text" className="bg-transparent w-full text-white outline-none text-sm font-bold placeholder:font-normal" placeholder="E-mail ou Usuário" value={loginUser} onChange={e => setLoginUser(e.target.value)} />
                             </div>
-                            <input type="text" className="bg-transparent w-full text-white outline-none text-sm font-bold placeholder:font-normal" placeholder="E-mail ou Usuário" value={loginUser} onChange={e => setLoginUser(e.target.value)} />
-                        </div>
-                        
-                        <div className="bg-slate-800/50 p-2 rounded-2xl border border-slate-700 flex items-center gap-2 relative">
-                            <div className="p-3 bg-slate-800 rounded-xl">
-                                <KeyRound className="text-slate-400 w-5 h-5" />
+                            <div className="bg-slate-800/50 p-2 rounded-2xl border border-slate-700 flex items-center gap-2 relative focus-within:border-blue-500 transition-colors">
+                                <div className="p-3 bg-slate-800 rounded-xl"><KeyRound className="text-slate-400 w-5 h-5" /></div>
+                                <input 
+                                    type={showPassword ? "text" : "password"} 
+                                    className="bg-transparent w-full text-white outline-none text-sm font-bold placeholder:font-normal pr-10" 
+                                    placeholder="Senha" 
+                                    value={loginPassword} 
+                                    onChange={e => setLoginPassword(e.target.value)} 
+                                    onKeyDown={e => e.key === 'Enter' && submitLogin()} 
+                                />
+                                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 text-slate-500 hover:text-slate-300 transition-colors">
+                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                </button>
                             </div>
-                            <input 
-                                type={showPassword ? "text" : "password"} 
-                                id="login-password" 
-                                className="bg-transparent w-full text-white outline-none text-sm font-bold placeholder:font-normal pr-10" 
-                                placeholder="Senha" 
-                                value={loginPassword} 
-                                onChange={e => setLoginPassword(e.target.value)} 
-                                onKeyDown={e => e.key === 'Enter' && submitLogin()} 
-                            />
-                            <button 
-                                type="button"
-                                onClick={() => setShowPassword(!showPassword)}
-                                className="absolute right-4 text-slate-500 hover:text-slate-300 transition-colors"
-                            >
-                                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                            </button>
+                            <button onClick={submitLogin} disabled={isLoading} className="w-full py-4 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl text-xs font-black uppercase shadow-lg flex items-center justify-center gap-2 transition-all active:scale-95">{isLoading ? <Loader2 className="animate-spin" /> : 'Entrar'}</button>
                         </div>
 
-                        <button onClick={submitLogin} disabled={isLoading} className="w-full py-4 bg-blue-600 text-white rounded-2xl text-xs font-black uppercase shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2">{isLoading ? <Loader2 className="animate-spin" /> : 'Entrar'}</button>
-                        <div className="flex gap-2"><button onClick={() => setIsCreatingProfile(true)} className="flex-1 py-3 bg-slate-800 text-slate-400 rounded-2xl text-[10px] font-black uppercase">Criar Conta</button><button onClick={() => setIsRecoveringPassword(true)} className="flex-1 py-3 bg-slate-800 text-slate-400 rounded-2xl text-[10px] font-black uppercase">Recuperar</button></div>
-                        <button onClick={handleDemoMode} className="w-full py-3 border border-dashed border-emerald-600/50 text-emerald-500 hover:bg-emerald-600/10 rounded-2xl text-[10px] font-black uppercase flex items-center justify-center gap-2 transition-all"><Beaker size={14} /> Modo Demonstração</button>
+                        <div className="flex gap-2 pt-2 border-t border-slate-800">
+                            <button onClick={() => setIsCreatingProfile(true)} className="flex-1 py-3 bg-slate-800 text-slate-400 rounded-2xl text-[10px] font-black uppercase hover:text-white transition-colors">Criar Nova Conta</button>
+                            <button onClick={() => setIsRecoveringPassword(true)} className="flex-1 py-3 bg-slate-800 text-slate-400 rounded-2xl text-[10px] font-black uppercase hover:text-white transition-colors">Recuperar Senha</button>
+                        </div>
+                        
                         {savedProfiles.length > 0 && (
-                            <div className="pt-4 border-t border-slate-800/50">
-                                <p className="text-[10px] text-slate-500 font-bold uppercase mb-2 text-center">Contas Conhecidas</p>
+                            <div className="pt-2">
+                                <p className="text-[10px] text-slate-500 font-bold uppercase mb-2 text-center">Salvos</p>
                                 <div className="flex flex-col gap-2">
                                     {savedProfiles.map(p => (
-                                        <div key={p.id} className="flex items-center gap-3 bg-slate-950 p-2 rounded-xl border border-slate-800 cursor-pointer hover:border-slate-600 transition-colors" onClick={() => handleSelectSavedProfile(p)}>
-                                            <div className="w-8 h-8 rounded-lg bg-blue-900/30 flex items-center justify-center text-blue-400 font-black text-xs">{p.name.charAt(0).toUpperCase()}</div>
+                                        <div key={p.id} className="flex items-center gap-3 bg-slate-950 p-2 rounded-xl border border-slate-800 cursor-pointer hover:border-slate-600 transition-colors group" onClick={() => handleSelectSavedProfile(p)}>
+                                            <div className="w-8 h-8 rounded-lg bg-blue-900/30 flex items-center justify-center text-blue-400 font-black text-xs group-hover:bg-blue-600 group-hover:text-white transition-colors">{p.name.charAt(0).toUpperCase()}</div>
                                             <div className="flex-1 overflow-hidden"><p className="text-xs font-bold text-white truncate">{p.name}</p><p className="text-[10px] text-slate-500 truncate">{p.email}</p></div>
                                             <button onClick={(e) => { e.stopPropagation(); handleRemoveSavedProfile(p.id); }} className="p-2 text-slate-600 hover:text-rose-500"><X size={14} /></button>
                                         </div>
@@ -356,11 +345,14 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                                 </div>
                             </div>
                         )}
+                        <button onClick={handleDemoMode} className="w-full py-3 border border-dashed border-emerald-600/50 text-emerald-500 hover:bg-emerald-600/10 rounded-2xl text-[10px] font-black uppercase flex items-center justify-center gap-2 transition-all"><Beaker size={14} /> Modo Demonstração</button>
                     </div>
                 )}
+
+                {/* TELAS SECUNDÁRIAS (CRIAR / RECUPERAR) - MANTIDAS IGUAIS */}
                 {isCreatingProfile && (
                     <div className="space-y-4 animate-in slide-in-from-right duration-300">
-                        <h3 className="text-center text-white font-bold text-sm uppercase mb-2">Novo Cadastro</h3>
+                        <h3 className="text-center text-white font-bold text-sm uppercase mb-2">Novo Cadastro (Gestor)</h3>
                         <input type="text" placeholder="Nome do Usuário" className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-white text-sm outline-none" value={newProfileForm.name} onChange={e => setNewProfileForm({...newProfileForm, name: e.target.value})} />
                         <input type="email" placeholder="E-mail para Login" className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-white text-sm outline-none" value={newProfileForm.email} onChange={e => setNewProfileForm({...newProfileForm, email: e.target.value})} />
                         <input type="text" placeholder="Nome do Negócio" className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-white text-sm outline-none" value={newProfileForm.businessName} onChange={e => setNewProfileForm({...newProfileForm, businessName: e.target.value})} />

@@ -108,7 +108,7 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
                             >
                                 {clientContracts.map((c) => (
                                     <option key={c.id} value={c.id}>
-                                        Contrato {c.id.substring(0, 6).toUpperCase()} • {new Date(c.created_at || c.start_date).toLocaleDateString()}
+                                        Contrato {c.id.substring(0, 6).toUpperCase()} • {new Date(c.start_date || c.created_at).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}
                                     </option>
                                 ))}
                             </select>

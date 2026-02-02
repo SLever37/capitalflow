@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { requestBrowserNotificationPermission } from '../../utils/notifications';
 import { asString } from '../../utils/safe';
 import { playNotificationSound } from '../../utils/notificationSound';
+import { onlyDigits } from '../../utils/formatters';
 
 type SavedProfile = {
   id: string;
@@ -77,6 +78,32 @@ export const useAuth = () => {
     }
   }, []);
 
+  const handleLoginSuccess = (profile: any, showToast: any) => {
+      playNotificationSound();
+      
+      const profileId = profile.id;
+      const profileName = resolveSmartName(profile); 
+      const profileEmail = asString(profile.usuario_email || profile.email || 'equipe@sistema');
+
+      setActiveProfileId(profileId);
+
+      // Atualiza lista de perfis salvos
+      const updatedSaved = [
+        ...savedProfiles.filter((p) => p.id !== profileId),
+        { id: profileId, name: profileName, email: profileEmail },
+      ].slice(0, 5);
+
+      setSavedProfiles(updatedSaved);
+      localStorage.setItem('cm_saved_profiles', JSON.stringify(updatedSaved));
+      localStorage.setItem(
+        'cm_session',
+        JSON.stringify({ profileId: profileId, ts: Date.now() })
+      );
+
+      showToast(`Bem-vindo, ${profileName}!`, 'success');
+  };
+
+  // Login Padrão (Gestor)
   const submitLogin = async (
     setIsLoading: (v: boolean) => void,
     showToast: (msg: string, type?: 'error' | 'success' | 'warning') => void
@@ -105,16 +132,14 @@ export const useAuth = () => {
         });
 
         if (!rpcError && data) {
-            // Trata retorno tanto como array quanto como objeto único (resiliência)
             profile = Array.isArray(data) ? data[0] : data;
         }
       } catch (e) {
         console.warn("RPC Login failed, falling back.", e);
       }
 
-      // 2. Fallback Manual Seguro (Caso a RPC falhe ou não encontre)
+      // 2. Fallback Manual Seguro
       if (!profile) {
-        // PostgREST exige aspas duplas em valores com caracteres especiais dentro do .or()
         const { data: fallbackData, error: fallbackError } = await supabase
           .from('perfis')
           .select('*')
@@ -122,12 +147,9 @@ export const useAuth = () => {
           .eq('senha_acesso', pass)
           .maybeSingle();
         
-        if (fallbackError) {
-            console.error("Fallback Login Error:", fallbackError);
-            throw new Error("Erro técnico ao consultar perfil.");
+        if (!fallbackError && fallbackData) {
+            profile = fallbackData;
         }
-
-        profile = fallbackData;
       }
 
       if (!profile) {
@@ -136,35 +158,63 @@ export const useAuth = () => {
         return;
       }
 
-      // LOGIN SUCESSO - Resolve o nome imediatamente
-      playNotificationSound();
-      
-      const profileId = profile.id;
-      const profileName = resolveSmartName(profile); 
-      const profileEmail = asString(profile.usuario_email || profile.email || userInput);
-
-      setActiveProfileId(profileId);
-
-      // Atualiza lista de perfis salvos
-      const updatedSaved = [
-        ...savedProfiles.filter((p) => p.id !== profileId),
-        { id: profileId, name: profileName, email: profileEmail },
-      ].slice(0, 5);
-
-      setSavedProfiles(updatedSaved);
-      localStorage.setItem('cm_saved_profiles', JSON.stringify(updatedSaved));
-      localStorage.setItem(
-        'cm_session',
-        JSON.stringify({ profileId: profileId, ts: Date.now() })
-      );
-
-      showToast(`Bem-vindo, ${profileName}!`, 'success');
+      handleLoginSuccess(profile, showToast);
     } catch (err: any) {
       console.error("Erro crítico no login:", err);
       showToast('Erro de conexão: ' + (err.message || 'Desconhecido'), 'error');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Login de Equipe (Sem Senha, com Validação de Dados)
+  const submitTeamLogin = async (
+    params: { document: string; phone: string; code: string },
+    setIsLoading: (v: boolean) => void,
+    showToast: (msg: string, type?: any) => void
+  ) => {
+      setIsLoading(true);
+      try {
+          const cleanDoc = onlyDigits(params.document);
+          const cleanPhone = onlyDigits(params.phone);
+          const cleanCode = params.code.trim();
+
+          if (!cleanDoc || !cleanPhone || !cleanCode) {
+              showToast("Preencha todos os campos para entrar.", "warning");
+              setIsLoading(false);
+              return;
+          }
+
+          // Busca perfil que combine CPF, Codigo de Acesso e Telefone (parcial ou total)
+          // Nota: Phone match exato ou contains pode variar dependendo de como salvou (55 ou nao).
+          // Vamos tentar match exato no Access Code e Documento primeiro.
+          const { data: profiles, error } = await supabase
+              .from('perfis')
+              .select('*')
+              .eq('document', cleanDoc)
+              .eq('access_code', cleanCode);
+
+          if (error) throw error;
+
+          // Validação de Telefone em memória (para ser mais flexível com o DDD/55)
+          const validProfile = profiles?.find(p => {
+              const dbPhone = onlyDigits(p.phone || '');
+              return dbPhone.includes(cleanPhone) || cleanPhone.includes(dbPhone);
+          });
+
+          if (!validProfile) {
+              showToast("Dados incorretos. Verifique CPF, Telefone e Código.", "error");
+              return;
+          }
+
+          handleLoginSuccess(validProfile, showToast);
+
+      } catch (e: any) {
+          console.error(e);
+          showToast("Erro ao entrar: " + e.message, "error");
+      } finally {
+          setIsLoading(false);
+      }
   };
 
   const handleLogout = () => {
@@ -190,6 +240,7 @@ export const useAuth = () => {
     loginPassword, setLoginPassword,
     savedProfiles,
     submitLogin,
+    submitTeamLogin, // Exportado
     handleLogout,
     handleSelectSavedProfile,
     handleRemoveSavedProfile,
