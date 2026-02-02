@@ -1,9 +1,10 @@
-
-import React, { useState } from 'react';
-import { HelpCircle, TrendingUp, User, KeyRound, Loader2, X, ChevronRight, Beaker, Eye, EyeOff } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { HelpCircle, TrendingUp, User, KeyRound, Loader2, X, ChevronRight, Beaker, Eye, EyeOff, UserPlus, Phone, ShieldCheck, Mail } from 'lucide-react';
 import { Modal } from '../../components/ui/Modal';
 import { supabase } from '../../lib/supabase';
 import { generateUUID } from '../../utils/generators';
+import { maskPhone, maskDocument, onlyDigits } from '../../utils/formatters';
+import { isValidCPForCNPJ } from '../../utils/validators';
 
 interface AuthScreenProps {
     loginUser: string;
@@ -24,11 +25,109 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
 }) => {
     const [isCreatingProfile, setIsCreatingProfile] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+    
+    // Novo Estado para Ativação de Membro
+    const [inviteToken, setInviteToken] = useState<string | null>(null);
+    const [memberActivationForm, setMemberActivationForm] = useState({
+        name: '', // Pré-carregado
+        document: '',
+        phone: '',
+        email: '',
+        password: '',
+        confirmPassword: ''
+    });
+    const [pendingProfileId, setPendingProfileId] = useState<string | null>(null);
+
+    // Estados originais
     const [newProfileForm, setNewProfileForm] = useState({ name: '', email: '', businessName: '', password: '', recoveryPhrase: '' });
     const [isRecoveringPassword, setIsRecoveringPassword] = useState(false);
     const [recoveryForm, setRecoveryForm] = useState({ email: '', phrase: '', newPassword: '' });
     const [showHelpModal, setShowHelpModal] = useState(false);
     const [isProcessingCreate, setIsProcessingCreate] = useState(false);
+
+    // Efeito para detectar Token de Convite na URL
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get('invite_token');
+        if (token) {
+            setInviteToken(token);
+            checkInviteToken(token);
+        }
+    }, []);
+
+    const checkInviteToken = async (token: string) => {
+        setIsProcessingCreate(true);
+        try {
+            // Busca perfil que tenha este token na recovery_phrase (hack de armazenamento temporário)
+            const { data, error } = await supabase
+                .from('perfis')
+                .select('*')
+                .eq('recovery_phrase', `INVITE:${token}`)
+                .single();
+
+            if (error || !data) {
+                showToast("Link de convite inválido ou expirado.", "error");
+                setInviteToken(null);
+            } else {
+                setPendingProfileId(data.id);
+                setMemberActivationForm(prev => ({ ...prev, name: data.nome_operador }));
+            }
+        } catch (e) {
+            console.error(e);
+            setInviteToken(null);
+        } finally {
+            setIsProcessingCreate(false);
+        }
+    };
+
+    const handleActivateMember = async () => {
+        if (!inviteToken || !pendingProfileId) return;
+
+        const { document, phone, email, password, confirmPassword } = memberActivationForm;
+
+        // Validações Rígidas
+        if (!email.trim() || !email.includes('@')) { showToast("E-mail inválido.", "error"); return; }
+        if (!document || !isValidCPForCNPJ(document)) { showToast("CPF inválido. Verifique os números.", "error"); return; }
+        if (!phone || phone.length < 14) { showToast("Telefone inválido.", "error"); return; }
+        if (password.length < 6) { showToast("A senha deve ter no mínimo 6 caracteres.", "error"); return; }
+        if (password !== confirmPassword) { showToast("As senhas não coincidem.", "error"); return; }
+
+        setIsProcessingCreate(true);
+        try {
+            // Atualiza o perfil placeholder com os dados reais do membro
+            const { error } = await supabase
+                .from('perfis')
+                .update({
+                    document: onlyDigits(document),
+                    phone: onlyDigits(phone),
+                    usuario_email: email.toLowerCase().trim(),
+                    email: email.toLowerCase().trim(), // Atualiza email principal
+                    senha_acesso: password,
+                    recovery_phrase: `ACTIVE:${new Date().toISOString()}`, // Invalida o token anterior
+                    last_active_at: new Date().toISOString()
+                })
+                .eq('id', pendingProfileId)
+                .eq('recovery_phrase', `INVITE:${inviteToken}`); // Trava de segurança extra
+
+            if (error) throw error;
+
+            showToast("Conta ativada com sucesso! Fazendo login...", "success");
+            
+            // Auto-login
+            setLoginUser(email);
+            setLoginPassword(password);
+            setTimeout(() => {
+                submitLogin();
+                // Limpa URL
+                window.history.replaceState({}, window.document.title, window.location.pathname);
+            }, 1000);
+
+        } catch (e: any) {
+            showToast("Erro na ativação: " + e.message, "error");
+        } finally {
+            setIsProcessingCreate(false);
+        }
+    };
 
     const handleCreateProfile = async () => {
         if (!newProfileForm.name.trim()) { showToast("Por favor, preencha o Nome do Usuário.", "error"); return; }
@@ -55,7 +154,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 nome_empresa: newProfileForm.businessName,
                 senha_acesso: newProfileForm.password.trim(),
                 recovery_phrase: newProfileForm.recoveryPhrase,
-                access_level: 2,
+                access_level: 2, // Default
                 total_available_capital: 0,
                 interest_balance: 0,
                 created_at: new Date().toISOString()
@@ -92,6 +191,74 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         localStorage.setItem('cm_session', JSON.stringify({ profileId: 'DEMO', timestamp: Date.now() }));
         window.location.reload();
     };
+
+    // TELA DE ATIVAÇÃO DE MEMBRO (CONVITE)
+    if (inviteToken && pendingProfileId) {
+        return (
+            <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 md:p-6 relative">
+                <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden flex flex-col justify-center animate-in zoom-in-95 duration-300">
+                    <div className="absolute inset-0 bg-blue-600/5 blur-3xl rounded-full pointer-events-none"></div>
+                    <div className="relative z-10 text-center mb-6">
+                        <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl shadow-lg shadow-blue-600/20 mb-4"><UserPlus className="text-white w-8 h-8" /></div>
+                        <h1 className="text-xl font-black text-white uppercase tracking-tighter mb-1">Bem-vindo à Equipe</h1>
+                        <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Complete seu cadastro para acessar</p>
+                    </div>
+
+                    <div className="space-y-4">
+                        <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center">
+                            <p className="text-[10px] text-slate-500 uppercase font-black">Olá,</p>
+                            <p className="text-lg font-black text-white uppercase">{memberActivationForm.name}</p>
+                        </div>
+
+                        <div>
+                            <label className="text-[10px] font-black text-slate-500 uppercase ml-1 mb-1 block">Seu E-mail de Login</label>
+                            <div className="bg-slate-800/50 p-2 rounded-xl border border-slate-700 flex items-center gap-2">
+                                <Mail className="text-slate-400 w-4 h-4 ml-2" />
+                                <input type="email" className="bg-transparent w-full text-white outline-none text-sm font-bold" placeholder="seu@email.com" value={memberActivationForm.email} onChange={e => setMemberActivationForm({...memberActivationForm, email: e.target.value})} />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="text-[10px] font-black text-slate-500 uppercase ml-1 mb-1 block">CPF (Apenas Números)</label>
+                            <div className="bg-slate-800/50 p-2 rounded-xl border border-slate-700 flex items-center gap-2">
+                                <ShieldCheck className="text-slate-400 w-4 h-4 ml-2" />
+                                <input type="text" className="bg-transparent w-full text-white outline-none text-sm font-bold" placeholder="000.000.000-00" value={memberActivationForm.document} onChange={e => setMemberActivationForm({...memberActivationForm, document: maskDocument(e.target.value)})} />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="text-[10px] font-black text-slate-500 uppercase ml-1 mb-1 block">WhatsApp</label>
+                            <div className="bg-slate-800/50 p-2 rounded-xl border border-slate-700 flex items-center gap-2">
+                                <Phone className="text-slate-400 w-4 h-4 ml-2" />
+                                <input type="tel" className="bg-transparent w-full text-white outline-none text-sm font-bold" placeholder="(00) 00000-0000" value={memberActivationForm.phone} onChange={e => setMemberActivationForm({...memberActivationForm, phone: maskPhone(e.target.value)})} />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="text-[10px] font-black text-slate-500 uppercase ml-1 mb-1 block">Crie sua Senha</label>
+                            <div className="bg-slate-800/50 p-2 rounded-xl border border-slate-700 flex items-center gap-2 relative">
+                                <KeyRound className="text-slate-400 w-4 h-4 ml-2" />
+                                <input type={showPassword ? "text" : "password"} className="bg-transparent w-full text-white outline-none text-sm font-bold pr-8" placeholder="Mínimo 6 caracteres" value={memberActivationForm.password} onChange={e => setMemberActivationForm({...memberActivationForm, password: e.target.value})} />
+                                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 text-slate-500 hover:text-white"><Eye size={14}/></button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="text-[10px] font-black text-slate-500 uppercase ml-1 mb-1 block">Confirme a Senha</label>
+                            <div className="bg-slate-800/50 p-2 rounded-xl border border-slate-700 flex items-center gap-2">
+                                <KeyRound className="text-slate-400 w-4 h-4 ml-2" />
+                                <input type="password" className="bg-transparent w-full text-white outline-none text-sm font-bold" placeholder="Repita a senha" value={memberActivationForm.confirmPassword} onChange={e => setMemberActivationForm({...memberActivationForm, confirmPassword: e.target.value})} />
+                            </div>
+                        </div>
+
+                        <button onClick={handleActivateMember} disabled={isProcessingCreate} className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-xs font-black uppercase shadow-lg transition-all mt-4 flex items-center justify-center gap-2">
+                            {isProcessingCreate ? <Loader2 className="animate-spin" /> : 'Ativar Minha Conta'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 md:p-6 relative">

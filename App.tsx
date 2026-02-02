@@ -53,18 +53,21 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('popstate', handlePopState);
   }, [activeUser === null, !!portalLoanId, !!legalSignToken, activeTab]);
 
+  // Se o usuário for STAFF (Nível 2), forçamos selectedStaffId para ele mesmo
+  // Isso garante que o painel seja "extremamente funcional" mostrando apenas o dele
+  const effectiveSelectedStaffId = (activeUser && activeUser.accessLevel === 2) ? activeUser.id : selectedStaffId;
+
   return (
     <>
       <AppGate portalLoanId={portalLoanId} legalSignToken={legalSignToken} activeProfileId={activeProfileId} activeUser={activeUser} isLoadingData={isLoadingData} loadError={loadError} loginUser={loginUser} setLoginUser={setLoginUser} loginPassword={loginPassword} setLoginPassword={setLoginPassword} submitLogin={submitLogin} savedProfiles={savedProfiles} handleSelectSavedProfile={handleSelectSavedProfile} handleRemoveSavedProfile={handleRemoveSavedProfile} showToast={showToast} setIsLoadingData={setIsLoadingData} toast={toast} >
         <AppShell toast={toast} activeTab={activeTab} setActiveTab={setActiveTab} activeUser={activeUser} isLoadingData={isLoadingData} onOpenNav={() => ui.setShowNavHub(true)} onNewLoan={() => { ui.setEditingLoan(null); ui.openModal('LOAN_FORM'); }} isStealthMode={ui.isStealthMode} toggleStealthMode={() => ui.setIsStealthMode(!ui.isStealthMode)} onOpenSupport={() => ui.openModal('SUPPORT_CHAT')} navOrder={navOrder}>
           
-          {/* Header e BottomNav Dinâmicos injetados via AppShell se possível, ou renderizados condicionalmente */}
           <div className="hidden">
              <HeaderBar activeTab={activeTab} setActiveTab={setActiveTab} activeUser={activeUser} isLoadingData={isLoadingData} onOpenNav={() => ui.setShowNavHub(true)} onNewLoan={() => ui.openModal('LOAN_FORM')} isStealthMode={ui.isStealthMode} toggleStealthMode={() => ui.setIsStealthMode(!ui.isStealthMode)} navOrder={navOrder} />
              <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} onOpenNav={() => ui.setShowNavHub(true)} onNewLoan={() => ui.openModal('LOAN_FORM')} navOrder={navOrder} primaryColor={activeUser?.brandColor} />
           </div>
 
-          {activeTab === 'DASHBOARD' && <DashboardContainer loans={loans} sources={sources} activeUser={activeUser} staffMembers={staffMembers} selectedStaffId={selectedStaffId} setSelectedStaffId={setSelectedStaffId} mobileDashboardTab={ui.mobileDashboardTab} setMobileDashboardTab={ui.setMobileDashboardTab} statusFilter={statusFilter} setStatusFilter={setStatusFilter} searchTerm={searchTerm} setSearchTerm={setSearchTerm} ui={ui} loanCtrl={loanCtrl} fileCtrl={fileCtrl} showToast={showToast} onRefresh={() => fetchFullData(activeUser?.id || '')} />}
+          {activeTab === 'DASHBOARD' && <DashboardContainer loans={loans} sources={sources} activeUser={activeUser} staffMembers={staffMembers} selectedStaffId={effectiveSelectedStaffId} setSelectedStaffId={setSelectedStaffId} mobileDashboardTab={ui.mobileDashboardTab} setMobileDashboardTab={ui.setMobileDashboardTab} statusFilter={statusFilter} setStatusFilter={setStatusFilter} searchTerm={searchTerm} setSearchTerm={setSearchTerm} ui={ui} loanCtrl={loanCtrl} fileCtrl={fileCtrl} showToast={showToast} onRefresh={() => fetchFullData(activeUser?.id || '')} />}
           {activeTab === 'CLIENTS' && <ClientsContainer clients={clients} clientSearchTerm={clientSearchTerm} setClientSearchTerm={setClientSearchTerm} clientCtrl={clientCtrl} loanCtrl={loanCtrl} showToast={showToast} ui={ui} />}
           {/* EQUIPE visível para operadores proprietários (sem supervisor_id) */}
           {activeTab === 'TEAM' && !activeUser?.supervisor_id && <TeamPage activeUser={activeUser} staffMembers={staffMembers} sources={sources} showToast={showToast} onRefresh={() => fetchFullData(activeUser?.id || '')} />}
