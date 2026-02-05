@@ -77,14 +77,14 @@ export const useClientPortalLogic = (initialLoanId: string) => {
       // Prioridade total para o link único (initialLoanId)
       if (initialLoanId) {
         try {
-          // 1. Valida existência do contrato
+          // 1. Valida existência do contrato e descobre o cliente dono
           const { data: loanRef, error: loanError } = await supabase
             .from('contratos')
             .select('client_id')
             .eq('id', initialLoanId)
             .maybeSingle();
 
-          if (loanError || !loanRef) throw new Error('Contrato não encontrado ou link expirado.');
+          if (loanError || !loanRef) throw new Error('Link inválido ou contrato não encontrado.');
 
           // 2. Carrega o cliente automaticamente (sem pedir código)
           const { data: clientRef, error: clientError } = await supabase
@@ -93,12 +93,12 @@ export const useClientPortalLogic = (initialLoanId: string) => {
             .eq('id', loanRef.client_id)
             .single();
 
-          if (clientError || !clientRef) throw new Error('Cliente não identificado.');
+          if (clientError || !clientRef) throw new Error('Cliente associado não identificado.');
 
           // 3. Login automático
           setLoggedClient(clientRef);
           setSelectedLoanId(initialLoanId);
-          // loadFullPortalData será disparado pelo useEffect abaixo quando loggedClient mudar
+          // O useEffect [selectedLoanId, loggedClient] abaixo disparará o loadFullPortalData
           
         } catch (e: any) {
           console.error("Portal Auto-Login Error:", e);

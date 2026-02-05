@@ -61,7 +61,11 @@ export const useLoanForm = ({ initialData, clients, sources, userProfile, onAdd,
         billingCycle: initialData.billingCycle || 'MONTHLY',
         notes: initialData.notes || '',
         guaranteeDescription: initialData.guaranteeDescription || '',
-        startDate: safeIsoDateOnly(initialData.startDate)
+        startDate: safeIsoDateOnly(initialData.startDate),
+        // Funding Fields Loading (Correção: usar != null para permitir valor 0)
+        fundingTotalPayable: initialData.fundingTotalPayable != null ? String(initialData.fundingTotalPayable) : '',
+        fundingProvider: initialData.fundingProvider || '',
+        fundingFeePercent: initialData.fundingFeePercent != null ? String(initialData.fundingFeePercent) : ''
       });
       setFixedDuration('30');
       setSkipWeekends(initialData.skipWeekends || false);
@@ -208,7 +212,7 @@ export const useLoanForm = ({ initialData, clients, sources, userProfile, onAdd,
         return;
     }
 
-    // CORREÇÃO: Permitir saldo negativo explicitamente para contabilidade correta
+    // CORREÇÃO: Permitir saldo negativo explícitamente para contabilidade correta
     if (formData.sourceId && !initialData) {
         const selectedSource = sources.find(s => s.id === formData.sourceId);
         if (selectedSource && parseFloat(formData.principal) > selectedSource.balance) {

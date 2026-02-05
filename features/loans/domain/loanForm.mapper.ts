@@ -2,6 +2,7 @@
 import { Loan, LoanBillingModality, PaymentMethod, LoanDocument } from '../../../types';
 import { generateUUID } from '../../../utils/generators';
 import { modalityRegistry } from '../../../domain/finance/modalities/registry';
+import { parseCurrency } from '../../../utils/formatters';
 
 export interface LoanFormState {
   clientId: string;
@@ -38,16 +39,16 @@ export const mapFormToLoan = (
   profileId: string
 ): Loan => {
   
-  const principal = parseFloat(form.principal);
-  const rate = parseFloat(form.interestRate);
+  const principal = parseCurrency(form.principal);
+  const rate = parseCurrency(form.interestRate);
   
   // Cálculo do Custo de Captação (Cartão)
   let fundingTotalPayable = 0;
   let fundingCost = 0;
   
   if (form.fundingTotalPayable) {
-      fundingTotalPayable = parseFloat(form.fundingTotalPayable);
-      if (!isNaN(fundingTotalPayable) && fundingTotalPayable > principal) {
+      fundingTotalPayable = parseCurrency(form.fundingTotalPayable);
+      if (fundingTotalPayable > principal) {
           fundingCost = fundingTotalPayable - principal;
       }
   }
@@ -80,21 +81,21 @@ export const mapFormToLoan = (
     pixKey: form.pixKey,
     principal,
     interestRate: rate,
-    finePercent: parseFloat(form.finePercent) || 0,
-    dailyInterestPercent: parseFloat(form.dailyInterestPercent) || 0,
+    finePercent: parseCurrency(form.finePercent),
+    dailyInterestPercent: parseCurrency(form.dailyInterestPercent),
     
     // Mapeamento de Funding
     fundingTotalPayable: fundingTotalPayable || undefined,
     fundingCost: fundingCost || undefined,
     fundingProvider: form.fundingProvider || undefined,
-    fundingFeePercent: parseFloat(form.fundingFeePercent || '') || undefined,
+    fundingFeePercent: parseCurrency(form.fundingFeePercent || '') || undefined,
 
     billingCycle: form.billingCycle,
     amortizationType: 'JUROS', 
     policiesSnapshot: { 
         interestRate: rate, 
-        finePercent: parseFloat(form.finePercent) || 0, 
-        dailyInterestPercent: parseFloat(form.dailyInterestPercent) || 0 
+        finePercent: parseCurrency(form.finePercent), 
+        dailyInterestPercent: parseCurrency(form.dailyInterestPercent) 
     },
     startDate: form.startDate, 
     installments,
