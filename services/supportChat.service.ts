@@ -91,36 +91,24 @@ export const supportChatService = {
             payload.operator_id = params.operator_id;
         }
 
-        // Tenta inserir normalmente
         const { error: dbError } = await supabase.from('mensagens_suporte').insert(payload);
         
         if (dbError) {
-            console.warn("Falha primária no envio:", dbError.message);
+            console.error("Database Error:", dbError);
             
-            // 1. Tratamento para erro de TIPO (Check Constraint - código 23514)
-            // Isso acontece se o banco ainda não aceita 'video_call' ou 'voice_call'
-            if (dbError.code === '23514' || dbError.message.includes('mensagens_suporte_type_check')) {
-                console.log("Aplicando fallback de compatibilidade para chamada...");
-                
-                const callLabel = params.type === 'video_call' ? 'VÍDEO' : 'VOZ';
+            // Tratamento amigável para erro de Constraint ou Schema Cache
+            if (dbError.message.includes('mensagens_suporte_type_check')) {
+                // FALLBACK: Se o tipo de chamada falhar no banco, envia como texto para não perder o log
+                payload.text = `[CHAMADA] ${payload.text}`;
                 payload.type = 'text';
-                payload.text = `📞 [CHAMADA DE ${callLabel}] ${params.text || 'Iniciada'}`;
-                
                 const { error: retryError } = await supabase.from('mensagens_suporte').insert(payload);
-                if (retryError) throw new Error(`Erro crítico no banco (fallback falhou): ${retryError.message}`);
-                
-                return; // Sucesso no fallback
-            } 
-            
-            // 2. Tratamento para coluna operator_id inexistente (Schema antigo)
-            else if (dbError.message.includes('operator_id')) {
+                if (retryError) throw new Error(`Erro crítico no banco: ${retryError.message}`);
+                console.warn("Mensagem de chamada enviada como fallback de texto devido a restrição de banco.");
+            } else if (dbError.message.includes('operator_id')) {
                 delete payload.operator_id;
                 const { error: retryError } = await supabase.from('mensagens_suporte').insert(payload);
-                if (retryError) throw new Error(`Erro ao registrar mensagem: ${retryError.message}`);
-                return;
-            } 
-            
-            else {
+                if (retryError) throw new Error(`Erro ao registrar mensagem sem ID do operador: ${retryError.message}`);
+            } else {
                 throw new Error(`Erro ao registrar mensagem: ${dbError.message}`);
             }
         }

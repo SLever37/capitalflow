@@ -4,8 +4,6 @@ import {
   Briefcase,
   UserPlus,
   User,
-  Palette,
-  Image as ImageIcon,
   ShieldCheck,
   Copy,
   Trash2,
@@ -15,7 +13,7 @@ import {
   UserCheck,
   Link as LinkIcon,
   KeyRound,
-  Phone,
+  Eye,
 } from 'lucide-react';
 import { UserProfile, CapitalSource } from '../types';
 import { formatMoney, maskDocument, maskPhone, onlyDigits } from '../utils/formatters';
@@ -46,6 +44,11 @@ type TeamMemberRow = {
   username_or_email: string;
   linked_profile_id: string | null;
   created_at: string;
+  // Campo virtual vindo do join
+  perfis?: {
+      access_code: string;
+      phone: string;
+  };
 };
 
 export const TeamPage: React.FC<TeamPageProps> = ({
@@ -56,9 +59,11 @@ export const TeamPage: React.FC<TeamPageProps> = ({
   const [team, setTeam] = useState<TeamRow | null>(null);
   const [members, setMembers] = useState<TeamMemberRow[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Estados para Modal de Cadastro de Membro
+  // Estados para Modal de Cadastro/Visualização de Membro
   const [isRegisteringMember, setIsRegisteringMember] = useState(false);
+  const [viewingMember, setViewingMember] = useState<TeamMemberRow | null>(null);
   const [newMemberForm, setNewMemberForm] = useState({ name: '', phone: '', cpf: '', code: '' });
   const [generatedCredentials, setGeneratedCredentials] = useState<{cpf: string, code: string, link: string} | null>(null);
 
@@ -67,37 +72,42 @@ export const TeamPage: React.FC<TeamPageProps> = ({
 
   const loadTeamData = async () => {
     if (!ownerId) return;
+    setIsLoading(true);
 
-    // 1) Pega a equipe do dono
-    const { data: teams, error: teamErr } = await supabase
-      .from('teams')
-      .select('*')
-      .eq('owner_profile_id', ownerId)
-      .order('created_at', { ascending: false })
-      .limit(1);
+    try {
+        // 1) Pega a equipe do dono
+        const { data: teams, error: teamErr } = await supabase
+          .from('teams')
+          .select('*')
+          .eq('owner_profile_id', ownerId)
+          .order('created_at', { ascending: false })
+          .limit(1);
 
-    if (teamErr) return;
+        if (teamErr) return;
 
-    const t = teams?.[0] ?? null;
-    setTeam(t);
+        const t = teams?.[0] ?? null;
+        setTeam(t);
 
-    if (!t) {
-      setMembers([]);
-      return;
+        if (!t) {
+          setMembers([]);
+          return;
+        }
+
+        // 2) Lista membros incluindo o código de acesso do perfil vinculado
+        const { data: m, error: memErr } = await supabase
+          .from('team_members')
+          .select('*, perfis:linked_profile_id(access_code, phone)')
+          .eq('team_id', t.id)
+          .order('created_at', { ascending: false });
+
+        if (memErr) {
+          showToast('Falha ao carregar membros: ' + memErr.message, 'error');
+          return;
+        }
+        setMembers(m as any ?? []);
+    } finally {
+        setIsLoading(false);
     }
-
-    // 2) Lista membros
-    const { data: m, error: memErr } = await supabase
-      .from('team_members')
-      .select('*')
-      .eq('team_id', t.id)
-      .order('created_at', { ascending: false });
-
-    if (memErr) {
-      showToast('Falha ao carregar membros: ' + memErr.message, 'error');
-      return;
-    }
-    setMembers(m ?? []);
   };
 
   useEffect(() => {
@@ -128,7 +138,6 @@ export const TeamPage: React.FC<TeamPageProps> = ({
   };
 
   const openRegisterModal = () => {
-      // Gera código aleatório de 4 dígitos
       const randomCode = Math.floor(1000 + Math.random() * 9000).toString();
       setNewMemberForm({ name: '', phone: '', cpf: '', code: randomCode });
       setGeneratedCredentials(null);
@@ -147,124 +156,79 @@ export const TeamPage: React.FC<TeamPageProps> = ({
 
       setIsSaving(true);
       try {
-          const dummyEmail = `member.${cleanCPF}@capitalflow.team`;
-          let profileId = '';
+          const profileId = generateUUID();
+          const dummyEmail = `member.${cleanCPF}@capitalflow.team`; 
+          
+          const { error: profileError } = await supabase.from('perfis').insert({
+              id: profileId,
+              supervisor_id: ownerId,
+              nome_operador: name.trim(),
+              nome_completo: name.trim(),
+              email: dummyEmail,
+              usuario_email: dummyEmail,
+              document: cleanCPF,
+              phone: cleanPhone,
+              access_code: code,
+              senha_acesso: 'NO_PASSWORD',
+              access_level: 2, 
+              total_available_capital: 0,
+              interest_balance: 0,
+              created_at: new Date().toISOString()
+          });
 
-          // 1. Verifica se já existe um perfil com este CPF
-          const { data: existingProfile } = await supabase
-              .from('perfis')
-              .select('id, supervisor_id')
-              .eq('document', cleanCPF)
-              .maybeSingle();
+          if (profileError) throw profileError;
 
-          if (existingProfile) {
-              // Se o perfil existe, verificamos se pertence a este supervisor ou está livre
-              if (existingProfile.supervisor_id && existingProfile.supervisor_id !== ownerId) {
-                  throw new Error("Este CPF já está vinculado a outra equipe/gestor.");
-              }
-              
-              profileId = existingProfile.id;
+          const { error: memberError } = await supabase.from('team_members').insert({
+              team_id: team.id,
+              profile_id: profileId,
+              linked_profile_id: profileId,
+              full_name: name.trim(),
+              cpf: cleanCPF,
+              username_or_email: cleanCPF,
+              role: 'MEMBER'
+          });
 
-              // Atualiza os dados do perfil existente (Recicla o usuário, atualizando senha/código)
-              const { error: updateError } = await supabase.from('perfis').update({
-                  nome_operador: name.trim(),
-                  nome_completo: name.trim(),
-                  phone: cleanPhone,
-                  access_code: code,
-                  email: dummyEmail, // Garante consistência
-                  usuario_email: dummyEmail,
-                  last_active_at: new Date().toISOString()
-              }).eq('id', profileId);
+          if (memberError) throw memberError;
 
-              if (updateError) throw new Error("Erro ao atualizar perfil existente: " + updateError.message);
-
-          } else {
-              // Cria novo perfil se não existir
-              profileId = generateUUID();
-              
-              const { error: profileError } = await supabase.from('perfis').insert({
-                  id: profileId,
-                  supervisor_id: ownerId,
-                  nome_operador: name.trim(),
-                  nome_completo: name.trim(),
-                  email: dummyEmail,
-                  usuario_email: dummyEmail,
-                  document: cleanCPF,
-                  phone: cleanPhone,
-                  access_code: code,
-                  senha_acesso: 'NO_PASSWORD', // Não usa senha
-                  access_level: 2, 
-                  total_available_capital: 0,
-                  interest_balance: 0,
-                  created_at: new Date().toISOString()
-              });
-
-              if (profileError) {
-                  if (profileError.message.includes('unique') || profileError.message.includes('duplicate')) {
-                       throw new Error("CPF ou dados duplicados no sistema.");
-                  }
-                  throw new Error("Erro ao criar perfil: " + profileError.message);
-              }
-          }
-
-          // 2. Vincula à Equipe (Verifica se já é membro antes de inserir)
-          const { data: existingMember } = await supabase
-              .from('team_members')
-              .select('id')
-              .eq('team_id', team.id)
-              .eq('linked_profile_id', profileId)
-              .maybeSingle();
-
-          if (!existingMember) {
-               const { error: memberError } = await supabase.from('team_members').insert({
-                  team_id: team.id,
-                  linked_profile_id: profileId,
-                  full_name: name.trim(),
-                  cpf: cleanCPF,
-                  username_or_email: cleanCPF
-              });
-              if (memberError) throw new Error("Erro ao vincular membro: " + memberError.message);
-          } else {
-              // Atualiza dados no vínculo se já existir
-              await supabase.from('team_members').update({
-                  full_name: name.trim(),
-                  username_or_email: cleanCPF
-              }).eq('id', existingMember.id);
-          }
-
-          // Sucesso
           setGeneratedCredentials({
               cpf: cleanCPF,
               code: code,
-              link: window.location.origin // Link base para login
+              link: window.location.origin
           });
           
-          showToast("Membro cadastrado/atualizado com sucesso!", "success");
+          showToast("Membro cadastrado com sucesso!", "success");
           await loadTeamData();
 
       } catch (e: any) {
-          showToast("Erro: " + e.message, "error");
+          showToast("Erro ao cadastrar: " + e.message, "error");
       } finally {
           setIsSaving(false);
       }
   };
 
-  const handleDeleteMember = async (memberId: string, linkedProfileId: string | null) => {
+  const handleDeleteMember = async (e: React.MouseEvent, memberId: string, linkedProfileId: string | null) => {
+    e.stopPropagation();
     if (!confirm('Remover este membro? O acesso será revogado imediatamente.')) return;
     try {
-      // Remove vínculo
       await supabase.from('team_members').delete().eq('id', memberId);
-      
-      // Opcional: Remover o perfil criado (soft delete ou hard delete)
       if (linkedProfileId) {
           await supabase.from('perfis').delete().eq('id', linkedProfileId);
       }
-
       showToast('Membro removido.', 'success');
       await loadTeamData();
     } catch (e: any) {
       showToast('Erro ao remover: ' + e.message, 'error');
     }
+  };
+
+  const handleViewCredentials = (member: TeamMemberRow) => {
+    setGeneratedCredentials({
+        cpf: member.cpf,
+        code: member.perfis?.access_code || '----',
+        link: window.location.origin
+    });
+    setViewingMember(member);
+    setIsRegisteringMember(true);
   };
 
   return (
@@ -275,7 +239,7 @@ export const TeamPage: React.FC<TeamPageProps> = ({
             <Briefcase className="text-blue-500" size={28} /> Minha Equipe
           </h2>
           <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">
-            Gestão de Acessos
+            Gestão de Acessos e Convites
           </p>
         </div>
 
@@ -302,7 +266,12 @@ export const TeamPage: React.FC<TeamPageProps> = ({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {!team ? (
+        {isLoading ? (
+            <div className="col-span-full py-24 text-center">
+                <Loader2 className="animate-spin text-blue-500 mx-auto" size={48} />
+                <p className="text-slate-500 text-xs font-black uppercase mt-4 tracking-widest">Sincronizando Colaboradores...</p>
+            </div>
+        ) : !team ? (
           <div className="col-span-full py-24 text-center border-2 border-dashed border-slate-800 rounded-[3rem] opacity-60">
             <Users className="mx-auto text-slate-700 mb-4" size={48} />
             <p className="text-slate-300 font-black uppercase text-xs tracking-widest">
@@ -320,18 +289,24 @@ export const TeamPage: React.FC<TeamPageProps> = ({
           members.map((m) => (
             <div
               key={m.id}
-              className="bg-slate-900 border border-slate-800 p-8 rounded-[3rem] group transition-all relative overflow-hidden hover:border-blue-500/30"
+              onClick={() => handleViewCredentials(m)}
+              className="bg-slate-900 border border-slate-800 p-8 rounded-[3rem] group transition-all relative overflow-hidden hover:border-blue-500 cursor-pointer shadow-xl hover:shadow-blue-900/10"
             >
                 <div className="flex justify-between items-start mb-6 relative z-10">
-                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center border-2 border-slate-800 overflow-hidden bg-slate-950">
-                    <User size={28} className="text-slate-700" />
+                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center border-2 border-slate-800 overflow-hidden bg-slate-950 group-hover:bg-blue-600 group-hover:border-blue-500 transition-colors">
+                    <User size={28} className="text-slate-700 group-hover:text-white" />
                   </div>
-                  <button
-                    onClick={() => handleDeleteMember(m.id, m.linked_profile_id)}
-                    className="p-2 bg-slate-800 text-rose-500 hover:bg-rose-900/20 rounded-xl transition-colors"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                  <div className="flex gap-2">
+                      <button className="p-2 bg-slate-800 text-blue-500 rounded-xl hover:bg-blue-600 hover:text-white transition-all opacity-0 group-hover:opacity-100">
+                        <Eye size={16} />
+                      </button>
+                      <button
+                        onClick={(e) => handleDeleteMember(e, m.id, m.linked_profile_id)}
+                        className="p-2 bg-slate-800 text-rose-500 hover:bg-rose-600 hover:text-white rounded-xl transition-all"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                  </div>
                 </div>
 
                 <h3 className="text-lg font-black text-white uppercase tracking-tight truncate">
@@ -341,19 +316,20 @@ export const TeamPage: React.FC<TeamPageProps> = ({
                   CPF: {maskDocument(m.cpf)}
                 </p>
 
-                <div className="pt-6 border-t border-slate-800">
-                    <p className="text-[9px] text-emerald-500 uppercase font-black tracking-widest flex items-center gap-1">
+                <div className="pt-6 border-t border-slate-800 flex justify-between items-center">
+                    <p className="text-[9px] text-emerald-500 font-black uppercase tracking-widest flex items-center gap-1">
                         <ShieldCheck size={12}/> Acesso Ativo
                     </p>
+                    <p className="text-[9px] text-slate-500 font-black uppercase group-hover:text-blue-400 transition-colors">Ver Credenciais</p>
                 </div>
             </div>
           ))
         )}
       </div>
 
-      {/* MODAL DE CADASTRO */}
+      {/* MODAL DE CADASTRO / VISUALIZAÇÃO */}
       {isRegisteringMember && (
-          <Modal onClose={() => setIsRegisteringMember(false)} title="Cadastrar Novo Membro">
+          <Modal onClose={() => { setIsRegisteringMember(false); setViewingMember(null); }} title={viewingMember ? "Credenciais do Membro" : "Cadastrar Novo Membro"}>
               {!generatedCredentials ? (
                   <div className="space-y-4">
                       <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 mb-4">
@@ -363,7 +339,7 @@ export const TeamPage: React.FC<TeamPageProps> = ({
                       </div>
 
                       <div>
-                          <label className="text-[10px] font-black uppercase text-slate-500 ml-1 mb-1 block">Nome Completo</label>
+                          <label className="text-[10px] font-black text-slate-500 uppercase ml-1 mb-1 block">Nome Completo</label>
                           <input 
                               type="text" 
                               className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none focus:border-blue-500 transition-colors"
@@ -422,31 +398,37 @@ export const TeamPage: React.FC<TeamPageProps> = ({
                           <ShieldCheck size={40}/>
                       </div>
                       <div>
-                          <h3 className="text-xl font-black text-white uppercase">Membro Cadastrado!</h3>
-                          <p className="text-slate-400 text-xs mt-2">Envie estas credenciais para o colaborador.</p>
+                          <h3 className="text-xl font-black text-white uppercase">{viewingMember ? 'Dados de Acesso' : 'Membro Cadastrado!'}</h3>
+                          <p className="text-slate-400 text-xs mt-2">Compartilhe estas credenciais com o colaborador.</p>
                       </div>
 
                       <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 text-left space-y-4">
                           <div>
-                              <p className="text-[10px] text-slate-500 font-black uppercase">Link de Acesso</p>
+                              <p className="text-[10px] text-slate-500 font-black uppercase">Link do Sistema</p>
                               <div className="flex gap-2 mt-1">
                                   <input readOnly value={generatedCredentials.link} className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-blue-400 font-mono outline-none"/>
-                                  <button onClick={() => navigator.clipboard.writeText(generatedCredentials.link)} className="p-2 bg-blue-600 text-white rounded-lg"><Copy size={14}/></button>
+                                  <button onClick={() => { navigator.clipboard.writeText(generatedCredentials.link); showToast("Link copiado!"); }} className="p-2 bg-blue-600 text-white rounded-lg"><Copy size={14}/></button>
                               </div>
                           </div>
                           <div className="grid grid-cols-2 gap-4">
                               <div>
                                   <p className="text-[10px] text-slate-500 font-black uppercase">Login (CPF)</p>
-                                  <p className="text-lg font-black text-white">{generatedCredentials.cpf}</p>
+                                  <div className="flex items-center justify-between bg-slate-900 p-2 rounded-lg mt-1">
+                                      <p className="text-base font-black text-white">{generatedCredentials.cpf}</p>
+                                      <button onClick={() => { navigator.clipboard.writeText(generatedCredentials.cpf); showToast("CPF copiado!"); }} className="text-slate-500 hover:text-white"><Copy size={12}/></button>
+                                  </div>
                               </div>
                               <div>
-                                  <p className="text-[10px] text-slate-500 font-black uppercase">Código</p>
-                                  <p className="text-lg font-black text-emerald-400 tracking-widest">{generatedCredentials.code}</p>
+                                  <p className="text-[10px] text-slate-500 font-black uppercase">Código (PIN)</p>
+                                  <div className="flex items-center justify-between bg-slate-900 p-2 rounded-lg mt-1">
+                                      <p className="text-base font-black text-emerald-400 tracking-widest">{generatedCredentials.code}</p>
+                                      <button onClick={() => { navigator.clipboard.writeText(generatedCredentials.code); showToast("Código copiado!"); }} className="text-slate-500 hover:text-white"><Copy size={12}/></button>
+                                  </div>
                               </div>
                           </div>
                       </div>
 
-                      <button onClick={() => setIsRegisteringMember(false)} className="w-full py-4 bg-slate-800 text-white rounded-2xl font-bold uppercase text-xs">Fechar</button>
+                      <button onClick={() => { setIsRegisteringMember(false); setViewingMember(null); }} className="w-full py-4 bg-slate-800 text-white rounded-2xl font-bold uppercase text-xs">Concluído</button>
                   </div>
               )}
           </Modal>
