@@ -12,22 +12,26 @@ export const renewMonthly = (
     forgivePenalty: boolean = false,
     manualDate?: Date | null
 ): RenewalResult => {
-    // Nota: Mensal geralmente segue ciclo fixo, mas poderia usar manualDate para renegociação de data.
-    // Por hora, mantemos a lógica original de +30 dias, mas respeitamos a interface.
     
     const currentDueDate = parseDateOnlyUTC(inst.dueDate);
     const daysLate = getDaysDiff(inst.dueDate); 
     
+    // Verifica se houve amortização do principal (Pagar Tudo / Abater)
+    const isPrincipalPayment = (Number(allocation?.principalPaid) || 0) > 0;
+
     let baseDate: Date;
     
     if (manualDate) {
         baseDate = manualDate;
-    } else if (daysLate > 0 && !forgivePenalty) {
+    } else if (daysLate > 0 && isPrincipalPayment) {
+        // Se pagou atrasado E abateu o principal, reseta para hoje
         baseDate = today;
     } else {
+        // Se pagou em dia OU apenas juros (Renovação), mantém o ciclo original
         baseDate = currentDueDate;
     }
 
+    // No Mensal, sempre joga 30 dias para frente
     const newStartDateISO = toISODateOnlyUTC(baseDate); 
     const newDueDateISO = toISODateOnlyUTC(addDaysUTC(baseDate, 30));
 

@@ -23,9 +23,27 @@ export const dailyFreeStrategy: ModalityStrategy = {
     },
 
     card: {
-        dueDateLabel: () => "Pago até:",
+        dueDateLabel: () => "Pago até",
         statusLabel: (inst, daysDiff) => {
-            return null; 
+            // daysDiff > 0: Hoje é maior que data (Atrasado)
+            // daysDiff < 0: Hoje é menor que data (Adiantado/Futuro)
+            
+            if (daysDiff > 0) {
+                return { 
+                    text: `ATRASADO HÁ ${daysDiff} DIAS`, 
+                    color: 'text-rose-500 font-black' 
+                };
+            }
+            if (daysDiff < 0) {
+                return { 
+                    text: `ADIANTADO (${Math.abs(daysDiff)} DIAS)`, 
+                    color: 'text-emerald-400 font-black' 
+                };
+            }
+            return { 
+                text: 'VENCE HOJE', 
+                color: 'text-amber-400 animate-pulse' 
+            };
         },
         showProgress: false
     }

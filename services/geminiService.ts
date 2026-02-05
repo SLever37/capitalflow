@@ -47,9 +47,10 @@ export const processNaturalLanguageCommand = async (text: string, portfolioConte
   `;
 
   const callAI = async (modelName: string) => {
+    // Simplified content structure to avoid serialization issues
     const response = await ai.models.generateContent({
       model: modelName,
-      contents: [{ parts: [{ text: text }] }],
+      contents: text,
       config: {
         systemInstruction: systemPrompt,
         responseMimeType: "application/json",
@@ -65,30 +66,46 @@ export const processNaturalLanguageCommand = async (text: string, portfolioConte
         // Tenta Modelo PRO (Melhor raciocínio)
         response = await callAI('gemini-3-pro-preview');
     } catch (err: any) {
-        // Fallback para Flash se PRO estiver sem cota (429) ou indisponível
-        const errStr = String(err);
-        if (err.status === 429 || err.code === 429 || errStr.includes('429') || errStr.includes('quota')) {
-            console.warn("Gemini Pro Quota Exceeded. Switching to Flash.");
-            response = await callAI('gemini-3-flash-preview');
-        } else {
-            throw err;
-        }
+        console.warn("Gemini Pro Error (Primary):", err);
+        // Fallback para Flash se PRO falhar (Quota ou Rede)
+        // Se o erro for XHR (Network), o Flash pode funcionar se for um problema temporário de endpoint específico do Pro
+        response = await callAI('gemini-3-flash-preview');
     }
 
-    let cleanJson = response.text || '{}';
-    cleanJson = cleanJson.replace(/```json/g, '').replace(/```/g, '').trim();
-    return JSON.parse(cleanJson);
+    let cleanJson = response?.text || '{}';
+    // Remove markdown code blocks if present
+    cleanJson = cleanJson.replace(/^```json\s*/, '').replace(/\s*```$/, '').trim();
+    
+    try {
+        return JSON.parse(cleanJson);
+    } catch (parseError) {
+        console.error("JSON Parse Error:", parseError, cleanJson);
+        return { 
+            intent: "UNKNOWN", 
+            feedback: "Não entendi completamente. Pode reformular?",
+            analysis: null
+        };
+    }
 
   } catch (error: any) {
     console.error("AI CRO Error:", error);
     
-    const errStr = String(error);
-    if (error.status === 429 || error.code === 429 || errStr.includes('429') || errStr.includes('quota') || errStr.includes('RESOURCE_EXHAUSTED')) {
+    const errStr = String(error?.message || error);
+    if (errStr.includes('429') || errStr.includes('quota') || errStr.includes('RESOURCE_EXHAUSTED')) {
         return { 
             intent: "ERROR",
             feedback: "Muitas requisições. A IA precisa descansar.", 
-            analysis: "Cota de uso da API excedida (Erro 429). Por favor, aguarde um minuto e tente novamente." 
+            analysis: "Cota de uso da API excedida. Por favor, aguarde um minuto." 
         };
+    }
+    
+    // Tratamento específico para erro de rede/XHR
+    if (errStr.includes('xhr error') || errStr.includes('fetch failed')) {
+         return {
+            intent: "ERROR",
+            feedback: "Erro de conexão com a IA.",
+            analysis: "Verifique sua internet ou se a chave de API está válida e ativa."
+         };
     }
 
     return { 

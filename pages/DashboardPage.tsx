@@ -48,6 +48,7 @@ interface DashboardPageProps {
   showToast: (msg: string, type?: 'error'|'success') => void;
   isStealthMode: boolean;
   onRenegotiate: (loan: Loan) => void;
+  onNewAporte: (loan: Loan) => void;
   onAgreementPayment: (loan: Loan, agreement: Agreement, inst: AgreementInstallment) => void;
   onRefresh: () => void;
 }
@@ -58,7 +59,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   searchTerm, setSearchTerm, selectedLoanId, setSelectedLoanId, onEdit, onMessage, onArchive, onRestore, 
   onDelete, onNote, onPayment, onPortalLink, onUploadPromissoria, onUploadDoc, onViewPromissoria, 
   onViewDoc, onReviewSignal, onOpenComprovante, onReverseTransaction, setWithdrawModal, showToast, 
-  isStealthMode, onRenegotiate, onAgreementPayment, onRefresh
+  isStealthMode, onRenegotiate, onNewAporte, onAgreementPayment, onRefresh
 }) => {
   return (
     <div className="flex flex-col gap-6">
@@ -83,7 +84,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
               <div className="grid grid-cols-1 gap-4 sm:gap-5">
                   {filteredLoans.map(loan => (
-                    <LoanCard key={loan.id} loan={loan} sources={sources} activeUser={activeUser} isExpanded={selectedLoanId === loan.id} onToggleExpand={() => setSelectedLoanId(selectedLoanId === loan.id ? null : loan.id)} onEdit={(e) => { e.stopPropagation(); onEdit(loan); }} onMessage={(e) => { e.stopPropagation(); onMessage(loan); }} onArchive={(e) => { e.stopPropagation(); onArchive(loan); }} onRestore={(e) => { e.stopPropagation(); onRestore(loan); }} onDelete={(e) => { e.stopPropagation(); onDelete(loan); }} onNote={(e) => { e.stopPropagation(); onNote(loan); }} onPayment={(l, i, c) => onPayment(l, i, c)} onPortalLink={(e) => { e.stopPropagation(); onPortalLink(loan); }} onUploadPromissoria={(e) => { e.stopPropagation(); onUploadPromissoria(loan); }} onUploadDoc={(e) => { e.stopPropagation(); onUploadDoc(loan); }} onViewPromissoria={(e, url) => { e.stopPropagation(); onViewPromissoria(url); }} onViewDoc={(e, url) => { e.stopPropagation(); onViewDoc(url); }} onReviewSignal={onReviewSignal} onOpenComprovante={onOpenComprovante} onReverseTransaction={onReverseTransaction} onRenegotiate={onRenegotiate} onAgreementPayment={onAgreementPayment} onRefresh={onRefresh} isStealthMode={isStealthMode} />
+                    <LoanCard key={loan.id} loan={loan} sources={sources} activeUser={activeUser} isExpanded={selectedLoanId === loan.id} onToggleExpand={() => setSelectedLoanId(selectedLoanId === loan.id ? null : loan.id)} onEdit={(e) => { e.stopPropagation(); onEdit(loan); }} onMessage={(e) => { e.stopPropagation(); onMessage(loan); }} onArchive={(e) => { e.stopPropagation(); onArchive(loan); }} onRestore={(e) => { e.stopPropagation(); onRestore(loan); }} onDelete={(e) => { e.stopPropagation(); onDelete(loan); }} onNote={(e) => { e.stopPropagation(); onNote(loan); }} onPayment={(l, i, c) => onPayment(l, i, c)} onPortalLink={(e) => { e.stopPropagation(); onPortalLink(loan); }} onUploadPromissoria={(e) => { e.stopPropagation(); onUploadPromissoria(loan); }} onUploadDoc={(e) => { e.stopPropagation(); onUploadDoc(loan); }} onViewPromissoria={(e, url) => { e.stopPropagation(); onViewPromissoria(url); }} onViewDoc={(e, url) => { e.stopPropagation(); onViewDoc(url); }} onReviewSignal={onReviewSignal} onOpenComprovante={onOpenComprovante} onReverseTransaction={onReverseTransaction} onRenegotiate={onRenegotiate} onNewAporte={onNewAporte} onAgreementPayment={onAgreementPayment} onRefresh={onRefresh} isStealthMode={isStealthMode} />
                   ))}
                   {filteredLoans.length === 0 && <div className="text-center py-24 bg-slate-900/30 rounded-[3rem] border-2 border-dashed border-slate-800 flex flex-col items-center px-4"><div className="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center mb-6"><BarChart3 className="w-8 h-8 text-slate-700" /></div><p className="font-black uppercase text-sm text-slate-500 tracking-widest">Nenhum contrato encontrado</p></div>}
               </div>

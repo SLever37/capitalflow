@@ -27,9 +27,7 @@ export const useLoanCardComputed = (loan: Loan, sources: CapitalSource[], isStea
   
   const isZeroBalance = totalDebt < 0.10;
 
-  // Lógica de Acordo (Defensiva)
   const agreement = loan.activeAgreement;
-  // Adjusted comparison to satisfy TS strict typing while maintaining core logic (AgreementStatus is 'ACTIVE' | 'PAID' | 'BROKEN')
   const normalizedAgreementStatus = (agreement?.status === 'ACTIVE') ? 'ACTIVE' : agreement?.status;
   const hasActiveAgreement = !!agreement && normalizedAgreementStatus === 'ACTIVE';
   const isAgreementPaid = !!agreement && agreement.status === 'PAID';
@@ -71,7 +69,16 @@ export const useLoanCardComputed = (loan: Loan, sources: CapitalSource[], isStea
     iconStyle = "bg-rose-500/20 text-rose-500";
   }
   else if (!isLate && !hasActiveAgreement) {
-    const daysUntilDue = Math.min(...loan.installments.filter(i => i.status !== LoanStatus.PAID).map(i => -getDaysDiff(i.dueDate)));
+    const daysUntilDue = Math.min(...loan.installments.filter(i => i.status !== LoanStatus.PAID).map(i => {
+        // FIX: Se for Mensal e datas iguais (recém renovado), força 30 dias para evitar card Laranja
+        if (!loan.billingCycle.includes('DAILY') && loan.startDate && i.dueDate) {
+             const d1 = parseDateOnlyUTC(loan.startDate).getTime();
+             const d2 = parseDateOnlyUTC(i.dueDate).getTime();
+             if (d1 === d2) return 30;
+        }
+        return -getDaysDiff(i.dueDate);
+    }));
+
     if (daysUntilDue >= 0 && daysUntilDue <= 3) {
       cardStyle = "bg-orange-950/30 border-orange-500/50 shadow-orange-900/10";
       iconStyle = "bg-orange-500/20 text-orange-500";

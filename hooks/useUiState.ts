@@ -19,6 +19,7 @@ export const useUiState = () => {
       setPaymentModal(null);
       setConfirmation(null);
       setNoteModalLoan(null);
+      setNewAporteModalLoan(null);
   }, []);
 
   const [noteText, setNoteText] = useState('');
@@ -39,6 +40,7 @@ export const useUiState = () => {
   const [addFundsValue, setAddFundsValue] = useState('');
   const [paymentModal, setPaymentModal] = useState<{loan: Loan, inst: Installment, calculations: any} | null>(null);
   const [renegotiationModalLoan, setRenegotiationModalLoan] = useState<Loan | null>(null);
+  const [newAporteModalLoan, setNewAporteModalLoan] = useState<Loan | null>(null);
   const [messageModalLoan, setMessageModalLoan] = useState<Loan | null>(null);
   const [withdrawValue, setWithdrawValue] = useState('');
   const [withdrawSourceId, setWithdrawSourceId] = useState('');
@@ -102,6 +104,7 @@ export const useUiState = () => {
     addFundsValue, setAddFundsValue,
     paymentModal, setPaymentModal,
     renegotiationModalLoan, setRenegotiationModalLoan,
+    newAporteModalLoan, setNewAporteModalLoan,
     messageModalLoan, setMessageModalLoan,
     withdrawValue, setWithdrawValue,
     withdrawSourceId, setWithdrawSourceId,

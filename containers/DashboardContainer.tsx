@@ -56,6 +56,11 @@ export const DashboardContainer: React.FC<DashboardContainerProps> = ({
       }
   };
 
+  const handleNewAporte = (loan: Loan) => {
+      ui.setNewAporteModalLoan(loan);
+      ui.openModal('NEW_APORTE');
+  };
+
   return (
     <DashboardPage 
         loans={loans} sources={sources} filteredLoans={filteredLoans} stats={stats} 
@@ -80,6 +85,7 @@ export const DashboardContainer: React.FC<DashboardContainerProps> = ({
         onOpenComprovante={fileCtrl.handleOpenComprovante}
         onReverseTransaction={loanCtrl.openReverseTransaction}
         onRenegotiate={(l) => { ui.setRenegotiationModalLoan(l); ui.openModal('RENEGOTIATION', l); }}
+        onNewAporte={handleNewAporte}
         onAgreementPayment={handleAgreementPayment}
         onRefresh={onRefresh}
         setWithdrawModal={() => ui.openModal('WITHDRAW')}

@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, ReactNode } from 'react';
 import { UserProfile, Client, Loan, CapitalSource } from '../types';
 
@@ -24,6 +25,7 @@ export type ModalType =
     | 'DELETE_ACCOUNT'
     | 'RESET_DATA'
     | 'RENEGOTIATION'
+    | 'NEW_APORTE'
     | 'AI_ASSISTANT'
     | 'SUPPORT_CHAT';
 

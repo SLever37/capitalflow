@@ -23,7 +23,7 @@ export const daily30Strategy: ModalityStrategy = {
     },
 
     card: {
-        dueDateLabel: () => "Vencimento:",
+        dueDateLabel: () => "Vencimento",
         statusLabel: () => null,
         showProgress: false
     }

@@ -21,7 +21,7 @@ export const legacyStrategy: ModalityStrategy = {
     },
 
     card: {
-        dueDateLabel: () => "Vencimento:",
+        dueDateLabel: () => "Vencimento",
         statusLabel: () => null,
         showProgress: true
     }

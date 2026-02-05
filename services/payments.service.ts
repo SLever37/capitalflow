@@ -90,7 +90,11 @@ export const paymentsService = {
       p_profit_generated: profitGenerated, // Garante que juros da quitação entrem aqui
       p_principal_returned: principalReturned,
       p_principal_delta: principalReturned, 
-      p_interest_delta: profitGenerated, 
+      
+      // CORREÇÃO ESTORNO: Envia APENAS o juro base no delta de juros. 
+      // A multa vai separada. Isso impede que o estorno some (Juros+Multa) de volta ao saldo de Juros.
+      p_interest_delta: Number(allocation?.interestPaid) || 0, 
+      
       p_late_fee_delta: Number(allocation?.lateFeePaid) || 0,
       p_notes: paymentNote, p_new_start_date: renewal.newStartDateISO, p_new_due_date: renewal.newDueDateISO,
       p_new_principal_remaining: renewal.newPrincipalRemaining, p_new_interest_remaining: renewal.newInterestRemaining,

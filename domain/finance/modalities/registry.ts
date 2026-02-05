@@ -13,12 +13,12 @@ const strategies: Record<string, ModalityStrategy> = {
     'DAILY_FIXED_TERM': dailyFixedTermStrategy,
 };
 
-// Fallback Map para compatibilidade de dados legados
+// Fallback Map para compatibilidade de dados legados (Migração segura)
 const legacyFallback: Record<string, ModalityStrategy> = {
     'DAILY_30_INTEREST': dailyFreeStrategy,
     'DAILY_30_CAPITAL': dailyFreeStrategy,
     'DAILY_FIXED': dailyFreeStrategy,
-    'DAILY': monthlyStrategy // Legado de 30 parcelas mapeado para Mensal (Gerenciamento manual) ou usar dailyFixedTermStrategy se preferir
+    'DAILY': monthlyStrategy 
 };
 
 export const modalityRegistry = {

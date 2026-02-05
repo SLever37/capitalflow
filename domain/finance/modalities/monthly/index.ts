@@ -20,8 +20,28 @@ export const monthlyStrategy: ModalityStrategy = {
     },
 
     card: {
-        dueDateLabel: () => "Vencimento:",
-        statusLabel: () => null, // Usa padrão
+        dueDateLabel: () => "Vencimento",
+        statusLabel: (inst, daysDiff) => {
+            // daysDiff > 0: Hoje é maior que vencimento (Atrasado)
+            // daysDiff < 0: Hoje é menor que vencimento (Futuro)
+            
+            if (daysDiff > 0) {
+                return { 
+                    text: `ATRASADO HÁ ${daysDiff} DIAS`, 
+                    color: 'text-rose-500 font-black' 
+                };
+            }
+            if (daysDiff < 0) {
+                return { 
+                    text: `FALTAM ${Math.abs(daysDiff)} DIAS`, 
+                    color: 'text-blue-400' 
+                };
+            }
+            return { 
+                text: 'VENCE HOJE', 
+                color: 'text-amber-400 animate-pulse' 
+            };
+        },
         showProgress: false
     }
 };

@@ -88,7 +88,12 @@ export const useAppState = (activeProfileId: string | null) => {
           const ownerId = u.supervisor_id || u.id;
           const isStaff = !!u.supervisor_id;
 
-          let loansQuery = supabase.from('contratos').select('*, parcelas(*), transacoes(*)').eq('profile_id', ownerId);
+          // CORREÇÃO CRÍTICA: Adicionados JOINs para acordos e sinalizações
+          let loansQuery = supabase
+            .from('contratos')
+            .select('*, parcelas(*), transacoes(*), acordos_inadimplencia(*, acordo_parcelas(*)), sinalizacoes_pagamento(*)')
+            .eq('profile_id', ownerId);
+            
           if (isStaff) loansQuery = loansQuery.eq('operador_responsavel_id', u.id);
 
           const [clientsRes, sourcesRes, loansRes] = await Promise.all([
@@ -105,7 +110,6 @@ export const useAppState = (activeProfileId: string | null) => {
           if (u.accessLevel === 1) {
               const { data: staffData } = await supabase.from('perfis').select('*').eq('supervisor_id', u.id);
               if (staffData) {
-                  // AQUI ESTAVA O ERRO: Mapeamos o array de staff corretamente agora
                   const mappedStaff = staffData.map(s => mapProfileFromDB(s));
                   setStaffMembers(mappedStaff);
               }

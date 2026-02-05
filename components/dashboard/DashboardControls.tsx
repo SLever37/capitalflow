@@ -53,13 +53,13 @@ export const DashboardControls: React.FC<DashboardControlsProps> = ({
             <div className="flex items-center gap-2">
                 <div className="flex md:hidden gap-1.5 flex-shrink-0">
                     <button 
-                        onClick={() => setIsMobileSearchOpen(!isMobileSearchOpen)}
+                        onClick={() => { setIsMobileSearchOpen(!isMobileSearchOpen); setIsMobileSortOpen(false); }}
                         className={`p-2.5 rounded-xl border transition-all ${isMobileSearchOpen ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-900 border-slate-800 text-slate-400'}`}
                     >
                         <Search size={18} />
                     </button>
                     <button 
-                        onClick={() => setIsMobileSortOpen(!isMobileSortOpen)}
+                        onClick={() => { setIsMobileSortOpen(!isMobileSortOpen); setIsMobileSearchOpen(false); }}
                         className={`p-2.5 rounded-xl border transition-all ${isMobileSortOpen ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-900 border-slate-800 text-slate-400'}`}
                     >
                         <ArrowDownWideNarrow size={18} />
@@ -105,6 +105,23 @@ export const DashboardControls: React.FC<DashboardControlsProps> = ({
                         onChange={e => setSearchTerm(e.target.value)} 
                         autoFocus={isMobileSearchOpen}
                     />
+                </div>
+            )}
+
+            {/* Mobile Sort Dropdown */}
+            {isMobileSortOpen && (
+                <div className="md:hidden bg-slate-900 border border-slate-800 p-2 rounded-2xl flex items-center gap-2 animate-in slide-in-from-top-2 duration-200">
+                    <div className="px-3 text-slate-500"><ArrowDownWideNarrow size={16}/></div>
+                    <select 
+                        value={sortOption} 
+                        onChange={e => { setSortOption(e.target.value as SortOption); setIsMobileSortOpen(false); }}
+                        className="bg-transparent text-white text-[10px] font-black uppercase outline-none p-2 cursor-pointer w-full"
+                    >
+                        <option value="DUE_DATE_ASC">Vencimento Próximo</option>
+                        <option value="NAME_ASC">Nome (A-Z)</option>
+                        <option value="CREATED_DESC">Entrada (Novo)</option>
+                        <option value="UPDATED_DESC">Alteração (Recente)</option>
+                    </select>
                 </div>
             )}
         </div>
