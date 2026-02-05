@@ -147,43 +147,90 @@ export const TeamPage: React.FC<TeamPageProps> = ({
 
       setIsSaving(true);
       try {
-          const profileId = generateUUID();
-          
-          // 1. Cria Perfil do Membro (Login Sem Senha)
-          // Usamos e-mail fictício para passar na constraint se existir, mas o login será via CPF/Code
-          const dummyEmail = `member.${cleanCPF}@capitalflow.team`; 
-          
-          const { error: profileError } = await supabase.from('perfis').insert({
-              id: profileId,
-              supervisor_id: ownerId,
-              nome_operador: name.trim(),
-              nome_completo: name.trim(),
-              email: dummyEmail,
-              usuario_email: dummyEmail,
-              document: cleanCPF,
-              phone: cleanPhone,
-              access_code: code,
-              senha_acesso: 'NO_PASSWORD', // Não usa senha
-              access_level: 2, 
-              total_available_capital: 0,
-              interest_balance: 0,
-              created_at: new Date().toISOString()
-          });
+          const dummyEmail = `member.${cleanCPF}@capitalflow.team`;
+          let profileId = '';
 
-          if (profileError) throw new Error("Erro ao criar perfil: " + profileError.message);
+          // 1. Verifica se já existe um perfil com este CPF
+          const { data: existingProfile } = await supabase
+              .from('perfis')
+              .select('id, supervisor_id')
+              .eq('document', cleanCPF)
+              .maybeSingle();
 
-          // 2. Vincula à Equipe
-          const { error: memberError } = await supabase.from('team_members').insert({
-              team_id: team.id,
-              profile_id: profileId,
-              linked_profile_id: profileId,
-              full_name: name.trim(),
-              cpf: cleanCPF,
-              username_or_email: cleanCPF,
-              role: 'MEMBER'
-          });
+          if (existingProfile) {
+              // Se o perfil existe, verificamos se pertence a este supervisor ou está livre
+              if (existingProfile.supervisor_id && existingProfile.supervisor_id !== ownerId) {
+                  throw new Error("Este CPF já está vinculado a outra equipe/gestor.");
+              }
+              
+              profileId = existingProfile.id;
 
-          if (memberError) throw new Error("Erro ao vincular membro: " + memberError.message);
+              // Atualiza os dados do perfil existente (Recicla o usuário, atualizando senha/código)
+              const { error: updateError } = await supabase.from('perfis').update({
+                  nome_operador: name.trim(),
+                  nome_completo: name.trim(),
+                  phone: cleanPhone,
+                  access_code: code,
+                  email: dummyEmail, // Garante consistência
+                  usuario_email: dummyEmail,
+                  last_active_at: new Date().toISOString()
+              }).eq('id', profileId);
+
+              if (updateError) throw new Error("Erro ao atualizar perfil existente: " + updateError.message);
+
+          } else {
+              // Cria novo perfil se não existir
+              profileId = generateUUID();
+              
+              const { error: profileError } = await supabase.from('perfis').insert({
+                  id: profileId,
+                  supervisor_id: ownerId,
+                  nome_operador: name.trim(),
+                  nome_completo: name.trim(),
+                  email: dummyEmail,
+                  usuario_email: dummyEmail,
+                  document: cleanCPF,
+                  phone: cleanPhone,
+                  access_code: code,
+                  senha_acesso: 'NO_PASSWORD', // Não usa senha
+                  access_level: 2, 
+                  total_available_capital: 0,
+                  interest_balance: 0,
+                  created_at: new Date().toISOString()
+              });
+
+              if (profileError) {
+                  if (profileError.message.includes('unique') || profileError.message.includes('duplicate')) {
+                       throw new Error("CPF ou dados duplicados no sistema.");
+                  }
+                  throw new Error("Erro ao criar perfil: " + profileError.message);
+              }
+          }
+
+          // 2. Vincula à Equipe (Verifica se já é membro antes de inserir)
+          const { data: existingMember } = await supabase
+              .from('team_members')
+              .select('id')
+              .eq('team_id', team.id)
+              .eq('linked_profile_id', profileId)
+              .maybeSingle();
+
+          if (!existingMember) {
+               const { error: memberError } = await supabase.from('team_members').insert({
+                  team_id: team.id,
+                  linked_profile_id: profileId,
+                  full_name: name.trim(),
+                  cpf: cleanCPF,
+                  username_or_email: cleanCPF
+              });
+              if (memberError) throw new Error("Erro ao vincular membro: " + memberError.message);
+          } else {
+              // Atualiza dados no vínculo se já existir
+              await supabase.from('team_members').update({
+                  full_name: name.trim(),
+                  username_or_email: cleanCPF
+              }).eq('id', existingMember.id);
+          }
 
           // Sucesso
           setGeneratedCredentials({
@@ -192,11 +239,11 @@ export const TeamPage: React.FC<TeamPageProps> = ({
               link: window.location.origin // Link base para login
           });
           
-          showToast("Membro cadastrado com sucesso!", "success");
+          showToast("Membro cadastrado/atualizado com sucesso!", "success");
           await loadTeamData();
 
       } catch (e: any) {
-          showToast("Erro ao cadastrar: " + e.message, "error");
+          showToast("Erro: " + e.message, "error");
       } finally {
           setIsSaving(false);
       }

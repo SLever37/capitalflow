@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { HelpCircle, TrendingUp, User, KeyRound, Loader2, X, ChevronRight, Beaker, Eye, EyeOff, UserPlus, Phone, ShieldCheck, Mail, Lock } from 'lucide-react';
 import { Modal } from '../../components/ui/Modal';
@@ -118,12 +119,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
 
             const { error: memberError } = await supabase.from('team_members').insert({
                 team_id: inviteData.team_id,
-                profile_id: newProfileId, 
                 linked_profile_id: newProfileId,
                 full_name: name.trim(),
                 cpf: cleanDoc,
-                username_or_email: email.trim().toLowerCase(),
-                role: 'MEMBER'
+                username_or_email: email.trim().toLowerCase()
             });
 
             if (memberError) throw new Error("Erro ao vincular à equipe: " + memberError.message);
