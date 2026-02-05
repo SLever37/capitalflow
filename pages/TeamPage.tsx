@@ -4,6 +4,8 @@ import {
   Briefcase,
   UserPlus,
   User,
+  Palette,
+  Image as ImageIcon,
   ShieldCheck,
   Copy,
   Trash2,
@@ -13,7 +15,7 @@ import {
   UserCheck,
   Link as LinkIcon,
   KeyRound,
-  Eye,
+  Phone,
 } from 'lucide-react';
 import { UserProfile, CapitalSource } from '../types';
 import { formatMoney, maskDocument, maskPhone, onlyDigits } from '../utils/formatters';
@@ -44,10 +46,6 @@ type TeamMemberRow = {
   username_or_email: string;
   linked_profile_id: string | null;
   created_at: string;
-  perfis?: {
-      access_code: string;
-      phone: string;
-  };
 };
 
 export const TeamPage: React.FC<TeamPageProps> = ({
@@ -58,10 +56,9 @@ export const TeamPage: React.FC<TeamPageProps> = ({
   const [team, setTeam] = useState<TeamRow | null>(null);
   const [members, setMembers] = useState<TeamMemberRow[]>([]);
   const [isSaving, setIsSaving] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
 
+  // Estados para Modal de Cadastro de Membro
   const [isRegisteringMember, setIsRegisteringMember] = useState(false);
-  const [viewingMember, setViewingMember] = useState<TeamMemberRow | null>(null);
   const [newMemberForm, setNewMemberForm] = useState({ name: '', phone: '', cpf: '', code: '' });
   const [generatedCredentials, setGeneratedCredentials] = useState<{cpf: string, code: string, link: string} | null>(null);
 
@@ -70,41 +67,42 @@ export const TeamPage: React.FC<TeamPageProps> = ({
 
   const loadTeamData = async () => {
     if (!ownerId) return;
-    setIsLoading(true);
-    try {
-        const { data: teams, error: teamErr } = await supabase
-          .from('teams')
-          .select('*')
-          .eq('owner_profile_id', ownerId)
-          .order('created_at', { ascending: false })
-          .limit(1);
 
-        if (teamErr) return;
-        const t = teams?.[0] ?? null;
-        setTeam(t);
+    // 1) Pega a equipe do dono
+    const { data: teams, error: teamErr } = await supabase
+      .from('teams')
+      .select('*')
+      .eq('owner_profile_id', ownerId)
+      .order('created_at', { ascending: false })
+      .limit(1);
 
-        if (!t) {
-          setMembers([]);
-          return;
-        }
+    if (teamErr) return;
 
-        const { data: m, error: memErr } = await supabase
-          .from('team_members')
-          .select('*, perfis:linked_profile_id(access_code, phone)')
-          .eq('team_id', t.id)
-          .order('created_at', { ascending: false });
+    const t = teams?.[0] ?? null;
+    setTeam(t);
 
-        if (memErr) {
-          showToast('Falha ao carregar membros: ' + memErr.message, 'error');
-          return;
-        }
-        setMembers(m as any ?? []);
-    } finally {
-        setIsLoading(false);
+    if (!t) {
+      setMembers([]);
+      return;
     }
+
+    // 2) Lista membros
+    const { data: m, error: memErr } = await supabase
+      .from('team_members')
+      .select('*')
+      .eq('team_id', t.id)
+      .order('created_at', { ascending: false });
+
+    if (memErr) {
+      showToast('Falha ao carregar membros: ' + memErr.message, 'error');
+      return;
+    }
+    setMembers(m ?? []);
   };
 
-  useEffect(() => { loadTeamData(); }, [ownerId]);
+  useEffect(() => {
+    loadTeamData();
+  }, [ownerId]);
 
   const handleCreateTeamIfMissing = async () => {
     if (!ownerId) return;
@@ -130,6 +128,7 @@ export const TeamPage: React.FC<TeamPageProps> = ({
   };
 
   const openRegisterModal = () => {
+      // Gera código aleatório de 4 dígitos
       const randomCode = Math.floor(1000 + Math.random() * 9000).toString();
       setNewMemberForm({ name: '', phone: '', cpf: '', code: randomCode });
       setGeneratedCredentials(null);
@@ -144,10 +143,14 @@ export const TeamPage: React.FC<TeamPageProps> = ({
 
       if (!name.trim()) { showToast("Nome é obrigatório.", "error"); return; }
       if (cleanCPF.length !== 11) { showToast("CPF inválido (11 dígitos).", "error"); return; }
-      
+      if (!code || code.length < 4) { showToast("Código de acesso inválido.", "error"); return; }
+
       setIsSaving(true);
       try {
           const profileId = generateUUID();
+          
+          // 1. Cria Perfil do Membro (Login Sem Senha)
+          // Usamos e-mail fictício para passar na constraint se existir, mas o login será via CPF/Code
           const dummyEmail = `member.${cleanCPF}@capitalflow.team`; 
           
           const { error: profileError } = await supabase.from('perfis').insert({
@@ -160,18 +163,17 @@ export const TeamPage: React.FC<TeamPageProps> = ({
               document: cleanCPF,
               phone: cleanPhone,
               access_code: code,
-              senha_acesso: 'NO_PASSWORD',
+              senha_acesso: 'NO_PASSWORD', // Não usa senha
               access_level: 2, 
-              interest_balance: 0,
               total_available_capital: 0,
+              interest_balance: 0,
               created_at: new Date().toISOString()
           });
 
-          if (profileError) throw profileError;
+          if (profileError) throw new Error("Erro ao criar perfil: " + profileError.message);
 
-          const memberId = generateUUID();
+          // 2. Vincula à Equipe
           const { error: memberError } = await supabase.from('team_members').insert({
-              id: memberId,
               team_id: team.id,
               profile_id: profileId,
               linked_profile_id: profileId,
@@ -181,16 +183,18 @@ export const TeamPage: React.FC<TeamPageProps> = ({
               role: 'MEMBER'
           });
 
-          if (memberError) throw memberError;
+          if (memberError) throw new Error("Erro ao vincular membro: " + memberError.message);
 
+          // Sucesso
           setGeneratedCredentials({
               cpf: cleanCPF,
               code: code,
-              link: `${window.location.origin}/?team_ref=${memberId}`
+              link: window.location.origin // Link base para login
           });
           
           showToast("Membro cadastrado com sucesso!", "success");
           await loadTeamData();
+
       } catch (e: any) {
           showToast("Erro ao cadastrar: " + e.message, "error");
       } finally {
@@ -198,24 +202,17 @@ export const TeamPage: React.FC<TeamPageProps> = ({
       }
   };
 
-  const handleViewCredentials = (member: TeamMemberRow) => {
-    setGeneratedCredentials({
-        cpf: member.cpf,
-        code: member.perfis?.access_code || '----',
-        link: `${window.location.origin}/?team_ref=${member.id}`
-    });
-    setViewingMember(member);
-    setIsRegisteringMember(true);
-  };
-
-  const handleDeleteMember = async (e: React.MouseEvent, memberId: string, linkedProfileId: string | null) => {
-    e.stopPropagation();
+  const handleDeleteMember = async (memberId: string, linkedProfileId: string | null) => {
     if (!confirm('Remover este membro? O acesso será revogado imediatamente.')) return;
     try {
+      // Remove vínculo
       await supabase.from('team_members').delete().eq('id', memberId);
+      
+      // Opcional: Remover o perfil criado (soft delete ou hard delete)
       if (linkedProfileId) {
           await supabase.from('perfis').delete().eq('id', linkedProfileId);
       }
+
       showToast('Membro removido.', 'success');
       await loadTeamData();
     } catch (e: any) {
@@ -231,7 +228,7 @@ export const TeamPage: React.FC<TeamPageProps> = ({
             <Briefcase className="text-blue-500" size={28} /> Minha Equipe
           </h2>
           <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">
-            Gestão de Acessos e Convites
+            Gestão de Acessos
           </p>
         </div>
 
@@ -258,12 +255,7 @@ export const TeamPage: React.FC<TeamPageProps> = ({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {isLoading ? (
-            <div className="col-span-full py-24 text-center">
-                <Loader2 className="animate-spin text-blue-500 mx-auto" size={48} />
-                <p className="text-slate-500 text-xs font-black uppercase mt-4 tracking-widest">Sincronizando Colaboradores...</p>
-            </div>
-        ) : !team ? (
+        {!team ? (
           <div className="col-span-full py-24 text-center border-2 border-dashed border-slate-800 rounded-[3rem] opacity-60">
             <Users className="mx-auto text-slate-700 mb-4" size={48} />
             <p className="text-slate-300 font-black uppercase text-xs tracking-widest">
@@ -281,24 +273,18 @@ export const TeamPage: React.FC<TeamPageProps> = ({
           members.map((m) => (
             <div
               key={m.id}
-              onClick={() => handleViewCredentials(m)}
-              className="bg-slate-900 border border-slate-800 p-8 rounded-[3rem] group transition-all relative overflow-hidden hover:border-blue-500 cursor-pointer shadow-xl hover:shadow-blue-900/10"
+              className="bg-slate-900 border border-slate-800 p-8 rounded-[3rem] group transition-all relative overflow-hidden hover:border-blue-500/30"
             >
                 <div className="flex justify-between items-start mb-6 relative z-10">
-                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center border-2 border-slate-800 overflow-hidden bg-slate-950 group-hover:bg-blue-600 group-hover:border-blue-500 transition-colors">
-                    <User size={28} className="text-slate-700 group-hover:text-white" />
+                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center border-2 border-slate-800 overflow-hidden bg-slate-950">
+                    <User size={28} className="text-slate-700" />
                   </div>
-                  <div className="flex gap-2">
-                      <button className="p-2 bg-slate-800 text-blue-500 rounded-xl hover:bg-blue-600 hover:text-white transition-all opacity-0 group-hover:opacity-100">
-                        <Eye size={16} />
-                      </button>
-                      <button
-                        onClick={(e) => handleDeleteMember(e, m.id, m.linked_profile_id)}
-                        className="p-2 bg-slate-800 text-rose-500 hover:bg-rose-600 hover:text-white rounded-xl transition-all"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                  </div>
+                  <button
+                    onClick={() => handleDeleteMember(m.id, m.linked_profile_id)}
+                    className="p-2 bg-slate-800 text-rose-500 hover:bg-rose-900/20 rounded-xl transition-colors"
+                  >
+                    <Trash2 size={16} />
+                  </button>
                 </div>
 
                 <h3 className="text-lg font-black text-white uppercase tracking-tight truncate">
@@ -308,75 +294,112 @@ export const TeamPage: React.FC<TeamPageProps> = ({
                   CPF: {maskDocument(m.cpf)}
                 </p>
 
-                <div className="pt-6 border-t border-slate-800 flex justify-between items-center">
-                    <p className="text-[9px] text-emerald-500 font-black uppercase tracking-widest flex items-center gap-1">
+                <div className="pt-6 border-t border-slate-800">
+                    <p className="text-[9px] text-emerald-500 uppercase font-black tracking-widest flex items-center gap-1">
                         <ShieldCheck size={12}/> Acesso Ativo
                     </p>
-                    <p className="text-[9px] text-slate-500 font-black uppercase group-hover:text-blue-400 transition-colors">Ver Link de Acesso</p>
                 </div>
             </div>
           ))
         )}
       </div>
 
+      {/* MODAL DE CADASTRO */}
       {isRegisteringMember && (
-          <Modal onClose={() => { setIsRegisteringMember(false); setViewingMember(null); }} title={viewingMember ? "Link de Acesso Único" : "Cadastrar Novo Membro"}>
+          <Modal onClose={() => setIsRegisteringMember(false)} title="Cadastrar Novo Membro">
               {!generatedCredentials ? (
                   <div className="space-y-4">
-                      <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 mb-4 text-center">
-                          <p className="text-[10px] text-slate-400 uppercase font-bold">
-                              O membro receberá um link especial para entrar apenas com o CPF.
+                      <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 mb-4">
+                          <p className="text-[10px] text-slate-400 uppercase font-bold text-center">
+                              Preencha os dados do colaborador. O acesso será gerado imediatamente.
                           </p>
                       </div>
 
                       <div>
-                          <label className="text-[10px] font-black text-slate-500 uppercase ml-1 mb-1 block">Nome Completo</label>
-                          <input type="text" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none focus:border-blue-500 transition-colors" value={newMemberForm.name} onChange={e => setNewMemberForm({...newMemberForm, name: e.target.value})} placeholder="Ex: João Silva" />
+                          <label className="text-[10px] font-black uppercase text-slate-500 ml-1 mb-1 block">Nome Completo</label>
+                          <input 
+                              type="text" 
+                              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none focus:border-blue-500 transition-colors"
+                              value={newMemberForm.name}
+                              onChange={e => setNewMemberForm({...newMemberForm, name: e.target.value})}
+                              placeholder="Ex: João Silva"
+                          />
                       </div>
 
                       <div className="grid grid-cols-2 gap-4">
                           <div>
-                              <label className="text-[10px] font-black uppercase text-slate-500 ml-1 mb-1 block">CPF (Login Único)</label>
-                              <input type="text" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none focus:border-blue-500 transition-colors" value={newMemberForm.cpf} onChange={e => setNewMemberForm({...newMemberForm, cpf: maskDocument(e.target.value)})} placeholder="000.000.000-00" />
+                              <label className="text-[10px] font-black uppercase text-slate-500 ml-1 mb-1 block">CPF (Login)</label>
+                              <input 
+                                  type="text" 
+                                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none focus:border-blue-500 transition-colors"
+                                  value={newMemberForm.cpf}
+                                  onChange={e => setNewMemberForm({...newMemberForm, cpf: maskDocument(e.target.value)})}
+                                  placeholder="000.000.000-00"
+                              />
                           </div>
                           <div>
                               <label className="text-[10px] font-black uppercase text-slate-500 ml-1 mb-1 block">Telefone</label>
-                              <input type="tel" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none focus:border-blue-500 transition-colors" value={newMemberForm.phone} onChange={e => setNewMemberForm({...newMemberForm, phone: maskPhone(e.target.value)})} placeholder="(00) 00000-0000" />
+                              <input 
+                                  type="tel" 
+                                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none focus:border-blue-500 transition-colors"
+                                  value={newMemberForm.phone}
+                                  onChange={e => setNewMemberForm({...newMemberForm, phone: maskPhone(e.target.value)})}
+                                  placeholder="(00) 00000-0000"
+                              />
+                          </div>
+                      </div>
+
+                      <div>
+                          <label className="text-[10px] font-black uppercase text-slate-500 ml-1 mb-1 block">Código de Acesso (Gerado)</label>
+                          <div className="flex gap-2">
+                              <input 
+                                  type="text" 
+                                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-emerald-400 font-black text-center text-lg outline-none tracking-widest"
+                                  value={newMemberForm.code}
+                                  onChange={e => setNewMemberForm({...newMemberForm, code: onlyDigits(e.target.value)})}
+                                  maxLength={6}
+                              />
+                              <button onClick={() => setNewMemberForm({...newMemberForm, code: Math.floor(1000 + Math.random() * 9000).toString()})} className="p-3 bg-slate-800 text-slate-400 rounded-xl hover:text-white transition-colors">
+                                  <KeyRound size={20}/>
+                              </button>
                           </div>
                       </div>
 
                       <button onClick={handleRegisterMember} disabled={isSaving} className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-black uppercase text-xs shadow-lg transition-all mt-4 flex items-center justify-center gap-2">
-                          {isSaving ? <Loader2 className="animate-spin"/> : <><UserPlus size={16}/> Gerar Link de Acesso</>}
+                          {isSaving ? <Loader2 className="animate-spin"/> : <><UserPlus size={16}/> Confirmar Cadastro</>}
                       </button>
                   </div>
               ) : (
                   <div className="space-y-6 text-center animate-in zoom-in duration-300">
-                      <div className="w-20 h-20 bg-indigo-500/20 rounded-full flex items-center justify-center mx-auto text-indigo-500">
-                          <LinkIcon size={40}/>
+                      <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto text-emerald-500">
+                          <ShieldCheck size={40}/>
                       </div>
                       <div>
-                          <h3 className="text-xl font-black text-white uppercase">{viewingMember ? 'Link de Acesso' : 'Link Gerado!'}</h3>
-                          <p className="text-slate-400 text-xs mt-2">Envie este link único para o colaborador. Ele entrará apenas confirmando o CPF.</p>
+                          <h3 className="text-xl font-black text-white uppercase">Membro Cadastrado!</h3>
+                          <p className="text-slate-400 text-xs mt-2">Envie estas credenciais para o colaborador.</p>
                       </div>
 
                       <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 text-left space-y-4">
                           <div>
-                              <p className="text-[10px] text-slate-500 font-black uppercase mb-1">Link Especial de Equipe</p>
-                              <div className="flex gap-2">
-                                  <input readOnly value={generatedCredentials.link} className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-indigo-400 font-mono outline-none"/>
-                                  <button onClick={() => { navigator.clipboard.writeText(generatedCredentials.link); showToast("Link copiado!"); }} className="p-2 bg-indigo-600 text-white rounded-lg"><Copy size={14}/></button>
+                              <p className="text-[10px] text-slate-500 font-black uppercase">Link de Acesso</p>
+                              <div className="flex gap-2 mt-1">
+                                  <input readOnly value={generatedCredentials.link} className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-blue-400 font-mono outline-none"/>
+                                  <button onClick={() => navigator.clipboard.writeText(generatedCredentials.link)} className="p-2 bg-blue-600 text-white rounded-lg"><Copy size={14}/></button>
                               </div>
                           </div>
-                          <div>
-                              <p className="text-[10px] text-slate-500 font-black uppercase mb-1">CPF Autorizado</p>
-                              <div className="flex items-center justify-between bg-slate-900 p-3 rounded-lg">
-                                  <p className="text-base font-black text-white">{maskDocument(generatedCredentials.cpf)}</p>
-                                  <span className="text-[8px] bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded font-black uppercase">Liberado</span>
+                          <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                  <p className="text-[10px] text-slate-500 font-black uppercase">Login (CPF)</p>
+                                  <p className="text-lg font-black text-white">{generatedCredentials.cpf}</p>
+                              </div>
+                              <div>
+                                  <p className="text-[10px] text-slate-500 font-black uppercase">Código</p>
+                                  <p className="text-lg font-black text-emerald-400 tracking-widest">{generatedCredentials.code}</p>
                               </div>
                           </div>
                       </div>
 
-                      <button onClick={() => { setIsRegisteringMember(false); setViewingMember(null); }} className="w-full py-4 bg-slate-800 text-white rounded-2xl font-bold uppercase text-xs">Concluído</button>
+                      <button onClick={() => setIsRegisteringMember(false)} className="w-full py-4 bg-slate-800 text-white rounded-2xl font-bold uppercase text-xs">Fechar</button>
                   </div>
               )}
           </Modal>

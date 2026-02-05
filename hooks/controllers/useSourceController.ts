@@ -40,15 +40,22 @@ export const useSourceController = (
     ui.setIsSaving(true);
     try {
       const id = crypto.randomUUID();
+      const ownerId = (activeUser as any).supervisor_id || activeUser.id;
+      const isStaff = !!(activeUser as any).supervisor_id;
+
+      // Se for STAFF criando, a fonte pertence ao Dono, mas com acesso exclusivo do STAFF
+      const operadorPermitido = isStaff ? activeUser.id : (ui.sourceForm.operador_permitido_id || null);
+
       const { error } = await supabase
         .from('fontes')
         .insert([
           {
             id,
-            profile_id: activeUser.id,
+            profile_id: ownerId,
             name: ui.sourceForm.name,
             type: ui.sourceForm.type,
             balance: initialBalance,
+            operador_permitido_id: operadorPermitido
           },
         ]);
 

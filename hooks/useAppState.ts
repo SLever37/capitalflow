@@ -6,9 +6,10 @@ import { maskPhone, maskDocument } from '../utils/formatters';
 import { mapLoanFromDB } from '../services/adapters/dbAdapters';
 import { asString, asNumber } from '../utils/safe';
 
-const DEFAULT_NAV: AppTab[] = ['DASHBOARD', 'CLIENTS'];
-const DEFAULT_HUB: AppTab[] = ['SOURCES', 'LEGAL', 'PROFILE'];
+const DEFAULT_NAV: AppTab[] = ['DASHBOARD', 'CLIENTS', 'TEAM'];
+const DEFAULT_HUB: AppTab[] = ['SOURCES', 'LEGAL', 'PROFILE', 'MASTER'];
 
+// Helper de mapeamento para reutilização
 const mapProfileFromDB = (data: any): UserProfile => ({
     id: data.id,
     name: asString(data.nome_operador),
@@ -64,14 +65,21 @@ export const useAppState = (activeProfileId: string | null) => {
   const [profileEditForm, setProfileEditForm] = useState<UserProfile | null>(null);
 
   const fetchFullData = useCallback(async (profileId: string) => {
-      if (!profileId || profileId === 'null' || profileId === 'DEMO') return;
+      if (!profileId || profileId === 'null') return;
+      
+      // Proteção para modo Demo
+      if (profileId === 'DEMO') {
+          return;
+      }
 
       setIsLoadingData(true);
       try {
           const { data: profileData, error: profileError } = await supabase.from('perfis').select('*').eq('id', profileId).single();
           if (profileError) throw profileError;
 
+          // Mapeamento do Usuário Ativo
           const u = mapProfileFromDB(profileData);
+          
           setActiveUser(u);
           setProfileEditForm(u);
           setNavOrder(u.ui_nav_order!);
@@ -80,21 +88,30 @@ export const useAppState = (activeProfileId: string | null) => {
           const ownerId = u.supervisor_id || u.id;
           const isStaff = !!u.supervisor_id;
 
-          // QUERIES COM ISOLAMENTO RIGOROSO
-          let clientsQuery = supabase.from('clientes').select('*');
-          let sourcesQuery = supabase.from('fontes').select('*');
-          let loansQuery = supabase.from('contratos').select('*, parcelas(*), transacoes(*), acordos_inadimplencia(*, acordo_parcelas(*)), sinalizacoes_pagamento(*)');
+          // --- ISOLAMENTO DE DADOS (STAFF vs OWNER) ---
 
+          // 1. Loans: Se Staff, vê apenas onde é responsável
+          let loansQuery = supabase
+            .from('contratos')
+            .select('*, parcelas(*), transacoes(*), acordos_inadimplencia(*, acordo_parcelas(*)), sinalizacoes_pagamento(*)')
+            .eq('profile_id', ownerId);
+            
           if (isStaff) {
-              // Membro da Equipe: vê APENAS seus clientes e APENAS fontes que o Master liberou explicitamente para ele
-              clientsQuery = clientsQuery.eq('profile_id', u.id);
-              sourcesQuery = sourcesQuery.eq('operador_permitido_id', u.id);
               loansQuery = loansQuery.eq('operador_responsavel_id', u.id);
-          } else {
-              // Master: vê tudo do seu ownerId
-              clientsQuery = clientsQuery.eq('profile_id', ownerId);
-              sourcesQuery = sourcesQuery.eq('profile_id', ownerId);
-              loansQuery = loansQuery.eq('profile_id', ownerId);
+          }
+
+          // 2. Clients: Se Staff, vê apenas os que ele criou ou foi atribuído (created_by_id)
+          // Nota: Se não houver created_by_id no banco, Staff pode acabar vendo nada ou tudo dependendo da query.
+          // Assumindo que contracts.service salva created_by_id.
+          let clientsQuery = supabase.from('clientes').select('*').eq('profile_id', ownerId);
+          if (isStaff) {
+              clientsQuery = clientsQuery.eq('created_by_id', u.id);
+          }
+
+          // 3. Sources: Se Staff, vê apenas fontes onde ele é operador permitido
+          let sourcesQuery = supabase.from('fontes').select('*').eq('profile_id', ownerId);
+          if (isStaff) {
+              sourcesQuery = sourcesQuery.eq('operador_permitido_id', u.id);
           }
 
           const [clientsRes, sourcesRes, loansRes] = await Promise.all([
@@ -107,13 +124,17 @@ export const useAppState = (activeProfileId: string | null) => {
           if (sourcesRes.data) setSources(sourcesRes.data.map((s: any) => ({ ...s, balance: asNumber(s.balance) })));
           if (loansRes.data) setLoans(loansRes.data.map((l: any) => mapLoanFromDB(l, clientsRes.data || [])));
 
+          // Carregamento de Equipe (Se for Master)
           if (u.accessLevel === 1) {
               const { data: staffData } = await supabase.from('perfis').select('*').eq('supervisor_id', u.id);
-              if (staffData) setStaffMembers(staffData.map(s => mapProfileFromDB(s)));
+              if (staffData) {
+                  const mappedStaff = staffData.map(s => mapProfileFromDB(s));
+                  setStaffMembers(mappedStaff);
+              }
           }
 
       } catch (error: any) {
-          console.error("Erro ao carregar dados:", error);
+          console.error("Erro ao carregar dados do perfil:", error);
           setLoadError(error.message);
       } finally {
           setIsLoadingData(false);
@@ -121,12 +142,43 @@ export const useAppState = (activeProfileId: string | null) => {
   }, []);
 
   const saveNavConfig = async (newNav: AppTab[], newHub: AppTab[]) => {
-      if (!activeUser || activeUser.id === 'DEMO') return;
+      if (!activeUser) return;
+      
+      // 1. Atualização Imediata da UI (Estado das Listas)
       setNavOrder(newNav);
       setHubOrder(newHub);
-      try {
-          await supabase.from('perfis').update({ ui_nav_order: newNav, ui_hub_order: newHub }).eq('id', activeUser.id);
-      } catch (e) { console.error("Erro ao salvar menus:", e); }
+
+      // 2. Sincronização do objeto do Usuário Ativo
+      const updatedUser = { 
+          ...activeUser, 
+          ui_nav_order: newNav, 
+          ui_hub_order: newHub 
+      };
+      setActiveUser(updatedUser);
+      
+      // Sincroniza também o formulário de edição se estiver aberto
+      if (profileEditForm?.id === activeUser.id) {
+          setProfileEditForm(updatedUser);
+      }
+
+      // 3. Persistência no Banco de Dados (apenas se não for demo)
+      if (activeUser.id !== 'DEMO') {
+          try {
+              const { error } = await supabase
+                .from('perfis')
+                .update({ 
+                    ui_nav_order: newNav, 
+                    ui_hub_order: newHub 
+                })
+                .eq('id', activeUser.id);
+                
+              if (error) {
+                  console.error("Falha ao salvar configuração no banco:", error);
+              }
+          } catch (e) {
+              console.error("Erro técnico na persistência dos menus:", e);
+          }
+      }
   };
 
   useEffect(() => { if (activeProfileId) fetchFullData(activeProfileId); }, [activeProfileId, fetchFullData]);
