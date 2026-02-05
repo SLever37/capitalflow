@@ -95,25 +95,16 @@ export const supportChatService = {
         
         if (dbError) {
             console.error("Database Error:", dbError);
-            
-            // Tratamento amigável para erro de Constraint ou Schema Cache
             if (dbError.message.includes('mensagens_suporte_type_check')) {
-                // FALLBACK: Se o tipo de chamada falhar no banco, envia como texto para não perder o log
                 payload.text = `[CHAMADA] ${payload.text}`;
                 payload.type = 'text';
                 const { error: retryError } = await supabase.from('mensagens_suporte').insert(payload);
                 if (retryError) throw new Error(`Erro crítico no banco: ${retryError.message}`);
-                console.warn("Mensagem de chamada enviada como fallback de texto devido a restrição de banco.");
-            } else if (dbError.message.includes('operator_id')) {
-                delete payload.operator_id;
-                const { error: retryError } = await supabase.from('mensagens_suporte').insert(payload);
-                if (retryError) throw new Error(`Erro ao registrar mensagem sem ID do operador: ${retryError.message}`);
             } else {
                 throw new Error(`Erro ao registrar mensagem: ${dbError.message}`);
             }
         }
 
-        // Auto-reply se o operador estiver offline
         if (params.sender === 'CLIENT') {
             const isOnline = await this.isOperatorOnline(params.profileId);
             if (!isOnline) {
@@ -123,6 +114,9 @@ export const supportChatService = {
     },
 
     async sendAutoReply(profileId: string, loanId: string) {
+        // Evita auto-reply em chats de equipe
+        if (loanId.startsWith('team_')) return;
+        
         try {
             await supabase.from('mensagens_suporte').insert({
                 id: generateUUID(),
@@ -163,9 +157,11 @@ export const supportChatService = {
 
     async getActiveChats(profileId: string) {
         if (!profileId) return [];
+        
+        // Busca mensagens onde o perfil do supervisor é o alvo
         const { data, error } = await supabase
             .from('mensagens_suporte')
-            .select('loan_id, created_at, text, sender, read, type, contratos(debtor_name)')
+            .select('loan_id, created_at, text, sender, read, type, contratos(debtor_name), perfis!mensagens_suporte_profile_id_fkey(nome_operador)')
             .eq('profile_id', profileId)
             .order('created_at', { ascending: false });
 
@@ -174,12 +170,14 @@ export const supportChatService = {
         const chatsMap = new Map();
         (data || []).forEach((m: any) => {
             if (!chatsMap.has(m.loan_id)) {
+                const isTeamChat = m.loan_id.startsWith('team_');
                 chatsMap.set(m.loan_id, {
                     loanId: m.loan_id,
                     lastMessage: m.type !== 'text' ? `[${m.type.toUpperCase()}]` : m.text,
                     timestamp: m.created_at,
-                    clientName: m.contratos?.debtor_name || 'Solicitação Suporte',
-                    unreadCount: m.sender === 'CLIENT' && !m.read ? 1 : 0
+                    clientName: isTeamChat ? (m.text.includes('Equipe') ? 'Colaborador' : m.perfis?.nome_operador || 'Membro da Equipe') : m.contratos?.debtor_name || 'Solicitação Suporte',
+                    unreadCount: m.sender === 'CLIENT' && !m.read ? 1 : 0,
+                    isTeamChat: isTeamChat
                 });
             } else if (m.sender === 'CLIENT' && !m.read) {
                 chatsMap.get(m.loan_id).unreadCount++;
