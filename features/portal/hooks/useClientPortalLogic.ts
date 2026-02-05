@@ -4,8 +4,6 @@ import { portalService, PortalSession } from '../../../services/portal.service';
 import { supabase } from '../../../lib/supabase';
 import { legalPublicService } from '../../legal/services/legalPublic.service';
 
-const PORTAL_SESSION_KEY = 'cm_portal_session';
-
 export const useClientPortalLogic = (initialLoanId: string) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSigning, setIsSigning] = useState(false);
@@ -73,74 +71,49 @@ export const useClientPortalLogic = (initialLoanId: string) => {
     }
   }, []);
 
-  // Inicialização da Sessão
+  // Inicialização da Sessão (Acesso Direto via Link)
   useEffect(() => {
     const checkSession = async () => {
-      const params = new URLSearchParams(window.location.search);
-      const magicCode = params.get('code');
-      const portalId = params.get('portal');
-
-      // A) Magic Link
-      if (magicCode && portalId) {
+      // Prioridade total para o link único (initialLoanId)
+      if (initialLoanId) {
         try {
-          const clientData = await portalService.validateMagicLink(portalId, magicCode);
-          setLoggedClient(clientData);
-          setSelectedLoanId(portalId);
+          // 1. Valida existência do contrato
+          const { data: loanRef, error: loanError } = await supabase
+            .from('contratos')
+            .select('client_id')
+            .eq('id', initialLoanId)
+            .maybeSingle();
 
-          const session: PortalSession = {
-            client_id: clientData.id,
-            access_code: 'MAGIC_LINK',
-            identifier: 'MAGIC_LINK',
-            last_loan_id: portalId,
-            saved_at: new Date().toISOString(),
-          };
+          if (loanError || !loanRef) throw new Error('Contrato não encontrado ou link expirado.');
 
-          localStorage.setItem(PORTAL_SESSION_KEY, JSON.stringify(session));
-          // Importante: Não setar isLoading false aqui, deixar o useEffect do selectedLoanId carregar os dados
-          return; 
-        } catch {
-          console.error('Magic Link inválido.');
+          // 2. Carrega o cliente automaticamente (sem pedir código)
+          const { data: clientRef, error: clientError } = await supabase
+            .from('clientes')
+            .select('*')
+            .eq('id', loanRef.client_id)
+            .single();
+
+          if (clientError || !clientRef) throw new Error('Cliente não identificado.');
+
+          // 3. Login automático
+          setLoggedClient(clientRef);
+          setSelectedLoanId(initialLoanId);
+          // loadFullPortalData será disparado pelo useEffect abaixo quando loggedClient mudar
+          
+        } catch (e: any) {
+          console.error("Portal Auto-Login Error:", e);
+          setPortalError(e.message || 'Erro ao acessar informações.');
+          setIsLoading(false);
         }
-      }
-
-      // B) Sessão Salva (LocalStorage)
-      try {
-        const raw = localStorage.getItem(PORTAL_SESSION_KEY);
-        if (!raw) {
-            setIsLoading(false);
-            return;
-        }
-
-        const sess = JSON.parse(raw) as PortalSession;
-        
-        // Verifica se a sessão é válida e restaura dados mínimos do cliente
-        if (sess.client_id) {
-            // Recupera nome do cliente para a UI inicial (será atualizado no loadFull)
-            const { data: clientCheck } = await supabase.from('clientes').select('id, name, document').eq('id', sess.client_id).single();
-            if (clientCheck) {
-                setLoggedClient(clientCheck);
-                // Se houver um ID na URL, ele tem prioridade sobre o da sessão antiga
-                const currentUrlId = params.get('portal');
-                if (currentUrlId) {
-                    setSelectedLoanId(currentUrlId);
-                } else if (sess.last_loan_id) {
-                    setSelectedLoanId(sess.last_loan_id);
-                }
-            } else {
-                localStorage.removeItem(PORTAL_SESSION_KEY);
-            }
-        }
-      } catch {
-        localStorage.removeItem(PORTAL_SESSION_KEY);
-      } finally {
-        // Se não tiver selecionado contrato ainda, para o loading aqui
-        if (!selectedLoanId) setIsLoading(false);
+      } else {
+        setPortalError('Link de acesso inválido.');
+        setIsLoading(false);
       }
     };
 
     checkSession();
     return () => abortControllerRef.current?.abort();
-  }, []);
+  }, [initialLoanId]);
 
   // Trigger de Carregamento de Dados (Sempre que ID ou Cliente mudar)
   useEffect(() => {
@@ -150,44 +123,17 @@ export const useClientPortalLogic = (initialLoanId: string) => {
   }, [selectedLoanId, loggedClient, loadFullPortalData]);
 
   const handleLogin = async () => {
-    if (!loginIdentifier) {
-      setPortalError('Informe seu Código de Acesso.');
-      return;
-    }
-
-    setPortalError(null);
-    setIsLoading(true);
-
-    try {
-      // Autentica usando o contrato atual selecionado na URL
-      const client = await portalService.authenticate(selectedLoanId, loginIdentifier);
-      setLoggedClient(client);
-      setByeName(null);
-
-      // Salva sessão
-      const session: PortalSession = {
-        client_id: client.id,
-        access_code: 'FRICTIONLESS',
-        identifier: loginIdentifier,
-        last_loan_id: selectedLoanId,
-        saved_at: new Date().toISOString(),
-      };
-      localStorage.setItem(PORTAL_SESSION_KEY, JSON.stringify(session));
-      
-      // O useEffect do selectedLoanId vai disparar o loadFullPortalData
-    } catch (e: any) {
-      setPortalError(e.message);
-      setIsLoading(false);
-    }
+    // Método mantido para compatibilidade, mas sem ação no novo fluxo direto
+    setPortalError('Por favor, utilize o link fornecido pelo seu gestor.');
   };
 
   const handleLogout = () => {
-    localStorage.removeItem(PORTAL_SESSION_KEY);
+    // Apenas limpa o estado local
     setByeName(loggedClient?.name || 'Cliente');
     setLoggedClient(null);
     setLoan(null);
     setPortalError(null);
-    setClientContracts([]); // Limpa lista
+    setClientContracts([]);
   };
 
   const handleSignalIntent = async (tipo: string) => {
