@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { ExternalLink, RefreshCw, UserCheck, ArrowRight } from 'lucide-react';
+import { RefreshCw, KeyRound, ArrowRight } from 'lucide-react';
 
 interface PortalLoginProps {
     loginIdentifier: string;
@@ -21,15 +21,15 @@ export const PortalLogin: React.FC<PortalLoginProps> = ({
         <div className="px-8 pb-10 space-y-6">
             <div className="space-y-4">
                 <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 focus-within:border-blue-500 transition-all shadow-inner">
-                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-2">
-                        <UserCheck size={12}/> Identificação Segura
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-2">
+                        <KeyRound size={12}/> Código de Acesso
                     </label>
                     <input 
                         value={loginIdentifier} 
                         onChange={e => setLoginIdentifier(e.target.value)} 
                         onKeyDown={handleKeyDown}
                         className="w-full bg-transparent text-white text-base font-bold outline-none placeholder:text-slate-700" 
-                        placeholder="CPF, Telefone ou Código do Cliente" 
+                        placeholder="Informe seu Código" 
                         autoFocus
                     />
                 </div>
@@ -44,7 +44,7 @@ export const PortalLogin: React.FC<PortalLoginProps> = ({
             </button>
             
             <p className="text-center text-[9px] text-slate-600 font-bold uppercase tracking-wider">
-                Acesso Simplificado • Ref: {selectedLoanId.slice(0, 8)}
+                Acesso Seguro • Ref: {selectedLoanId.slice(0, 8)}
             </p>
         </div>
     );

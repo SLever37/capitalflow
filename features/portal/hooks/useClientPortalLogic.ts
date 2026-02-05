@@ -151,7 +151,7 @@ export const useClientPortalLogic = (initialLoanId: string) => {
 
   const handleLogin = async () => {
     if (!loginIdentifier) {
-      setPortalError('Informe seu CPF, telefone ou código.');
+      setPortalError('Informe seu Código de Acesso.');
       return;
     }
 

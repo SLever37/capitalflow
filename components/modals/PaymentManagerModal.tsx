@@ -190,7 +190,7 @@ export const PaymentManagerModal: React.FC<PaymentManagerModalProps> = ({
                 )}
 
                 <div className="flex gap-3 pt-2">
-                    <button onClick={() => { onOpenMessage(loan); onClose(); }} disabled={isProcessing} className="p-4 bg-slate-950 border border-slate-800 rounded-2xl text-slate-400 hover:text-emerald-500 transition-all"><MessageSquare/></button>
+                    <button onClick={() => { onOpenMessage(loan); }} disabled={isProcessing} className="p-4 bg-slate-950 border border-slate-800 rounded-2xl text-slate-400 hover:text-emerald-500 transition-all"><MessageSquare/></button>
                     <button 
                         onClick={() => handleConfirmWrapper(false)} 
                         disabled={isProcessing || (isDailyFree && paymentType !== 'FULL' && !customAmount) || (paymentType === 'RENEW_AV' && !avAmount)} 
