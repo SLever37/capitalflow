@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { BarChart3, Banknote, CheckCircle2, Briefcase, PieChart as PieIcon, TrendingUp } from 'lucide-react';
+import { BarChart3, Banknote, CheckCircle2, Briefcase, PieChart as PieIcon, TrendingUp, Users, Calendar, Percent } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, LineChart, Line, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
 import { Loan, CapitalSource, LedgerEntry, Agreement, AgreementInstallment, SortOption, UserProfile } from '../types';
 import { LoanCard } from '../components/cards/LoanCard';
@@ -9,6 +9,7 @@ import { ProfitCard } from '../components/cards/ProfitCard';
 import { DashboardAlerts } from '../features/dashboard/DashboardAlerts';
 import { DashboardControls } from '../components/dashboard/DashboardControls';
 import { AIBalanceInsight } from '../features/dashboard/AIBalanceInsight';
+import { formatMoney } from '../utils/formatters';
 
 interface DashboardPageProps {
   loans: Loan[];
@@ -92,9 +93,66 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
           <aside className={`w-full lg:w-96 space-y-5 sm:space-y-6 ${mobileDashboardTab === 'CONTRACTS' ? 'hidden md:block' : ''}`}>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4">
-                  <StatCard title="Capital na Rua" value={`R$ ${stats.totalLent.toLocaleString()}`} rawValue={stats.totalLent} icon={<Banknote />} target={activeUser?.targetCapital} current={stats.totalLent} isStealthMode={isStealthMode} />
-                  <StatCard title="Recebido (Total)" value={`R$ ${stats.totalReceived.toLocaleString()}`} rawValue={stats.totalReceived} icon={<CheckCircle2 />} isStealthMode={isStealthMode} />
-                  <StatCard title="Lucro Projetado" value={`R$ ${stats.expectedProfit.toLocaleString()}`} rawValue={stats.expectedProfit} icon={<Briefcase />} target={activeUser?.targetProfit} current={stats.expectedProfit} isStealthMode={isStealthMode} />
+                  
+                  {/* CARD CAPITAL NA RUA */}
+                  <StatCard 
+                    title="Capital na Rua" 
+                    value={`R$ ${stats.totalLent.toLocaleString()}`} 
+                    rawValue={stats.totalLent} 
+                    icon={<Banknote size={20} />} 
+                    target={activeUser?.targetCapital} 
+                    current={stats.totalLent} 
+                    isStealthMode={isStealthMode}
+                    indicatorColor="bg-blue-500"
+                    footer={
+                        <>
+                            <div className="flex items-center gap-1.5 text-blue-400">
+                                <Users size={12}/>
+                                <span className="text-[10px] font-black uppercase">{stats.activeCount} Contratos Ativos</span>
+                            </div>
+                        </>
+                    }
+                  />
+
+                  {/* CARD RECEBIDO TOTAL */}
+                  <StatCard 
+                    title="Recebido (Total)" 
+                    value={`R$ ${stats.totalReceived.toLocaleString()}`} 
+                    rawValue={stats.totalReceived} 
+                    icon={<CheckCircle2 size={20} />} 
+                    isStealthMode={isStealthMode}
+                    indicatorColor="bg-purple-500"
+                    footer={
+                        <>
+                            <div className="flex items-center gap-1.5 text-purple-400">
+                                <Calendar size={12}/>
+                                <span className="text-[10px] font-black uppercase">+ {formatMoney(stats.receivedThisMonth, isStealthMode)} Este Mês</span>
+                            </div>
+                        </>
+                    }
+                  />
+
+                  {/* CARD LUCRO PROJETADO */}
+                  <StatCard 
+                    title="Lucro Projetado" 
+                    value={`R$ ${stats.expectedProfit.toLocaleString()}`} 
+                    rawValue={stats.expectedProfit} 
+                    icon={<Briefcase size={20} />} 
+                    target={activeUser?.targetProfit} 
+                    current={stats.expectedProfit} 
+                    isStealthMode={isStealthMode}
+                    indicatorColor="bg-amber-500"
+                    footer={
+                        <>
+                            <div className="flex items-center gap-1.5 text-amber-400">
+                                <Percent size={12}/>
+                                <span className="text-[10px] font-black uppercase">Retorno Est. {stats.roi.toFixed(1)}%</span>
+                            </div>
+                        </>
+                    }
+                  />
+
+                  {/* CARD LUCRO DISPONÍVEL */}
                   <ProfitCard balance={stats.interestBalance} onWithdraw={() => setWithdrawModal(true)} isStealthMode={isStealthMode} />
               </div>
               
