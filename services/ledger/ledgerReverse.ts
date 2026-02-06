@@ -1,3 +1,4 @@
+
 // services/ledger/ledgerReverse.ts
 import { supabase } from '../../lib/supabase';
 import { Loan, UserProfile, LedgerEntry } from '../../types';
@@ -19,11 +20,7 @@ import { logReversalAudit } from './ledgerAudit';
  * - Juros/multa: removem apenas do "Lucro disponível" (perfis.interest_balance)
  * - Capital: sai/volta na fonte (carteira)
  * - Parcela/contrato volta ao estado anterior
- * - Estorno gravado como auditoria (não entra em contagem financeira)
- *
- * IMPORTANTE:
- * - Para evitar bugs de “frontend desatualizado”, na reversão de APORTE
- *   buscamos a parcela direto no BANCO (fonte da verdade).
+ * - Estorno gravado como auditoria com valor NEGATIVO para anular o original nos gráficos
  */
 export async function reverseTransaction(
   transaction: LedgerEntry,
@@ -62,8 +59,9 @@ export async function reverseTransaction(
   /**
    * 2) Ajuste do lucro disponível: (juros + multa) APENAS para pagamento
    * - Juros/multa não existem “na carteira”; eles só existem em interest_balance.
+   * - O valor a remover é subtraído do saldo atual.
    */
-  const profitToRemove = calcProfitToRemove(tx);
+  const profitToRemove = Math.abs(calcProfitToRemove(tx)); // Força valor positivo para garantir subtração
 
   if (profitToRemove > 0) {
     const { data: profile, error: profileErr } = await supabase
@@ -75,7 +73,7 @@ export async function reverseTransaction(
     if (profileErr) throw profileErr;
 
     const currentProfit = toNumber((profile as any)?.interest_balance);
-    const nextProfit = clampNonNegative(currentProfit - profitToRemove);
+    const nextProfit = currentProfit - profitToRemove; // Permite ficar negativo se necessário para correção
 
     const { error: updProfitErr } = await supabase
       .from('perfis')
@@ -191,14 +189,16 @@ export async function reverseTransaction(
   }
 
   /**
-   * 4) Log auditável (não entra em somatórios)
-   * - amount/deltas = 0 no log
-   * - category = 'SISTEMA'
+   * 4) Log auditável com VALORES NEGATIVOS para anular a soma
+   * - Isso garante que gráficos de "Total Recebido" subtraiam este valor
    */
   const reversedPrincipal =
-    isPayment ? toNumber(tx.principalDelta) : (isLendMore || isAporte) ? toNumber(tx.amount) : 0;
+    isPayment ? -toNumber(tx.principalDelta) : (isLendMore || isAporte) ? -toNumber(tx.amount) : 0;
 
-  const reversedProfit = isPayment ? profitToRemove : 0;
+  const reversedProfit = isPayment ? -profitToRemove : 0;
+  
+  // Total da transação negativa
+  const totalReversedAmount = -toNumber(tx.amount);
 
   await logReversalAudit({
     ownerId,
@@ -207,10 +207,11 @@ export async function reverseTransaction(
     installmentId: tx.installmentId,
     originalTxId: tx.id,
     originalType: tx.type,
+    amount: totalReversedAmount,
     reversedPrincipal,
     reversedProfit,
     notes: tx.notes,
   });
 
-  return 'Estorno realizado: fonte ajustada (se aplicável), lucro ajustado (se aplicável) e contrato/parcela revertidos.';
+  return 'Estorno realizado com sucesso. Saldos ajustados.';
 }

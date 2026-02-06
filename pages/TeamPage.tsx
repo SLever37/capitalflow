@@ -220,6 +220,14 @@ export const TeamPage: React.FC<TeamPageProps> = ({
     }
   };
 
+  const copyMemberAccess = (m: TeamMemberRow) => {
+      // Como não temos a senha/código salva em plain text facilmente acessível aqui (segurança),
+      // Copiamos o link de login e instruções.
+      const text = `Acesse: ${window.location.origin}\nLogin (CPF): ${m.cpf}\nUse seu Código de Acesso.`;
+      navigator.clipboard.writeText(text);
+      showToast("Dados de acesso copiados!", "success");
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -279,12 +287,22 @@ export const TeamPage: React.FC<TeamPageProps> = ({
                   <div className="w-16 h-16 rounded-2xl flex items-center justify-center border-2 border-slate-800 overflow-hidden bg-slate-950">
                     <User size={28} className="text-slate-700" />
                   </div>
-                  <button
-                    onClick={() => handleDeleteMember(m.id, m.linked_profile_id)}
-                    className="p-2 bg-slate-800 text-rose-500 hover:bg-rose-900/20 rounded-xl transition-colors"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                  <div className="flex gap-2">
+                      <button
+                        onClick={() => copyMemberAccess(m)}
+                        className="p-2 bg-slate-800 text-blue-400 hover:bg-blue-600/20 rounded-xl transition-colors"
+                        title="Copiar Acesso"
+                      >
+                        <Copy size={16} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteMember(m.id, m.linked_profile_id)}
+                        className="p-2 bg-slate-800 text-rose-500 hover:bg-rose-900/20 rounded-xl transition-colors"
+                        title="Remover Membro"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                  </div>
                 </div>
 
                 <h3 className="text-lg font-black text-white uppercase tracking-tight truncate">

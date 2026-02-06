@@ -1,3 +1,4 @@
+
 // services/ledger/ledgerAudit.ts
 import { supabase } from '../../lib/supabase';
 import { generateUUID } from '../../utils/generators';
@@ -44,8 +45,8 @@ export async function logRestore(ownerId: string, loanId: string, sourceId?: str
 
 /**
  * Log auditável do estorno:
- * - NÃO entra em somatórios financeiros (amount/deltas = 0)
- * - category='SISTEMA' para ficar fácil ignorar em relatórios
+ * - Registra valores negativos para balancear o ledger (somas)
+ * - category='ESTORNO'
  */
 export async function logReversalAudit(params: {
   ownerId: string;
@@ -54,11 +55,12 @@ export async function logReversalAudit(params: {
   installmentId: string | null;
   originalTxId: string;
   originalType: string;
-  reversedPrincipal: number;
-  reversedProfit: number;
+  amount: number; // Total negativo da transação
+  reversedPrincipal: number; // Principal negativo
+  reversedProfit: number; // Juros negativo
   notes?: string;
 }) {
-  const { ownerId, loanId, sourceId, installmentId, originalTxId, originalType, reversedPrincipal, reversedProfit, notes } = params;
+  const { ownerId, loanId, sourceId, installmentId, originalTxId, originalType, amount, reversedPrincipal, reversedProfit, notes } = params;
 
   const { error } = await supabase.from('transacoes').insert({
     id: generateUUID(),
@@ -68,16 +70,14 @@ export async function logReversalAudit(params: {
     installment_id: installmentId,
     date: new Date().toISOString(),
     type: 'ESTORNO',
-    amount: 0,
-    principal_delta: 0,
-    interest_delta: 0,
+    amount: amount, // Valor negativo para anular a soma
+    principal_delta: reversedPrincipal,
+    interest_delta: reversedProfit,
     late_fee_delta: 0,
-    category: 'SISTEMA',
+    category: 'ESTORNO', // Categoria específica
     notes:
-      `Estorno aplicado (auditoria). Ref=${originalTxId} | Orig=${originalType} | ` +
-      `Revertido: capital=${Number(reversedPrincipal || 0).toFixed(2)}, ` +
-      `juros+multa=${Number(reversedProfit || 0).toFixed(2)}` +
-      (notes ? ` | Obs: ${notes}` : ''),
+      `Estorno aplicado. Ref=${originalTxId}` +
+      (notes ? ` | Obs Original: ${notes}` : ''),
   });
 
   if (error) throw error;

@@ -91,6 +91,13 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                         </div>
                         <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><Camera className="text-white" size={24}/></div>
                     </div>
+                    <button 
+                        onClick={() => profilePhotoInputRef.current?.click()}
+                        className="mt-2 text-[10px] font-bold text-blue-500 hover:text-blue-400 uppercase tracking-wider flex items-center gap-1"
+                    >
+                        <Camera size={12}/> Alterar Foto
+                    </button>
+                    
                     <h2 className="text-xl font-black text-white mt-4">{profileEditForm.name}</h2>
                     <p className="text-sm text-slate-500 font-bold uppercase tracking-widest">{profileEditForm.businessName || 'Operador'}</p>
                 </div>
