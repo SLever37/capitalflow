@@ -49,6 +49,36 @@ export const contractsService = {
       throw new Error('Perfil inválido. Refaça o login.');
     }
 
+    // --- AUTO-CRIAÇÃO DE CLIENTE (Se não selecionado) ---
+    let finalClientId = safeUUID(loan.clientId);
+
+    if (!finalClientId && loan.debtorName && loan.debtorName.trim().length > 0) {
+        const newClientId = generateUUID();
+        // Gera códigos aleatórios simples para o cliente automático
+        const accessCode = String(Math.floor(Math.random() * 10000)).padStart(4, '0');
+        const clientNumber = String(Math.floor(100000 + Math.random() * 900000));
+
+        const { error: clientError } = await supabase.from('clientes').insert({
+            id: newClientId,
+            profile_id: ownerId,
+            name: loan.debtorName,
+            phone: loan.debtorPhone || null,
+            document: loan.debtorDocument || null,
+            address: loan.debtorAddress || null,
+            access_code: accessCode,
+            client_number: clientNumber,
+            notes: 'Criado automaticamente via Novo Contrato',
+            created_at: new Date().toISOString()
+        });
+
+        if (clientError) {
+            console.error("Erro auto-criação cliente:", clientError);
+            throw new Error("Erro ao criar cliente automaticamente: " + clientError.message);
+        }
+        
+        finalClientId = newClientId;
+    }
+
     const loanId = editingLoan ? loan.id : ensureUUID(loan.id);
     const principal = safeFloat(loan.principal);
     const totalToReceive = safeFloat(loan.totalToReceive);
@@ -59,7 +89,7 @@ export const contractsService = {
       operador_responsavel_id:
         activeUser.accessLevel === 1 ? null : safeUUID(activeUser.id),
 
-      client_id: safeUUID(loan.clientId),
+      client_id: finalClientId, // Usa o ID resolvido (existente ou novo)
       source_id: safeUUID(loan.sourceId),
 
       debtor_name: loan.debtorName,
