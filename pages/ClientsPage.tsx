@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Plus, Search, Edit, Trash2, CheckSquare, Square, XCircle, CheckCircle } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, CheckSquare, Square, XCircle, MapPin, Phone } from 'lucide-react';
 import { Client } from '../types';
 import { startDictation } from '../utils/speech';
 
@@ -57,34 +57,51 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({
             <button onClick={() => startDictation(setClientSearchTerm, (msg) => showToast(msg, 'error'))} className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 hover:text-white hover:border-slate-600 transition-colors text-xs font-black uppercase" title="Buscar por voz" type="button">🎙</button>
         </div>
         
-        {/* GRID RESPONSIVA AJUSTADA: sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 */}
+        {/* GRID COMPACTA E MODERNA */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {filteredClients.map(client => (
                 <div 
                     key={client.id} 
-                    className={`bg-slate-900 border p-6 rounded-[2rem] transition-all group relative ${isBulkDeleteMode ? 'cursor-pointer border-slate-700 hover:border-blue-500' : 'border-slate-800 hover:border-blue-500/50'} ${isBulkDeleteMode && selectedClientsToDelete.includes(client.id) ? 'bg-blue-900/10 border-blue-500' : ''}`}
+                    className={`bg-slate-900 border p-4 rounded-3xl transition-all group relative flex flex-col ${isBulkDeleteMode ? 'cursor-pointer border-slate-700 hover:border-blue-500' : 'border-slate-800 hover:border-blue-500/50 hover:shadow-lg'} ${isBulkDeleteMode && selectedClientsToDelete.includes(client.id) ? 'bg-blue-900/10 border-blue-500' : ''}`}
                     onClick={isBulkDeleteMode ? () => toggleClientSelection(client.id) : undefined}
                 >
                     {isBulkDeleteMode && (
-                        <div className="absolute top-4 right-4 text-blue-500">
-                            {selectedClientsToDelete.includes(client.id) ? <CheckSquare size={24} className="fill-blue-500/20"/> : <Square size={24} className="text-slate-600"/>}
+                        <div className="absolute top-3 right-3 text-blue-500 z-10">
+                            {selectedClientsToDelete.includes(client.id) ? <CheckSquare size={20} className="fill-blue-500/20"/> : <Square size={20} className="text-slate-600"/>}
                         </div>
                     )}
 
-                    <div className="flex items-start justify-between mb-4">
-                        <div className="w-12 h-12 bg-slate-800 rounded-2xl flex items-center justify-center text-slate-500 font-black text-xl group-hover:text-blue-500 transition-colors overflow-hidden border border-slate-700">
-                            {client.name.charAt(0)}
+                    <div className="flex items-center gap-3 mb-3">
+                        {client.fotoUrl ? (
+                            <img src={client.fotoUrl} className="w-10 h-10 rounded-full object-cover border border-slate-700" alt={client.name}/>
+                        ) : (
+                            <div className="w-10 h-10 bg-slate-800 rounded-full flex items-center justify-center text-slate-500 font-black text-sm group-hover:text-blue-500 transition-colors border border-slate-700 shrink-0">
+                                {client.name.charAt(0)}
+                            </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                            <h3 className="font-bold text-white text-sm truncate uppercase">{client.name}</h3>
+                            <p className="text-[10px] text-slate-500 truncate font-mono">{(client as any).document || 'S/ CPF'}</p>
                         </div>
                         {!isBulkDeleteMode && (
-                            <div className="flex gap-2">
-                                <button onClick={() => openClientModal(client)} className="p-2 text-slate-600 hover:text-white transition-colors"><Edit size={16}/></button>
-                                <button onClick={(e) => { e.stopPropagation(); openConfirmation({ type: 'DELETE_CLIENT', target: client.id }); }} className="p-2 text-slate-600 hover:text-rose-500 transition-colors"><Trash2 size={16}/></button>
+                            <button onClick={() => openClientModal(client)} className="p-2 text-slate-600 hover:text-white bg-slate-950 rounded-xl hover:bg-slate-800 transition-colors">
+                                <Edit size={14}/>
+                            </button>
+                        )}
+                    </div>
+
+                    <div className="space-y-1.5 mt-auto">
+                        <div className="flex items-center gap-2 text-[10px] text-slate-400 bg-slate-950/50 p-2 rounded-xl">
+                            <Phone size={12} className="text-blue-500"/> 
+                            <span className="truncate">{client.phone}</span>
+                        </div>
+                        {(client as any).address && (
+                            <div className="flex items-center gap-2 text-[10px] text-slate-400 bg-slate-950/50 p-2 rounded-xl">
+                                <MapPin size={12} className="text-emerald-500"/>
+                                <span className="truncate">{(client as any).address}</span>
                             </div>
                         )}
                     </div>
-                    <h3 className="font-bold text-white text-lg truncate pr-6">{client.name}</h3>
-                    <p className="text-sm text-slate-500 mb-4">{client.phone}</p>
-                    <div className="space-y-2 pt-4 border-t border-slate-800"><div className="flex justify-between text-xs"><span className="text-slate-600 uppercase font-bold">Documento</span><span className="text-slate-400">{(client as any).document || '-'}</span></div><div className="flex justify-between text-xs"><span className="text-slate-600 uppercase font-bold">Endereço</span><span className="text-slate-400 truncate max-w-[150px]">{(client as any).address || '-'}</span></div></div>
                 </div>
             ))}
         </div>

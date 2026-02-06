@@ -18,7 +18,8 @@ export default defineConfig(({ mode }) => {
       plugins: [react()],
       define: {
         // Substituição estática segura para o build de produção
-        // REMOVIDO: 'process.env.API_KEY' para segurança. A chave agora vive apenas no Supabase Edge Functions.
+        // Fallback: Injeta a API Key para uso local caso a Edge Function falhe
+        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         'process.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL),
         'process.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY),
         'process.env.NODE_ENV': JSON.stringify(mode),

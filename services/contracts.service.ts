@@ -49,44 +49,55 @@ export const contractsService = {
       throw new Error('Perfil inválido. Refaça o login.');
     }
 
-    // --- AUTO-CRIAÇÃO DE CLIENTE (Se não selecionado) ---
+    // --- AUTO-CRIAÇÃO OU VÍNCULO DE CLIENTE ---
     let finalClientId = safeUUID(loan.clientId);
 
-    // [TESTE INTERNO] Logs de diagnóstico para verificar a lógica
-    const shouldCreateClient = !finalClientId && loan.debtorName && loan.debtorName.trim().length > 0;
-    console.log('[ContractsService] Verificando auto-criação:', { 
-        clientIdInput: loan.clientId, 
-        resolvedId: finalClientId, 
-        debtorName: loan.debtorName, 
-        willCreate: shouldCreateClient 
-    });
+    const shouldCheckClient = !finalClientId && loan.debtorName && loan.debtorName.trim().length > 0;
+    
+    if (shouldCheckClient) {
+        // 1. Tenta encontrar cliente existente pelo CPF/CNPJ
+        if (loan.debtorDocument && loan.debtorDocument.trim().length > 0) {
+            const { data: existingClient } = await supabase
+                .from('clientes')
+                .select('id')
+                .eq('profile_id', ownerId)
+                .eq('document', loan.debtorDocument)
+                .maybeSingle();
 
-    if (shouldCreateClient) {
-        const newClientId = generateUUID();
-        // Gera códigos aleatórios simples para o cliente automático
-        const accessCode = String(Math.floor(Math.random() * 10000)).padStart(4, '0');
-        const clientNumber = String(Math.floor(100000 + Math.random() * 900000));
-
-        const { error: clientError } = await supabase.from('clientes').insert({
-            id: newClientId,
-            profile_id: ownerId,
-            name: loan.debtorName,
-            phone: loan.debtorPhone || null,
-            document: loan.debtorDocument || null,
-            address: loan.debtorAddress || null,
-            access_code: accessCode,
-            client_number: clientNumber,
-            notes: 'Criado automaticamente via Novo Contrato',
-            created_at: new Date().toISOString()
-        });
-
-        if (clientError) {
-            console.error("Erro auto-criação cliente:", clientError);
-            throw new Error("Erro ao criar cliente automaticamente: " + clientError.message);
+            if (existingClient) {
+                console.log('[ContractsService] Cliente existente encontrado via CPF. Vinculando:', existingClient.id);
+                finalClientId = existingClient.id;
+            }
         }
-        
-        console.log('[ContractsService] Cliente criado automaticamente com ID:', newClientId);
-        finalClientId = newClientId;
+
+        // 2. Se ainda não tem ID (não existe), cria um novo
+        if (!finalClientId) {
+            const newClientId = generateUUID();
+            // Gera códigos aleatórios simples para o cliente automático
+            const accessCode = String(Math.floor(Math.random() * 10000)).padStart(4, '0');
+            const clientNumber = String(Math.floor(100000 + Math.random() * 900000));
+
+            const { error: clientError } = await supabase.from('clientes').insert({
+                id: newClientId,
+                profile_id: ownerId,
+                name: loan.debtorName,
+                phone: loan.debtorPhone || null,
+                document: loan.debtorDocument || null,
+                address: loan.debtorAddress || null,
+                access_code: accessCode,
+                client_number: clientNumber,
+                notes: 'Criado automaticamente via Novo Contrato',
+                created_at: new Date().toISOString()
+            });
+
+            if (clientError) {
+                console.error("Erro auto-criação cliente:", clientError);
+                throw new Error("Erro ao criar cliente automaticamente: " + clientError.message);
+            }
+            
+            console.log('[ContractsService] Novo cliente criado automaticamente:', newClientId);
+            finalClientId = newClientId;
+        }
     }
 
     const loanId = editingLoan ? loan.id : ensureUUID(loan.id);

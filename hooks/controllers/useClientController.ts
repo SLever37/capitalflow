@@ -20,24 +20,27 @@ export const useClientController = (
   const openClientModal = (client?: Client) => {
       ui.setEditingClient(client || null);
       if (client) {
-          ui.setClientDraftAccessCode(String((client as any).access_code || '').trim());
-          ui.setClientDraftNumber(String((client as any).client_number || '').trim());
-          ui.setClientForm({ 
-              name: client.name, 
-              phone: client.phone, 
-              document: (client as any).document || (client as any).cpf || (client as any).cnpj || '', 
-              email: (client as any).email || '', 
-              address: (client as any).address || '', 
-              city: (client as any).city || '', 
-              state: (client as any).state || '', 
-              notes: (client as any).notes || '',
-              fotoUrl: client.fotoUrl || '' // Carrega a foto existente no formulário
+          ui.setClientDraftAccessCode(client.access_code || '');
+          ui.setClientDraftNumber(client.client_number || '');
+          ui.setClientForm({
+              name: client.name,
+              phone: maskPhone(client.phone),
+              document: client.document,
+              email: client.email || '',
+              address: client.address || '',
+              city: client.city || '',
+              state: client.state || '',
+              notes: client.notes || '',
+              fotoUrl: client.fotoUrl || ''
           });
       } else {
-          const codes = new Set((clients || []).map(c => String((c as any).access_code || '').trim()).filter(Boolean));
-          const nums = new Set((clients || []).map(c => String((c as any).client_number || '').trim()).filter(Boolean));
+          // Gerar novos códigos de rascunho
+          const codes = new Set(clients.map(c => String(c.access_code || '').trim()).filter(Boolean));
+          const nums = new Set(clients.map(c => String(c.client_number || '').trim()).filter(Boolean));
+          
           ui.setClientDraftAccessCode(generateUniqueAccessCode(codes));
           ui.setClientDraftNumber(generateUniqueClientNumber(nums));
+
           ui.setClientForm({ name: '', phone: '', document: '', email: '', address: '', city: '', state: '', notes: '', fotoUrl: '' });
       }
       ui.openModal('CLIENT_FORM');
@@ -47,186 +50,206 @@ export const useClientController = (
       const file = e.target.files?.[0];
       if (!file || !ui.editingClient) return;
 
-      if (file.size > 2 * 1024 * 1024) {
-          showToast("Imagem muito grande (máx 2MB).", "error");
-          return;
-      }
-
       ui.setIsSaving(true);
       try {
-          // Upload para o Storage
-          const url = await clientAvatarService.uploadAvatar(file, ui.editingClient.id);
+          // 1. Upload
+          const publicUrl = await clientAvatarService.uploadAvatar(file, ui.editingClient.id);
           
-          // Persistência imediata no banco
-          await clientAvatarService.updateClientPhoto(ui.editingClient.id, url);
+          // 2. Update DB
+          await clientAvatarService.updateClientPhoto(ui.editingClient.id, publicUrl);
           
-          // Atualiza Estado Local do Formulário
-          ui.setClientForm({ ...ui.clientForm, fotoUrl: url });
-          showToast("Foto do cliente atualizada!", "success");
+          // 3. Update UI State
+          ui.setClientForm({ ...ui.clientForm, fotoUrl: publicUrl });
+          showToast("Foto atualizada!", "success");
           
-          // Refresh global para atualizar cache local de clientes e contratos
-          if (activeUser) fetchFullData(activeUser.id);
+          // Refresh lists
+          if (activeUser?.id) await fetchFullData(activeUser.id);
+          
       } catch (err: any) {
           showToast(err.message, "error");
       } finally {
           ui.setIsSaving(false);
-          if (e.target) e.target.value = ''; // Reset input
       }
   };
 
   const handleSaveClient = async () => {
-      if (!activeUser) return;
-      
-      if (!ui.clientForm.name.trim()) {
-          showToast("O Nome do cliente é obrigatório.", "error");
-          return;
-      }
+    if (!activeUser) return;
+    const { name, phone, document, email, address, city, state, notes } = ui.clientForm;
 
-      if (ui.clientForm.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ui.clientForm.email)) {
-          showToast("O e-mail informado é inválido.", "error");
-          return;
-      }
+    if (!name.trim()) { showToast("Nome é obrigatório.", "error"); return; }
+    if (!phone.trim()) { showToast("Telefone é obrigatório.", "error"); return; }
+    
+    // Validação de Documento
+    if (document && !isValidCPForCNPJ(document)) {
+        showToast("CPF ou CNPJ inválido.", "error");
+        return;
+    }
 
-      if (ui.isSaving) return;
-      
-      const docClean = onlyDigits(ui.clientForm.document);
-      
-      if (activeUser.id !== 'DEMO' && !isTestClientName(ui.clientForm.name)) {
-        if (!docClean) { showToast('Informe um CPF ou CNPJ válido (ou use nome TESTE para cadastro de teste).', 'error'); return; }
-        if (!isValidCPForCNPJ(docClean)) { showToast('CPF/CNPJ inválido. Verifique os dígitos.', 'error'); return; }
-      }
+    if (ui.isSaving) return;
 
-      if (activeUser.id === 'DEMO') { 
-          demoService.handleSaveClient(ui.clientForm, ui.editingClient, clients, setClients, activeUser, showToast); 
-          ui.closeModal(); 
-          return; 
-      }
+    if (activeUser.id === 'DEMO') {
+        demoService.handleSaveClient(ui.clientForm, ui.editingClient, clients, setClients, activeUser, showToast);
+        ui.closeModal();
+        return;
+    }
 
-      ui.setIsSaving(true);
-      try {
-          const id = ui.editingClient?.id || crypto.randomUUID();
-          
-          const payload = { 
-              id, 
-              profile_id: activeUser.id, 
-              name: ui.clientForm.name, 
-              phone: ui.clientForm.phone, 
-              email: ui.clientForm.email, 
-              address: ui.clientForm.address, 
-              city: ui.clientForm.city, 
-              state: ui.clientForm.state,
-              foto_url: ui.clientForm.fotoUrl || null, // Garante que a foto_url seja salva/persistida no upsert
-              access_code: (() => {
-                  const existingCode = (ui.editingClient as any)?.access_code;
-                  if (existingCode && String(existingCode).trim().length > 0) return String(existingCode);
-                  const draft = String(ui.clientDraftAccessCode || '').trim();
-                  if (draft) return draft;
-                  const codes = new Set((clients || []).filter(c => String((c as any).id) !== String(id)).map(c => String((c as any).access_code || '').trim()).filter(Boolean));
-                  return generateUniqueAccessCode(codes);
-              })(),
-              client_number: (() => {
-                  const existingNum = (ui.editingClient as any)?.client_number;
-                  if (existingNum && String(existingNum).trim().length > 0) return String(existingNum);
-                  const draft = String(ui.clientDraftNumber || '').trim();
-                  if (draft) return draft;
-                  const nums = new Set((clients || []).filter(c => String((c as any).id) !== String(id)).map(c => String((c as any).client_number || '').trim()).filter(Boolean));
-                  return generateUniqueClientNumber(nums);
-              })(),
-              cpf: (docClean.length === 11 ? docClean : null), 
-              cnpj: (docClean.length === 14 ? docClean : null), 
-              document: docClean || null, 
-              notes: ui.clientForm.notes, 
-              created_at: ui.editingClient ? ui.editingClient.createdAt : new Date().toISOString()
-          };
-          
-          const { error } = await supabase.from('clientes').upsert(payload);
-          if (error) { 
-              console.error(error); 
-              showToast("Erro ao salvar cliente: " + error.message, "error"); 
-          } else { 
-              showToast("Cliente salvo!", "success"); 
-              ui.closeModal(); 
-              fetchFullData(activeUser.id); 
-          }
-      } catch(e: any) { 
-          showToast("Erro ao salvar cliente: " + e.message, "error"); 
-      } finally { 
-          ui.setIsSaving(false); 
-      }
+    ui.setIsSaving(true);
+    try {
+        const ownerId = (activeUser as any).supervisor_id || activeUser.id;
+        const cleanDoc = onlyDigits(document);
+        
+        // --- VERIFICAÇÃO DE DUPLICIDADE DE CPF/CNPJ ---
+        // Regra: Não permite duplicidade, EXCETO se for o CPF genérico legado (00000000000)
+        // Se for edição, ignora o próprio ID.
+        if (cleanDoc && cleanDoc !== '00000000000' && cleanDoc.length >= 11) {
+            let query = supabase
+                .from('clientes')
+                .select('id, name')
+                .eq('profile_id', ownerId)
+                .eq('document', document); // Com formatação original ou limpa, dependendo de como salvou. Idealmente limpar antes.
+            
+            // Se for edição, exclui o cliente atual da busca
+            if (ui.editingClient) {
+                query = query.neq('id', ui.editingClient.id);
+            }
+
+            const { data: existing } = await query.maybeSingle();
+
+            if (existing) {
+                showToast(`Documento já cadastrado para: ${existing.name}.`, "error");
+                ui.setIsSaving(false);
+                return;
+            }
+        }
+
+        const id = ui.editingClient ? ui.editingClient.id : crypto.randomUUID();
+        const payload: any = {
+            id,
+            profile_id: ownerId,
+            name: name.trim(),
+            phone: normalizeBrazilianPhone(phone),
+            document: document,
+            email: email,
+            address: address,
+            city: city,
+            state: state,
+            notes: notes
+        };
+
+        // Se for novo, insere códigos gerados
+        if (!ui.editingClient) {
+            payload.access_code = ui.clientDraftAccessCode;
+            payload.client_number = ui.clientDraftNumber;
+            payload.created_at = new Date().toISOString();
+        }
+
+        const { error } = await supabase.from('clientes').upsert(payload);
+
+        if (error) {
+            console.error(error);
+            showToast("Erro ao salvar cliente: " + error.message, "error");
+        } else {
+            showToast(ui.editingClient ? "Cliente atualizado!" : "Cliente cadastrado!", "success");
+            ui.closeModal();
+            await fetchFullData(activeUser.id);
+        }
+    } catch (e: any) {
+        showToast("Erro ao salvar cliente.", "error");
+    } finally {
+        ui.setIsSaving(false);
+    }
   };
 
   const handlePickContact = async () => {
     if ('contacts' in navigator && 'ContactsManager' in window) {
-      try {
-        const props = ['name', 'tel'];
-        const opts = { multiple: false };
-        const contacts = await (navigator as any).contacts.select(props, opts);
-        if (contacts.length) {
-          const contact = contacts[0];
-          const name = contact.name && contact.name.length > 0 ? contact.name[0] : '';
-          let number = contact.tel && contact.tel.length > 0 ? contact.tel[0] : '';
-          
-          const normalizedPhone = normalizeBrazilianPhone(number);
-          
-          ui.setClientForm((prev: any) => ({ ...prev, name: name || prev.name, phone: normalizedPhone }));
+        try {
+            const props = ['name', 'tel', 'email', 'address'];
+            const opts = { multiple: false };
+            const contacts = await (navigator as any).contacts.select(props, opts);
+            
+            if (contacts.length) {
+                const contact = contacts[0];
+                const name = contact.name?.[0] || '';
+                const tel = contact.tel?.[0] || '';
+                const email = contact.email?.[0] || '';
+                const addressObj = contact.address?.[0];
+                
+                let addressStr = '';
+                let cityStr = '';
+                let stateStr = '';
+
+                if (addressObj) {
+                    addressStr = [addressObj.addressLine, addressObj.street].filter(Boolean).join(', ');
+                    cityStr = addressObj.city || '';
+                    stateStr = addressObj.region || '';
+                }
+
+                ui.setClientForm((prev: any) => ({
+                    ...prev,
+                    name: name || prev.name,
+                    phone: tel ? maskPhone(tel) : prev.phone,
+                    email: email || prev.email,
+                    address: addressStr || prev.address,
+                    city: cityStr || prev.city,
+                    state: stateStr || prev.state
+                }));
+            }
+        } catch (ex) {
+            // Ignora cancelamento
         }
-      } catch (ex) {}
-    } else { 
-        alert("A importação de contatos funciona melhor em dispositivos móveis (Android/Chrome)."); 
+    } else {
+        showToast("Importação indisponível neste dispositivo.", "error");
     }
   };
 
+  // Bulk Actions
   const toggleBulkDeleteMode = () => {
       ui.setIsBulkDeleteMode(!ui.isBulkDeleteMode);
       ui.setSelectedClientsToDelete([]);
   };
 
-  const toggleClientSelection = (clientId: string) => {
-      if (ui.selectedClientsToDelete.includes(clientId)) {
-          ui.setSelectedClientsToDelete((prev: string[]) => prev.filter(id => id !== clientId));
-      } else {
-          ui.setSelectedClientsToDelete((prev: string[]) => [...prev, clientId]);
-      }
+  const toggleClientSelection = (id: string) => {
+      ui.setSelectedClientsToDelete((prev: string[]) => 
+          prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+      );
   };
 
   const executeBulkDelete = async () => {
-      if (!activeUser) return;
-      if (ui.selectedClientsToDelete.length === 0) { showToast("Nenhum cliente selecionado.", "error"); return; }
-      if (activeUser.id === 'DEMO') {
-           demoService.executeAction('DELETE_CLIENT', null, [], () => {}, clients, setClients, [], () => {}, showToast);
-           ui.setSelectedClientsToDelete([]);
-           ui.setIsBulkDeleteMode(false);
-           return;
+      const count = ui.selectedClientsToDelete.length;
+      if (count === 0) return;
+      
+      if (!confirm(`Tem certeza que deseja excluir ${count} clientes? Esta ação removerá também o histórico e contratos vinculados.`)) return;
+
+      if (activeUser?.id === 'DEMO') {
+          showToast(`${count} clientes removidos (Demo)`, "success");
+          ui.setIsBulkDeleteMode(false);
+          ui.setSelectedClientsToDelete([]);
+          return;
       }
 
-      if (!window.confirm(`Tem certeza que deseja excluir ${ui.selectedClientsToDelete.length} clientes?`)) return;
-
       try {
-          ui.setIsSaving(true);
           const { error } = await supabase
-            .from('clientes')
-            .delete()
-            .in('id', ui.selectedClientsToDelete)
-            .eq('profile_id', activeUser.id);
+              .from('clientes')
+              .delete()
+              .in('id', ui.selectedClientsToDelete)
+              .eq('profile_id', (activeUser as any).supervisor_id || activeUser!.id);
 
           if (error) throw error;
-          
-          showToast(`${ui.selectedClientsToDelete.length} clientes excluídos.`, "success");
-          ui.setSelectedClientsToDelete([]);
+
+          showToast(`${count} clientes removidos com sucesso!`, "success");
+          await fetchFullData(activeUser!.id);
           ui.setIsBulkDeleteMode(false);
-          await fetchFullData(activeUser.id);
+          ui.setSelectedClientsToDelete([]);
       } catch (e: any) {
-          showToast("Erro ao excluir (verifique se existem contratos ativos): " + e.message, "error");
-      } finally {
-          ui.setIsSaving(false);
+          showToast("Erro ao excluir clientes: " + e.message, "error");
       }
   };
 
   return {
     openClientModal,
     handleSaveClient,
-    handlePickContact,
     handleAvatarUpload,
+    handlePickContact,
     toggleBulkDeleteMode,
     toggleClientSelection,
     executeBulkDelete

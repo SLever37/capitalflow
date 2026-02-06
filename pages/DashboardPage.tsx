@@ -83,11 +83,40 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 onStaffChange={onStaffChange}
               />
 
-              <div className="grid grid-cols-1 gap-4 sm:gap-5">
+              {/* Layout Masonry (Colunas) para melhor aproveitamento vertical ao expandir cards */}
+              <div className="columns-1 md:columns-2 xl:columns-3 gap-4">
                   {filteredLoans.map(loan => (
-                    <LoanCard key={loan.id} loan={loan} sources={sources} activeUser={activeUser} isExpanded={selectedLoanId === loan.id} onToggleExpand={() => setSelectedLoanId(selectedLoanId === loan.id ? null : loan.id)} onEdit={(e) => { e.stopPropagation(); onEdit(loan); }} onMessage={(e) => { e.stopPropagation(); onMessage(loan); }} onArchive={(e) => { e.stopPropagation(); onArchive(loan); }} onRestore={(e) => { e.stopPropagation(); onRestore(loan); }} onDelete={(e) => { e.stopPropagation(); onDelete(loan); }} onNote={(e) => { e.stopPropagation(); onNote(loan); }} onPayment={(l, i, c) => onPayment(l, i, c)} onPortalLink={(e) => { e.stopPropagation(); onPortalLink(loan); }} onUploadPromissoria={(e) => { e.stopPropagation(); onUploadPromissoria(loan); }} onUploadDoc={(e) => { e.stopPropagation(); onUploadDoc(loan); }} onViewPromissoria={(e, url) => { e.stopPropagation(); onViewPromissoria(url); }} onViewDoc={(e, url) => { e.stopPropagation(); onViewDoc(url); }} onReviewSignal={onReviewSignal} onOpenComprovante={onOpenComprovante} onReverseTransaction={onReverseTransaction} onRenegotiate={onRenegotiate} onNewAporte={onNewAporte} onAgreementPayment={onAgreementPayment} onRefresh={onRefresh} isStealthMode={isStealthMode} />
+                    <div key={loan.id} className="break-inside-avoid mb-4">
+                        <LoanCard 
+                            loan={loan} 
+                            sources={sources} 
+                            activeUser={activeUser} 
+                            isExpanded={selectedLoanId === loan.id} 
+                            onToggleExpand={() => setSelectedLoanId(selectedLoanId === loan.id ? null : loan.id)} 
+                            onEdit={(e) => { e.stopPropagation(); onEdit(loan); }} 
+                            onMessage={(e) => { e.stopPropagation(); onMessage(loan); }} 
+                            onArchive={(e) => { e.stopPropagation(); onArchive(loan); }} 
+                            onRestore={(e) => { e.stopPropagation(); onRestore(loan); }} 
+                            onDelete={(e) => { e.stopPropagation(); onDelete(loan); }} 
+                            onNote={(e) => { e.stopPropagation(); onNote(loan); }} 
+                            onPayment={(l, i, c) => onPayment(l, i, c)} 
+                            onPortalLink={(e) => { e.stopPropagation(); onPortalLink(loan); }} 
+                            onUploadPromissoria={(e) => { e.stopPropagation(); onUploadPromissoria(loan); }} 
+                            onUploadDoc={(e) => { e.stopPropagation(); onUploadDoc(loan); }} 
+                            onViewPromissoria={(e, url) => { e.stopPropagation(); onViewPromissoria(url); }} 
+                            onViewDoc={(e, url) => { e.stopPropagation(); onViewDoc(url); }} 
+                            onReviewSignal={onReviewSignal} 
+                            onOpenComprovante={onOpenComprovante} 
+                            onReverseTransaction={onReverseTransaction} 
+                            onRenegotiate={onRenegotiate} 
+                            onNewAporte={onNewAporte} 
+                            onAgreementPayment={onAgreementPayment} 
+                            onRefresh={onRefresh} 
+                            isStealthMode={isStealthMode} 
+                        />
+                    </div>
                   ))}
-                  {filteredLoans.length === 0 && <div className="text-center py-24 bg-slate-900/30 rounded-[3rem] border-2 border-dashed border-slate-800 flex flex-col items-center px-4"><div className="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center mb-6"><BarChart3 className="w-8 h-8 text-slate-700" /></div><p className="font-black uppercase text-sm text-slate-500 tracking-widest">Nenhum contrato encontrado</p></div>}
+                  {filteredLoans.length === 0 && <div className="col-span-full text-center py-24 bg-slate-900/30 rounded-[3rem] border-2 border-dashed border-slate-800 flex flex-col items-center px-4"><div className="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center mb-6"><BarChart3 className="w-8 h-8 text-slate-700" /></div><p className="font-black uppercase text-sm text-slate-500 tracking-widest">Nenhum contrato encontrado</p></div>}
               </div>
           </div>
 

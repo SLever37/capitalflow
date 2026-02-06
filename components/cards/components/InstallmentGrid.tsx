@@ -40,7 +40,7 @@ export const InstallmentGrid: React.FC<InstallmentGridProps> = (props) => {
     };
 
     return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 items-stretch">
+        <div className="grid grid-cols-1 gap-4 items-stretch">
             {orderedInstallments.map((inst, i) => {
                 // Derivação de Estado Puro (Lógica)
                 const viewModel = prepareInstallmentViewModel(loan, inst, i, context);
