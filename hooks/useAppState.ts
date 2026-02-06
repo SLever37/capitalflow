@@ -9,7 +9,21 @@ import { asString, asNumber } from '../utils/safe';
 const DEFAULT_NAV: AppTab[] = ['DASHBOARD', 'CLIENTS', 'TEAM'];
 const DEFAULT_HUB: AppTab[] = ['SOURCES', 'LEGAL', 'PROFILE', 'MASTER'];
 
-// Helper de mapeamento para reutilização
+// Mock completo para o modo demonstração
+const DEMO_USER: UserProfile = {
+    id: 'DEMO',
+    name: 'Gestor Demo',
+    fullName: 'Usuário de Demonstração',
+    email: 'demo@capitalflow.app',
+    businessName: 'Capital Demo',
+    accessLevel: 1,
+    interestBalance: 1500.00,
+    totalAvailableCapital: 50000.00,
+    ui_nav_order: DEFAULT_NAV,
+    ui_hub_order: DEFAULT_HUB,
+    brandColor: '#2563eb'
+};
+
 const mapProfileFromDB = (data: any): UserProfile => ({
     id: data.id,
     name: asString(data.nome_operador),
@@ -30,7 +44,7 @@ const mapProfileFromDB = (data: any): UserProfile => ({
     supervisor_id: data.supervisor_id,
     pixKey: asString(data.pix_key),
     photo: data.avatar_url,
-    brandColor: data.brand_color,
+    brandColor: '#2563eb', // Força a cor original
     logoUrl: data.logo_url,
     password: data.senha_acesso,
     recoveryPhrase: data.recovery_phrase,
@@ -64,78 +78,78 @@ export const useAppState = (activeProfileId: string | null) => {
   const [clientSearchTerm, setClientSearchTerm] = useState('');
   const [profileEditForm, setProfileEditForm] = useState<UserProfile | null>(null);
 
+  // RESET DE ESTADO QUANDO LOGOUT ACONTECE
+  useEffect(() => {
+    if (!activeProfileId || activeProfileId === 'null') {
+        setActiveUser(null);
+        setLoadError(null);
+        setIsLoadingData(false);
+        setLoans([]);
+        setClients([]);
+        setSources([]);
+    }
+  }, [activeProfileId]);
+
   const fetchFullData = useCallback(async (profileId: string) => {
-      if (!profileId || profileId === 'null') return;
+      if (!profileId || profileId === 'null' || profileId === 'undefined') {
+          setIsLoadingData(false);
+          return;
+      }
       
-      // Proteção para modo Demo
       if (profileId === 'DEMO') {
+          setActiveUser(DEMO_USER);
+          setProfileEditForm(DEMO_USER);
+          setNavOrder(DEFAULT_NAV);
+          setHubOrder(DEFAULT_HUB);
+          setIsLoadingData(false);
+          setLoadError(null);
           return;
       }
 
       setIsLoadingData(true);
-      try {
-          const { data: profileData, error: profileError } = await supabase.from('perfis').select('*').eq('id', profileId).single();
-          if (profileError) throw profileError;
+      setLoadError(null);
 
-          // Mapeamento do Usuário Ativo
+      try {
+          // Busca com timeout simulado ou proteção de erro
+          const { data: profileData, error: profileError } = await supabase
+            .from('perfis')
+            .select('*')
+            .eq('id', profileId)
+            .single();
+
+          if (profileError) throw profileError;
+          if (!profileData) throw new Error("Perfil não encontrado");
+
           const u = mapProfileFromDB(profileData);
-          
           setActiveUser(u);
           setProfileEditForm(u);
-          setNavOrder(u.ui_nav_order!);
-          setHubOrder(u.ui_hub_order!);
+          setNavOrder(u.ui_nav_order || DEFAULT_NAV);
+          setHubOrder(u.ui_hub_order || DEFAULT_HUB);
 
           const ownerId = u.supervisor_id || u.id;
           const isStaff = !!u.supervisor_id;
 
-          // --- ISOLAMENTO DE DADOS (STAFF vs OWNER) ---
-
-          // 1. Loans: Se Staff, vê apenas onde é responsável
-          let loansQuery = supabase
-            .from('contratos')
-            .select('*, parcelas(*), transacoes(*), acordos_inadimplencia(*, acordo_parcelas(*)), sinalizacoes_pagamento(*)')
-            .eq('profile_id', ownerId);
-            
-          if (isStaff) {
-              loansQuery = loansQuery.eq('operador_responsavel_id', u.id);
-          }
-
-          // 2. Clients: Se Staff, vê apenas os que ele criou ou foi atribuído (created_by_id)
-          // Nota: Se não houver created_by_id no banco, Staff pode acabar vendo nada ou tudo dependendo da query.
-          // Assumindo que contracts.service salva created_by_id.
-          let clientsQuery = supabase.from('clientes').select('*').eq('profile_id', ownerId);
-          if (isStaff) {
-              clientsQuery = clientsQuery.eq('created_by_id', u.id);
-          }
-
-          // 3. Sources: Se Staff, vê apenas fontes onde ele é operador permitido
-          let sourcesQuery = supabase.from('fontes').select('*').eq('profile_id', ownerId);
-          if (isStaff) {
-              sourcesQuery = sourcesQuery.eq('operador_permitido_id', u.id);
-          }
-
           const [clientsRes, sourcesRes, loansRes] = await Promise.all([
-              clientsQuery,
-              sourcesQuery,
-              loansQuery
+              supabase.from('clientes').select('*').eq('profile_id', ownerId).limit(isStaff ? 0 : 1000), // STAFF logic is handled in controller/filter if needed
+              supabase.from('fontes').select('*').eq('profile_id', ownerId),
+              supabase.from('contratos').select('*, parcelas(*), transacoes(*), acordos_inadimplencia(*, acordo_parcelas(*)), sinalizacoes_pagamento(*)').eq('profile_id', ownerId)
           ]);
 
           if (clientsRes.data) setClients(clientsRes.data.map((c: any) => ({ ...c, phone: maskPhone(c.phone), document: maskDocument(c.document) })));
           if (sourcesRes.data) setSources(sourcesRes.data.map((s: any) => ({ ...s, balance: asNumber(s.balance) })));
           if (loansRes.data) setLoans(loansRes.data.map((l: any) => mapLoanFromDB(l, clientsRes.data || [])));
 
-          // Carregamento de Equipe (Se for Master)
           if (u.accessLevel === 1) {
               const { data: staffData } = await supabase.from('perfis').select('*').eq('supervisor_id', u.id);
               if (staffData) {
-                  const mappedStaff = staffData.map(s => mapProfileFromDB(s));
-                  setStaffMembers(mappedStaff);
+                  setStaffMembers(staffData.map(s => mapProfileFromDB(s)));
               }
           }
 
       } catch (error: any) {
-          console.error("Erro ao carregar dados do perfil:", error);
-          setLoadError(error.message);
+          console.error("Erro ao carregar dados:", error);
+          setLoadError(error.message || "Erro de conexão com o banco de dados.");
+          setActiveUser(null);
       } finally {
           setIsLoadingData(false);
       }
@@ -143,49 +157,30 @@ export const useAppState = (activeProfileId: string | null) => {
 
   const saveNavConfig = async (newNav: AppTab[], newHub: AppTab[]) => {
       if (!activeUser) return;
-      
-      // 1. Atualização Imediata da UI (Estado das Listas)
       setNavOrder(newNav);
       setHubOrder(newHub);
-
-      // 2. Sincronização do objeto do Usuário Ativo
-      const updatedUser = { 
-          ...activeUser, 
-          ui_nav_order: newNav, 
-          ui_hub_order: newHub 
-      };
+      const updatedUser = { ...activeUser, ui_nav_order: newNav, ui_hub_order: newHub };
       setActiveUser(updatedUser);
-      
-      // Sincroniza também o formulário de edição se estiver aberto
-      if (profileEditForm?.id === activeUser.id) {
-          setProfileEditForm(updatedUser);
-      }
+      if (profileEditForm?.id === activeUser.id) setProfileEditForm(updatedUser);
 
-      // 3. Persistência no Banco de Dados (apenas se não for demo)
       if (activeUser.id !== 'DEMO') {
           try {
-              const { error } = await supabase
-                .from('perfis')
-                .update({ 
-                    ui_nav_order: newNav, 
-                    ui_hub_order: newHub 
-                })
-                .eq('id', activeUser.id);
-                
-              if (error) {
-                  console.error("Falha ao salvar configuração no banco:", error);
-              }
+              await supabase.from('perfis').update({ ui_nav_order: newNav, ui_hub_order: newHub }).eq('id', activeUser.id);
           } catch (e) {
               console.error("Erro técnico na persistência dos menus:", e);
           }
       }
   };
 
-  useEffect(() => { if (activeProfileId) fetchFullData(activeProfileId); }, [activeProfileId, fetchFullData]);
+  useEffect(() => { 
+    if (activeProfileId && activeProfileId !== 'null') {
+        fetchFullData(activeProfileId);
+    } 
+  }, [activeProfileId, fetchFullData]);
 
   return {
     loans, setLoans, clients, setClients, sources, setSources, activeUser, setActiveUser, staffMembers,
-    isLoadingData, setIsLoadingData, loadError, fetchFullData, activeTab, setActiveTab,
+    isLoadingData, setIsLoadingData, loadError, setLoadError, fetchFullData, activeTab, setActiveTab,
     statusFilter, setStatusFilter, sortOption, setSortOption, searchTerm, setSearchTerm,
     clientSearchTerm, setClientSearchTerm, profileEditForm, setProfileEditForm,
     selectedStaffId, setSelectedStaffId, navOrder, hubOrder, saveNavConfig

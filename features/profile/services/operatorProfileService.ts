@@ -51,7 +51,7 @@ export const operatorProfileService = {
             zip_code: (curatedData as any).zipCode,
             pix_key: curatedData.pixKey,
             avatar_url: curatedData.photo,
-            brand_color: curatedData.brandColor,
+            brand_color: '#2563eb', // Força a cor padrão
             logo_url: curatedData.logoUrl,
             default_interest_rate: curatedData.defaultInterestRate,
             default_fine_percent: curatedData.defaultFinePercent,
@@ -139,7 +139,7 @@ export const operatorProfileService = {
             addressNumber: asString(raw.addressNumber).substring(0, 20),
             pixKey: asString(raw.pixKey).substring(0, 100),
             photo: raw.photo,
-            brandColor: raw.brandColor || '#2563eb',
+            brandColor: '#2563eb', // Força a cor padrão
             logoUrl: raw.logoUrl,
             defaultInterestRate: Math.abs(Number(raw.defaultInterestRate) || 30),
             defaultFinePercent: Math.abs(Number(raw.defaultFinePercent) || 2),
@@ -181,7 +181,7 @@ export const operatorProfileService = {
             totalAvailableCapital: asNumber(dbProfile.total_available_capital),
             interestBalance: asNumber(dbProfile.interest_balance),
             createdAt: asString(dbProfile.created_at),
-            brandColor: asString(dbProfile.brand_color),
+            brandColor: '#2563eb', // Cor original restaurada
             logoUrl: dbProfile.logo_url,
             defaultInterestRate: asNumber(dbProfile.default_interest_rate),
             defaultFinePercent: asNumber(dbProfile.default_fine_percent),

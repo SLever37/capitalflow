@@ -181,12 +181,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
 
                         <div className="pt-6 border-t border-slate-800">
                             <h4 className="text-xs font-black text-white uppercase mb-4 flex items-center gap-2"><Palette size={14} className="text-purple-500"/> Personalização</h4>
-                            <div className="flex gap-4 items-center bg-slate-950 p-4 rounded-2xl border border-slate-800">
+                            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
                                 <div>
-                                    <label className="text-[10px] font-black text-slate-500 uppercase block mb-1">Cor da Marca</label>
-                                    <input type="color" value={profileEditForm.brandColor || '#2563eb'} onChange={e => setProfileEditForm({...profileEditForm, brandColor: e.target.value})} className="w-12 h-12 rounded cursor-pointer bg-transparent border-none" />
-                                </div>
-                                <div className="flex-1">
                                     <label className="text-[10px] font-black text-slate-500 uppercase block mb-1">Logo URL (Opcional)</label>
                                     <input type="text" value={profileEditForm.logoUrl} onChange={e => setProfileEditForm({...profileEditForm, logoUrl: e.target.value})} className="w-full bg-slate-900 border border-slate-800 rounded-lg p-3 text-xs text-white" placeholder="https://..." />
                                 </div>
