@@ -18,7 +18,7 @@ export default defineConfig(({ mode }) => {
       plugins: [react()],
       define: {
         // Substituição estática segura para o build de produção
-        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY || env.VITE_GEMINI_API_KEY),
+        // REMOVIDO: 'process.env.API_KEY' para segurança. A chave agora vive apenas no Supabase Edge Functions.
         'process.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL),
         'process.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY),
         'process.env.NODE_ENV': JSON.stringify(mode),
@@ -36,7 +36,7 @@ export default defineConfig(({ mode }) => {
                 manualChunks: {
                     vendor: ['react', 'react-dom', 'lucide-react'],
                     charts: ['recharts'],
-                    utils: ['xlsx', '@google/genai']
+                    utils: ['xlsx']
                 }
             }
         }
