@@ -52,7 +52,16 @@ export const contractsService = {
     // --- AUTO-CRIAÇÃO DE CLIENTE (Se não selecionado) ---
     let finalClientId = safeUUID(loan.clientId);
 
-    if (!finalClientId && loan.debtorName && loan.debtorName.trim().length > 0) {
+    // [TESTE INTERNO] Logs de diagnóstico para verificar a lógica
+    const shouldCreateClient = !finalClientId && loan.debtorName && loan.debtorName.trim().length > 0;
+    console.log('[ContractsService] Verificando auto-criação:', { 
+        clientIdInput: loan.clientId, 
+        resolvedId: finalClientId, 
+        debtorName: loan.debtorName, 
+        willCreate: shouldCreateClient 
+    });
+
+    if (shouldCreateClient) {
         const newClientId = generateUUID();
         // Gera códigos aleatórios simples para o cliente automático
         const accessCode = String(Math.floor(Math.random() * 10000)).padStart(4, '0');
@@ -76,6 +85,7 @@ export const contractsService = {
             throw new Error("Erro ao criar cliente automaticamente: " + clientError.message);
         }
         
+        console.log('[ContractsService] Cliente criado automaticamente com ID:', newClientId);
         finalClientId = newClientId;
     }
 
