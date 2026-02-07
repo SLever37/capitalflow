@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState } from "react";
 import { Modal } from "../ui/Modal";
 import { supabase } from "../../lib/supabase";
@@ -7,12 +8,13 @@ type PixDepositModalProps = {
   onClose: () => void;
   // opcional: se você quiser amarrar no futuro com a fonte (carteira)
   sourceId?: string | null;
+  profileId?: string;
 };
 
-export default function PixDepositModal({ isOpen, onClose, sourceId }: PixDepositModalProps) {
+export default function PixDepositModal({ isOpen, onClose, sourceId, profileId }: PixDepositModalProps) {
   const [amount, setAmount] = useState<string>("10.00");
-  const [payerName, setPayerName] = useState<string>("Teste PIX");
-  const [payerEmail, setPayerEmail] = useState<string>("teste@pix.com");
+  const [payerName, setPayerName] = useState<string>("Aporte Capital");
+  const [payerEmail, setPayerEmail] = useState<string>("financeiro@capital.app");
 
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -59,6 +61,7 @@ export default function PixDepositModal({ isOpen, onClose, sourceId }: PixDeposi
           payer_name: payerName,
           payer_email: payerEmail,
           source_id: sourceId ?? null,
+          profile_id: profileId // Garante uso do token do operador
         },
       });
 
@@ -91,7 +94,7 @@ export default function PixDepositModal({ isOpen, onClose, sourceId }: PixDeposi
   }
 
   return (
-    <Modal onClose={onClose} title="Depósito via PIX (Mercado Pago)">
+    <Modal onClose={onClose} title="Aporte de Capital (PIX)">
       <div className="space-y-4">
         {!result && (
           <>
@@ -103,18 +106,18 @@ export default function PixDepositModal({ isOpen, onClose, sourceId }: PixDeposi
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   className="w-full bg-slate-950 p-3 rounded-xl text-white font-bold outline-none border border-slate-800 focus:border-blue-500 transition-colors"
-                  placeholder="10.00"
+                  placeholder="1000.00"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">Nome</label>
+                <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">Identificação</label>
                 <input
                   type="text"
                   value={payerName}
                   onChange={(e) => setPayerName(e.target.value)}
                   className="w-full bg-slate-950 p-3 rounded-xl text-white font-bold outline-none border border-slate-800 focus:border-blue-500 transition-colors"
-                  placeholder="Cliente"
+                  placeholder="Seu Nome / Empresa"
                 />
               </div>
 
@@ -125,7 +128,7 @@ export default function PixDepositModal({ isOpen, onClose, sourceId }: PixDeposi
                   value={payerEmail}
                   onChange={(e) => setPayerEmail(e.target.value)}
                   className="w-full bg-slate-950 p-3 rounded-xl text-white font-bold outline-none border border-slate-800 focus:border-blue-500 transition-colors"
-                  placeholder="cliente@email.com"
+                  placeholder="financeiro@empresa.com"
                 />
               </div>
             </div>
@@ -135,13 +138,19 @@ export default function PixDepositModal({ isOpen, onClose, sourceId }: PixDeposi
                 <p className="text-[11px] text-red-200 font-bold">{err}</p>
               </div>
             )}
+            
+            <div className="bg-blue-900/10 border border-blue-500/20 p-3 rounded-xl">
+                <p className="text-[10px] text-blue-200 leading-tight">
+                    O valor será depositado na sua conta Mercado Pago e, após confirmação automática, o saldo da Fonte será atualizado no sistema.
+                </p>
+            </div>
 
             <button
               onClick={handleCreatePix}
               disabled={loading}
               className="w-full py-4 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-black rounded-xl uppercase transition-all shadow-lg"
             >
-              {loading ? "Gerando PIX..." : "Gerar PIX"}
+              {loading ? "Gerando Cobrança..." : "Gerar QR Code PIX"}
             </button>
           </>
         )}
@@ -150,19 +159,19 @@ export default function PixDepositModal({ isOpen, onClose, sourceId }: PixDeposi
           <>
             <div className="bg-emerald-900/20 border border-emerald-500/30 p-3 rounded-xl">
               <p className="text-[11px] text-emerald-200 font-bold">
-                PIX criado (status: {result.status} / {result.provider_status})
+                Aporte Iniciado (status: {result.status})
               </p>
               <p className="text-[10px] text-slate-300 mt-1">
-                payment_id: <span className="font-mono">{result.provider_payment_id}</span>
+                ID Transação: <span className="font-mono">{result.provider_payment_id}</span>
               </p>
             </div>
 
             {qrImgSrc && (
-              <div className="flex justify-center">
+              <div className="flex justify-center bg-white p-4 rounded-xl">
                 <img
                   src={qrImgSrc}
                   alt="QR Code PIX"
-                  className="rounded-xl border border-slate-800 max-w-[320px] w-full"
+                  className="max-w-[280px] w-full mix-blend-multiply"
                 />
               </div>
             )}
@@ -173,14 +182,14 @@ export default function PixDepositModal({ isOpen, onClose, sourceId }: PixDeposi
                 value={result.qr_code}
                 readOnly
                 className="w-full bg-slate-950 p-3 rounded-xl text-white text-[11px] font-mono outline-none border border-slate-800"
-                rows={5}
+                rows={4}
               />
               <div className="flex gap-2">
                 <button
                   onClick={() => copyText(result.qr_code)}
                   className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl uppercase transition-all"
                 >
-                  Copiar código
+                  Copiar Código
                 </button>
                 <button
                   onClick={() => {
@@ -189,7 +198,7 @@ export default function PixDepositModal({ isOpen, onClose, sourceId }: PixDeposi
                   }}
                   className="flex-1 py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl uppercase transition-all border border-slate-800"
                 >
-                  Novo PIX
+                  Novo Aporte
                 </button>
               </div>
             </div>

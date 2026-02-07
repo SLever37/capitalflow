@@ -1,13 +1,15 @@
+
 import React, { useState } from "react";
 import PixDepositModal from "../components/modals/PixDepositModal";
 import { SourcesPage } from "../pages/SourcesPage";
-import { CapitalSource } from "../types";
+import { CapitalSource, UserProfile } from "../types";
 
 interface SourcesContainerProps {
   sources: CapitalSource[];
   ui: any;
   sourceCtrl: any;
   loanCtrl: any;
+  activeUser: UserProfile | null;
 }
 
 export const SourcesContainer: React.FC<SourcesContainerProps> = ({
@@ -15,6 +17,7 @@ export const SourcesContainer: React.FC<SourcesContainerProps> = ({
   ui,
   sourceCtrl,
   loanCtrl,
+  activeUser,
 }) => {
   // ✅ Modal PIX (usa sourceId porque é isso que o PixDepositModal espera)
   const [pixSourceId, setPixSourceId] = useState<string | null>(null);
@@ -38,11 +41,12 @@ export const SourcesContainer: React.FC<SourcesContainerProps> = ({
         onOpenPixDeposit={openPixDeposit}
       />
 
-      {/* ✅ Modal PIX */}
+      {/* ✅ Modal PIX com Profile ID para token correto */}
       <PixDepositModal
         isOpen={!!pixSourceId}
         onClose={closePixDeposit}
         sourceId={pixSourceId}
+        profileId={activeUser?.id}
       />
     </>
   );

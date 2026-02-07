@@ -119,7 +119,8 @@ export const App: React.FC = () => {
               {activeTab === 'CLIENTS' && <ClientsContainer clients={clients} clientSearchTerm={clientSearchTerm} setClientSearchTerm={setClientSearchTerm} clientCtrl={clientCtrl} loanCtrl={loanCtrl} showToast={showToast} ui={ui} />}
               {/* EQUIPE visível para operadores proprietários (sem supervisor_id) */}
               {activeTab === 'TEAM' && !activeUser?.supervisor_id && <TeamPage activeUser={activeUser} staffMembers={staffMembers} sources={sources} showToast={showToast} onRefresh={() => fetchFullData(activeUser?.id || '')} />}
-              {activeTab === 'SOURCES' && <SourcesContainer sources={sources} ui={ui} sourceCtrl={sourceCtrl} loanCtrl={loanCtrl} />}
+              {/* Passando activeUser para SourcesContainer */}
+              {activeTab === 'SOURCES' && <SourcesContainer sources={sources} ui={ui} sourceCtrl={sourceCtrl} loanCtrl={loanCtrl} activeUser={activeUser} />}
               {activeTab === 'PROFILE' && activeUser && <ProfileContainer activeUser={activeUser} clients={clients} loans={loans} sources={sources} ui={ui} profileCtrl={profileCtrl} handleLogout={handleLogout} showToast={showToast} profileEditForm={profileEditForm} setProfileEditForm={setProfileEditForm} fileCtrl={fileCtrl} navOrder={navOrder} hubOrder={hubOrder} saveNavConfig={saveNavConfig} />}
               {activeTab === 'LEGAL' && <LegalContainer loans={loans} sources={sources} activeUser={activeUser} ui={ui} loanCtrl={loanCtrl} fileCtrl={fileCtrl} showToast={showToast} onRefresh={() => fetchFullData(activeUser?.id || '')} />}
               
