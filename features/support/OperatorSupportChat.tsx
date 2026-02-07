@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { MessageCircle, ChevronLeft, ShieldCheck, User, X, Clock, Search, Filter } from 'lucide-react';
 import { supportChatService } from '../../services/supportChat.service';
@@ -17,7 +16,7 @@ function diffLabel(ts: string | number | Date) {
   return `${d}d`;
 }
 
-// regra simples: online se houve atividade nos últimos X segundos
+// Regra: Online se houve atividade nos últimos 2 minutos
 const ONLINE_WINDOW_SECONDS = 120; 
 
 export const OperatorSupportChat = ({

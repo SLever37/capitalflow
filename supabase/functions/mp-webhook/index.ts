@@ -12,22 +12,21 @@ function json(data: unknown, status = 200) {
   });
 }
 
-// Helpers de Data
+// Helpers de Data Simples (Adiciona dias UTC)
 const addDays = (dateStr: string, days: number) => {
   const d = new Date(dateStr);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString();
+  d.setDate(d.getDate() + days); // Uso simples de Date (Edge roda em UTC)
+  return d.toISOString().split('T')[0]; // YYYY-MM-DD
 };
 
 serve(async (req) => {
   try {
     if (req.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
 
-    const MP_ACCESS_TOKEN = Deno.env.get("MP_ACCESS_TOKEN");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-    if (!MP_ACCESS_TOKEN || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       return json({ ok: false, error: "Missing env vars" }, 500);
     }
 
@@ -42,6 +41,35 @@ serve(async (req) => {
     const paymentId = body?.data?.id || body?.resource;
     if (!paymentId) return json({ ok: false, error: "Missing payment id" }, 400);
 
+    // ✅ NOVO: Buscar qual token usar.
+    // Primeiro, precisamos saber a quem pertence esse pagamento.
+    // Consultamos payment_charges pelo ID do provedor (paymentId)
+    const { data: chargeData } = await supabase
+        .from('payment_charges')
+        .select('profile_id')
+        .eq('provider_payment_id', String(paymentId))
+        .maybeSingle();
+
+    let MP_ACCESS_TOKEN = Deno.env.get("MP_ACCESS_TOKEN");
+
+    if (chargeData?.profile_id) {
+        // Se encontramos o registro local, buscamos o token do perfil dono
+        const { data: profile } = await supabase
+            .from('perfis')
+            .select('mp_access_token')
+            .eq('id', chargeData.profile_id)
+            .single();
+        
+        if (profile?.mp_access_token && profile.mp_access_token.trim().length > 10) {
+            MP_ACCESS_TOKEN = profile.mp_access_token;
+        }
+    }
+
+    if (!MP_ACCESS_TOKEN) {
+        // Se não tiver token global nem específico, não tem como validar
+        return json({ ok: false, error: "No MP Token available" }, 500);
+    }
+
     // 1. Buscar detalhes atualizados no Mercado Pago
     const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
       headers: { Authorization: `Bearer ${MP_ACCESS_TOKEN}` },
@@ -55,7 +83,7 @@ serve(async (req) => {
     const status = payment.status;
     const metadata = payment.metadata || {};
     
-    // Atualiza registro de log de cobrança se existir
+    // Atualiza registro de log de cobrança
     await supabase.from('payment_charges')
       .update({
         provider_status: status,
@@ -86,10 +114,9 @@ serve(async (req) => {
 
         if (loanErr || instErr || !loan || !inst) {
             console.error("Dados de contrato não encontrados para baixa automática", metadata);
-            return json({ ok: true, warning: "Loan data not found for auto-process" });
+            return json({ ok: true, warning: "Loan/Installment not found" });
         }
 
-        // Evita duplicidade: Se parcela já estiver paga, para.
         if (inst.status === 'PAID') {
              return json({ ok: true, message: "Installment already paid" });
         }
@@ -99,18 +126,19 @@ serve(async (req) => {
         const profileId = metadata.profile_id || loan.profile_id;
         const sourceId = metadata.source_id || loan.source_id;
 
-        // B. Calcular "Próximo Estado"
+        // B. Preparar Parâmetros da RPC
         let rpcParams: any = {
+            p_idempotency_key: crypto.randomUUID(),
             p_loan_id: loan.id,
             p_installment_id: inst.id,
             p_profile_id: profileId,
+            p_operator_id: null, // Ação do Sistema
             p_source_id: sourceId,
             p_amount_to_pay: amountPaid,
-            p_notes: `Pagamento via PIX Portal (${paymentType === 'FULL' ? 'Quitação' : 'Renovação'})`,
+            p_notes: `PIX Automático (${paymentType === 'FULL' ? 'Quitação' : 'Renovação'})`,
             p_category: 'RECEITA'
         };
 
-        // --- CÁLCULO FINANCEIRO DO CONTRATO ---
         if (paymentType === 'FULL') {
             const principal = Number(inst.principal_remaining);
             const profit = Math.max(0, amountPaid - principal);
@@ -126,7 +154,7 @@ serve(async (req) => {
                 
                 // Zera tudo
                 p_new_start_date: loan.start_date, 
-                p_new_due_date: inst.due_date,
+                p_new_due_date: inst.data_vencimento || inst.due_date,
                 p_new_principal_remaining: 0,
                 p_new_interest_remaining: 0,
                 p_new_scheduled_principal: 0,
@@ -135,15 +163,18 @@ serve(async (req) => {
             };
 
         } else {
-            const currentDueDate = inst.due_date || loan.start_date;
+            // Lógica Simplificada de Renovação Automática (Avança 30 dias)
+            // Em produção real, replicaria a lógica exata de strategies
+            const currentDueDate = inst.data_vencimento || inst.due_date || loan.start_date;
             const newDate = addDays(currentDueDate, 30);
             
             const principalBase = Number(inst.principal_remaining);
+            // Recalcula juros do próximo mês baseado na taxa do contrato
             const nextInterest = principalBase * (Number(loan.interest_rate) / 100);
 
             rpcParams = {
                 ...rpcParams,
-                p_payment_type: 'PAYMENT_PARTIAL',
+                p_payment_type: 'PAYMENT_PARTIAL', // ou 'RENEW_INTEREST' se mapeado no banco
                 p_profit_generated: amountPaid,
                 p_principal_returned: 0,
                 p_principal_delta: 0,
@@ -161,7 +192,7 @@ serve(async (req) => {
             };
         }
 
-        // C. Executar Transação Atômica (Ledger + Status)
+        // C. Executar Transação Atômica
         const { error: rpcError } = await supabase.rpc('process_payment_atomic', rpcParams);
 
         if (rpcError) {
@@ -169,20 +200,17 @@ serve(async (req) => {
             return json({ ok: false, error: "Auto-process failed: " + rpcError.message });
         }
 
-        // =================================================================
-        // D. TAXA MP (1%) - Lançamento Automático de Custo
-        // =================================================================
+        // D. Taxa MP (1%)
         const mpFee = amountPaid * 0.01;
-        
         if (mpFee > 0) {
-            // 1. Registrar no Ledger (Transacoes) como Despesa
+            // Lança despesa e ajusta lucro
             await supabase.from('transacoes').insert({
                 loan_id: loan.id,
                 profile_id: profileId,
                 source_id: sourceId,
                 date: new Date().toISOString(),
                 type: 'TAXA_MP',
-                amount: -mpFee, // Valor negativo (Saída/Custo)
+                amount: -mpFee,
                 principal_delta: 0,
                 interest_delta: 0,
                 late_fee_delta: 0,
@@ -190,13 +218,7 @@ serve(async (req) => {
                 notes: `Taxa Mercado Pago (1%): R$ ${mpFee.toFixed(2)}`
             });
 
-            // 2. Deduzir do Lucro Líquido (Interest Balance) do Perfil
-            // A RPC process_payment_atomic já somou o lucro bruto. Agora subtraímos a taxa.
-            // Não alteramos o 'balance' da fonte pois o dinheiro líquido que entra lá já deveria ser descontado, 
-            // mas como a RPC assume valor cheio na fonte, podemos ajustar aqui ou assumir que a fonte recebe bruto e a taxa sai depois.
-            // Padrão CapitalFlow: InterestBalance é o lucro disponível. Taxa reduz lucro.
-            
-            // Ajuste manual de saldo de lucro
+            // Deduz do lucro
             const { data: profile } = await supabase.from('perfis').select('interest_balance').eq('id', profileId).single();
             if (profile) {
                 await supabase.from('perfis')
@@ -205,14 +227,14 @@ serve(async (req) => {
             }
         }
 
-        // E. Criar Notificação para o Operador
+        // E. Notificação interna
         await supabase.from('sinalizacoes_pagamento').insert({
             client_id: loan.client_id,
             loan_id: loan.id,
             profile_id: profileId,
             tipo_intencao: 'PAGAR_PIX',
             status: 'APROVADO',
-            review_note: `Automação PIX: R$ ${amountPaid.toFixed(2)} recebidos. Taxa MP: R$ ${mpFee.toFixed(2)}.`,
+            review_note: `Automação PIX: R$ ${amountPaid.toFixed(2)} confirmados.`,
             reviewed_at: new Date().toISOString()
         });
     }

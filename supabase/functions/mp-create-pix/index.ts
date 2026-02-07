@@ -1,5 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 declare const Deno: any;
 
@@ -22,15 +23,34 @@ serve(async (req) => {
       return new Response(JSON.stringify({ ok: false, error: "Valor inválido" }), { status: 400 });
     }
 
-    const MP_ACCESS_TOKEN = Deno.env.get("MP_ACCESS_TOKEN");
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // 1. Resolver Token do Mercado Pago (Global ou Perfil)
+    let MP_ACCESS_TOKEN = Deno.env.get("MP_ACCESS_TOKEN");
+
+    if (profile_id) {
+        const { data: profile } = await supabase
+            .from('perfis')
+            .select('mp_access_token')
+            .eq('id', profile_id)
+            .single();
+        
+        if (profile?.mp_access_token && profile.mp_access_token.trim().length > 10) {
+            MP_ACCESS_TOKEN = profile.mp_access_token;
+            console.log(`Usando token personalizado para o perfil ${profile_id}`);
+        }
+    }
+
     if (!MP_ACCESS_TOKEN) {
       return new Response(JSON.stringify({ ok: false, error: "MP_ACCESS_TOKEN não configurado" }), { status: 500 });
     }
 
-    // 1. Gerar UUID de referência externa
+    // 2. Gerar UUID de referência externa
     const external_reference = crypto.randomUUID();
 
-    // 2. Montar Payload para o Mercado Pago
+    // 3. Montar Payload para o Mercado Pago
     const mpPayload = {
       transaction_amount: Number(amount),
       description: `Pagamento Contrato ${loan_id?.slice(0,8)} - ${payment_type}`,
@@ -54,7 +74,7 @@ serve(async (req) => {
       }
     };
 
-    // 3. Chamar API do Mercado Pago
+    // 4. Chamar API do Mercado Pago
     const mpRes = await fetch("https://api.mercadopago.com/v1/payments", {
       method: "POST",
       headers: {
@@ -76,18 +96,8 @@ serve(async (req) => {
     const qr_code_base64 = mpData.point_of_interaction?.transaction_data?.qr_code_base64;
     const paymentId = String(mpData.id);
 
-    // 4. Salvar registro na tabela payment_charges (Supabase)
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-
-    await fetch(`${SUPABASE_URL}/rest/v1/payment_charges`, {
-      method: "POST",
-      headers: {
-        "apikey": SUPABASE_KEY!,
-        "Authorization": `Bearer ${SUPABASE_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
+    // 5. Salvar registro na tabela payment_charges (Supabase)
+    await supabase.from('payment_charges').insert({
         charge_id: external_reference, // Usamos nosso UUID como ID interno
         provider_payment_id: paymentId,
         loan_id,
@@ -100,7 +110,6 @@ serve(async (req) => {
         qr_code,
         qr_code_base64,
         created_at: new Date().toISOString()
-      })
     });
 
     return new Response(JSON.stringify({

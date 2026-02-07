@@ -21,7 +21,10 @@ export const operatorProfileService = {
 
         const { error: uploadError } = await supabase.storage
             .from('avatars')
-            .upload(filePath, file, { upsert: true });
+            .upload(filePath, file, { 
+                upsert: true,
+                contentType: file.type || 'image/jpeg'
+            });
 
         if (uploadError) {
             throw new Error(`Erro no storage: ${uploadError.message}`);
@@ -50,6 +53,7 @@ export const operatorProfileService = {
             state: (curatedData as any).state,
             zip_code: (curatedData as any).zipCode,
             pix_key: curatedData.pixKey,
+            mp_access_token: curatedData.mpAccessToken, // NOVO CAMPO
             avatar_url: curatedData.photo,
             brand_color: '#2563eb', // Força a cor padrão
             logo_url: curatedData.logoUrl,
@@ -138,6 +142,7 @@ export const operatorProfileService = {
             address: asString(raw.address).substring(0, 200),
             addressNumber: asString(raw.addressNumber).substring(0, 20),
             pixKey: asString(raw.pixKey).substring(0, 100),
+            mpAccessToken: asString(raw.mpAccessToken || '').trim(), // NOVO
             photo: raw.photo,
             brandColor: '#2563eb', // Força a cor padrão
             logoUrl: raw.logoUrl,
@@ -174,6 +179,7 @@ export const operatorProfileService = {
             state: asString(dbProfile.state),
             zipCode: asString(dbProfile.zip_code),
             pixKey: asString(dbProfile.pix_key),
+            mpAccessToken: asString(dbProfile.mp_access_token), // NOVO
             photo: dbProfile.avatar_url,
             password: dbProfile.senha_acesso,
             recoveryPhrase: dbProfile.recovery_phrase,
