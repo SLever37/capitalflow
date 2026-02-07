@@ -7,6 +7,7 @@ import { formatMoney } from '../../utils/formatters';
 import { PortalPaymentModal } from './components/PortalPaymentModal'; 
 import { PortalChatDrawer } from './components/PortalChatDrawer';
 import { supabase } from '../../lib/supabase';
+import { getDaysUntilDue } from '../../components/cards/LoanCardComposition/helpers';
 
 export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) => {
     const {
@@ -227,32 +228,65 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
                                 {installments.length === 0 ? (
                                     <div className="p-8 text-center text-slate-600 text-[10px] font-bold uppercase">Nenhuma parcela encontrada.</div>
                                 ) : (
-                                    installments.map((p, idx) => (
-                                        <div key={idx} className="flex justify-between items-center p-4 border-b border-slate-800 last:border-0 hover:bg-slate-800/50 transition-colors">
-                                            <div className="flex items-center gap-3">
-                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black ${p.status === 'PAID' ? 'bg-emerald-500/10 text-emerald-500' : p.status === 'LATE' ? 'bg-rose-500/10 text-rose-500' : 'bg-slate-800 text-slate-400'}`}>
-                                                    {p.numero_parcela}
+                                    installments.map((p, idx) => {
+                                        // LÓGICA DE STATUS UNIFICADA
+                                        const daysDiff = getDaysUntilDue(p.data_vencimento);
+                                        let statusLabel = '';
+                                        let statusColor = 'text-slate-500';
+                                        let dateColor = 'text-slate-300';
+
+                                        if (p.status === 'PAID') {
+                                            statusLabel = 'Pago';
+                                            statusColor = 'text-emerald-500';
+                                            dateColor = 'text-slate-500';
+                                        } else {
+                                            if (daysDiff < 0) {
+                                                const d = Math.abs(daysDiff);
+                                                statusLabel = `Vencido há ${d} dia${d === 1 ? '' : 's'}`;
+                                                statusColor = 'text-rose-500';
+                                                dateColor = 'text-rose-400';
+                                            } else if (daysDiff === 0) {
+                                                statusLabel = 'Vence hoje';
+                                                statusColor = 'text-amber-500 animate-pulse';
+                                                dateColor = 'text-amber-400';
+                                            } else if (daysDiff <= 3) {
+                                                statusLabel = `Faltam ${daysDiff} dia${daysDiff === 1 ? '' : 's'}`;
+                                                statusColor = 'text-amber-500';
+                                                dateColor = 'text-amber-400';
+                                            } else {
+                                                statusLabel = 'Em dia';
+                                                statusColor = 'text-slate-500';
+                                                dateColor = 'text-slate-300';
+                                            }
+                                        }
+
+                                        return (
+                                            <div key={idx} className="flex justify-between items-center p-4 border-b border-slate-800 last:border-0 hover:bg-slate-800/50 transition-colors">
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black ${p.status === 'PAID' ? 'bg-emerald-500/10 text-emerald-500' : (daysDiff < 0 && p.status !== 'PAID') ? 'bg-rose-500/10 text-rose-500' : 'bg-slate-800 text-slate-400'}`}>
+                                                        {p.numero_parcela}
+                                                    </div>
+                                                    <div>
+                                                        <p className={`text-[10px] font-bold uppercase ${dateColor}`}>
+                                                            {new Date(p.data_vencimento).toLocaleDateString()}
+                                                        </p>
+                                                        <p className={`text-[9px] font-bold uppercase ${statusColor}`}>
+                                                            {statusLabel}
+                                                        </p>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <p className={`text-[10px] font-bold uppercase ${p.status === 'LATE' ? 'text-rose-400' : 'text-slate-300'}`}>
-                                                        {new Date(p.data_vencimento).toLocaleDateString()}
-                                                    </p>
-                                                    <p className="text-[9px] text-slate-500 font-bold uppercase">
-                                                        {p.status === 'PAID' ? 'Pago' : p.status === 'LATE' ? 'Em Atraso' : 'A Vencer'}
-                                                    </p>
-                                                </div>
+                                                <span className={`text-xs font-black ${p.status === 'PAID' ? 'text-emerald-500 decoration-slate-500' : 'text-white'}`}>
+                                                    {formatMoney(p.valor_parcela)}
+                                                </span>
                                             </div>
-                                            <span className={`text-xs font-black ${p.status === 'PAID' ? 'text-emerald-500 decoration-slate-500' : 'text-white'}`}>
-                                                {formatMoney(p.valor_parcela)}
-                                            </span>
-                                        </div>
-                                    ))
+                                        );
+                                    })
                                 )}
                             </div>
                         </div>
                     </div>
 
-                    {/* INFO CREDOR (ATUALIZADO PARA MOSTRAR DADOS REAIS) */}
+                    {/* INFO CREDOR */}
                     {creditorInfo && (
                         <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800/50 flex items-center gap-3 opacity-90 hover:opacity-100 transition-opacity">
                             <div className="p-2 bg-slate-800 rounded-xl text-slate-400"><Building size={16}/></div>

@@ -1,4 +1,3 @@
-
 import { supabase } from '../lib/supabase';
 import { GoogleGenAI } from "@google/genai";
 
@@ -72,8 +71,9 @@ export const processNaturalLanguageCommand = async (text: string, portfolioConte
             "${text}"
             `;
 
+            // Changed to flash-preview to avoid quota exhaustion (429) on preview tier
             const response = await ai.models.generateContent({
-              model: 'gemini-3-pro-preview',
+              model: 'gemini-3-flash-preview', 
               contents: userPrompt,
               config: {
                 systemInstruction: systemInstruction,
@@ -88,9 +88,17 @@ export const processNaturalLanguageCommand = async (text: string, portfolioConte
 
         } catch (localError: any) {
             console.error("Local AI Error:", localError);
+            
+            // Tratamento aprimorado de erro para exibir mensagem útil na UI
+            let msg = localError.message || (localError.error && localError.error.message) || JSON.stringify(localError);
+            
+            if (msg.includes('429') || msg.includes('quota') || msg.includes('RESOURCE_EXHAUSTED')) {
+                msg = "Cota da IA excedida (429). Aguarde alguns instantes ou verifique seu plano.";
+            }
+
             return { 
                 intent: "ERROR", 
-                feedback: "Erro na IA Local: " + localError.message, 
+                feedback: "Falha na IA: " + msg, 
                 analysis: "Verifique sua API Key ou conexão." 
             };
         }

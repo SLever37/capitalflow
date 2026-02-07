@@ -25,7 +25,8 @@ export const LoanForm: React.FC<LoanFormProps> = (props) => {
     isSubmitting, isUploading,
     attachments, customDocuments,
     showCamera, videoRef, fileInputRef,
-    autoDueDate, isDailyModality,
+    // Fix: Replaced autoDueDate with manualFirstDueDate and added setManualFirstDueDate to match useLoanForm return type
+    manualFirstDueDate, setManualFirstDueDate, isDailyModality,
     startCamera, takePhoto, stopCamera,
     handleClientSelect, handlePickContact,
     handleFileUpload, toggleDocVisibility, removeDoc,
@@ -70,6 +71,7 @@ export const LoanForm: React.FC<LoanFormProps> = (props) => {
             />
 
             {/* COLUNA 2: FINANCEIRO */}
+            {/* Fix: Passed manualFirstDueDate and setManualFirstDueDate props to match LoanFormFinancialSection signature */}
             <LoanFormFinancialSection 
                 sources={props.sources}
                 formData={formData}
@@ -77,7 +79,8 @@ export const LoanForm: React.FC<LoanFormProps> = (props) => {
                 isDailyModality={isDailyModality}
                 fixedDuration={fixedDuration}
                 setFixedDuration={setFixedDuration}
-                autoDueDate={autoDueDate}
+                manualFirstDueDate={manualFirstDueDate}
+                setManualFirstDueDate={setManualFirstDueDate}
                 skipWeekends={skipWeekends}
                 setSkipWeekends={setSkipWeekends}
             />

@@ -1,4 +1,3 @@
-
 import { supabase } from '../lib/supabase';
 import { UserProfile, Loan, CapitalSource } from '../types';
 import { generateUUID } from '../utils/generators';
@@ -53,51 +52,51 @@ export const contractsService = {
     let finalClientId = safeUUID(loan.clientId);
 
     const shouldCheckClient = !finalClientId && loan.debtorName && loan.debtorName.trim().length > 0;
-    
+
     if (shouldCheckClient) {
-        // 1. Tenta encontrar cliente existente pelo CPF/CNPJ
-        if (loan.debtorDocument && loan.debtorDocument.trim().length > 0) {
-            const { data: existingClient } = await supabase
-                .from('clientes')
-                .select('id')
-                .eq('profile_id', ownerId)
-                .eq('document', loan.debtorDocument)
-                .maybeSingle();
+      // 1. Tenta encontrar cliente existente pelo CPF/CNPJ
+      if (loan.debtorDocument && loan.debtorDocument.trim().length > 0) {
+        const { data: existingClient } = await supabase
+          .from('clientes')
+          .select('id')
+          .eq('profile_id', ownerId)
+          .eq('document', loan.debtorDocument)
+          .maybeSingle();
 
-            if (existingClient) {
-                console.log('[ContractsService] Cliente existente encontrado via CPF. Vinculando:', existingClient.id);
-                finalClientId = existingClient.id;
-            }
+        if (existingClient) {
+          console.log('[ContractsService] Cliente existente encontrado via CPF. Vinculando:', existingClient.id);
+          finalClientId = existingClient.id;
+        }
+      }
+
+      // 2. Se ainda não tem ID (não existe), cria um novo
+      if (!finalClientId) {
+        const newClientId = generateUUID();
+        // Gera códigos aleatórios simples para o cliente automático
+        const accessCode = String(Math.floor(Math.random() * 10000)).padStart(4, '0');
+        const clientNumber = String(Math.floor(100000 + Math.random() * 900000));
+
+        const { error: clientError } = await supabase.from('clientes').insert({
+          id: newClientId,
+          profile_id: ownerId,
+          name: loan.debtorName,
+          phone: loan.debtorPhone || null,
+          document: loan.debtorDocument || null,
+          address: loan.debtorAddress || null,
+          access_code: accessCode,
+          client_number: clientNumber,
+          notes: 'Criado automaticamente via Novo Contrato',
+          created_at: new Date().toISOString()
+        });
+
+        if (clientError) {
+          console.error("Erro auto-criação cliente:", clientError);
+          throw new Error("Erro ao criar cliente automaticamente: " + clientError.message);
         }
 
-        // 2. Se ainda não tem ID (não existe), cria um novo
-        if (!finalClientId) {
-            const newClientId = generateUUID();
-            // Gera códigos aleatórios simples para o cliente automático
-            const accessCode = String(Math.floor(Math.random() * 10000)).padStart(4, '0');
-            const clientNumber = String(Math.floor(100000 + Math.random() * 900000));
-
-            const { error: clientError } = await supabase.from('clientes').insert({
-                id: newClientId,
-                profile_id: ownerId,
-                name: loan.debtorName,
-                phone: loan.debtorPhone || null,
-                document: loan.debtorDocument || null,
-                address: loan.debtorAddress || null,
-                access_code: accessCode,
-                client_number: clientNumber,
-                notes: 'Criado automaticamente via Novo Contrato',
-                created_at: new Date().toISOString()
-            });
-
-            if (clientError) {
-                console.error("Erro auto-criação cliente:", clientError);
-                throw new Error("Erro ao criar cliente automaticamente: " + clientError.message);
-            }
-            
-            console.log('[ContractsService] Novo cliente criado automaticamente:', newClientId);
-            finalClientId = newClientId;
-        }
+        console.log('[ContractsService] Novo cliente criado automaticamente:', newClientId);
+        finalClientId = newClientId;
+      }
     }
 
     const loanId = editingLoan ? loan.id : ensureUUID(loan.id);
@@ -144,6 +143,10 @@ export const contractsService = {
       cliente_foto_url: loan.clientAvatarUrl || null
     };
 
+    // =========================
+    // ✅ PASSO 1: CORREÇÃO DO VENCIMENTO "VOLTA"
+    // Ao editar contrato, atualizar também as PARCELAS
+    // =========================
     if (editingLoan) {
       const { error } = await supabase
         .from('contratos')
@@ -151,6 +154,32 @@ export const contractsService = {
         .eq('id', loanId);
 
       if (error) throw new Error('Erro ao atualizar contrato: ' + error.message);
+
+      // ✅ NOVO: Persistir vencimentos/valores das parcelas no DB
+      if (loan.installments?.length) {
+        const installmentsPayload = loan.installments.map(inst => ({
+          id: ensureUUID(inst.id),
+          loan_id: loanId,
+          profile_id: ownerId,
+          numero_parcela: inst.number || 1,
+          data_vencimento: inst.dueDate, // <-- aqui está a data que a UI usa
+          valor_parcela: safeFloat(inst.amount),
+          amount: safeFloat(inst.amount),
+          scheduled_principal: safeFloat(inst.scheduledPrincipal),
+          scheduled_interest: safeFloat(inst.scheduledInterest),
+          principal_remaining: safeFloat(inst.principalRemaining),
+          interest_remaining: safeFloat(inst.interestRemaining),
+          late_fee_accrued: safeFloat(inst.lateFeeAccrued),
+        }));
+
+        // Upsert: se existir, atualiza; se não existir, cria
+        const { error: upsertErr } = await supabase
+          .from('parcelas')
+          .upsert(installmentsPayload, { onConflict: 'id' });
+
+        if (upsertErr) throw new Error('Erro ao atualizar parcelas: ' + upsertErr.message);
+      }
+
     } else {
       const { error } = await supabase
         .from('contratos')

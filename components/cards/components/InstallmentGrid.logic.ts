@@ -1,6 +1,6 @@
 
 import { Loan, Installment, LoanStatus } from '../../../types';
-import { getDaysDiff, formatBRDate, parseDateOnlyUTC, addDaysUTC } from '../../../utils/dateHelpers';
+import { getDaysDiff, formatBRDate, parseDateOnlyUTC, todayDateOnlyUTC } from '../../../utils/dateHelpers';
 import { calculateTotalDue, getInstallmentStatusLogic } from '../../../domain/finance/calculations';
 
 export interface InstallmentViewModel {
@@ -25,13 +25,6 @@ export interface InstallmentViewModel {
     isFixedTerm: boolean;
 }
 
-/**
- * Retorna SEMPRE a data de vencimento exata do backend.
- */
-export const calculateDisplayDueDate = (loan: Loan, inst: Installment, isDailyFree: boolean, isFixedTerm: boolean): string => {
-    return inst.dueDate;
-};
-
 export const prepareInstallmentViewModel = (
     loan: Loan,
     inst: Installment,
@@ -49,29 +42,16 @@ export const prepareInstallmentViewModel = (
 ): InstallmentViewModel => {
     const { isDailyFree, isFixedTerm, fixedTermStats, isPaid, isZeroBalance, isFullyFinalized, showProgress, strategy } = context;
 
-    const st = getInstallmentStatusLogic(inst);
     const debt = calculateTotalDue(loan, inst);
     
-    // Fonte da Verdade Inicial
-    let displayDueDate = inst.dueDate;
+    // VÍNCULO DIRETO COM O CONTRATO: A data exibida é a data real da parcela no banco
+    const displayDueDate = inst.dueDate;
 
-    // FIX: Para contratos MENSAIS recém-renovados/criados onde start_date == due_date,
-    // o sistema considera como vencimento em 30 dias (novo ciclo), não hoje.
-    // Isso evita que o card fique Laranja (Vence Hoje) logo após renovar.
-    if (!loan.billingCycle.includes('DAILY') && loan.startDate && inst.dueDate) {
-        const d1 = parseDateOnlyUTC(loan.startDate).getTime();
-        const d2 = parseDateOnlyUTC(inst.dueDate).getTime();
-        if (d1 === d2) {
-             displayDueDate = addDaysUTC(inst.dueDate, 30).toISOString();
-        }
-    }
-    
-    // Cálculo de dias baseado na data (possivelmente projetada)
-    // Positivo = Atrasado | Zero = Hoje | Negativo = Futuro
+    // Diferença em relação a HOJE (Positivo = Atrasado)
     const daysDiff = getDaysDiff(displayDueDate);
     
-    // isLateInst considera o status do banco OU o cálculo de dias corrigido
-    const isLateInst = st === LoanStatus.LATE || (daysDiff > 0 && !isPaid);
+    // Status de Atraso real: Se a data passou e não está pago
+    const isLateInst = daysDiff > 0 && inst.status !== LoanStatus.PAID;
     
     const isFixedTermDone = isFixedTerm && fixedTermStats && fixedTermStats.paidDays >= fixedTermStats.totalDays;
     const isInstPaid = inst.status === LoanStatus.PAID;
@@ -81,47 +61,40 @@ export const prepareInstallmentViewModel = (
     let daysPrepaid = 0;
     
     if (isDailyFree) {
-        const due = new Date(displayDueDate); 
-        const now = new Date();
-        due.setHours(0, 0, 0, 0); now.setHours(0, 0, 0, 0);
-        const diffTime = due.getTime() - now.getTime();
-        if (diffTime > 0) { 
+        if (daysDiff < 0) { 
             isPrepaid = true; 
-            daysPrepaid = Math.floor(diffTime / (1000 * 3600 * 24)); 
+            daysPrepaid = Math.abs(daysDiff); 
         }
     }
 
     let statusText = '';
     let statusColor = '';
 
-    const strategyStatus = strategy?.card?.statusLabel 
-        ? strategy.card.statusLabel({ ...inst, dueDate: displayDueDate }, daysDiff) 
-        : null;
-
+    // LÓGICA DE STATUS - MODO FOCO
     if (isInstPaid || isZeroBalance) { 
         statusText = 'CONTRATO FINALIZADO'; 
         statusColor = 'text-emerald-500 font-black'; 
     }
+    else if (isLateInst) {
+        statusText = `VENCIDO HÁ ${daysDiff} ${daysDiff === 1 ? 'DIA' : 'DIAS'}`; 
+        statusColor = 'text-rose-500 font-black animate-pulse'; 
+    }
     else if (isPrepaid) { 
-        statusText = `Adiantado (${daysPrepaid} dias)`; 
+        statusText = `ADIANTADO (${daysPrepaid} DIAS)`; 
         statusColor = 'text-emerald-400 font-black'; 
     }
     else if (isFixedTerm) { 
         const paidUntil = fixedTermStats?.paidUntilDate; 
-        const today = new Date();
-        today.setHours(0,0,0,0);
-        
         if (isFixedTermDone) { 
             statusText = 'CONTRATO FINALIZADO'; 
             statusColor = 'text-emerald-500 font-black'; 
         } else if (paidUntil) {
-            const diffTime = paidUntil.getTime() - today.getTime();
-            const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            if (daysLeft >= 0) { 
-                statusText = `EM DIA (Pago até ${formatBRDate(paidUntil)})`; 
+            const diff = getDaysDiff(paidUntil);
+            if (diff <= 0) { 
+                statusText = `EM DIA (Até ${formatBRDate(paidUntil)})`; 
                 statusColor = 'text-emerald-400 font-black'; 
             } else { 
-                statusText = `ATRASADO (${Math.abs(daysLeft)} dias)`; 
+                statusText = `ATRASADO (${Math.abs(diff)} dias)`; 
                 statusColor = 'text-rose-500 font-black animate-pulse'; 
             }
         } else { 
@@ -129,23 +102,14 @@ export const prepareInstallmentViewModel = (
             statusColor = 'text-blue-400'; 
         }
     }
-    else if (strategyStatus) {
-        statusText = strategyStatus.text;
-        statusColor = strategyStatus.color;
-    }
     else {
-        if (daysDiff > 0) { 
-            statusText = `Atrasado há ${daysDiff} dias`; 
-            statusColor = 'text-rose-500 font-black'; 
-        } 
-        else if (daysDiff === 0) { 
-            statusText = 'Vence HOJE'; 
-            statusColor = 'text-amber-400 animate-pulse'; 
+        if (daysDiff === 0) { 
+            statusText = 'VENCE HOJE'; 
+            statusColor = 'text-amber-400 animate-pulse font-black'; 
         }
         else { 
-            // Negativo = Futuro
-            statusText = `Faltam ${Math.abs(daysDiff)} dias`; 
-            statusColor = 'text-blue-400'; 
+            statusText = `FALTAM ${Math.abs(daysDiff)} DIAS`; 
+            statusColor = 'text-blue-400 font-bold'; 
         }
     }
 

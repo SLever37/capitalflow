@@ -88,8 +88,8 @@ Deno.serve(async (req: any) => {
     "${text}"
     `;
 
-    // gemini-3-pro-preview recommended for complex reasoning
-    const model = 'gemini-3-pro-preview'; 
+    // Switch to gemini-3-flash-preview for efficiency and quota management
+    const model = 'gemini-3-flash-preview'; 
     
     const response = await ai.models.generateContent({
       model: model,

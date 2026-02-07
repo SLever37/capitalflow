@@ -1,6 +1,5 @@
-
 import { LoanStatus, Installment } from '../../../../types';
-import { addDaysUTC, parseDateOnlyUTC } from '../../../../utils/dateHelpers';
+import { addMonthsUTC, parseDateOnlyUTC, toISODateOnlyUTC } from '../../../../utils/dateHelpers';
 import { generateUUID } from '../../../../utils/generators';
 
 export const calculateMonthlyInstallments = (
@@ -10,17 +9,18 @@ export const calculateMonthlyInstallments = (
   existingId?: string
 ): { installments: Installment[], totalToReceive: number } => {
   const baseDate = parseDateOnlyUTC(startDateStr);
-  
+
   // MENSAL: Juros Simples (Principal * Taxa)
   const scheduledInterest = principal * (rate / 100);
   const totalToReceive = principal + scheduledInterest;
-  
-  // Vencimento: +30 dias
-  const dueDate = addDaysUTC(baseDate, 30);
-  
+
+  // ✅ Vencimento mensal real: +1 mês de calendário (não +30 dias)
+  const dueDate = addMonthsUTC(baseDate, 1);
+
   const installment: Installment = {
     id: existingId || generateUUID(),
-    dueDate: dueDate.toISOString(),
+    // ✅ Salvar como YYYY-MM-DD (evita shift de fuso e melhora alertas)
+    dueDate: toISODateOnlyUTC(dueDate),
     amount: parseFloat(totalToReceive.toFixed(2)),
     scheduledPrincipal: parseFloat(principal.toFixed(2)),
     scheduledInterest: parseFloat(scheduledInterest.toFixed(2)),

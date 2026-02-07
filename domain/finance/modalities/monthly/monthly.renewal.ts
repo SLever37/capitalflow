@@ -13,39 +13,34 @@ export const renewMonthly = (
     manualDate?: Date | null
 ): RenewalResult => {
     
-    // Data de vencimento atual da parcela (Fonte da Verdade)
+    // Data de vencimento atual registrada no contrato
     const currentDueDate = parseDateOnlyUTC(inst.dueDate);
     const daysLate = getDaysDiff(inst.dueDate); 
     
-    // Verifica se houve amortização do principal
-    const isPrincipalPayment = (Number(allocation?.principalPaid) || 0) > 0;
-
     let baseDate: Date;
     
     if (manualDate) {
-        // Se o usuário escolheu uma data, respeita
+        // 1. Data Manual (Soberania do operador)
         baseDate = manualDate;
-    } else if (daysLate > 0 && isPrincipalPayment) {
-        // Se pagou atrasado E abateu o principal (renegociação implícita), reseta o ciclo para hoje
+    } else if (daysLate > 0 && (Number(allocation?.principalPaid) || 0) > 0) {
+        // 2. Atraso com amortização: reseta o ciclo para hoje (renegociação implícita)
         baseDate = today;
     } else {
-        // Renovação Padrão (pagamento de juros):
-        // SEMPRE usa a data de vencimento original como base para manter o ciclo mensal perfeito.
-        // Isso evita que pagar atrasado ou adiantado mova o vencimento para uma data errada (ex: pular 2 meses)
+        // 3. Pagamento de Juros (Renovação Padrão):
+        // Sempre avança 30 dias EM CIMA da data teórica de vencimento.
+        // Isso impede que, se o cliente pagar adiantado 10 dias, ele "perca" esses 10 dias de juros.
         baseDate = currentDueDate;
     }
 
-    // No Mensal, sempre joga 30 dias para frente a partir da base
-    // Se a base for Jan 01, vai para Jan 31/Fev 01. Se a base for "Hoje" (em atraso amortizado), vai +30 de hoje.
+    // Calcula o novo início e novo vencimento (Ciclo de 30 dias)
     const newStartDateISO = toISODateOnlyUTC(baseDate); 
     const newDueDateISO = toISODateOnlyUTC(addDaysUTC(baseDate, 30));
 
     const currentPrincipalRemaining = Number(inst.principalRemaining) || 0;
     const principalPaidNow = (Number(allocation?.principalPaid) || 0) + (Number(allocation?.avGenerated) || 0);
-
     const newPrincipalRemaining = Math.max(0, currentPrincipalRemaining - principalPaidNow);
     
-    // Projeta o próximo juro (Mês cheio)
+    // O próximo juro é projetado sobre o novo saldo para o mês seguinte
     const nextMonthInterest = newPrincipalRemaining * (loan.interestRate / 100);
     
     return {

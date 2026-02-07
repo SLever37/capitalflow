@@ -1,12 +1,16 @@
 
 import { CapitalSource } from '../../../types';
 
+/**
+ * Retorna a data em formato YYYY-MM-DD respeitando o dia local do operador.
+ */
 export const safeIsoDateOnly = (val: string | undefined): string => {
     if (!val) {
-        // CORREÇÃO: Usar data local compensada para evitar bugs de UTC (data caindo no dia seguinte)
         const now = new Date();
-        const localDate = new Date(now.getTime() - (now.getTimezoneOffset() * 60000));
-        return localDate.toISOString().split('T')[0];
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const d = String(now.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
     }
     return val.includes('T') ? val.split('T')[0] : val;
 };

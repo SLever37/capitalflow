@@ -1,108 +1,124 @@
-
 // utils/dateHelpers.ts
 const MS_PER_DAY = 86400000;
 export type DateInput = string | Date | null | undefined;
 
+/**
+ * Retorna a data de HOJE no fuso do navegador, com hora zerada (00:00:00).
+ */
 export const todayDateOnlyUTC = (): Date => {
-  const now = new Date();
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
 };
 
+/**
+ * Converte qualquer entrada para um objeto Date local (00:00:00).
+ * Resolve strings ISO (UTC) para o dia correspondente no fuso do usuário de forma literal.
+ */
 export const parseDateOnlyUTC = (input: DateInput): Date => {
   if (!input) return todayDateOnlyUTC();
 
-  // Se já for Date válido
+  let d: Date;
   if (input instanceof Date) {
-    if (isNaN(input.getTime())) return todayDateOnlyUTC();
-    return new Date(Date.UTC(input.getUTCFullYear(), input.getUTCMonth(), input.getUTCDate()));
-  }
-
-  try {
+    d = new Date(input.getTime());
+  } else {
     const raw = String(input).trim();
     if (!raw) return todayDateOnlyUTC();
 
-    // ISO YYYY-MM-DD
-    const iso10 = raw.slice(0, 10);
-    if (/^\d{4}-\d{2}-\d{2}$/.test(iso10)) {
-      const [y, m, d] = iso10.split('-').map(Number);
-      return new Date(Date.UTC(y, m - 1, d));
-    }
-
-    // BR DD/MM/YYYY
-    if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) {
+    // Extrai apenas a parte da data YYYY-MM-DD para ignorar shifts de UTC
+    const dateMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (dateMatch) {
+      const [_, y, m, dayPart] = dateMatch.map(Number);
+      d = new Date(y, m - 1, dayPart, 0, 0, 0);
+    } else if (/^\d{2}\/\d{2}\/\d{4}/.test(raw)) {
       const [dd, mm, yyyy] = raw.split('/').map(Number);
-      return new Date(Date.UTC(yyyy, mm - 1, dd));
+      d = new Date(yyyy, mm - 1, dd, 0, 0, 0);
+    } else {
+      d = new Date(raw);
     }
-
-    // Tenta construtor padrão
-    const d = new Date(raw);
-    if (Number.isNaN(d.getTime())) return todayDateOnlyUTC(); // Fallback seguro
-    return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-  } catch (e) {
-    return todayDateOnlyUTC();
   }
+
+  if (isNaN(d.getTime())) return todayDateOnlyUTC();
+  d.setHours(0, 0, 0, 0);
+  return d;
 };
 
 export const isWeekendUTC = (date: Date): boolean => {
-  const day = date.getUTCDay();
-  return day === 0 || day === 6; // 0 = Domingo, 6 = Sábado
+  const day = date.getDay(); // Fuso Local
+  return day === 0 || day === 6;
 };
 
 export const addDaysUTC = (date: DateInput, days: number, skipWeekends: boolean = false): Date => {
   let d = parseDateOnlyUTC(date);
-  
+
   if (!skipWeekends) {
-    d.setUTCDate(d.getUTCDate() + days);
+    d.setDate(d.getDate() + days);
     return d;
   }
 
-  // LÓGICA REFINADA PARA DIAS ÚTEIS
   if (days > 0) {
-      let added = 0;
-      while (added < days) {
-        d.setUTCDate(d.getUTCDate() + 1);
-        if (!isWeekendUTC(d)) {
-          added++;
-        }
-      }
-  }
-  
-  // Apenas move para o próximo dia útil se a data final cair num fim de semana
-  if (days > 0) {
-    while (isWeekendUTC(d)) {
-      d.setUTCDate(d.getUTCDate() + 1);
+    let added = 0;
+    while (added < days) {
+      d.setDate(d.getDate() + 1);
+      if (!isWeekendUTC(d)) added++;
+    }
+  } else if (days < 0) {
+    let subtracted = 0;
+    while (subtracted < Math.abs(days)) {
+      d.setDate(d.getDate() - 1);
+      if (!isWeekendUTC(d)) subtracted++;
     }
   }
-  
+
+  while (isWeekendUTC(d)) {
+    d.setDate(d.getDate() + 1);
+  }
+
+  return d;
+};
+
+/**
+ * ✅ NOVO: Soma meses por calendário (mensal real).
+ * Ex.: 31/01 + 1 mês => 28/02 (ou 29 em ano bissexto)
+ */
+export const addMonthsUTC = (date: DateInput, months: number): Date => {
+  const d = parseDateOnlyUTC(date);
+  const originalDay = d.getDate();
+
+  // Vai para o dia 1 antes de mudar o mês (evita overflow)
+  d.setDate(1);
+  d.setMonth(d.getMonth() + months);
+
+  // Último dia do mês alvo
+  const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(originalDay, lastDay));
+
+  d.setHours(0, 0, 0, 0);
   return d;
 };
 
 export const toISODateOnlyUTC = (date: DateInput): string => {
   const d = parseDateOnlyUTC(date);
-  const y = d.getUTCFullYear();
-  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(d.getUTCDate()).padStart(2, '0');
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 };
 
 export const formatBRDate = (date: DateInput): string => {
   const d = parseDateOnlyUTC(date);
-  const dd = String(d.getUTCDate()).padStart(2, '0');
-  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
-  const yyyy = d.getUTCFullYear();
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const yyyy = d.getFullYear();
   return `${dd}/${mm}/${yyyy}`;
 };
 
-// Hoje - target (positivo = atrasado; negativo = faltam dias)
 export const getDaysDiff = (targetDate: DateInput): number => {
-  const target = parseDateOnlyUTC(targetDate).getTime();
-  const today = todayDateOnlyUTC().getTime();
-  return Math.round((today - target) / MS_PER_DAY);
-};
+  const target = parseDateOnlyUTC(targetDate);
+  const today = todayDateOnlyUTC();
 
-export const getDaysUntilDue = (dueDate: DateInput): number => {
-  const diff = getDaysDiff(dueDate);
-  return diff < 0 ? Math.abs(diff) : 0;
+  const diffTime = today.getTime() - target.getTime();
+  return Math.round(diffTime / MS_PER_DAY);
 };
 
 export const getDueStatus = (dueDate: DateInput) => {

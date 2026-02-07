@@ -9,6 +9,7 @@ import { mapFormToLoan, LoanFormState } from '../domain/loanForm.mapper';
 import { calculateAutoDueDate } from '../domain/loanForm.preview';
 import { getInitialFormState } from './loanForm.defaults';
 import { safeIsoDateOnly, safeSourceId, safeFileFirst } from '../utils/formHelpers';
+import { parseDateOnlyUTC, toISODateOnlyUTC, addDaysUTC } from '../../../utils/dateHelpers';
 
 interface UseLoanFormProps {
   initialData?: Loan | null;
@@ -26,6 +27,9 @@ export const useLoanForm = ({ initialData, clients, sources, userProfile, onAdd,
   const [skipWeekends, setSkipWeekends] = useState(false);
   
   const [formData, setFormData] = useState<LoanFormState>(() => getInitialFormState(safeSourceId(sources)));
+  
+  // NOVO: Estado para controlar o vencimento da 1ª parcela de forma manual/automática
+  const [manualFirstDueDate, setManualFirstDueDate] = useState<string>('');
 
   const [attachments, setAttachments] = useState<string[]>([]);
   const [documentPhotos, setDocumentPhotos] = useState<string[]>([]);
@@ -35,10 +39,15 @@ export const useLoanForm = ({ initialData, clients, sources, userProfile, onAdd,
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Derived State
-  const autoDueDate = useMemo(() => 
-    calculateAutoDueDate(formData.startDate, formData.billingCycle, fixedDuration), 
-  [formData.startDate, formData.billingCycle, fixedDuration]);
+  // Efeito para sugerir data de vencimento quando a data do contrato ou modalidade muda
+  useEffect(() => {
+    if (!initialData) {
+        const start = parseDateOnlyUTC(formData.startDate);
+        let daysToAdd = formData.billingCycle === 'MONTHLY' ? 30 : 1;
+        const suggested = toISODateOnlyUTC(addDaysUTC(start, daysToAdd, skipWeekends));
+        setManualFirstDueDate(suggested);
+    }
+  }, [formData.startDate, formData.billingCycle, skipWeekends, initialData]);
 
   const isDailyModality = formData.billingCycle !== 'MONTHLY';
 
@@ -62,11 +71,16 @@ export const useLoanForm = ({ initialData, clients, sources, userProfile, onAdd,
         notes: initialData.notes || '',
         guaranteeDescription: initialData.guaranteeDescription || '',
         startDate: safeIsoDateOnly(initialData.startDate),
-        // Funding Fields Loading (Correção: usar != null para permitir valor 0)
         fundingTotalPayable: initialData.fundingTotalPayable != null ? String(initialData.fundingTotalPayable) : '',
         fundingProvider: initialData.fundingProvider || '',
         fundingFeePercent: initialData.fundingFeePercent != null ? String(initialData.fundingFeePercent) : ''
       });
+      
+      // Se estiver editando, carrega o vencimento real da parcela 1
+      if (initialData.installments?.[0]) {
+          setManualFirstDueDate(safeIsoDateOnly(initialData.installments[0].dueDate));
+      }
+      
       setFixedDuration('30');
       setSkipWeekends(initialData.skipWeekends || false);
       setAttachments(initialData.attachments || []);
@@ -84,7 +98,6 @@ export const useLoanForm = ({ initialData, clients, sources, userProfile, onAdd,
     }
   }, [initialData, userProfile, sources]);
 
-  // CORREÇÃO: Cleanup de URLs blob
   useEffect(() => {
       return () => {
           customDocuments.forEach(doc => {
@@ -93,7 +106,6 @@ export const useLoanForm = ({ initialData, clients, sources, userProfile, onAdd,
       };
   }, [customDocuments]);
 
-  // CORREÇÃO: Cleanup da Câmera ao desmontar
   useEffect(() => {
       return () => {
           if (videoRef.current && videoRef.current.srcObject) {
@@ -103,7 +115,6 @@ export const useLoanForm = ({ initialData, clients, sources, userProfile, onAdd,
       };
   }, []);
 
-  // Handlers
   const handleClientSelect = (id: string) => {
     if (!id) { setFormData({ ...formData, clientId: '' }); return; }
     const client = clients.find(c => c.id === id);
@@ -212,19 +223,16 @@ export const useLoanForm = ({ initialData, clients, sources, userProfile, onAdd,
         return;
     }
 
-    // CORREÇÃO: Permitir saldo negativo explícitamente para contabilidade correta
     if (formData.sourceId && !initialData) {
         const selectedSource = sources.find(s => s.id === formData.sourceId);
         if (selectedSource && parseFloat(formData.principal) > selectedSource.balance) {
             const diff = parseFloat(formData.principal) - selectedSource.balance;
-            // Alerta, mas permite continuar
             if(!window.confirm(`AVISO CONTÁBIL:\n\nO valor do empréstimo (R$ ${parseFloat(formData.principal).toLocaleString()}) é maior que o saldo na carteira ${selectedSource.name} (R$ ${selectedSource.balance.toLocaleString()}).\n\nIsso deixará a carteira NEGATIVA em R$ -${diff.toLocaleString()}.\n\nDeseja confirmar esta saída de caixa?`)) return;
         }
     }
 
     setIsSubmitting(true);
     try {
-        // Pass userProfile.id to mapFormToLoan to ensure Loan type compliance
         const loanPayload = mapFormToLoan(
             formData, 
             fixedDuration, 
@@ -235,6 +243,11 @@ export const useLoanForm = ({ initialData, clients, sources, userProfile, onAdd,
             userProfile?.id || ''
         );
         loanPayload.skipWeekends = skipWeekends;
+        
+        // CORREÇÃO CRÍTICA: Aplica a data manual na primeira parcela
+        if (loanPayload.installments?.[0] && manualFirstDueDate) {
+            loanPayload.installments[0].dueDate = manualFirstDueDate;
+        }
         
         await onAdd(loanPayload);
     } catch (err: any) {
@@ -252,7 +265,8 @@ export const useLoanForm = ({ initialData, clients, sources, userProfile, onAdd,
     isSubmitting, isUploading,
     attachments, documentPhotos, customDocuments,
     showCamera, videoRef, fileInputRef,
-    autoDueDate, isDailyModality,
+    manualFirstDueDate, setManualFirstDueDate,
+    isDailyModality,
     startCamera, takePhoto, stopCamera,
     handleClientSelect, handlePickContact,
     handleFileUpload, toggleDocVisibility, removeDoc,

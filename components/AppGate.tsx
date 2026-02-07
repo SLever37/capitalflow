@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Loader2 } from 'lucide-react';
-import { ClientPortalView } from '../features/portal/ClientPortalView';
+import { ClientPortalView } from '../containers/ClientPortal/ClientPortalView';
 import { PublicLegalSignPage } from '../features/legal/components/PublicLegalSignPage';
 import { AuthScreen } from '../features/auth/AuthScreen';
 import { UserProfile } from '../types';

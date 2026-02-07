@@ -63,13 +63,7 @@ export const useAppState = (activeProfileId: string | null) => {
   const [loans, setLoans] = useState<Loan[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [sources, setSources] = useState<CapitalSource[]>([]);
-  
-  // staffMembers: APENAS subordinados (Equipe do usuário)
   const [staffMembers, setStaffMembers] = useState<UserProfile[]>([]);
-  
-  // systemUsers: TODOS os usuários (Apenas para Master/SAC)
-  const [systemUsers, setSystemUsers] = useState<UserProfile[]>([]);
-  
   const [selectedStaffId, setSelectedStaffId] = useState<string>('ALL');
   
   const [navOrder, setNavOrder] = useState<AppTab[]>(DEFAULT_NAV);
@@ -93,8 +87,6 @@ export const useAppState = (activeProfileId: string | null) => {
         setLoans([]);
         setClients([]);
         setSources([]);
-        setStaffMembers([]);
-        setSystemUsers([]);
     }
   }, [activeProfileId]);
 
@@ -118,7 +110,7 @@ export const useAppState = (activeProfileId: string | null) => {
       setLoadError(null);
 
       try {
-          // Busca perfil atual
+          // Busca com timeout simulado ou proteção de erro
           const { data: profileData, error: profileError } = await supabase
             .from('perfis')
             .select('*')
@@ -134,12 +126,11 @@ export const useAppState = (activeProfileId: string | null) => {
           setNavOrder(u.ui_nav_order || DEFAULT_NAV);
           setHubOrder(u.ui_hub_order || DEFAULT_HUB);
 
-          // Define quem é o "dono" dos dados (se for staff, vê dados do supervisor)
           const ownerId = u.supervisor_id || u.id;
           const isStaff = !!u.supervisor_id;
 
           const [clientsRes, sourcesRes, loansRes] = await Promise.all([
-              supabase.from('clientes').select('*').eq('profile_id', ownerId).limit(isStaff ? 0 : 1000),
+              supabase.from('clientes').select('*').eq('profile_id', ownerId).limit(isStaff ? 0 : 1000), // STAFF logic is handled in controller/filter if needed
               supabase.from('fontes').select('*').eq('profile_id', ownerId),
               supabase.from('contratos').select('*, parcelas(*), transacoes(*), acordos_inadimplencia(*, acordo_parcelas(*)), sinalizacoes_pagamento(*)').eq('profile_id', ownerId)
           ]);
@@ -148,25 +139,16 @@ export const useAppState = (activeProfileId: string | null) => {
           if (sourcesRes.data) setSources(sourcesRes.data.map((s: any) => ({ ...s, balance: asNumber(s.balance) })));
           if (loansRes.data) setLoans(loansRes.data.map((l: any) => mapLoanFromDB(l, clientsRes.data || [])));
 
-          // 1. Carrega EQUIPE (Subordinados) - Disponível para qualquer usuário que tenha montado equipe
-          const { data: teamData } = await supabase
-            .from('perfis')
-            .select('*')
-            .eq('supervisor_id', u.id); // Apenas quem eu gerencio
-            
-          if (teamData) {
-              setStaffMembers(teamData.map(s => mapProfileFromDB(s)));
-          }
-
-          // 2. Carrega SISTEMA (SAC/Master) - Apenas para Admins (Nível 1)
           if (u.accessLevel === 1) {
-              const { data: allUsersData } = await supabase
+              // CORREÇÃO MASTER: Remove filtro 'supervisor_id' para ver TODOS os usuários
+              const { data: staffData } = await supabase
                 .from('perfis')
                 .select('*')
+                .neq('id', u.id) // Evita duplicar o próprio admin na lista
                 .order('nome_operador', { ascending: true });
                 
-              if (allUsersData) {
-                  setSystemUsers(allUsersData.map(s => mapProfileFromDB(s)));
+              if (staffData) {
+                  setStaffMembers(staffData.map(s => mapProfileFromDB(s)));
               }
           }
 
@@ -203,8 +185,8 @@ export const useAppState = (activeProfileId: string | null) => {
   }, [activeProfileId, fetchFullData]);
 
   return {
-    loans, setLoans, clients, setClients, sources, setSources, activeUser, setActiveUser, 
-    staffMembers, systemUsers, // Exporta ambas as listas
+    loans, setLoans, clients, setClients, sources, setSources, activeUser, setActiveUser, staffMembers,
+    systemUsers: staffMembers,
     isLoadingData, setIsLoadingData, loadError, setLoadError, fetchFullData, activeTab, setActiveTab,
     statusFilter, setStatusFilter, sortOption, setSortOption, searchTerm, setSearchTerm,
     clientSearchTerm, setClientSearchTerm, profileEditForm, setProfileEditForm,

@@ -1,6 +1,6 @@
 
 import React, { useMemo } from 'react';
-import { Wallet, CalendarX, Clock, CreditCard, AlertTriangle } from 'lucide-react';
+import { Wallet, CalendarX, Clock, CreditCard, AlertTriangle, CalendarDays } from 'lucide-react';
 import { CapitalSource, LoanBillingModality } from '../../types';
 import { formatMoney } from '../../utils/formatters';
 
@@ -11,19 +11,19 @@ interface LoanFormFinancialSectionProps {
   isDailyModality: boolean;
   fixedDuration: string;
   setFixedDuration: (v: string) => void;
-  autoDueDate: string;
+  manualFirstDueDate: string;
+  setManualFirstDueDate: (v: string) => void;
   skipWeekends?: boolean;
   setSkipWeekends?: (v: boolean) => void;
 }
 
 export const LoanFormFinancialSection: React.FC<LoanFormFinancialSectionProps> = ({
-  sources, formData, setFormData, isDailyModality, fixedDuration, setFixedDuration, autoDueDate, skipWeekends, setSkipWeekends
+  sources, formData, setFormData, isDailyModality, fixedDuration, setFixedDuration, manualFirstDueDate, setManualFirstDueDate, skipWeekends, setSkipWeekends
 }) => {
   
   const selectedSource = sources.find(s => s.id === formData.sourceId);
   const isCardSource = selectedSource?.type === 'CARD';
 
-  // Cálculo de Custo em tempo real
   const fundingCostDisplay = useMemo(() => {
       const principal = parseFloat(formData.principal) || 0;
       const totalPayable = parseFloat(formData.fundingTotalPayable) || 0;
@@ -33,7 +33,7 @@ export const LoanFormFinancialSection: React.FC<LoanFormFinancialSectionProps> =
               isValid: true
           };
       }
-      return { cost: 0, isValid: totalPayable === 0 }; // 0 é válido se não preenchido, mas se preenchido deve ser > principal
+      return { cost: 0, isValid: totalPayable === 0 };
   }, [formData.principal, formData.fundingTotalPayable]);
 
   return (
@@ -41,7 +41,6 @@ export const LoanFormFinancialSection: React.FC<LoanFormFinancialSectionProps> =
       <h3 className="text-[10px] font-black uppercase tracking-widest text-purple-500 flex items-center gap-2"><Wallet className="w-4 h-4" /> Condições</h3>
       <div className="space-y-4">
         
-        {/* Seletor de Modalidade */}
         <div className="flex bg-slate-950 p-1 rounded-2xl border border-slate-800">
             <button type="button" onClick={() => setFormData({...formData, billingCycle: 'MONTHLY'})} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${formData.billingCycle === 'MONTHLY' ? 'bg-purple-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}>Mensal</button>
             <button type="button" onClick={() => setFormData({...formData, billingCycle: 'DAILY_FREE'})} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${isDailyModality ? 'bg-purple-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}>Diário</button>
@@ -61,7 +60,6 @@ export const LoanFormFinancialSection: React.FC<LoanFormFinancialSectionProps> =
                     </select>
                 </div>
 
-                {/* Input de Prazo (Aparece apenas para DAILY_FIXED_TERM) */}
                 {formData.billingCycle === 'DAILY_FIXED_TERM' && (
                     <div className="space-y-1 animate-in fade-in">
                         <label className="text-[9px] text-slate-500 font-black uppercase ml-2 flex items-center gap-1"><Clock size={10}/> Prazo Total (Dias)</label>
@@ -76,7 +74,6 @@ export const LoanFormFinancialSection: React.FC<LoanFormFinancialSectionProps> =
                     </div>
                 )}
 
-                {/* Switch de Dias Úteis */}
                 <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex items-center justify-between group hover:border-purple-500/30 transition-all">
                     <div className="flex items-center gap-3">
                         <div className={`p-2 rounded-lg transition-colors ${skipWeekends ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-500'}`}>
@@ -115,10 +112,14 @@ export const LoanFormFinancialSection: React.FC<LoanFormFinancialSectionProps> =
               <input required type="date" value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-white text-sm" />
           </div>
           <div className="space-y-1">
-              <label className="text-[9px] text-slate-500 font-black uppercase ml-2">{formData.billingCycle === 'DAILY_FREE' ? 'Pago Até:' : 'Vencimento (1º)'}</label>
-              <div className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 text-emerald-500 font-bold text-sm flex items-center justify-center">
-                  {formData.billingCycle === 'DAILY' || formData.billingCycle === 'DAILY_FIXED_TERM' ? 'Sequencial' : `${autoDueDate}`}
-              </div>
+              <label className="text-[9px] text-blue-400 font-black uppercase ml-2 flex items-center gap-1"><CalendarDays size={10}/> Vencimento (1º)</label>
+              <input 
+                  required 
+                  type="date" 
+                  value={manualFirstDueDate} 
+                  onChange={e => setManualFirstDueDate(e.target.value)} 
+                  className="w-full bg-slate-950 border border-blue-500/30 rounded-2xl px-5 py-4 text-white font-bold text-sm focus:border-blue-500 outline-none" 
+              />
           </div>
         </div>
         
@@ -140,7 +141,6 @@ export const LoanFormFinancialSection: React.FC<LoanFormFinancialSectionProps> =
             </select>
         </div>
 
-        {/* --- CUSTO DE CAPTAÇÃO (CARTÃO) --- */}
         {isCardSource && (
             <div className="bg-rose-950/20 border border-rose-500/30 p-4 rounded-2xl space-y-4 animate-in slide-in-from-right">
                 <div className="flex items-center gap-2 text-rose-400 mb-2">
