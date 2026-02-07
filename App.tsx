@@ -22,6 +22,7 @@ import { OperatorSupportChat } from './features/support/OperatorSupportChat';
 import { TeamPage } from './pages/TeamPage';
 import { HeaderBar } from './layout/HeaderBar';
 import { BottomNav } from './layout/BottomNav';
+import { notificationService } from './services/notification.service';
 
 export const App: React.FC = () => {
   const { activeProfileId, loginUser, setLoginUser, loginPassword, setLoginPassword, savedProfiles, submitLogin, handleLogout, handleSelectSavedProfile, handleRemoveSavedProfile } = useAuth();
@@ -42,13 +43,49 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     if (!activeUser && !portalLoanId && !legalSignToken) return;
+    
+    // 1. Solicita permissão para notificações do sistema (Barra do Android / Desktop)
+    notificationService.requestPermission();
+
+    // 2. Trava de histórico para botão Voltar
     window.history.pushState(null, document.title, window.location.href);
-    const handlePopState = () => {
+    
+    const handlePopState = (event: PopStateEvent) => {
       const currentUi = uiRef.current;
-      if (currentUi.activeModal) { currentUi.closeModal(); window.history.pushState(null, '', window.location.href); return; }
-      if (currentUi.showNavHub) { currentUi.setShowNavHub(false); window.history.pushState(null, '', window.location.href); return; }
-      if (activeTab !== 'DASHBOARD' && !portalLoanId && !legalSignToken) { setActiveTab('DASHBOARD'); window.history.pushState(null, '', window.location.href); return; }
+      
+      // Prioridade 1: Se houver modal aberto, fecha o modal e mantém no app
+      if (currentUi.activeModal) { 
+          currentUi.closeModal(); 
+          window.history.pushState(null, '', window.location.href); 
+          return; 
+      }
+      
+      // Prioridade 2: Se houver NavHub aberto, fecha
+      if (currentUi.showNavHub) { 
+          currentUi.setShowNavHub(false); 
+          window.history.pushState(null, '', window.location.href); 
+          return; 
+      }
+      
+      // Prioridade 3: Se não estiver na Dashboard, volta para Dashboard
+      if (activeTab !== 'DASHBOARD' && !portalLoanId && !legalSignToken) { 
+          setActiveTab('DASHBOARD'); 
+          window.history.pushState(null, '', window.location.href); 
+          return; 
+      }
+
+      // Prioridade 4: Anti-Saída (Confirmar antes de sair)
+      // Ocorre quando está na Dashboard sem modais e aperta voltar
+      const confirmExit = window.confirm("Deseja mesmo sair do sistema?");
+      if (!confirmExit) {
+          // Usuário cancelou a saída: Empurra o estado de volta para impedir o back
+          window.history.pushState(null, '', window.location.href);
+      } else {
+          // Usuário confirmou: Executa Logout limpo
+          handleLogout();
+      }
     };
+    
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, [activeUser === null, !!portalLoanId, !!legalSignToken, activeTab]);
