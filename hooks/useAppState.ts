@@ -140,7 +140,13 @@ export const useAppState = (activeProfileId: string | null) => {
           if (loansRes.data) setLoans(loansRes.data.map((l: any) => mapLoanFromDB(l, clientsRes.data || [])));
 
           if (u.accessLevel === 1) {
-              const { data: staffData } = await supabase.from('perfis').select('*').eq('supervisor_id', u.id);
+              // CORREÇÃO MASTER: Remove filtro 'supervisor_id' para ver TODOS os usuários
+              const { data: staffData } = await supabase
+                .from('perfis')
+                .select('*')
+                .neq('id', u.id) // Evita duplicar o próprio admin na lista
+                .order('nome_operador', { ascending: true });
+                
               if (staffData) {
                   setStaffMembers(staffData.map(s => mapProfileFromDB(s)));
               }

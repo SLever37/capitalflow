@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Edit, ShieldAlert, KeyRound } from 'lucide-react';
+import { Edit, ShieldAlert, KeyRound, Shield, User, Search } from 'lucide-react';
 
 interface MasterPageProps {
   allUsers: any[];
@@ -23,39 +23,91 @@ export const MasterPage: React.FC<MasterPageProps> = ({
       return diff < 5 * 60 * 1000; // 5 minutos
   };
 
+  const handleOpenEdit = (u: any) => {
+      setMasterEditUser(u);
+      ui?.openModal('MASTER_EDIT_USER');
+  };
+
   return (
     <div className="space-y-6">
         <div className="bg-slate-900 border border-slate-800 p-6 rounded-[2rem]">
-            <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-black text-white uppercase">Gestão Master</h2>
-                <div className="flex gap-2">
-                    <input type="text" placeholder="Buscar usuário..." className="bg-slate-950 border border-slate-800 p-2 rounded-xl text-white text-sm outline-none" value={sacSearch} onChange={e => setSacSearch(e.target.value)} />
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                <div>
+                    <h2 className="text-xl font-black text-white uppercase flex items-center gap-2">
+                        <Shield className="text-rose-500" size={24}/> Gestão Master (SAC)
+                    </h2>
+                    <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">Administração de Operadores</p>
+                </div>
+                
+                <div className="bg-slate-950 border border-slate-800 p-2 rounded-2xl flex items-center gap-2 w-full sm:w-auto">
+                    <Search className="text-slate-500 ml-2" size={16}/>
+                    <input 
+                        type="text" 
+                        placeholder="Buscar usuário, email..." 
+                        className="bg-transparent w-full sm:w-64 p-2 text-white text-sm outline-none font-bold" 
+                        value={sacSearch} 
+                        onChange={e => setSacSearch(e.target.value)} 
+                    />
                 </div>
             </div>
+
             <div className="space-y-3">
                 {allUsers.filter(u => (u.nome_operador || '').toLowerCase().includes(sacSearch.toLowerCase()) || (u.usuario_email || '').toLowerCase().includes(sacSearch.toLowerCase())).map(u => {
                     const userIsOnline = isOnline(u.last_active_at);
+                    const isAdmin = u.access_level === 1;
                     
                     return (
-                        <div key={u.id} className="flex items-center justify-between bg-slate-950 p-4 rounded-2xl border border-slate-800">
-                            <div>
-                                <div className="flex items-center gap-2">
-                                    <div 
-                                        className={`w-2.5 h-2.5 rounded-full ${userIsOnline ? 'bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.6)]' : 'bg-slate-700'}`} 
-                                        title={userIsOnline ? 'Online agora' : `Visto por último: ${u.last_active_at ? new Date(u.last_active_at).toLocaleString() : 'Nunca'}`}
-                                    ></div>
-                                    <p className="font-bold text-white">{u.nome_operador} <span className="text-[10px] text-slate-500 uppercase">({u.access_level === 1 ? 'ADMIN' : 'USER'})</span></p>
+                        <div key={u.id} className="flex flex-col sm:flex-row items-center justify-between bg-slate-950 p-4 rounded-2xl border border-slate-800 gap-4 group hover:border-slate-700 transition-all">
+                            <div className="flex items-center gap-4 w-full sm:w-auto">
+                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border-2 shrink-0 ${isAdmin ? 'bg-rose-500/10 border-rose-500/20 text-rose-500' : 'bg-slate-800 border-slate-700 text-slate-400'}`}>
+                                    {isAdmin ? <Shield size={20}/> : <User size={20}/>}
                                 </div>
-                                <p className="text-xs text-slate-500 ml-4.5">{u.usuario_email}</p>
+                                
+                                <div className="min-w-0">
+                                    <div className="flex items-center gap-2">
+                                        <p className="font-black text-white uppercase truncate">{u.nome_operador}</p>
+                                        {userIsOnline && (
+                                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-lg shadow-emerald-500/50" title="Online Agora"></span>
+                                        )}
+                                    </div>
+                                    <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider truncate">{u.usuario_email}</p>
+                                    <p className="text-[10px] text-slate-600 truncate">{u.nome_empresa || 'Empresa não definida'}</p>
+                                </div>
                             </div>
-                            <div className="flex gap-2">
-                                <button onClick={() => { setMasterEditUser(u); ui?.openModal('MASTER_EDIT_USER'); }} className="p-2 bg-slate-800 text-blue-500 rounded-lg hover:bg-slate-700 transition-colors"><Edit size={16}/></button>
-                                <button onClick={() => handleToggleAdmin(u)} className="p-2 bg-slate-800 text-purple-500 rounded-lg hover:bg-slate-700 transition-colors"><ShieldAlert size={16}/></button>
-                                <button onClick={() => handleAdminResetPassword(u)} className="p-2 bg-slate-800 text-rose-500 rounded-lg hover:bg-slate-700 transition-colors"><KeyRound size={16}/></button>
+
+                            <div className="flex items-center gap-2 w-full sm:w-auto justify-end border-t sm:border-0 border-slate-800 pt-3 sm:pt-0">
+                                <button 
+                                    onClick={() => handleOpenEdit(u)} 
+                                    className="px-4 py-2 bg-slate-900 border border-slate-800 text-blue-400 hover:text-white hover:bg-blue-600 rounded-xl transition-all text-[10px] font-black uppercase flex items-center gap-2 flex-1 sm:flex-none justify-center"
+                                >
+                                    <Edit size={14}/> Editar / Senha
+                                </button>
+                                
+                                {isAdmin ? (
+                                    <button 
+                                        onClick={() => handleToggleAdmin(u)} 
+                                        className="p-2.5 bg-slate-900 border border-slate-800 text-slate-500 hover:text-rose-500 hover:border-rose-500/30 rounded-xl transition-all"
+                                        title="Remover Admin"
+                                    >
+                                        <ShieldAlert size={16}/>
+                                    </button>
+                                ) : (
+                                    <button 
+                                        onClick={() => handleToggleAdmin(u)} 
+                                        className="p-2.5 bg-slate-900 border border-slate-800 text-slate-500 hover:text-emerald-500 hover:border-emerald-500/30 rounded-xl transition-all"
+                                        title="Promover a Admin"
+                                    >
+                                        <Shield size={16}/>
+                                    </button>
+                                )}
                             </div>
                         </div>
                     );
                 })}
+                
+                {allUsers.length === 0 && (
+                    <div className="text-center py-10 text-slate-600 text-xs font-bold uppercase">Nenhum usuário encontrado.</div>
+                )}
             </div>
         </div>
     </div>

@@ -83,41 +83,54 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 onStaffChange={onStaffChange}
               />
 
-              {/* Layout Masonry (Colunas) para melhor aproveitamento vertical ao expandir cards */}
-              <div className="columns-1 md:columns-2 xl:columns-3 gap-4">
-                  {filteredLoans.map(loan => (
-                    <div key={loan.id} className="break-inside-avoid mb-4">
-                        <LoanCard 
-                            loan={loan} 
-                            sources={sources} 
-                            activeUser={activeUser} 
-                            isExpanded={selectedLoanId === loan.id} 
-                            onToggleExpand={() => setSelectedLoanId(selectedLoanId === loan.id ? null : loan.id)} 
-                            onEdit={(e) => { e.stopPropagation(); onEdit(loan); }} 
-                            onMessage={(e) => { e.stopPropagation(); onMessage(loan); }} 
-                            onArchive={(e) => { e.stopPropagation(); onArchive(loan); }} 
-                            onRestore={(e) => { e.stopPropagation(); onRestore(loan); }} 
-                            onDelete={(e) => { e.stopPropagation(); onDelete(loan); }} 
-                            onNote={(e) => { e.stopPropagation(); onNote(loan); }} 
-                            onPayment={(l, i, c) => onPayment(l, i, c)} 
-                            onPortalLink={(e) => { e.stopPropagation(); onPortalLink(loan); }} 
-                            onUploadPromissoria={(e) => { e.stopPropagation(); onUploadPromissoria(loan); }} 
-                            onUploadDoc={(e) => { e.stopPropagation(); onUploadDoc(loan); }} 
-                            onViewPromissoria={(e, url) => { e.stopPropagation(); onViewPromissoria(url); }} 
-                            onViewDoc={(e, url) => { e.stopPropagation(); onViewDoc(url); }} 
-                            onReviewSignal={onReviewSignal} 
-                            onOpenComprovante={onOpenComprovante} 
-                            onReverseTransaction={onReverseTransaction} 
-                            onRenegotiate={onRenegotiate} 
-                            onNewAporte={onNewAporte} 
-                            onAgreementPayment={onAgreementPayment} 
-                            onRefresh={onRefresh} 
-                            isStealthMode={isStealthMode} 
-                        />
-                    </div>
-                  ))}
-                  {filteredLoans.length === 0 && <div className="col-span-full text-center py-24 bg-slate-900/30 rounded-[3rem] border-2 border-dashed border-slate-800 flex flex-col items-center px-4"><div className="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center mb-6"><BarChart3 className="w-8 h-8 text-slate-700" /></div><p className="font-black uppercase text-sm text-slate-500 tracking-widest">Nenhum contrato encontrado</p></div>}
-              </div>
+              {/* Lista de Contratos: Renderização Condicional */}
+              {filteredLoans.length > 0 ? (
+                  <div className="columns-1 md:columns-2 xl:columns-3 gap-4">
+                      {filteredLoans.map(loan => (
+                        <div key={loan.id} className="break-inside-avoid mb-4">
+                            <LoanCard 
+                                loan={loan} 
+                                sources={sources} 
+                                activeUser={activeUser} 
+                                isExpanded={selectedLoanId === loan.id} 
+                                onToggleExpand={() => setSelectedLoanId(selectedLoanId === loan.id ? null : loan.id)} 
+                                onEdit={(e) => { e.stopPropagation(); onEdit(loan); }} 
+                                onMessage={(e) => { e.stopPropagation(); onMessage(loan); }} 
+                                onArchive={(e) => { e.stopPropagation(); onArchive(loan); }} 
+                                onRestore={(e) => { e.stopPropagation(); onRestore(loan); }} 
+                                onDelete={(e) => { e.stopPropagation(); onDelete(loan); }} 
+                                onNote={(e) => { e.stopPropagation(); onNote(loan); }} 
+                                onPayment={(l, i, c) => onPayment(l, i, c)} 
+                                onPortalLink={(e) => { e.stopPropagation(); onPortalLink(loan); }} 
+                                onUploadPromissoria={(e) => { e.stopPropagation(); onUploadPromissoria(loan); }} 
+                                onUploadDoc={(e) => { e.stopPropagation(); onUploadDoc(loan); }} 
+                                onViewPromissoria={(e, url) => { e.stopPropagation(); onViewPromissoria(url); }} 
+                                onViewDoc={(e, url) => { e.stopPropagation(); onViewDoc(url); }} 
+                                onReviewSignal={onReviewSignal} 
+                                onOpenComprovante={onOpenComprovante} 
+                                onReverseTransaction={onReverseTransaction} 
+                                onRenegotiate={onRenegotiate} 
+                                onNewAporte={onNewAporte} 
+                                onAgreementPayment={onAgreementPayment} 
+                                onRefresh={onRefresh} 
+                                isStealthMode={isStealthMode} 
+                            />
+                        </div>
+                      ))}
+                  </div>
+              ) : (
+                  // Empty State Otimizado
+                  <div className="flex flex-col items-center justify-center py-20 px-6 bg-slate-900/50 border border-dashed border-slate-800 rounded-[3rem] text-center mt-4">
+                      <div className="w-20 h-20 bg-slate-900 rounded-3xl flex items-center justify-center mb-6 shadow-2xl shadow-black/50 border border-slate-800 rotate-3 transition-transform hover:rotate-6">
+                          <BarChart3 className="w-8 h-8 text-slate-600" />
+                      </div>
+                      <h3 className="text-white font-black uppercase tracking-tight text-lg mb-2">Nenhum contrato encontrado</h3>
+                      <p className="text-slate-500 text-xs font-medium max-w-sm leading-relaxed">
+                          Não encontramos registros com os filtros atuais. <br/>
+                          Limpe a busca ou inicie uma nova operação.
+                      </p>
+                  </div>
+              )}
           </div>
 
           <aside className={`w-full lg:w-96 space-y-5 sm:space-y-6 ${mobileDashboardTab === 'CONTRACTS' ? 'hidden md:block' : ''}`}>

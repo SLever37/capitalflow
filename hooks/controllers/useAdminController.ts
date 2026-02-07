@@ -1,3 +1,4 @@
+
 import { supabase } from '../../lib/supabase';
 import { UserProfile } from '../../types';
 
@@ -19,43 +20,37 @@ export const useAdminController = (
   };
 
   const handleAdminResetPassword = async (user: any) => {
-      if (!activeUser || activeUser.accessLevel !== 1) return;
-      const newPass = prompt(`Digite a nova senha para ${user.nome_operador}:`);
-      if (newPass !== null) {
-          const cleanPass = newPass.trim();
-          if (cleanPass.length < 4) {
-              showToast("A senha deve ter pelo menos 4 caracteres.", "error");
-              return;
-          }
-          const { error } = await supabase.from('perfis').update({ senha_acesso: cleanPass }).eq('id', user.id);
-          if (error) {
-              console.error("Admin Reset Error:", error);
-              showToast("Erro ao redefinir senha: " + error.message, "error");
-          } else {
-              showToast("Senha redefinida com sucesso!", "success");
-          }
-      }
+      // Deprecado em favor do modal completo, mas mantido como fallback se chamado diretamente
+      ui.setMasterEditUser(user);
+      ui.openModal('MASTER_EDIT_USER');
   };
 
-  const handleMasterUpdateUser = async () => {
-      if (!activeUser || !ui.masterEditUser || activeUser.accessLevel !== 1) return;
+  const handleMasterUpdateUser = async (updatedData: any) => {
+      if (!activeUser || activeUser.accessLevel !== 1) return;
+      
+      const targetUser = updatedData || ui.masterEditUser;
+      if (!targetUser) return;
+
       const updates: any = { 
-          nome_operador: ui.masterEditUser.nome_operador, 
-          nome_empresa: ui.masterEditUser.nome_empresa, 
-          pix_key: ui.masterEditUser.pix_key, 
-          access_level: ui.masterEditUser.access_level 
+          nome_operador: targetUser.nome_operador, 
+          usuario_email: targetUser.usuario_email,
+          nome_empresa: targetUser.nome_empresa, 
+          pix_key: targetUser.pix_key, 
+          access_level: targetUser.access_level 
       };
       
-      if (ui.masterEditUser.newPassword && ui.masterEditUser.newPassword.trim().length > 0) {
-          updates.senha_acesso = ui.masterEditUser.newPassword.trim();
+      if (targetUser.newPassword && targetUser.newPassword.trim().length > 0) {
+          updates.senha_acesso = targetUser.newPassword.trim();
       }
       
-      const { error } = await supabase.from('perfis').update(updates).eq('id', ui.masterEditUser.id);
+      const { error } = await supabase.from('perfis').update(updates).eq('id', targetUser.id);
+      
       if (error) { 
           showToast("Erro ao atualizar usuário: " + error.message, "error"); 
       } else { 
-          showToast("Usuário atualizado!", "success"); 
+          showToast("Usuário atualizado com sucesso!", "success"); 
           ui.setMasterEditUser(null); 
+          ui.closeModal();
           fetchAllUsers(); 
       }
   };

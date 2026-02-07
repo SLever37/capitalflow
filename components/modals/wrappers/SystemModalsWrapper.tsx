@@ -13,9 +13,10 @@ import { AIAssistantModal } from '../AIAssistantModal';
 import { NoteWrapper } from '../ModalWrappers';
 import { Copy } from 'lucide-react';
 import { ResetDataModal, DeleteAccountModal } from '../../../features/profile/components/ProfileDangerModals';
+import { MasterEditUserModal } from '../MasterEditUserModal';
 
 export const SystemModalsWrapper = () => {
-    const { activeModal, closeModal, ui, activeUser, fileCtrl, fetchFullData, clients, loanCtrl, sources, aiCtrl, loans, profileCtrl, showToast } = useModal();
+    const { activeModal, closeModal, ui, activeUser, fileCtrl, fetchFullData, clients, loanCtrl, sources, aiCtrl, loans, profileCtrl, adminCtrl, showToast } = useModal();
     
     // Proteção contra ui undefined
     if (!ui) return null;
@@ -32,6 +33,15 @@ export const SystemModalsWrapper = () => {
     };
 
     switch (activeModal?.type) {
+        case 'MASTER_EDIT_USER':
+            return (
+                <MasterEditUserModal 
+                    user={ui.masterEditUser} 
+                    onClose={closeModal} 
+                    onSave={(updatedUser) => adminCtrl.handleMasterUpdateUser(updatedUser)} 
+                />
+            );
+
         case 'IMPORT_SHEET_SELECT':
             return (
                 <Modal onClose={closeModal} title="Selecionar Aba">
