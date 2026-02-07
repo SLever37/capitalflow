@@ -32,7 +32,7 @@ export const useAudioRecorder = () => {
       'audio/webm',
       'audio/ogg;codecs=opus',
       'audio/ogg',
-      'audio/mp4' // Safari fallback sometimes
+      'audio/mp4' 
     ];
     for (const m of candidates) {
       if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(m)) {
@@ -61,7 +61,7 @@ export const useAudioRecorder = () => {
         }
       };
 
-      recorder.start(); // Sem timeslice para melhor performance em alguns browsers
+      recorder.start(); 
       setIsRecording(true);
       setRecordMs(0);
 
@@ -69,10 +69,22 @@ export const useAudioRecorder = () => {
         setRecordMs(prev => prev + 1000);
       }, 1000);
 
-    } catch (err) {
-      console.error("Erro ao iniciar gravação:", err);
+    } catch (err: any) {
+      // ✅ FIX: Tratamento silencioso para erro "Requested device not found"
       cleanup();
-      alert("Não foi possível acessar o microfone.");
+      
+      let msg = "Não foi possível acessar o microfone.";
+      if (err.name === 'NotFoundError' || err.message?.includes('device not found') || err.message?.includes('Requested device not found')) {
+          msg = "Nenhum microfone detectado neste dispositivo.";
+          console.warn("AudioRecorder:", msg);
+      } else if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+          msg = "Permissão de microfone negada. Verifique as configurações do site.";
+          console.warn("AudioRecorder:", msg);
+      } else {
+          console.error("Erro ao iniciar gravação:", err);
+      }
+      
+      alert(msg);
     }
   };
 
@@ -95,7 +107,7 @@ export const useAudioRecorder = () => {
 
         const mimeType = recorder.mimeType || 'audio/webm';
         const blob = new Blob(chunksRef.current, { type: mimeType });
-        const ext = mimeType.includes('ogg') ? 'ogg' : 'webm'; // Simplificação
+        const ext = mimeType.includes('ogg') ? 'ogg' : 'webm';
         const file = new File([blob], `audio_${Date.now()}.${ext}`, { type: mimeType });
         
         resolve({ audioFile: file, duration: recordMs });

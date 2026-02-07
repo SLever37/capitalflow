@@ -1,3 +1,4 @@
+
 import { useEffect, useRef, useState } from 'react';
 
 type RecorderState = 'idle' | 'recording' | 'stopped' | 'error';
@@ -21,7 +22,6 @@ export function useAudioRecorder() {
 
   useEffect(() => {
     return () => {
-      // cleanup ao desmontar
       try {
         if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
           mediaRecorderRef.current.stop();
@@ -42,7 +42,7 @@ export function useAudioRecorder() {
     for (const t of candidates) {
       if ((window as any).MediaRecorder?.isTypeSupported?.(t)) return t;
     }
-    return ''; // deixa o browser escolher
+    return '';
   };
 
   const startRecording = async () => {
@@ -50,7 +50,6 @@ export function useAudioRecorder() {
     setAudioBlob(null);
 
     try {
-      // pede microfone
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
 
@@ -89,14 +88,23 @@ export function useAudioRecorder() {
         cleanupStream();
       };
 
-      // ✅ IMPORTANTE: sem limite de tempo
-      recorder.start(); // grava até o usuário parar
+      recorder.start();
     } catch (e: any) {
       setState('error');
       setIsRecording(false);
-      setError(e?.message || 'Permissão de microfone negada.');
+      
+      // ✅ FIX: Tratamento silencioso para erro de hardware
+      let msg = 'Falha ao acessar microfone.';
+      if (e.name === 'NotFoundError' || e.message?.includes('device not found') || e.message?.includes('Requested device not found')) {
+          msg = 'Nenhum microfone detectado.';
+          console.warn("AudioRecorder:", msg);
+      } else if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
+          msg = 'Permissão para microfone negada.';
+          console.warn("AudioRecorder:", msg);
+      }
+      setError(msg);
+      
       cleanupStream();
-      throw e;
     }
   };
 

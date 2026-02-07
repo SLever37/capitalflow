@@ -1,8 +1,24 @@
-import React, { useState, useEffect } from 'react';
-import { MessageCircle, ChevronLeft, ShieldCheck, User } from 'lucide-react';
-import { supportChatService } from '../../services/supportChat.service';
-import { Modal } from '../../components/ui/Modal';
+
+import React, { useState, useEffect, useMemo } from 'react';
+import { MessageCircle, ChevronLeft, ShieldCheck, User, X, Clock, Search, Filter } from 'lucide-react';
+import { supportChatService } from '../services/supportChat.service';
 import { ChatContainer } from './ChatContainer';
+
+function diffLabel(ts: string | number | Date) {
+  const t = typeof ts === 'string' || typeof ts === 'number' ? new Date(ts) : ts;
+  const ms = Date.now() - t.getTime();
+  const sec = Math.max(0, Math.floor(ms / 1000));
+  if (sec < 60) return `agora`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `${h}h`;
+  const d = Math.floor(h / 24);
+  return `${d}d`;
+}
+
+// regra simples: online se houve atividade nos últimos X segundos
+const ONLINE_WINDOW_SECONDS = 120; 
 
 export const OperatorSupportChat = ({
   activeUser,
@@ -13,6 +29,7 @@ export const OperatorSupportChat = ({
 }) => {
   const [chats, setChats] = useState<any[]>([]);
   const [selectedChat, setSelectedChat] = useState<any>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const loadChats = async () => {
     if (!activeUser) return;
@@ -22,150 +39,180 @@ export const OperatorSupportChat = ({
 
   useEffect(() => {
     loadChats();
+    // Polling leve para atualizar lista de conversas
+    const interval = setInterval(loadChats, 10000);
+    return () => clearInterval(interval);
   }, []);
 
+  const statusInfo = useMemo(() => {
+    if (!selectedChat?.timestamp) return { isOnline: false, label: 'Sem atividade' };
+    const lastAt = new Date(selectedChat.timestamp).getTime();
+    const secs = Math.floor((Date.now() - lastAt) / 1000);
+    const isOnline = secs <= ONLINE_WINDOW_SECONDS;
+    const label = isOnline ? 'Online Agora' : `Visto há ${diffLabel(selectedChat.timestamp)}`;
+    return { isOnline, label };
+  }, [selectedChat?.timestamp]);
+
+  const filteredChats = useMemo(() => {
+    return chats.filter(c => 
+      c.clientName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      c.loanId.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [chats, searchTerm]);
+
   return (
-    <Modal onClose={onClose} title="Atendimento Profissional">
-      {/* ✅ CORREÇÃO MOBILE:
-          - remove altura fixa 650px
-          - usa 90dvh no mobile
-          - remove overflow-x (barra horizontal)
-          - remove negative margin agressiva no mobile
-      */}
-      <div className="flex flex-col h-[90dvh] sm:h-[85dvh] -m-4 sm:-m-12 bg-slate-900 overflow-hidden overflow-x-hidden rounded-b-[2.5rem]">
-        {/* LISTA DE CHATS */}
-        <div
-          className={`flex flex-col h-full w-full bg-slate-950 overflow-hidden ${
-            selectedChat
-              ? 'hidden md:flex md:w-1/3 md:border-r border-slate-800'
-              : 'flex'
-          }`}
-        >
-          {/* Header da Lista */}
-          <div className="p-4 border-b border-slate-800 shrink-0">
-            <div className="bg-emerald-600/10 border border-emerald-500/20 p-3 rounded-xl flex items-center gap-3">
-              <ShieldCheck className="text-emerald-500 shrink-0" size={20} />
-              <div className="min-w-0">
-                <p className="text-[10px] text-emerald-400 font-black uppercase tracking-widest leading-none mb-1 truncate">
-                  Central de Suporte
-                </p>
-                <p className="text-[9px] text-slate-400 font-bold uppercase truncate">
-                  Atendimentos Ativos: {chats.length}
-                </p>
-              </div>
-            </div>
+    <div className="fixed inset-0 z-[200] bg-slate-950 flex flex-col animate-in fade-in duration-300 font-sans">
+      
+      {/* TOP BAR - COMMAND CENTER STYLE */}
+      <div className="h-16 border-b border-slate-800 bg-slate-950 flex items-center justify-between px-4 sm:px-6 shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center text-white shadow-lg shadow-blue-900/50">
+             <ShieldCheck size={20}/>
           </div>
-
-          {/* Lista Scrollável */}
-          <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar p-2 space-y-2">
-            {chats.length === 0 ? (
-              <div className="text-center py-16 opacity-40 flex flex-col items-center">
-                <MessageCircle size={44} className="mb-4 text-blue-500" />
-                <p className="text-xs font-black uppercase tracking-widest">
-                  Nenhum chamado
-                </p>
-              </div>
-            ) : (
-              chats.map((chat) => (
-                <button
-                  key={chat.loanId}
-                  onClick={() => setSelectedChat(chat)}
-                  className={`w-full p-3 rounded-2xl flex items-center gap-3 transition-all text-left relative overflow-hidden group ${
-                    selectedChat?.loanId === chat.loanId
-                      ? 'bg-blue-600/10 border border-blue-500/50'
-                      : 'bg-slate-900 border border-slate-800 hover:border-slate-700'
-                  }`}
-                >
-                  {/* Avatar */}
-                  <div className="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center text-blue-500 font-black border border-slate-700 shrink-0 shadow-lg">
-                    <User size={20} />
-                  </div>
-
-                  {/* Conteúdo */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-baseline mb-1">
-                      <p className="text-xs font-black text-white uppercase truncate pr-2">
-                        {chat.clientName}
-                      </p>
-                      <span className="text-[9px] text-slate-500 font-mono shrink-0">
-                        {new Date(chat.timestamp).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </span>
-                    </div>
-
-                    <div className="flex justify-between items-center">
-                      <p className="text-[10px] text-slate-400 truncate w-full pr-2">
-                        {chat.lastMessage}
-                      </p>
-
-                      {chat.unreadCount > 0 && (
-                        <span className="bg-rose-500 text-white text-[9px] font-black h-5 min-w-[1.25rem] px-1.5 flex items-center justify-center rounded-full shadow-lg shadow-rose-900/40 shrink-0 animate-pulse">
-                          {chat.unreadCount}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </button>
-              ))
-            )}
+          <div>
+            <h1 className="text-sm font-black text-white uppercase tracking-wider leading-none">Central de Atendimento</h1>
+            <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-widest">Painel do Operador • {chats.length} Chamados</p>
           </div>
-
-          {/* ✅ Empty state melhor no mobile quando há chats mas nenhum selecionado */}
-          {chats.length > 0 && !selectedChat && (
-            <div className="shrink-0 p-4 border-t border-slate-800 bg-slate-950/60">
-              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest text-center">
-                Toque em um atendimento para abrir a conversa
-              </p>
-            </div>
-          )}
         </div>
+        <button 
+          onClick={onClose}
+          className="p-2.5 bg-slate-900 text-slate-400 hover:text-white hover:bg-rose-950/30 hover:border-rose-900 border border-slate-800 rounded-xl transition-all group"
+          title="Fechar Painel"
+        >
+          <X size={18} className="group-hover:scale-110 transition-transform"/>
+        </button>
+      </div>
 
-        {/* ÁREA DE CHAT */}
-        {selectedChat && (
-          <div className="flex flex-col h-full absolute inset-0 bg-slate-900 md:relative md:flex-1 md:inset-auto z-10 animate-in slide-in-from-right duration-300 overflow-hidden">
-            <div className="p-3 bg-slate-950 border-b border-slate-800 flex items-center gap-3 shrink-0 shadow-lg z-20">
-              <button
-                onClick={() => {
-                  setSelectedChat(null);
-                  loadChats();
-                }}
-                className="p-2 bg-slate-900 rounded-xl text-slate-400 hover:text-white border border-slate-800 transition-colors md:hidden"
-              >
-                <ChevronLeft size={20} />
-              </button>
-
-              <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-black shrink-0">
-                {selectedChat.clientName.charAt(0)}
-              </div>
-
-              <div className="min-w-0 flex-1">
-                <h3 className="text-white font-black uppercase text-xs tracking-widest truncate">
-                  {selectedChat.clientName}
-                </h3>
-                <div className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                  <p className="text-[9px] text-emerald-500 font-bold uppercase truncate">
-                    Online • Contrato #{selectedChat.loanId.slice(0, 4)}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-hidden">
-              <ChatContainer
-                loanId={selectedChat.loanId}
-                profileId={activeUser.id}
-                operatorId={activeUser.id}
-                senderType="OPERATOR"
-                clientName={selectedChat.clientName}
-                placeholder="Digite sua mensagem..."
+      <div className="flex-1 flex overflow-hidden">
+        {/* SIDEBAR - LISTA DE CONVERSAS */}
+        <div className={`
+            flex flex-col w-full md:w-[380px] lg:w-[420px] bg-slate-950 border-r border-slate-800 transition-all duration-300
+            ${selectedChat ? 'hidden md:flex' : 'flex'}
+        `}>
+          {/* Search Bar */}
+          <div className="p-4 border-b border-slate-800">
+            <div className="relative group">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-500 transition-colors" size={16}/>
+              <input 
+                type="text" 
+                placeholder="Buscar cliente ou contrato..." 
+                className="w-full bg-slate-900 border border-slate-800 rounded-xl py-3 pl-10 pr-4 text-xs font-bold text-white outline-none focus:border-blue-500 transition-all placeholder:text-slate-600"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
               />
             </div>
           </div>
-        )}
+
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
+            {filteredChats.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-64 text-slate-600">
+                <MessageCircle size={32} className="mb-3 opacity-20"/>
+                <p className="text-xs font-bold uppercase">Nenhuma conversa encontrada</p>
+              </div>
+            ) : (
+              filteredChats.map((chat) => {
+                const isActive = selectedChat?.loanId === chat.loanId;
+                return (
+                  <button
+                    key={chat.loanId}
+                    onClick={() => setSelectedChat(chat)}
+                    className={`w-full p-4 rounded-xl flex items-start gap-3 transition-all border ${
+                      isActive 
+                        ? 'bg-blue-900/10 border-blue-500/30 shadow-md' 
+                        : 'bg-transparent border-transparent hover:bg-slate-900 hover:border-slate-800'
+                    }`}
+                  >
+                    <div className="relative shrink-0">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-black border ${isActive ? 'bg-blue-600 text-white border-blue-500' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
+                        {chat.clientName.charAt(0)}
+                      </div>
+                      {chat.unreadCount > 0 && (
+                        <div className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 rounded-full flex items-center justify-center text-[9px] font-black text-white border-2 border-slate-950 animate-bounce">
+                          {chat.unreadCount}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex-1 min-w-0 text-left">
+                      <div className="flex justify-between items-baseline mb-1">
+                        <span className={`text-xs font-black uppercase truncate ${isActive ? 'text-white' : 'text-slate-300'}`}>
+                          {chat.clientName}
+                        </span>
+                        <span className="text-[9px] text-slate-500 font-mono shrink-0 ml-2">
+                          {diffLabel(chat.timestamp)}
+                        </span>
+                      </div>
+                      <p className={`text-[11px] truncate leading-tight ${isActive ? 'text-blue-200' : 'text-slate-500'}`}>
+                        {chat.lastMessage}
+                      </p>
+                      <p className="text-[9px] text-slate-600 font-bold uppercase mt-1.5 tracking-wider">
+                        Contrato #{chat.loanId.slice(0,6)}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* ÁREA DE CHAT (MAIN) */}
+        <div className={`flex-1 flex flex-col bg-slate-900 relative ${!selectedChat ? 'hidden md:flex' : 'flex'}`}>
+          {selectedChat ? (
+            <>
+              {/* Chat Header Mobile/Desktop */}
+              <div className="h-16 border-b border-slate-800 bg-slate-900 flex items-center justify-between px-4 sm:px-6 shrink-0 shadow-sm z-10">
+                <div className="flex items-center gap-3 min-w-0">
+                  <button 
+                    onClick={() => setSelectedChat(null)}
+                    className="md:hidden p-2 -ml-2 text-slate-400 hover:text-white"
+                  >
+                    <ChevronLeft size={24} />
+                  </button>
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center text-white font-bold shrink-0">
+                    {selectedChat.clientName.charAt(0)}
+                  </div>
+                  <div className="min-w-0">
+                    <h2 className="text-sm font-black text-white uppercase truncate">{selectedChat.clientName}</h2>
+                    <div className="flex items-center gap-2">
+                        <div className={`w-1.5 h-1.5 rounded-full ${statusInfo.isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-slate-600'}`}></div>
+                        <p className={`text-[10px] font-bold uppercase ${statusInfo.isOnline ? 'text-emerald-500' : 'text-slate-500'}`}>
+                            {statusInfo.label}
+                        </p>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Actions Placeholder */}
+                <div className="flex gap-2">
+                    {/* Add actions here like "View Contract" */}
+                </div>
+              </div>
+
+              {/* Messages Area */}
+              <div className="flex-1 overflow-hidden relative">
+                <ChatContainer
+                  loanId={selectedChat.loanId}
+                  profileId={activeUser.id}
+                  operatorId={activeUser.id}
+                  senderType="OPERATOR"
+                  clientName={selectedChat.clientName}
+                  placeholder="Digite sua resposta..."
+                />
+              </div>
+            </>
+          ) : (
+            /* Empty State Desktop */
+            <div className="flex-1 flex flex-col items-center justify-center text-slate-600 bg-slate-900/50">
+              <div className="w-24 h-24 bg-slate-800/50 rounded-3xl flex items-center justify-center mb-6 border-2 border-dashed border-slate-700">
+                 <MessageCircle size={40} className="opacity-50"/>
+              </div>
+              <h3 className="text-sm font-black uppercase text-white tracking-widest mb-2">Pronto para Atender</h3>
+              <p className="text-xs text-slate-500 max-w-xs text-center">Selecione uma conversa na lista lateral para iniciar o atendimento ao cliente.</p>
+            </div>
+          )}
+        </div>
       </div>
-    </Modal>
+    </div>
   );
 };

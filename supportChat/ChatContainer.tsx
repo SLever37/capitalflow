@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Send,
@@ -16,9 +17,9 @@ import {
   Pause,
   X
 } from 'lucide-react';
-import { supportChatService, SupportMessage } from '../../services/supportChat.service';
-import { supabase } from '../../lib/supabase';
-import { playNotificationSound } from '../../utils/notificationSound';
+import { supportChatService, SupportMessage } from '../services/supportChat.service';
+import { supabase } from '../lib/supabase';
+import { playNotificationSound } from '../utils/notificationSound';
 
 interface ChatContainerProps {
   loanId: string;
@@ -68,7 +69,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
           const newMsg = payload.new as SupportMessage;
           setMessages((prev) => [...prev, newMsg]);
 
-          if (newMsg.sender !== senderType) {
+          if (newMsg.sender_type !== senderType) {
             playNotificationSound();
             await supportChatService.markAsRead(loanId, senderType);
           }
@@ -87,7 +88,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     };
   }, [loanId]);
 
-  const handleSend = async (text?: string, type: any = 'text') => {
+  const handleSend = async (text?: string, type: any = 'text', file?: File) => {
     const msg = (text ?? inputText).trim();
     if (!msg && type === 'text') return;
 
@@ -99,7 +100,8 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         sender: senderType,
         operatorId: operatorId || undefined,
         text: msg,
-        type
+        type,
+        file
       });
       setInputText('');
     } finally {
@@ -114,15 +116,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     setIsUploading(true);
     try {
       const type = file.type.startsWith('image/') ? 'image' : 'file';
-      await supportChatService.sendMessage({
-        loanId: loanId,
-        profileId: profileId,
-        sender: senderType,
-        operatorId: operatorId || undefined,
-        text: type === 'image' ? '📷 Imagem' : `📎 Arquivo: ${file.name}`,
-        type,
-        file: file
-      });
+      await handleSend(type === 'image' ? '📷 Imagem' : `📎 Arquivo: ${file.name}`, type, file);
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -157,7 +151,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
                 <ImageIcon size={16} /> Imagem indisponível
               </div>
             )}
-            <p className="text-[10px] mt-1 opacity-70">{m.text}</p>
+            <p className="text-[10px] mt-1 opacity-70">{m.content || m.text}</p>
           </div>
         );
 
@@ -201,7 +195,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
       case 'file':
         return (
           <a
-            href={m.file_url}
+            href={m.file_url || '#'}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-3 bg-black/10 p-3 rounded-xl hover:bg-black/20 transition-colors max-w-full overflow-hidden"
@@ -210,14 +204,14 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
               <FileText size={20} />
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-bold truncate">{m.text.replace('📎 Arquivo: ', '')}</p>
+              <p className="text-xs font-bold truncate">{(m.content || m.text)?.replace('📎 Arquivo: ', '')}</p>
               <p className="text-[9px] opacity-70 uppercase font-black">Baixar Documento</p>
             </div>
           </a>
         );
 
       default:
-        return <p className="text-xs leading-relaxed whitespace-pre-wrap break-words">{m.text}</p>;
+        return <p className="text-xs leading-relaxed whitespace-pre-wrap break-words">{m.content || m.text}</p>;
     }
   };
 
@@ -243,10 +237,10 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
 
       <div className="flex-1 p-4 overflow-y-auto overflow-x-hidden custom-scrollbar space-y-4 pt-12" ref={scrollRef}>
         {messages.map((m) => (
-          <div key={m.id} className={`flex ${m.sender === senderType ? 'justify-end' : 'justify-start'}`}>
+          <div key={m.id} className={`flex ${m.sender_type === senderType ? 'justify-end' : 'justify-start'}`}>
             <div
               className={`max-w-[90%] sm:max-w-[85%] p-3 rounded-2xl shadow-sm relative group overflow-hidden ${
-                m.sender === senderType
+                m.sender_type === senderType
                   ? 'bg-blue-600 text-white rounded-tr-none'
                   : 'bg-slate-800 text-slate-200 rounded-tl-none border border-slate-700'
               }`}
@@ -254,8 +248,8 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
               {renderMessageContent(m)}
               <div className="flex items-center justify-end gap-1 mt-1 opacity-50 text-[8px] font-black uppercase">
                 {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                {m.sender === 'OPERATOR' && m.operator_id === operatorId && <User size={8} className="ml-1" />}
-                {m.sender === senderType && (m.read ? <CheckCheck size={10} className="text-emerald-300" /> : <Check size={10} />)}
+                {m.sender_type === 'OPERATOR' && m.operator_id && m.operator_id !== profileId && <User size={8} className="ml-1" />}
+                {m.sender_type === senderType && (m.read ? <CheckCheck size={10} className="text-emerald-300" /> : <Check size={10} />)}
               </div>
             </div>
           </div>
