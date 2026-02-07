@@ -7,7 +7,7 @@ import { PortalPaymentModal } from '../../features/portal/components/PortalPayme
 import { PortalChatDrawer } from '../../features/portal/components/PortalChatDrawer';
 import { supabase } from '../../lib/supabase';
 
-// Novos Componentes
+// Componentes
 import { PortalHeader } from './components/PortalHeader';
 import { PortalSummaryCard } from './components/PortalSummaryCard';
 import { PortalActions } from './components/PortalActions';
@@ -15,14 +15,16 @@ import { PortalDocuments } from './components/PortalDocuments';
 import { PortalInstallmentsList } from './components/PortalInstallmentsList';
 import { PortalCreditorInfo } from './components/PortalCreditorInfo';
 import { PortalManualPaymentModal } from './components/PortalManualPaymentModal';
+import { PortalGenericUploadModal } from './components/PortalGenericUploadModal';
 import { PortalContractsModal } from './components/PortalContractsModal';
+import { PortalUploadsHistory } from './components/PortalUploadsHistory';
 
 export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) => {
     const {
         isLoading, isSigning, portalError,
         loginIdentifier, setLoginIdentifier,
         loggedClient, selectedLoanId, setSelectedLoanId,
-        loan, installments, pixKey, clientContracts,
+        loan, installments, pixKey, clientContracts, portalSignals,
         handleLogin, handleLogout, handleSignDocument, handleViewDocument,
         loadFullPortalData, handleSignalIntent, handleReceiptUpload,
         intentId
@@ -31,6 +33,7 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
     const [isLegalOpen, setIsLegalOpen] = useState(false);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [showManualPaymentModal, setShowManualPaymentModal] = useState(false);
+    const [showGenericUploadModal, setShowGenericUploadModal] = useState(false);
     const [showContractsList, setShowContractsList] = useState(false);
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
@@ -70,6 +73,15 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
             setUnreadCount(0);
         }
     }, [loan?.id, isChatOpen]);
+
+    const handleCopyPix = () => {
+        if (pixKey) {
+            navigator.clipboard.writeText(pixKey);
+            alert("Chave PIX copiada!");
+        } else {
+            alert("Chave PIX não disponível.");
+        }
+    };
 
     // --- RENDERIZADORES ---
 
@@ -123,7 +135,7 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
                     onOpenContracts={() => setShowContractsList(true)}
                 />
 
-                <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-5">
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-6">
                     
                     <PortalSummaryCard 
                         totalJuridicoDevido={totalJuridicoDevido} 
@@ -133,10 +145,16 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
                     <PortalActions 
                         onAutoPayment={() => setShowPaymentModal(true)} 
                         onManualPayment={() => setShowManualPaymentModal(true)}
+                        onGenericUpload={() => setShowGenericUploadModal(true)}
                         onLegal={() => setIsLegalOpen(true)}
+                        onCopyPix={handleCopyPix}
                         disablePayment={totalJuridicoDevido <= 0}
                     />
 
+                    {/* Espaço de Uploads Recentes (Meu Envios) */}
+                    <PortalUploadsHistory signals={portalSignals} />
+
+                    {/* Espaço de Documentos do Credor */}
                     <PortalDocuments documents={activeDocuments} />
 
                     <PortalInstallmentsList 
@@ -165,16 +183,16 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
 
             <PortalChatDrawer loan={loan} isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
 
-            {/* MODAL JURÍDICO */}
+            {/* MODAL JURÍDICO E ASSINATURAS */}
             {isLegalOpen && (
                 <div className="fixed inset-0 bg-slate-950/98 backdrop-blur-md flex items-center justify-center p-4 z-[150]">
                     <div className="bg-slate-900 p-6 rounded-[2.5rem] border border-indigo-500/30 max-w-lg w-full shadow-2xl animate-in zoom-in-95">
                         <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-white font-black uppercase text-sm flex items-center gap-2"><Lock size={16} className="text-indigo-500"/> Central Jurídica</h2>
+                            <h2 className="text-white font-black uppercase text-sm flex items-center gap-2"><Lock size={16} className="text-indigo-500"/> Assinaturas & Contratos</h2>
                             <button onClick={() => setIsLegalOpen(false)} className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors"><X size={18}/></button>
                         </div>
                         <div className="space-y-4">
-                            <div className="bg-slate-900 p-5 rounded-3xl border border-slate-800 text-center">
+                            <div className="bg-slate-950 p-5 rounded-3xl border border-slate-800 text-center">
                                 <Gavel className="mx-auto text-indigo-400 mb-3" size={32}/>
                                 <h4 className="text-white font-bold text-sm uppercase mb-1">Título Executivo Pendente</h4>
                                 <p className="text-[10px] text-slate-500 leading-relaxed">Você possui um instrumento de Confissão de Dívida aguardando assinatura eletrônica para validade total do acordo.</p>
@@ -211,11 +229,21 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
                     pixKey={pixKey}
                     onConfirmUpload={async (file) => {
                         await handleSignalIntent('PAGAR_PIX');
-                        // Pequeno delay para garantir que o ID foi setado (embora o ideal seja handleSignalIntent retornar o ID)
-                        // Como estamos usando o hook, vamos confiar que se handleSignalIntent não lançar erro, o upload vai funcionar se o ID estiver no state
-                        // Melhor seria o hook retornar o ID. Vamos ajustar o hook ou assumir o flow.
-                        // Atualização: o hook agora expõe intentId, mas ele é async.
-                        // O componente ManualPaymentModal lida com isso se passarmos a função composta.
+                        await handleReceiptUpload(file);
+                        loadFullPortalData(selectedLoanId, loggedClient.id);
+                    }}
+                />
+            )}
+
+            {/* MODAL UPLOAD GENÉRICO */}
+            {showGenericUploadModal && (
+                <PortalGenericUploadModal
+                    onClose={() => setShowGenericUploadModal(false)}
+                    onConfirmUpload={async (file, description) => {
+                        // Reutiliza o fluxo de "sinalização" mas com tipo diferente
+                        await handleSignalIntent('ENVIO_DOC'); 
+                        // Nota: Se quiser passar a descrição, precisaria atualizar o hook ou salvar no metadata do storage/DB
+                        // Por simplicidade, usamos o fluxo existente de upload
                         await handleReceiptUpload(file);
                         loadFullPortalData(selectedLoanId, loggedClient.id);
                     }}
