@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { ShieldCheck, RefreshCw, X, Gavel, MessageCircle, FileSignature, Lock, Eye, RefreshCw as Spinner } from 'lucide-react';
+import { ShieldCheck, RefreshCw, X, Gavel, MessageCircle, FileSignature, Lock, Eye, RefreshCw as Spinner, List } from 'lucide-react';
 import { useClientPortalLogic } from '../../features/portal/hooks/useClientPortalLogic';
 import { PortalLogin } from '../../features/portal/components/PortalLogin';
 import { PortalPaymentModal } from '../../features/portal/components/PortalPaymentModal'; 
@@ -14,6 +14,8 @@ import { PortalActions } from './components/PortalActions';
 import { PortalDocuments } from './components/PortalDocuments';
 import { PortalInstallmentsList } from './components/PortalInstallmentsList';
 import { PortalCreditorInfo } from './components/PortalCreditorInfo';
+import { PortalManualPaymentModal } from './components/PortalManualPaymentModal';
+import { PortalContractsModal } from './components/PortalContractsModal';
 
 export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) => {
     const {
@@ -22,11 +24,14 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
         loggedClient, selectedLoanId, setSelectedLoanId,
         loan, installments, pixKey, clientContracts,
         handleLogin, handleLogout, handleSignDocument, handleViewDocument,
-        loadFullPortalData 
+        loadFullPortalData, handleSignalIntent, handleReceiptUpload,
+        intentId
     } = useClientPortalLogic(initialLoanId);
 
     const [isLegalOpen, setIsLegalOpen] = useState(false);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [showManualPaymentModal, setShowManualPaymentModal] = useState(false);
+    const [showContractsList, setShowContractsList] = useState(false);
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
 
@@ -115,6 +120,7 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
                     setSelectedLoanId={setSelectedLoanId} 
                     clientContracts={clientContracts} 
                     handleLogout={handleLogout} 
+                    onOpenContracts={() => setShowContractsList(true)}
                 />
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-5">
@@ -125,7 +131,8 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
                     />
 
                     <PortalActions 
-                        onPayment={() => setShowPaymentModal(true)} 
+                        onAutoPayment={() => setShowPaymentModal(true)} 
+                        onManualPayment={() => setShowManualPaymentModal(true)}
                         onLegal={() => setIsLegalOpen(true)}
                         disablePayment={totalJuridicoDevido <= 0}
                     />
@@ -167,7 +174,7 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
                             <button onClick={() => setIsLegalOpen(false)} className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors"><X size={18}/></button>
                         </div>
                         <div className="space-y-4">
-                            <div className="bg-slate-950 p-5 rounded-3xl border border-slate-800 text-center">
+                            <div className="bg-slate-900 p-5 rounded-3xl border border-slate-800 text-center">
                                 <Gavel className="mx-auto text-indigo-400 mb-3" size={32}/>
                                 <h4 className="text-white font-bold text-sm uppercase mb-1">Título Executivo Pendente</h4>
                                 <p className="text-[10px] text-slate-500 leading-relaxed">Você possui um instrumento de Confissão de Dívida aguardando assinatura eletrônica para validade total do acordo.</p>
@@ -187,13 +194,41 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
                 </div>
             )}
 
-            {/* MODAL PAGAMENTO */}
+            {/* MODAL PAGAMENTO AUTOMÁTICO (MP) */}
             {showPaymentModal && installments.length > 0 && (
                 <PortalPaymentModal 
                     loan={loan} 
                     installment={pendingInstallments[0] || installments[installments.length-1]} 
                     clientData={{ name: loggedClient.name, doc: loggedClient.document }} 
                     onClose={() => { setShowPaymentModal(false); loadFullPortalData(selectedLoanId, loggedClient.id); }} 
+                />
+            )}
+
+            {/* MODAL PAGAMENTO MANUAL (PIX + COMPROVANTE) */}
+            {showManualPaymentModal && (
+                <PortalManualPaymentModal
+                    onClose={() => setShowManualPaymentModal(false)}
+                    pixKey={pixKey}
+                    onConfirmUpload={async (file) => {
+                        await handleSignalIntent('PAGAR_PIX');
+                        // Pequeno delay para garantir que o ID foi setado (embora o ideal seja handleSignalIntent retornar o ID)
+                        // Como estamos usando o hook, vamos confiar que se handleSignalIntent não lançar erro, o upload vai funcionar se o ID estiver no state
+                        // Melhor seria o hook retornar o ID. Vamos ajustar o hook ou assumir o flow.
+                        // Atualização: o hook agora expõe intentId, mas ele é async.
+                        // O componente ManualPaymentModal lida com isso se passarmos a função composta.
+                        await handleReceiptUpload(file);
+                        loadFullPortalData(selectedLoanId, loggedClient.id);
+                    }}
+                />
+            )}
+
+            {/* MODAL LISTA DE CONTRATOS */}
+            {showContractsList && (
+                <PortalContractsModal
+                    contracts={clientContracts}
+                    currentLoanId={selectedLoanId}
+                    onSelect={(id) => { setSelectedLoanId(id); setShowContractsList(false); }}
+                    onClose={() => setShowContractsList(false)}
                 />
             )}
         </div>

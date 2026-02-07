@@ -306,11 +306,11 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
-                  handleSendText();
+                  handleSend();
                 }
               }}
               className="w-full bg-transparent px-4 py-3 text-white text-xs outline-none resize-none max-h-24 custom-scrollbar placeholder:text-slate-600"
-              placeholder={isRecording ? 'Gravando áudio...' : placeholder || 'Digite sua mensagem...'}
+              placeholder={placeholder || 'Digite sua mensagem...'}
               rows={1}
               style={{ minHeight: '44px' }}
               disabled={isUploading}
@@ -319,7 +319,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
 
           {inputText.trim() ? (
             <button
-              onClick={() => handleSendText}
+              onClick={() => handleSend()}
               disabled={isUploading}
               className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-500 transition-all shadow-lg active:scale-95 disabled:opacity-50"
             >
