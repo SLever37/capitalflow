@@ -27,7 +27,7 @@ import { notificationService } from './services/notification.service';
 export const App: React.FC = () => {
   const { activeProfileId, loginUser, setLoginUser, loginPassword, setLoginPassword, savedProfiles, submitLogin, handleLogout, handleSelectSavedProfile, handleRemoveSavedProfile } = useAuth();
   const { toast, showToast } = useToast();
-  const { loans, setLoans, clients, setClients, sources, setSources, activeUser, setActiveUser, staffMembers, selectedStaffId, setSelectedStaffId, isLoadingData, setIsLoadingData, fetchFullData, activeTab, setActiveTab, statusFilter, setStatusFilter, sortOption, setSortOption, searchTerm, setSearchTerm, clientSearchTerm, setClientSearchTerm, profileEditForm, setProfileEditForm, loadError, navOrder, hubOrder, saveNavConfig } = useAppState(activeProfileId);
+  const { loans, setLoans, clients, setClients, sources, setSources, activeUser, setActiveUser, staffMembers, systemUsers, selectedStaffId, setSelectedStaffId, isLoadingData, setIsLoadingData, fetchFullData, activeTab, setActiveTab, statusFilter, setStatusFilter, sortOption, setSortOption, searchTerm, setSearchTerm, clientSearchTerm, setClientSearchTerm, profileEditForm, setProfileEditForm, loadError, navOrder, hubOrder, saveNavConfig } = useAppState(activeProfileId);
   const ui = useUiState() as any;
   ui.sortOption = sortOption;
   ui.setSortOption = setSortOption;
@@ -111,7 +111,8 @@ export const App: React.FC = () => {
           {activeTab === 'SOURCES' && <SourcesContainer sources={sources} ui={ui} sourceCtrl={sourceCtrl} loanCtrl={loanCtrl} />}
           {activeTab === 'PROFILE' && activeUser && <ProfileContainer activeUser={activeUser} clients={clients} loans={loans} sources={sources} ui={ui} profileCtrl={profileCtrl} handleLogout={handleLogout} showToast={showToast} profileEditForm={profileEditForm} setProfileEditForm={setProfileEditForm} fileCtrl={fileCtrl} navOrder={navOrder} hubOrder={hubOrder} saveNavConfig={saveNavConfig} />}
           {activeTab === 'LEGAL' && <LegalContainer loans={loans} sources={sources} activeUser={activeUser} ui={ui} loanCtrl={loanCtrl} fileCtrl={fileCtrl} showToast={showToast} onRefresh={() => fetchFullData(activeUser?.id || '')} />}
-          {activeTab === 'MASTER' && activeUser?.accessLevel === 1 && <MasterContainer allUsers={[activeUser, ...(staffMembers || [])].filter(Boolean)} ui={ui} adminCtrl={adminCtrl} />}
+          {/* MasterContainer agora recebe systemUsers (lista global para SAC) */}
+          {activeTab === 'MASTER' && activeUser?.accessLevel === 1 && <MasterContainer allUsers={systemUsers} ui={ui} adminCtrl={adminCtrl} />}
           
           <ModalHostContainer ui={ui} activeUser={activeUser} clients={clients} sources={sources} loans={loans} isLoadingData={isLoadingData} loanCtrl={loanCtrl} clientCtrl={clientCtrl} sourceCtrl={sourceCtrl} paymentCtrl={paymentCtrl} profileCtrl={profileCtrl} adminCtrl={adminCtrl} fileCtrl={fileCtrl} aiCtrl={aiCtrl} showToast={showToast} fetchFullData={fetchFullData} handleLogout={handleLogout} />
           {ui.activeModal?.type === 'SUPPORT_CHAT' && <OperatorSupportChat activeUser={activeUser} onClose={ui.closeModal} />}
