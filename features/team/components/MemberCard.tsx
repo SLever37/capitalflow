@@ -1,16 +1,14 @@
 
 import React from 'react';
-import { Trash2, User, ShieldCheck, Mail, Clock, AlertCircle, Edit2, MessageSquare } from 'lucide-react';
+import { Trash2, User, ShieldCheck, Mail, Clock, AlertCircle } from 'lucide-react';
 import { maskDocument } from '../../../utils/formatters';
 
 interface MemberCardProps {
   member: any;
   onDelete: (id: string) => void;
-  onEdit?: (member: any) => void;
-  onChat?: (member: any) => void;
 }
 
-export const MemberCard: React.FC<MemberCardProps> = ({ member, onDelete, onEdit, onChat }) => {
+export const MemberCard: React.FC<MemberCardProps> = ({ member, onDelete }) => {
   // Erison no CSV não tem profile_id vinculado
   const isPending = !member.profile_id;
   
@@ -70,33 +68,13 @@ export const MemberCard: React.FC<MemberCardProps> = ({ member, onDelete, onEdit
           <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
             {roleLabel}
           </span>
-          <div className="flex gap-2">
-              {onChat && member.profile_id && (
-                  <button 
-                    onClick={() => onChat(member)} 
-                    className="p-3 bg-slate-950 text-slate-600 hover:text-blue-500 hover:bg-blue-500/10 rounded-xl transition-all border border-slate-800 hover:border-blue-500/30"
-                    title="Conversar com Membro"
-                  >
-                    <MessageSquare size={18} />
-                  </button>
-              )}
-              {onEdit && (
-                  <button 
-                    onClick={() => onEdit(member)} 
-                    className="p-3 bg-slate-950 text-slate-600 hover:text-amber-500 hover:bg-amber-500/10 rounded-xl transition-all border border-slate-800 hover:border-amber-500/30"
-                    title="Editar Membro"
-                  >
-                    <Edit2 size={18} />
-                  </button>
-              )}
-              <button 
-                onClick={() => onDelete(member.id)} 
-                className="p-3 bg-slate-950 text-slate-600 hover:text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all border border-slate-800 hover:border-rose-500/30"
-                title="Excluir Membro"
-              >
-                <Trash2 size={18} />
-              </button>
-          </div>
+          <button 
+            onClick={() => onDelete(member.id)} 
+            className="p-3 bg-slate-950 text-slate-600 hover:text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all border border-slate-800 hover:border-rose-500/30"
+            title="Excluir Membro"
+          >
+            <Trash2 size={18} />
+          </button>
       </div>
     </div>
   );

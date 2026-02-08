@@ -77,44 +77,6 @@ export const useTeamInvite = ({ teamId, onSuccess, showToast }: UseTeamInvitePro
     }
   };
 
-  const updateMember = async (memberId: string, updates: any) => {
-    setIsProcessing(true);
-    try {
-      const { error } = await supabase
-        .from('team_members')
-        .update({
-          full_name: updates.full_name,
-          role: updates.role,
-          team_id: updates.team_id,
-          supervisor_id: updates.supervisor_id || null
-        })
-        .eq('id', memberId);
-
-      if (error) throw error;
-      
-      // Se o membro tiver um perfil vinculado, atualiza o supervisor_id no perfil também
-      const { data: member } = await supabase
-        .from('team_members')
-        .select('profile_id')
-        .eq('id', memberId)
-        .single();
-
-      if (member?.profile_id) {
-        await supabase
-          .from('perfis')
-          .update({ supervisor_id: updates.supervisor_id || null })
-          .eq('id', member.profile_id);
-      }
-
-      showToast("Membro atualizado com sucesso!", "success");
-      onSuccess();
-    } catch (e: any) {
-      showToast("Erro ao atualizar: " + e.message, "error");
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
   const resetInviteState = () => {
     setInviteResult(null);
   };
@@ -124,7 +86,6 @@ export const useTeamInvite = ({ teamId, onSuccess, showToast }: UseTeamInvitePro
     inviteResult,
     createInvite,
     deleteMember,
-    updateMember,
     resetInviteState
   };
 };

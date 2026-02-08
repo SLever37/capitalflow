@@ -94,7 +94,7 @@ export const App: React.FC = () => {
                 {activeTab === 'CLIENTS' && <ClientsContainer clients={clients} clientSearchTerm={clientSearchTerm} setClientSearchTerm={setClientSearchTerm} clientCtrl={clientCtrl} loanCtrl={loanCtrl} showToast={showToast} ui={ui} />}
                 
                 {/* ABA EQUIPE: O Erison aparecerá aqui devido à correção no hook de dados */}
-                {activeTab === 'TEAM' && !activeUser?.supervisor_id && <TeamPage activeUser={activeUser} showToast={showToast} ui={ui} onRefresh={() => fetchFullData(activeUser?.id || '')} />}
+                {activeTab === 'TEAM' && !activeUser?.supervisor_id && <TeamPage activeUser={activeUser} showToast={showToast} onRefresh={() => fetchFullData(activeUser?.id || '')} />}
                 
                 {activeTab === 'SOURCES' && <SourcesContainer sources={sources} ui={ui} sourceCtrl={sourceCtrl} loanCtrl={loanCtrl} />}
                 {activeTab === 'PROFILE' && activeUser && <ProfileContainer activeUser={activeUser} clients={clients} loans={loans} sources={sources} ui={ui} profileCtrl={profileCtrl} handleLogout={handleLogout} showToast={showToast} profileEditForm={profileEditForm} setProfileEditForm={setProfileEditForm} fileCtrl={fileCtrl} navOrder={navOrder} hubOrder={hubOrder} saveNavConfig={saveNavConfig} />}

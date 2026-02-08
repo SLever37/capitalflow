@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { Modal } from '../ui/Modal';
 import { CalendarView } from '../../features/calendar/CalendarView';
 import { UserProfile } from '../../types';
 import { useToast } from '../../hooks/useToast';
@@ -13,13 +14,14 @@ interface AgendaModalProps {
 export const AgendaModal: React.FC<AgendaModalProps> = ({ onClose, activeUser, onSystemAction }) => {
     const { showToast } = useToast();
 
-    // Agora renderiza diretamente o CalendarView que possui seu próprio overlay fixo (fixed inset-0)
     return (
-        <CalendarView 
-            activeUser={activeUser}
-            showToast={showToast}
-            onClose={onClose}
-            onSystemAction={onSystemAction}
-        />
+        <Modal onClose={onClose} title="Agenda">
+            <CalendarView 
+                activeUser={activeUser}
+                showToast={showToast}
+                onClose={onClose}
+                onSystemAction={onSystemAction}
+            />
+        </Modal>
     );
 };

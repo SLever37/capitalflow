@@ -108,7 +108,6 @@ export const portalService = {
         ...p,
         data_vencimento: p.data_vencimento || p.due_date,
         valor_parcela: p.valor_parcela || p.amount,
-        lateFeeAccrued: p.late_fee_accrued || 0,
       }));
     }
 

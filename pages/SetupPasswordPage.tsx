@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
-// Removido react-router-dom para evitar erro de build
-// import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Lock, Loader2, CheckCircle } from 'lucide-react';
 
 export const SetupPasswordPage = () => {
-  const navigate = (path: string) => { window.location.pathname = path; };
+  const navigate = useNavigate();
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);

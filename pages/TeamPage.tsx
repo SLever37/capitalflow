@@ -5,35 +5,18 @@ import { useTeamData } from '../features/team/hooks/useTeamData';
 import { useTeamInvite } from '../features/team/hooks/useTeamInvite';
 import { MemberCard } from '../features/team/components/MemberCard';
 import { InviteModal } from '../features/team/components/InviteModal';
-import { MemberEditModal } from '../features/team/components/MemberEditModal';
 
-export const TeamPage = ({ activeUser, showToast, ui }: any) => {
+export const TeamPage = ({ activeUser, showToast }: any) => {
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editingMember, setEditingMember] = useState<any>(null);
   
   // Hook de Dados (Blindado para seu DB)
   const { teams, activeTeam, setActiveTeam, members, loading, refresh } = useTeamData(activeUser?.id);
   
-  const { createInvite, isProcessing, inviteResult, resetInviteState, deleteMember, updateMember } = useTeamInvite({
+  const { createInvite, isProcessing, inviteResult, resetInviteState, deleteMember } = useTeamInvite({
     teamId: activeTeam?.id,
     onSuccess: refresh,
     showToast
   });
-
-  const handleEditMember = (member: any) => {
-    setEditingMember(member);
-    setIsEditModalOpen(true);
-  };
-
-  const handleChatMember = (member: any) => {
-    if (ui && ui.openModal) {
-        // Abre o chat de suporte com o perfil do membro
-        // Aqui simulamos a abertura do chat
-        ui.setMessageModalLoan({ id: 'TEAM_CHAT', clientId: member.profile_id, debtorName: member.full_name });
-        ui.openModal('MESSAGE_HUB');
-    }
-  };
 
   if (loading && teams.length === 0) {
     return (
@@ -117,8 +100,6 @@ export const TeamPage = ({ activeUser, showToast, ui }: any) => {
                     key={member.id} 
                     member={member} 
                     onDelete={deleteMember} 
-                    onEdit={handleEditMember}
-                    onChat={handleChatMember}
                 />
             ))
         )}
@@ -131,15 +112,6 @@ export const TeamPage = ({ activeUser, showToast, ui }: any) => {
         isLoading={isProcessing}
         result={inviteResult}
         resetResult={resetInviteState}
-      />
-
-      <MemberEditModal 
-        isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        member={editingMember}
-        teams={teams}
-        onSave={updateMember}
-        isLoading={isProcessing}
       />
     </div>
   );

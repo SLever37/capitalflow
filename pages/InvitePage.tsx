@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react';
-// Removido react-router-dom para evitar erro de build, usando URLSearchParams nativo
-// import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Loader2, ShieldCheck } from 'lucide-react';
 
 export const InvitePage = () => {
-  const searchParams = new URLSearchParams(window.location.search);
-  const navigate = (path: string) => { window.location.pathname = path; };
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [status, setStatus] = useState<'loading' | 'error' | 'success'>('loading');
   const token = searchParams.get('token');
 
