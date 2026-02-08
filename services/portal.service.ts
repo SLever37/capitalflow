@@ -1,7 +1,5 @@
-
+// services/portal.service.ts
 import { supabase } from '../lib/supabase';
-import { Loan } from '../types';
-import { mapLoanFromDB } from './adapters/loanAdapter';
 
 export const portalService = {
   /**
@@ -11,7 +9,7 @@ export const portalService = {
   async fetchLoanByToken(token: string) {
     const { data: loan, error } = await supabase
       .from('contratos')
-      .select('*, clients:client_id(*)') // Join para pegar dados básicos do cliente se necessário
+      .select('*, clients:client_id(*)')
       .eq('portal_token', token)
       .single();
 
@@ -25,13 +23,17 @@ export const portalService = {
   /**
    * Lista todos os contratos do cliente para o dropdown/switcher.
    * Retorna apenas dados essenciais para navegação.
+   *
+   * ✅ IMPORTANTE: removido filtro `.eq('is_archived', false)` porque em alguns bancos
+   * esse campo não existe e quebra a listagem com erro de coluna inexistente.
    */
   async fetchClientContracts(clientId: string) {
     const { data, error } = await supabase
       .from('contratos')
-      .select('id, code, start_date, created_at, portal_token, principal, total_to_receive')
+      .select(
+        'id, code, start_date, created_at, portal_token, principal, total_to_receive'
+      )
       .eq('client_id', clientId)
-      .eq('is_archived', false) // Opcional: mostrar ou não arquivados no portal
       .order('created_at', { ascending: false });
 
     if (error) throw new Error('Falha ao listar contratos.');
@@ -40,7 +42,6 @@ export const portalService = {
 
   /**
    * Carrega dados completos do contrato (parcelas, sinais, etc).
-   * Reutiliza a lógica de mapping existente.
    */
   async fetchLoanDetails(loanId: string) {
     // 1) Parcelas
@@ -65,15 +66,20 @@ export const portalService = {
 
     return {
       installments: installments || [],
-      signals
+      signals,
     };
   },
 
   /**
    * Registra intenção de pagamento
    */
-  async submitPaymentIntent(clientId: string, loanId: string, profileId: string, tipo: string) {
-    // Tenta via RPC primeiro (mais seguro/atômico)
+  async submitPaymentIntent(
+    clientId: string,
+    loanId: string,
+    profileId: string,
+    tipo: string
+  ) {
+    // Tenta via RPC primeiro
     try {
       const { data, error } = await supabase.rpc('portal_submit_payment_intent', {
         p_client_id: clientId,
@@ -101,5 +107,5 @@ export const portalService = {
       if (error) throw new Error('Falha ao registrar intenção.');
       return data?.id;
     }
-  }
+  },
 };
