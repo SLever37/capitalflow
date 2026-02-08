@@ -48,30 +48,40 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ activeUser, showToas
     const selectedStr = selectedDate.toDateString();
 
     return (
-        <div className="flex flex-col h-[85vh] -m-6 sm:-m-12 overflow-hidden bg-slate-950 relative">
+        <div className="fixed inset-0 z-[200] bg-slate-950 flex flex-col animate-in fade-in duration-300 font-sans">
             
-            {/* --- HEADER SUPERIOR --- */}
-            <div className="px-6 pt-6 pb-4 border-b border-slate-800 bg-slate-900/50 backdrop-blur-md z-20 flex flex-col gap-4">
-                <div className="flex justify-between items-center">
+            {/* --- HEADER SUPERIOR (ESTILO CHAT DE SUPORTE) --- */}
+            <div className="h-16 border-b border-slate-800 bg-slate-950 flex items-center justify-between px-4 sm:px-6 shrink-0">
+                <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 bg-purple-600 rounded-lg flex items-center justify-center text-white shadow-lg shadow-purple-900/50">
+                        <CalIcon size={20}/>
+                    </div>
                     <div>
-                        <h2 className="text-2xl font-black text-white uppercase tracking-tighter flex items-center gap-2">
-                            <CalIcon className="text-purple-500"/> Agenda
-                        </h2>
-                        <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">
-                            {selectedDate.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                        <h1 className="text-sm font-black text-white uppercase tracking-wider leading-none">Agenda de Compromissos</h1>
+                        <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-widest">
+                            {selectedDate.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
                         </p>
                     </div>
-                    <div className="flex gap-3">
-                        <button 
-                            onClick={() => setShowRadar(true)} 
-                            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-2 border ${radarCount > 0 ? 'bg-rose-600 border-rose-500 text-white animate-pulse' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'}`}
-                        >
-                            <ShieldAlert size={14}/> 
-                            Radar
-                            {radarCount > 0 && <span className="bg-white text-rose-600 px-1.5 py-0.5 rounded-full text-[9px]">{radarCount}</span>}
-                        </button>
-                    </div>
                 </div>
+                <div className="flex items-center gap-2">
+                    <button 
+                        onClick={() => setShowRadar(true)} 
+                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-2 border ${radarCount > 0 ? 'bg-rose-600 border-rose-500 text-white animate-pulse' : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'}`}
+                    >
+                        <ShieldAlert size={14}/> 
+                        Radar {radarCount > 0 && <span className="bg-white text-rose-600 px-1.5 py-0.5 rounded-full text-[9px]">{radarCount}</span>}
+                    </button>
+                    <button 
+                        onClick={onClose}
+                        className="p-2.5 bg-slate-900 text-slate-400 hover:text-white hover:bg-rose-950/30 hover:border-rose-900 border border-slate-800 rounded-xl transition-all group"
+                    >
+                        <X size={18} className="group-hover:scale-110 transition-transform"/>
+                    </button>
+                </div>
+            </div>
+
+            {/* Day Strip Navigator (Sub-header) */}
+            <div className="px-6 py-4 border-b border-slate-800 bg-slate-900/30 backdrop-blur-md z-20">
 
                 {/* Day Strip Navigator */}
                 <div className="flex items-center justify-between gap-2">

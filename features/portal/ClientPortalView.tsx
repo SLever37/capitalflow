@@ -98,7 +98,14 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
 
     // Cálculo de Totais
     const pendingInstallments = installments.filter(i => i.status !== 'PAID');
-    const totalJuridicoDevido = pendingInstallments.reduce((acc, i) => acc + i.valor_parcela, 0);
+    
+    // CORREÇÃO: Soma o valor da parcela + multas/juros de atraso acumulados
+    const totalJuridicoDevido = pendingInstallments.reduce((acc, i) => {
+        const base = i.valor_parcela || 0;
+        const late = i.lateFeeAccrued || 0;
+        return acc + base + late;
+    }, 0);
+    
     const nextDueDate = pendingInstallments.length > 0 ? new Date(pendingInstallments[0].data_vencimento) : null;
 
     return (
