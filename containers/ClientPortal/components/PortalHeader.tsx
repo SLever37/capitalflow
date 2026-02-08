@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LogOut, ChevronDown, Lock, LayoutList } from 'lucide-react';
+import { LogOut, ChevronDown, Lock } from 'lucide-react';
 
 interface PortalHeaderProps {
     loggedClient: any;
@@ -8,11 +8,10 @@ interface PortalHeaderProps {
     setSelectedLoanId: (id: string) => void;
     clientContracts: any[];
     handleLogout: () => void;
-    onOpenContracts: () => void;
 }
 
 export const PortalHeader: React.FC<PortalHeaderProps> = ({ 
-    loggedClient, selectedLoanId, setSelectedLoanId, clientContracts, handleLogout, onOpenContracts
+    loggedClient, selectedLoanId, setSelectedLoanId, clientContracts, handleLogout 
 }) => {
     return (
         <div className="bg-slate-950 border-b border-slate-800 shrink-0 relative z-20">
@@ -31,9 +30,10 @@ export const PortalHeader: React.FC<PortalHeaderProps> = ({
                 </button>
             </div>
 
-            {/* CONTRATO SWITCHER / BOTÃO LISTA */}
-            <div className="px-5 pb-5 flex gap-2">
-                <div className="relative group flex-1">
+            {/* CONTRATO SWITCHER */}
+            <div className="px-5 pb-5">
+                <label className="text-[9px] font-black text-blue-500 uppercase tracking-widest mb-2 block ml-1">Contrato Selecionado</label>
+                <div className="relative group">
                     <select 
                         value={selectedLoanId}
                         onChange={(e) => setSelectedLoanId(e.target.value)}
@@ -47,17 +47,9 @@ export const PortalHeader: React.FC<PortalHeaderProps> = ({
                         ))}
                     </select>
                     <div className="absolute right-3 top-3 pointer-events-none text-slate-500 group-hover:text-white transition-colors">
-                        <ChevronDown size={16} />
+                        {clientContracts.length > 1 ? <ChevronDown size={16} /> : <Lock size={14} className="opacity-50"/>}
                     </div>
                 </div>
-                
-                <button 
-                    onClick={onOpenContracts}
-                    className="px-3 bg-slate-900 border border-slate-800 rounded-xl text-blue-500 hover:bg-slate-800 hover:text-white transition-colors"
-                    title="Ver Todos os Contratos"
-                >
-                    <LayoutList size={20}/>
-                </button>
             </div>
         </div>
     );

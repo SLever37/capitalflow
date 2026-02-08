@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { User, Save, Upload, Download, RefreshCw, Trash2, Shield, Settings, DollarSign, FileSpreadsheet, Lock, Camera, Palette, MapPin, Phone, LayoutGrid, ArrowUp, ArrowDown, CreditCard, Mail, FileText, Smartphone } from 'lucide-react';
+import { User, Save, Upload, Download, RefreshCw, Trash2, Shield, Settings, DollarSign, FileSpreadsheet, Lock, Camera, Palette, MapPin, Phone, LayoutGrid, ArrowUp, ArrowDown, CreditCard, Mail, FileText } from 'lucide-react';
 import { UserProfile, Loan, AppTab } from '../types';
 import { maskPhone, formatMoney, maskDocument } from '../utils/formatters';
 import { useProfilePageLogic } from '../features/profile/hooks/useProfilePageLogic';
@@ -204,25 +204,6 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                         <div className="flex items-center gap-3 text-emerald-500 mb-4">
                             <DollarSign size={24}/>
                             <h3 className="text-lg font-black uppercase">Configurações Financeiras</h3>
-                        </div>
-
-                        {/* ACCESS TOKEN MP (DINÂMICO) */}
-                        <div className="bg-blue-900/10 border border-blue-500/20 p-5 rounded-2xl mb-6">
-                            <div className="flex items-center gap-2 mb-2 text-blue-400">
-                                <Smartphone size={18}/>
-                                <h4 className="text-xs font-black uppercase tracking-widest">Integração Mercado Pago (PIX Automático)</h4>
-                            </div>
-                            <p className="text-[10px] text-blue-200 mb-3 leading-relaxed">
-                                Para receber pagamentos automáticos na sua própria conta, insira abaixo seu <b>Access Token de Produção</b> do Mercado Pago.
-                                Se deixar em branco, o sistema usará a conta padrão do sistema.
-                            </p>
-                            <input 
-                                type="password" 
-                                value={profileEditForm.mpAccessToken || ''} 
-                                onChange={e => setProfileEditForm({...profileEditForm, mpAccessToken: e.target.value})} 
-                                className="w-full bg-slate-900 border border-blue-500/30 rounded-xl p-4 text-white font-mono text-xs outline-none focus:border-blue-500 placeholder:text-slate-600"
-                                placeholder="APP_USR-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                            />
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

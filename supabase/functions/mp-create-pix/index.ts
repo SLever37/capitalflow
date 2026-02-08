@@ -1,68 +1,39 @@
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
 declare const Deno: any;
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-Deno.serve(async (req: any) => {
-  // Tratamento de CORS Preflight (Browser)
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
-
+serve(async (req) => {
   try {
-    // 1. Parse do Corpo da Requisição
-    let body;
-    try {
-        body = await req.json();
-    } catch (e) {
-        throw new Error("Corpo da requisição inválido (JSON esperado).");
+    // CORS e Método
+    if (req.method === "OPTIONS") {
+      return new Response("ok", { headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" } });
+    }
+    
+    if (req.method !== "POST") {
+      return new Response("Method Not Allowed", { status: 405 });
     }
 
+    const body = await req.json();
     const { amount, payer_name, payer_email, payer_doc, loan_id, installment_id, payment_type, profile_id, source_id } = body;
 
-    // 2. Validações
-    if (!amount || Number(amount) <= 0) {
-      throw new Error("Valor inválido.");
+    // Validação Básica
+    if (!amount || amount <= 0) {
+      return new Response(JSON.stringify({ ok: false, error: "Valor inválido" }), { status: 400 });
     }
 
-    // 3. Inicializar Supabase Admin
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
-
-    // 4. Resolver Token do Mercado Pago (Global ou Perfil)
-    let MP_ACCESS_TOKEN = Deno.env.get("MP_ACCESS_TOKEN");
-
-    if (profile_id) {
-        const { data: profile } = await supabaseClient
-            .from('perfis')
-            .select('mp_access_token')
-            .eq('id', profile_id)
-            .single();
-        
-        if (profile?.mp_access_token && profile.mp_access_token.trim().length > 10) {
-            MP_ACCESS_TOKEN = profile.mp_access_token;
-            console.log(`Usando token personalizado para o perfil ${profile_id}`);
-        }
-    }
-
+    const MP_ACCESS_TOKEN = Deno.env.get("MP_ACCESS_TOKEN");
     if (!MP_ACCESS_TOKEN) {
-      throw new Error("Token do Mercado Pago não configurado. Verifique as configurações do perfil.");
+      return new Response(JSON.stringify({ ok: false, error: "MP_ACCESS_TOKEN não configurado" }), { status: 500 });
     }
 
-    // 5. Gerar ID de Referência (Idempotência)
+    // 1. Gerar UUID de referência externa
     const external_reference = crypto.randomUUID();
 
-    // 6. Payload para o Mercado Pago
+    // 2. Montar Payload para o Mercado Pago
     const mpPayload = {
       transaction_amount: Number(amount),
-      description: `Pagamento CapitalFlow ${loan_id ? `- Contrato ${loan_id.slice(0,8)}` : '- Aporte'}`,
+      description: `Pagamento Contrato ${loan_id?.slice(0,8)} - ${payment_type}`,
       payment_method_id: "pix",
       external_reference,
       payer: {
@@ -73,7 +44,7 @@ Deno.serve(async (req: any) => {
           number: payer_doc.replace(/\D/g, "")
         } : undefined
       },
-      // Metadados para Webhook
+      // Metadados que voltarão no Webhook
       metadata: {
         loan_id,
         installment_id,
@@ -83,7 +54,7 @@ Deno.serve(async (req: any) => {
       }
     };
 
-    // 7. Chamada à API do Mercado Pago
+    // 3. Chamar API do Mercado Pago
     const mpRes = await fetch("https://api.mercadopago.com/v1/payments", {
       method: "POST",
       headers: {
@@ -98,31 +69,40 @@ Deno.serve(async (req: any) => {
 
     if (!mpRes.ok) {
       console.error("Erro MP:", mpData);
-      const msg = mpData.message || "Erro desconhecido no Mercado Pago";
-      throw new Error(`Mercado Pago recusou: ${msg}`);
+      return new Response(JSON.stringify({ ok: false, error: mpData.message || "Erro no Mercado Pago" }), { status: 500 });
     }
 
     const qr_code = mpData.point_of_interaction?.transaction_data?.qr_code;
     const qr_code_base64 = mpData.point_of_interaction?.transaction_data?.qr_code_base64;
     const paymentId = String(mpData.id);
 
-    // 8. Salvar Log no Supabase
-    await supabaseClient.from('payment_charges').insert({
-        charge_id: external_reference,
+    // 4. Salvar registro na tabela payment_charges (Supabase)
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+    await fetch(`${SUPABASE_URL}/rest/v1/payment_charges`, {
+      method: "POST",
+      headers: {
+        "apikey": SUPABASE_KEY!,
+        "Authorization": `Bearer ${SUPABASE_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        charge_id: external_reference, // Usamos nosso UUID como ID interno
         provider_payment_id: paymentId,
         loan_id,
         installment_id,
-        profile_id: profile_id, // Importante para o webhook saber de quem é
+        profile_id,
         amount,
-        payment_type,
+        payment_type, // RENEW_INTEREST, FULL, LEND_MORE
         status: "PENDING",
         provider_status: mpData.status,
         qr_code,
         qr_code_base64,
         created_at: new Date().toISOString()
+      })
     });
 
-    // 9. Retorno Sucesso
     return new Response(JSON.stringify({
       ok: true,
       charge_id: external_reference,
@@ -131,16 +111,12 @@ Deno.serve(async (req: any) => {
       qr_code,
       qr_code_base64,
       external_reference
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
-    })
+    }), { 
+      status: 200, 
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } 
+    });
 
-  } catch (error: any) {
-    console.error("Function Error:", error);
-    return new Response(JSON.stringify({ ok: false, error: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 400, // Retorna 400 para que o cliente não tente retry infinito
-    })
+  } catch (err: any) {
+    return new Response(JSON.stringify({ ok: false, error: err.message }), { status: 500 });
   }
-})
+});

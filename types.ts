@@ -168,8 +168,6 @@ export interface UserProfile {
   // Configurações de UI
   ui_nav_order?: AppTab[];
   ui_hub_order?: AppTab[];
-  // Integrações
-  mpAccessToken?: string; // Token do Mercado Pago
 }
 
 export interface Loan {

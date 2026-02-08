@@ -44,7 +44,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, isUploading, place
         onSend('📍 Localização (Demo)', 'location');
         setShowAttachMenu(false);
     } 
-    // Image e File são tratados pelo fileInputRef via click no AttachMenu (que recebe a ref)
   };
 
   const handleStopRecording = async () => {
@@ -62,7 +61,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, isUploading, place
   };
 
   return (
-    <div className="p-3 bg-slate-900 border-t border-slate-800 relative select-none">
+    <div className="p-4 bg-[#0f172a] border-t border-slate-800/50 relative select-none z-30">
       {/* Menu de Anexos */}
       {showAttachMenu && (
         <AttachMenu 
@@ -75,7 +74,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, isUploading, place
 
       {/* Interface de Gravação Ativa */}
       {isRecording ? (
-        <div className="flex items-center gap-4 bg-slate-800 p-3 rounded-2xl animate-in fade-in slide-in-from-bottom-2">
+        <div className="flex items-center gap-4 bg-slate-800 p-3 rounded-2xl animate-in fade-in slide-in-from-bottom-2 border border-slate-700">
             <div className="flex items-center gap-3 flex-1">
                 <span className="w-3 h-3 bg-rose-500 rounded-full animate-pulse"></span>
                 <span className="text-xs font-bold text-white uppercase tracking-wider">
@@ -95,17 +94,17 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, isUploading, place
             </button>
         </div>
       ) : (
-        <div className="flex gap-2 items-end">
+        <div className="flex gap-3 items-end">
           <button
             onClick={() => setShowAttachMenu(!showAttachMenu)}
             className={`p-3 rounded-xl transition-all ${
-              showAttachMenu ? 'bg-slate-700 text-white' : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+              showAttachMenu ? 'bg-slate-800 text-white' : 'bg-transparent text-slate-500 hover:text-white hover:bg-slate-800'
             }`}
           >
             {showAttachMenu ? <X size={20} /> : <Paperclip size={20} />}
           </button>
 
-          <div className="flex-1 bg-slate-950 border border-slate-800 rounded-xl flex items-center focus-within:border-blue-500 transition-colors">
+          <div className="flex-1 bg-[#1e293b] border border-slate-800 rounded-2xl flex items-center focus-within:border-blue-500/50 focus-within:ring-1 focus-within:ring-blue-500/20 transition-all">
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
@@ -115,10 +114,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, isUploading, place
                   handleSendText();
                 }
               }}
-              className="w-full bg-transparent px-4 py-3 text-white text-xs outline-none resize-none max-h-24 custom-scrollbar placeholder:text-slate-600"
+              className="w-full bg-transparent px-4 py-3 text-white text-sm font-medium outline-none resize-none max-h-32 custom-scrollbar placeholder:text-slate-600"
               placeholder={placeholder || 'Digite sua mensagem...'}
               rows={1}
-              style={{ minHeight: '44px' }}
+              style={{ minHeight: '48px' }}
               disabled={isUploading}
             />
           </div>
@@ -133,7 +132,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, isUploading, place
             </button>
           ) : (
             <button
-              // Pointer events para suportar mobile touch sem delay
               onPointerDown={(e) => {
                   e.preventDefault();
                   startRecording();
