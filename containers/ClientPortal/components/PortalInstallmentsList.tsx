@@ -2,13 +2,15 @@
 import React from 'react';
 import { FileText } from 'lucide-react';
 import { PortalInstallmentItem } from './PortalInstallmentItem';
+import { Loan } from '../../../types';
 
 interface PortalInstallmentsListProps {
+    loan: Loan;
     installments: any[];
     pendingCount: number;
 }
 
-export const PortalInstallmentsList: React.FC<PortalInstallmentsListProps> = ({ installments, pendingCount }) => {
+export const PortalInstallmentsList: React.FC<PortalInstallmentsListProps> = ({ loan, installments, pendingCount }) => {
     return (
         <div className="space-y-3">
             <div className="flex items-center justify-between px-1">
@@ -26,7 +28,7 @@ export const PortalInstallmentsList: React.FC<PortalInstallmentsListProps> = ({ 
                         <div className="p-8 text-center text-slate-600 text-[10px] font-bold uppercase">Nenhuma parcela encontrada.</div>
                     ) : (
                         installments.map((p, idx) => (
-                            <PortalInstallmentItem key={idx} installment={p} />
+                            <PortalInstallmentItem key={idx} loan={loan} installment={p} />
                         ))
                     )}
                 </div>

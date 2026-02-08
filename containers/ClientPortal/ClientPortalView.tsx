@@ -6,6 +6,7 @@ import { PortalLogin } from '../../features/portal/components/PortalLogin';
 import { PortalPaymentModal } from '../../features/portal/components/PortalPaymentModal'; 
 import { PortalChatDrawer } from '../../features/portal/components/PortalChatDrawer';
 import { supabase } from '../../lib/supabase';
+import { resolveDebtSummary } from '../../features/portal/mappers/portalDebtRules';
 
 // Novos Componentes
 import { PortalHeader } from './components/PortalHeader';
@@ -100,10 +101,9 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
         );
     }
 
-    // Cálculo de Totais
+    // ✅ Cálculo de Totais (USANDO FONTE ÚNICA)
+    const { totalDue, nextDueDate, pendingCount } = resolveDebtSummary(loan, installments);
     const pendingInstallments = installments.filter(i => i.status !== 'PAID');
-    const totalJuridicoDevido = pendingInstallments.reduce((acc, i) => acc + i.valor_parcela, 0);
-    const nextDueDate = pendingInstallments.length > 0 ? new Date(pendingInstallments[0].data_vencimento) : null;
 
     return (
         <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 relative">
@@ -120,21 +120,22 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-5">
                     
                     <PortalSummaryCard 
-                        totalJuridicoDevido={totalJuridicoDevido} 
+                        totalJuridicoDevido={totalDue} 
                         nextDueDate={nextDueDate} 
                     />
 
                     <PortalActions 
                         onPayment={() => setShowPaymentModal(true)} 
                         onLegal={() => setIsLegalOpen(true)}
-                        disablePayment={totalJuridicoDevido <= 0}
+                        disablePayment={totalDue <= 0}
                     />
 
                     <PortalDocuments documents={activeDocuments} />
 
                     <PortalInstallmentsList 
+                        loan={loan}
                         installments={installments} 
-                        pendingCount={pendingInstallments.length} 
+                        pendingCount={pendingCount} 
                     />
 
                     <PortalCreditorInfo creditor={creditorInfo} />
@@ -192,7 +193,6 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
                 <PortalPaymentModal 
                     loan={loan} 
                     installment={pendingInstallments[0] || installments[installments.length-1]} 
-                    // CHANGE: Passando ID do cliente para permitir notificação
                     clientData={{ name: loggedClient.name, doc: loggedClient.document, id: loggedClient.id }} 
                     onClose={() => { setShowPaymentModal(false); loadFullPortalData(selectedLoanId, loggedClient.id); }} 
                 />
