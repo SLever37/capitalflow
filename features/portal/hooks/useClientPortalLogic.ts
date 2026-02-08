@@ -1,48 +1,37 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { portalService } from '../../../services/portal.service';
 import { mapLoanFromDB } from '../../../services/adapters/loanAdapter';
-import { Loan, Installment } from '../../../types';
+import { Loan } from '../../../types';
+import { resolveDebtSummary } from '../mappers/portalDebtRules';
 
 export const useClientPortalLogic = (initialToken: string) => {
   const [isLoading, setIsLoading] = useState(true);
   const [portalError, setPortalError] = useState<string | null>(null);
 
-  // Dados
-  const [loan, setLoan] = useState<Loan | null>(null);
-  const [installments, setInstallments] = useState<Installment[]>([]);
-  const [clientContracts, setClientContracts] = useState<any[]>([]);
+  // Dados Centrados no Cliente
   const [loggedClient, setLoggedClient] = useState<any>(null);
+  const [clientContracts, setClientContracts] = useState<Loan[]>([]);
 
-  // Token ativo (fonte da verdade)
-  const [activeToken, setActiveToken] = useState<string>(initialToken);
-
-  // Estado auxiliar
+  // Estado Auxiliar
   const [isSigning, setIsSigning] = useState(false);
 
-  const loadPortalData = useCallback(async (token: string) => {
-    if (!token) return;
+  // Carregamento Unificado
+  const loadFullPortalData = useCallback(async () => {
+    if (!initialToken) return;
 
     setIsLoading(true);
     setPortalError(null);
 
     try {
-      // A) contrato pelo TOKEN (público)
-      const rawLoan = await portalService.fetchLoanByToken(token);
-
-      // ✅ FIX: clientId vem SEMPRE do campo da tabela contratos (não depende do embed)
-      const clientId: string | null = (rawLoan as any)?.client_id ?? null;
-      if (!clientId) throw new Error('Contrato sem cliente associado (client_id ausente).');
-
-      // B) dados do cliente (preferir embed, mas com fallback seguro)
-      const embeddedClient = (rawLoan as any)?.clients ?? null;
+      // 1. Validação de Acesso (Usa o token para achar o contrato "porta de entrada")
+      const entryLoan = await portalService.fetchLoanByToken(initialToken);
+      const clientId = (entryLoan as any)?.client_id;
       
-      // Se não veio no embed, busca explicitamente (método adicionado ao service)
-      const clientData =
-        embeddedClient && typeof embeddedClient === 'object'
-          ? embeddedClient
-          : await portalService.fetchClientById(clientId);
+      if (!clientId) throw new Error('Contrato sem cliente associado.');
 
+      // 2. Dados do Cliente
+      const clientData = (entryLoan as any)?.clients || await portalService.fetchClientById(clientId);
       if (!clientData?.id) throw new Error('Dados do cliente não encontrados.');
 
       setLoggedClient({
@@ -50,55 +39,79 @@ export const useClientPortalLogic = (initialToken: string) => {
         name: clientData.name,
         document: clientData.document || '',
         phone: clientData.phone,
+        email: clientData.email
       });
 
-      // C) detalhes do contrato
-      const { installments: rawInst, signals } = await portalService.fetchLoanDetails((rawLoan as any).id);
-
-      // D) mapeia
-      const mappedLoan = mapLoanFromDB(rawLoan, rawInst, undefined, []);
-      (mappedLoan as any).paymentSignals = signals;
-      (mappedLoan as any).portal_token = token;
-
-      setLoan(mappedLoan);
-      setInstallments(mappedLoan.installments);
-
-      // E) lista contratos do MESMO cliente
-      const contracts = await portalService.fetchClientContracts(clientId);
+      // 3. Buscar TODOS os contratos deste cliente (Lista Resumida)
+      const rawContractsList = await portalService.fetchClientContracts(clientId);
       
-      // ✅ FILTRO DE SEGURANÇA: Garante que apenas contratos com o MESMO client_id entrem na lista
-      // Isso previne que contratos de outros clientes vazem caso a query tenha retornado dados indevidos.
-      const safeContracts = (contracts || []).filter((c: any) => 
-          c.client_id && String(c.client_id) === String(clientId)
+      // 4. Hidratação Profunda (Carregar parcelas e detalhes para CADA contrato)
+      // Isso permite que a UI mostre o status real de todos eles simultaneamente.
+      const hydratedContracts: Loan[] = await Promise.all(
+        rawContractsList.map(async (contractHeader: any) => {
+            // Busca dados completos no banco para este contrato específico
+            // Precisamos dos dados 'raw' do contrato + parcelas
+            // Como fetchClientContracts retorna parcial, vamos buscar o full loan details de cada um
+            // Otimização: Poderíamos criar uma RPC, mas aqui faremos via loop controlado
+            
+            // Reutiliza a lógica de fetch loan by ID (simulada aqui recuperando o loan completo)
+            // Precisamos buscar o contrato completo no supabase
+            // A portalService não tem "fetchLoanById", vamos usar a lógica interna ou expandir a service
+            // Para simplificar e manter segurança, usamos o fetchDetails que já pega parcelas
+            
+            // A solução mais robusta é buscar o contrato completo
+            const { data: fullLoanData, error } = await import('../../../lib/supabase').then(m => 
+                m.supabase.from('contratos')
+                .select('*, parcelas(*), sinalizacoes_pagamento(*)')
+                .eq('id', contractHeader.id)
+                .single()
+            );
+            
+            if (error || !fullLoanData) return null;
+
+            return mapLoanFromDB(
+                fullLoanData, 
+                fullLoanData.parcelas, 
+                undefined, // acordos (se necessário, expandir query)
+                [] 
+            );
+        })
       );
 
-      setClientContracts(safeContracts);
+      // Filtra nulos e ordena por status (atrasados primeiro)
+      const validContracts = hydratedContracts.filter(Boolean) as Loan[];
+      
+      // Ordenação Inteligente:
+      // 1. Atrasados
+      // 2. A Vencer Próximo
+      // 3. Pagos/Arquivados pro final
+      const sortedContracts = validContracts.sort((a, b) => {
+          const summaryA = resolveDebtSummary(a, a.installments);
+          const summaryB = resolveDebtSummary(b, b.installments);
+          
+          // Prioridade para quem tem atraso
+          if (summaryA.hasLateInstallments && !summaryB.hasLateInstallments) return -1;
+          if (!summaryA.hasLateInstallments && summaryB.hasLateInstallments) return 1;
+          
+          // Se ambos iguais, pelo vencimento mais próximo
+          const dateA = summaryA.nextDueDate?.getTime() || 9999999999999;
+          const dateB = summaryB.nextDueDate?.getTime() || 9999999999999;
+          return dateA - dateB;
+      });
+
+      setClientContracts(sortedContracts);
 
     } catch (err: any) {
       console.error('Portal Load Error:', err);
-      setPortalError(err?.message || 'Não foi possível carregar o contrato.');
-      setLoan(null);
-      setInstallments([]);
-      setClientContracts([]);
-      setLoggedClient(null);
+      setPortalError(err?.message || 'Não foi possível carregar os dados do portal.');
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [initialToken]);
 
   useEffect(() => {
-    if (activeToken) loadPortalData(activeToken);
-  }, [activeToken, loadPortalData]);
-
-  const handleSwitchContract = (newToken: string) => {
-    if (!newToken || newToken === activeToken) return;
-
-    const newUrl = new URL(window.location.href);
-    newUrl.searchParams.set('portal', newToken);
-    window.history.pushState({}, '', newUrl.toString());
-
-    setActiveToken(newToken);
-  };
+    loadFullPortalData();
+  }, [loadFullPortalData]);
 
   const handleSignDocument = async (_type: string) => {
     setIsSigning(true);
@@ -112,18 +125,14 @@ export const useClientPortalLogic = (initialToken: string) => {
   return {
     isLoading,
     portalError,
-
-    loan,
-    installments,
     loggedClient,
-    clientContracts,
-
-    activeToken,
-    setActiveToken: handleSwitchContract,
-
-    loadFullPortalData: () => loadPortalData(activeToken),
+    clientContracts, // Array completo de contratos
+    loadFullPortalData,
     handleSignDocument,
     handleViewDocument,
     isSigning,
+    // Compatibilidade temporária
+    activeToken: initialToken,
+    setActiveToken: () => {}, 
   };
 };

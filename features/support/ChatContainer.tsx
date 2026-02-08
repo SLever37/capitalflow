@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect } from 'react';
 import { Phone, Video, Lock } from 'lucide-react';
 import { ChatMessages } from './components/ChatMessages';
@@ -62,9 +63,17 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     }
   }, [localStream]);
 
-  const handleSend = async (text: string, type: any = 'text', file?: File, meta?: any) => {
-    // upload fica em outro passo; aqui só envia texto/links/metadata
-    await sendMessage(text, type, undefined, meta);
+  const handleSend = async (text: string, type: any = 'text', file?: any, meta?: any) => {
+    // upload fica em outro passo ou componente; aqui só envia texto/links/metadata
+    // Se 'file' for string, passamos como fileUrl
+    const fileUrl = typeof file === 'string' ? file : undefined;
+    
+    try {
+      await sendMessage(text, type, fileUrl, meta);
+    } catch (e: any) {
+      console.error(e);
+      alert(e?.message || 'Falha ao enviar mensagem');
+    }
   };
 
   const handleReopen = () => {

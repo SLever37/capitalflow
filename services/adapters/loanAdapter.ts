@@ -1,3 +1,4 @@
+
 // services/adapters/loanAdapter.ts
 import { Agreement, AgreementInstallment, Installment, Loan, LoanStatus } from '../../types';
 import { asArray, asNumber, asString, safeDateString } from '../../utils/safe';
@@ -184,6 +185,8 @@ export function mapLoanFromDB(
 
     isArchived: !!(l?.is_archived ?? l?.isArchived),
     skipWeekends: !!(l?.skip_weekends ?? l?.skipWeekends),
+
+    portalToken: asString(l?.portal_token ?? l?.portalToken),
 
     activeAgreement,
   } as Loan;

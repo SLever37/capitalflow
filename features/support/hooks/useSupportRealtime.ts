@@ -1,3 +1,4 @@
+
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { playNotificationSound } from '../../../utils/notificationSound';
@@ -188,29 +189,31 @@ export const useSupportRealtime = (loanId: string, profileId: string, role: Role
 
     const payload: any = {
       loan_id: loanId,
-
-      // compat/legado
-      sender: role,
       profile_id: profileId,
 
-      // novo
+      // Dados de remetente
+      sender: role,
       sender_type: role,
       sender_user_id: profileId,
 
+      // Conteúdo
       content: content ?? '',
+      text: content ?? '', // Fallback para compatibilidade
       type,
       file_url: fileUrl || null,
       metadata: metadata || null,
 
+      // Status inicial
       read: false,
-      created_at: new Date().toISOString(),
+      // created_at: removido para usar default do banco
     };
 
     if (role === 'OPERATOR') payload.operator_id = profileId;
 
     const { error } = await supabase.from('mensagens_suporte').insert(payload);
+    
     if (error) {
-      console.error('mensagens_suporte insert error:', error);
+      console.error('[CHAT_SEND_ERROR]', error, payload);
       throw new Error(error.message || 'Falha ao enviar mensagem.');
     }
   };
