@@ -1,4 +1,3 @@
-// services/portal.service.ts
 import { supabase } from '../lib/supabase';
 
 export const portalService = {
@@ -21,18 +20,13 @@ export const portalService = {
   },
 
   /**
-   * Lista todos os contratos do cliente para o dropdown/switcher.
-   * Retorna apenas dados essenciais para navegação.
-   *
-   * ✅ IMPORTANTE: removido filtro `.eq('is_archived', false)` porque em alguns bancos
-   * esse campo não existe e quebra a listagem com erro de coluna inexistente.
+   * Lista contratos do cliente para dropdown/switcher.
+   * (SELECT mínimo para não quebrar quando colunas opcionais não existem no DB)
    */
   async fetchClientContracts(clientId: string) {
     const { data, error } = await supabase
       .from('contratos')
-      .select(
-        'id, code, start_date, created_at, portal_token, principal, total_to_receive'
-      )
+      .select('id, created_at, portal_token')
       .eq('client_id', clientId)
       .order('created_at', { ascending: false });
 
@@ -44,7 +38,6 @@ export const portalService = {
    * Carrega dados completos do contrato (parcelas, sinais, etc).
    */
   async fetchLoanDetails(loanId: string) {
-    // 1) Parcelas
     const { data: installments, error: instErr } = await supabase
       .from('parcelas')
       .select('*')
@@ -53,7 +46,6 @@ export const portalService = {
 
     if (instErr) throw new Error('Erro ao carregar parcelas.');
 
-    // 2) Sinais / Comprovantes
     let signals: any[] = [];
     try {
       const { data: sig } = await supabase
@@ -64,22 +56,13 @@ export const portalService = {
       if (sig) signals = sig;
     } catch {}
 
-    return {
-      installments: installments || [],
-      signals,
-    };
+    return { installments: installments || [], signals };
   },
 
   /**
    * Registra intenção de pagamento
    */
-  async submitPaymentIntent(
-    clientId: string,
-    loanId: string,
-    profileId: string,
-    tipo: string
-  ) {
-    // Tenta via RPC primeiro
+  async submitPaymentIntent(clientId: string, loanId: string, profileId: string, tipo: string) {
     try {
       const { data, error } = await supabase.rpc('portal_submit_payment_intent', {
         p_client_id: clientId,
@@ -90,7 +73,6 @@ export const portalService = {
       if (error) throw error;
       return data;
     } catch {
-      // Fallback manual
       const { data, error } = await supabase
         .from('sinalizacoes_pagamento')
         .insert({
