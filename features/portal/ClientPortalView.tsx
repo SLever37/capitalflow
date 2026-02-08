@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { ShieldCheck, RefreshCw, X, Building, MapPin, Gavel, MessageCircle, FileSignature, Lock, FileText, ChevronDown, LogOut, Calendar, DollarSign, Wallet, Eye, Download, Paperclip } from 'lucide-react';
 import { useClientPortalLogic } from './hooks/useClientPortalLogic';
@@ -244,7 +245,7 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
                                         let statusColor = 'text-slate-500';
                                         let dateColor = 'text-slate-300';
 
-                                        if (p.status === LoanStatus.PAID) {
+                                        if ((p.status as string) === LoanStatus.PAID) {
                                             statusLabel = 'Pago';
                                             statusColor = 'text-emerald-500';
                                             dateColor = 'text-slate-500';
@@ -360,7 +361,7 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
                 <PortalPaymentModal 
                     loan={loan} 
                     installment={pendingInstallments[0] || installments[installments.length-1]} 
-                    clientData={{ name: loggedClient.name, doc: loggedClient.document }} 
+                    clientData={{ name: loggedClient.name, doc: loggedClient.document, id: loggedClient.id }} 
                     onClose={() => { setShowPaymentModal(false); loadFullPortalData(); }} 
                 />
             )}

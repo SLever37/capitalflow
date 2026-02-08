@@ -86,7 +86,7 @@ export const App: React.FC = () => {
     disabled: isPublicView,
   });
 
-  // Init Notifications Permissions (apenas se logado)
+  // Init Notifications Permissions (apenas se logado E não for view pública)
   useEffect(() => {
     if (activeUser && !isPublicView) {
         notificationService.requestPermission();

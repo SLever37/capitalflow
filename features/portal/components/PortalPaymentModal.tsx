@@ -25,9 +25,6 @@ export const PortalPaymentModal: React.FC<PortalPaymentModalProps> = ({ loan, in
 
   const pixKey = (loan as any).pixKey || (loan as any).pix_key || "";
   
-  // Determina se está atrasado baseado na existência de multa/mora no breakdown
-  const isLate = options.breakdown.fine > 0;
-
   const handleNotifyPayment = async () => {
     if (!clientData.id) return;
     setStep('NOTIFYING');
@@ -69,8 +66,8 @@ export const PortalPaymentModal: React.FC<PortalPaymentModalProps> = ({ loan, in
             <BillingView 
                 totalToPay={options.totalToPay}
                 interestOnlyWithFees={options.renewToPay}
-                isLate={isLate}
-                daysLate={0} // Opcional, a view usa apenas se > 0, mas aqui já passamos o total com multa
+                dueDateISO={options.dueDateISO} // NOVO: Passa data para lógica de label
+                daysLateRaw={options.daysLate}  // NOVO: Passa dias crus
                 pixKey={pixKey}
                 onCopyPix={copyPixKey}
                 onNotify={handleNotifyPayment}

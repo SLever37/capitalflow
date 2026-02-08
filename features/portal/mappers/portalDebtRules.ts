@@ -10,6 +10,7 @@ export interface PortalDebtSummary {
     nextDueDate: Date | null;
     pendingCount: number;
     hasLateInstallments: boolean;
+    maxDaysLate: number; // Novo: para notificações
 }
 
 export interface InstallmentDebtDetail {
@@ -33,19 +34,61 @@ export interface PaymentOptions {
         fine: number;
     };
     canRenew: boolean;
+    // Novos campos para UI correta
+    daysLate: number;
+    dueDateISO: string;
 }
+
+/**
+ * HELPER DE LABEL DE VENCIMENTO (Regra Centralizada)
+ */
+export const getPortalDueLabel = (daysLate: number, dueDateISO: string) => {
+    // 1. Atrasado real (multa aplicável ou passado)
+    if (daysLate > 0) {
+        return { 
+            label: `Vencido há ${daysLate} dia${daysLate === 1 ? '' : 's'}`, 
+            detail: '(+ Taxas e Multas inclusas)',
+            variant: 'OVERDUE' 
+        };
+    }
+
+    // Calcula diferença real (negativo = futuro) para labels de "Vence em..."
+    const rawDiff = -getDaysDiff(dueDateISO); // getDaysDiff retorna (hoje - data). Invertemos para (data - hoje).
+
+    // 2. Vence Hoje
+    if (rawDiff === 0) {
+        return { 
+            label: 'Vence hoje', 
+            detail: '',
+            variant: 'DUE_TODAY' 
+        };
+    }
+
+    // 3. Futuro
+    if (rawDiff > 0) {
+        return { 
+            label: `Vence em ${rawDiff} dia${rawDiff === 1 ? '' : 's'}`, 
+            detail: '',
+            variant: 'DUE_SOON' 
+        };
+    }
+
+    // Fallback (passado mas sem daysLate > 0, ex: pago ou tolerância)
+    return { label: 'Em dia', detail: '', variant: 'OK' };
+};
 
 /**
  * 1. RESUMO GERAL DA DÍVIDA (Card Principal)
  */
 export const resolveDebtSummary = (loan: Loan, installments: Installment[]): PortalDebtSummary => {
-    if (!loan || !installments) return { totalDue: 0, nextDueDate: null, pendingCount: 0, hasLateInstallments: false };
+    if (!loan || !installments) return { totalDue: 0, nextDueDate: null, pendingCount: 0, hasLateInstallments: false, maxDaysLate: 0 };
 
     const pending = installments.filter(i => i.status !== 'PAID');
     const loanCalc = normalizeLoanForCalc(loan);
 
     let totalDue = 0;
     let hasLate = false;
+    let maxDaysLate = 0;
 
     // Soma inteligente: Usa o motor financeiro para cada parcela
     pending.forEach(inst => {
@@ -53,7 +96,10 @@ export const resolveDebtSummary = (loan: Loan, installments: Installment[]): Por
         const debt = calculateTotalDue(loanCalc, instCalc);
         totalDue += debt.total; // total já inclui multa/mora se houver atraso
         
-        if (debt.daysLate > 0) hasLate = true;
+        if (debt.daysLate > 0) {
+            hasLate = true;
+            if (debt.daysLate > maxDaysLate) maxDaysLate = debt.daysLate;
+        }
     });
 
     const nextDueDate = pending.length > 0 
@@ -64,7 +110,8 @@ export const resolveDebtSummary = (loan: Loan, installments: Installment[]): Por
         totalDue,
         nextDueDate,
         pendingCount: pending.length,
-        hasLateInstallments: hasLate
+        hasLateInstallments: hasLate,
+        maxDaysLate
     };
 };
 
@@ -77,22 +124,19 @@ export const resolveInstallmentDebt = (loan: Loan, inst: Installment): Installme
     const debt = calculateTotalDue(loanCalc, instCalc);
 
     const isLate = debt.daysLate > 0;
-    const daysDiff = getDaysDiff(inst.dueDate); // Negativo = Faltam dias, Positivo = Atrasado
+    const dueInfo = getPortalDueLabel(debt.daysLate, inst.dueDate);
 
-    let statusLabel = 'Em dia';
+    let statusLabel = dueInfo.label;
     let statusColor = 'text-slate-500';
 
     if (inst.status === 'PAID') {
         statusLabel = 'Pago';
         statusColor = 'text-emerald-500';
-    } else if (daysDiff > 0) {
-        statusLabel = `Vencido há ${daysDiff} dias`;
+    } else if (dueInfo.variant === 'OVERDUE') {
         statusColor = 'text-rose-500 font-bold';
-    } else if (daysDiff === 0) {
-        statusLabel = 'Vence Hoje';
+    } else if (dueInfo.variant === 'DUE_TODAY') {
         statusColor = 'text-amber-500 font-bold animate-pulse';
-    } else if (daysDiff > -3) {
-        statusLabel = `Faltam ${Math.abs(daysDiff)} dias`;
+    } else if (dueInfo.variant === 'DUE_SOON') {
         statusColor = 'text-amber-500';
     }
 
@@ -133,7 +177,9 @@ export const resolvePaymentOptions = (loan: Loan, inst: Installment): PaymentOpt
             fine: debt.lateFee
         },
         // Só permite renovar se houver juros ou multa a pagar. Se for só principal, é quitação.
-        canRenew: (debt.interest + debt.lateFee) > 0
+        canRenew: (debt.interest + debt.lateFee) > 0,
+        daysLate: debt.daysLate,
+        dueDateISO: inst.dueDate
     };
 };
 

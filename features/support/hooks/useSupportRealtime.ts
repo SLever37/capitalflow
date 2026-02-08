@@ -6,13 +6,13 @@ type Role = 'CLIENT' | 'OPERATOR';
 type TicketStatus = 'OPEN' | 'CLOSED';
 
 const ONLINE_TTL_MS = 60_000; // 60s
-const HEARTBEAT_MS = 20_000;  // 20s
+const HEARTBEAT_MS = 20_000; // 20s
 const ONLINE_POLL_MS = 10_000;
 
 function isOtherOnline(lastSeenAt?: string | null) {
   if (!lastSeenAt) return false;
   const last = new Date(lastSeenAt).getTime();
-  return Number.isFinite(last) && (Date.now() - last) < ONLINE_TTL_MS;
+  return Number.isFinite(last) && Date.now() - last < ONLINE_TTL_MS;
 }
 
 export const useSupportRealtime = (loanId: string, profileId: string, role: Role) => {
@@ -33,47 +33,54 @@ export const useSupportRealtime = (loanId: string, profileId: string, role: Role
       setIsLoading(true);
 
       // Mensagens
-      const { data: msgs } = await supabase
-        .from('mensagens_suporte')
-        .select('*')
-        .eq('loan_id', loanId)
-        .order('created_at', { ascending: true });
+      {
+        const { data: msgs, error } = await supabase
+          .from('mensagens_suporte')
+          .select('*')
+          .eq('loan_id', loanId)
+          .order('created_at', { ascending: true });
 
-      if (msgs) setMessages(msgs);
+        if (!error && msgs) setMessages(msgs);
+      }
 
       // Ticket (último)
-      const { data: ticket } = await supabase
-        .from('support_tickets')
-        .select('id,status,created_at')
-        .eq('loan_id', loanId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (ticket?.status) {
-        setTicketStatus(ticket.status as TicketStatus);
-      } else {
-        // Cria ticket inicial OPEN (com profile_id de quem abriu)
-        const { data: newTicket } = await supabase
+      {
+        const { data: ticket } = await supabase
           .from('support_tickets')
-          .insert({ loan_id: loanId, status: 'OPEN', profile_id: profileId })
-          .select('status')
-          .single();
+          .select('id,status,created_at')
+          .eq('loan_id', loanId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-        if (newTicket?.status) setTicketStatus(newTicket.status as TicketStatus);
+        if (ticket?.status) {
+          setTicketStatus(ticket.status as TicketStatus);
+        } else {
+          // Cria ticket inicial OPEN
+          const { data: newTicket } = await supabase
+            .from('support_tickets')
+            .insert({ loan_id: loanId, status: 'OPEN', profile_id: profileId })
+            .select('status')
+            .single();
+
+          if (newTicket?.status) setTicketStatus(newTicket.status as TicketStatus);
+        }
       }
 
       // Presença inicial: pega o último last_seen da role oposta
-      const { data: presence } = await supabase
-        .from('support_presence')
-        .select('last_seen_at,role')
-        .eq('loan_id', loanId)
-        .neq('role', role)
-        .order('last_seen_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      {
+        const { data: presence } = await supabase
+          .from('support_presence')
+          .select('last_seen_at,role')
+          .eq('loan_id', loanId)
+          .neq('role', role)
+          .order('last_seen_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-      setIsOnline(isOtherOnline((presence as any)?.last_seen_at));
+        setIsOnline(isOtherOnline((presence as any)?.last_seen_at));
+      }
+
       setIsLoading(false);
     };
 
@@ -96,12 +103,10 @@ export const useSupportRealtime = (loanId: string, profileId: string, role: Role
           const senderUserId =
             (payload.new as any)?.sender_user_id ||
             (payload.new as any)?.operator_id ||
+            (payload.new as any)?.profile_id ||
             null;
 
-          const isMine = senderUserId
-            ? senderUserId === profileId
-            : (payload.new as any)?.profile_id === profileId;
-
+          const isMine = senderUserId ? senderUserId === profileId : false;
           if (!isMine) playNotificationSound();
         }
       )
@@ -129,20 +134,22 @@ export const useSupportRealtime = (loanId: string, profileId: string, role: Role
 
     // Heartbeat
     const sendHeartbeat = async () => {
-      await supabase.from('support_presence').upsert({
+      const { error } = await supabase.from('support_presence').upsert({
         profile_id: profileId,
         loan_id: loanId,
         role,
         last_seen_at: new Date().toISOString(),
       });
+
+      if (error) console.error('support_presence upsert error:', error);
     };
 
     sendHeartbeat();
     heartbeatRef.current = window.setInterval(sendHeartbeat, HEARTBEAT_MS);
 
-    // Poll online (resolve casos de background / perda de evento)
+    // Poll online
     const pollOnline = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('support_presence')
         .select('last_seen_at,role')
         .eq('loan_id', loanId)
@@ -151,7 +158,7 @@ export const useSupportRealtime = (loanId: string, profileId: string, role: Role
         .limit(1)
         .maybeSingle();
 
-      setIsOnline(isOtherOnline((data as any)?.last_seen_at));
+      if (!error) setIsOnline(isOtherOnline((data as any)?.last_seen_at));
     };
 
     onlinePollRef.current = window.setInterval(pollOnline, ONLINE_POLL_MS);
@@ -179,34 +186,48 @@ export const useSupportRealtime = (loanId: string, profileId: string, role: Role
       throw new Error('Atendimento encerrado. Aguarde reabertura pelo operador ou abra um novo chamado.');
     }
 
-    await supabase.from('mensagens_suporte').insert({
-      profile_id: profileId,
+    const payload: any = {
       loan_id: loanId,
-      sender: role,       // legado
-      sender_type: role,  // novo
+
+      // compat/legado
+      sender: role,
+      profile_id: profileId,
+
+      // novo
+      sender_type: role,
       sender_user_id: profileId,
-      content,
+
+      content: content ?? '',
       type,
       file_url: fileUrl || null,
       metadata: metadata || null,
+
       read: false,
       created_at: new Date().toISOString(),
-    });
+    };
+
+    if (role === 'OPERATOR') payload.operator_id = profileId;
+
+    const { error } = await supabase.from('mensagens_suporte').insert(payload);
+    if (error) {
+      console.error('mensagens_suporte insert error:', error);
+      throw new Error(error.message || 'Falha ao enviar mensagem.');
+    }
   };
 
-  // ✅ NOVO: Enviar localização real
+  // ✅ Enviar localização real
   const sendLocation = async (lat: number, lng: number) => {
     await sendMessage(
       `https://maps.google.com/?q=${lat},${lng}`,
       'location',
-      null as any,
+      undefined,
       { lat, lng }
     );
   };
 
   const updateTicketStatus = async (newStatus: TicketStatus) => {
     if (newStatus === 'CLOSED') {
-      await supabase
+      const { error } = await supabase
         .from('support_tickets')
         .update({
           status: 'CLOSED',
@@ -216,17 +237,21 @@ export const useSupportRealtime = (loanId: string, profileId: string, role: Role
         })
         .eq('loan_id', loanId)
         .eq('status', 'OPEN');
+
+      if (error) throw new Error(error.message || 'Falha ao encerrar ticket.');
       return;
     }
 
     // Reabrir = cria novo ticket OPEN (histórico preservado)
-    await supabase.from('support_tickets').insert({
+    const { error } = await supabase.from('support_tickets').insert({
       loan_id: loanId,
       status: 'OPEN',
       profile_id: profileId,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });
+
+    if (error) throw new Error(error.message || 'Falha ao reabrir ticket.');
   };
 
   return {
@@ -235,7 +260,7 @@ export const useSupportRealtime = (loanId: string, profileId: string, role: Role
     isOnline,
     isLoading,
     sendMessage,
-    sendLocation, // ✅ exportado
+    sendLocation,
     updateTicketStatus,
   };
 };
