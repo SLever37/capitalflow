@@ -1,4 +1,5 @@
-import React, { useEffect, useRef } from 'react';
+
+import React, { useEffect } from 'react';
 import { AppShell } from './layout/AppShell';
 import { NavHubController } from './layout/NavHubController';
 import { AppGate } from './components/AppGate';
@@ -26,48 +27,73 @@ import { notificationService } from './services/notification.service';
 import { MasterScreen } from './features/master/MasterScreen';
 
 export const App: React.FC = () => {
-  const { activeProfileId, loginUser, setLoginUser, loginPassword, setLoginPassword, savedProfiles, submitLogin, handleLogout, handleSelectSavedProfile, handleRemoveSavedProfile } = useAuth();
+  // Hooks de Infraestrutura
+  const { portalToken, legalSignToken } = usePortalRouting();
   const { toast, showToast } = useToast();
-  const { loans, setLoans, clients, setClients, sources, setSources, activeUser, setActiveUser, staffMembers, systemUsers, selectedStaffId, setSelectedStaffId, isLoadingData, setIsLoadingData, fetchFullData, activeTab, setActiveTab, statusFilter, setStatusFilter, sortOption, setSortOption, searchTerm, setSearchTerm, clientSearchTerm, setClientSearchTerm, profileEditForm, setProfileEditForm, loadError, navOrder, hubOrder, saveNavConfig } = useAppState(activeProfileId);
+  
+  const {
+    activeProfileId,
+    loginUser, setLoginUser,
+    loginPassword, setLoginPassword,
+    savedProfiles,
+    submitLogin,
+    handleLogout,
+    handleSelectSavedProfile,
+    handleRemoveSavedProfile,
+  } = useAuth();
+
+  const {
+    loans, setLoans,
+    clients, setClients,
+    sources, setSources,
+    activeUser, setActiveUser,
+    staffMembers, systemUsers,
+    selectedStaffId, setSelectedStaffId,
+    isLoadingData, setIsLoadingData,
+    fetchFullData,
+    activeTab, setActiveTab,
+    statusFilter, setStatusFilter,
+    sortOption, setSortOption,
+    searchTerm, setSearchTerm,
+    clientSearchTerm, setClientSearchTerm,
+    profileEditForm, setProfileEditForm,
+    loadError,
+    navOrder, hubOrder,
+    saveNavConfig,
+  } = useAppState(activeProfileId);
+
   const ui = useUiState() as any;
   ui.sortOption = sortOption;
   ui.setSortOption = setSortOption;
-  ui.staffMembers = staffMembers; 
-  const { portalLoanId, legalSignToken } = usePortalRouting();
-  const isPublicView = !!portalLoanId || !!legalSignToken;
+  ui.staffMembers = staffMembers;
+
+  const isPublicView = !!portalToken || !!legalSignToken;
+
   usePersistedTab(activeTab, setActiveTab);
-  const controllers = useControllers(activeUser, ui, loans, setLoans, clients, setClients, sources, setSources, setActiveUser, setIsLoadingData, fetchFullData, () => Promise.resolve(), handleLogout, showToast, profileEditForm, setProfileEditForm);
-  const { loanCtrl, clientCtrl, sourceCtrl, profileCtrl, paymentCtrl, fileCtrl, aiCtrl } = controllers;
-  useAppNotifications({ loans, sources, activeUser, showToast, setActiveTab, setSelectedLoanId: ui.setSelectedLoanId, disabled: isPublicView });
-  const uiRef = useRef(ui);
-  uiRef.current = ui;
 
+  const controllers = useControllers(
+    activeUser, ui, loans, setLoans, clients, setClients,
+    sources, setSources, setActiveUser, setIsLoadingData,
+    fetchFullData, () => Promise.resolve(), handleLogout,
+    showToast, profileEditForm, setProfileEditForm
+  );
+
+  const { loanCtrl, clientCtrl, sourceCtrl, profileCtrl, paymentCtrl, fileCtrl, aiCtrl, adminCtrl } = controllers;
+
+  useAppNotifications({
+    loans, sources, activeUser, showToast, setActiveTab,
+    setSelectedLoanId: ui.setSelectedLoanId,
+    disabled: isPublicView,
+  });
+
+  // Init Notifications Permissions (apenas se logado)
   useEffect(() => {
-    if (!activeUser && !portalLoanId && !legalSignToken) return;
-    
-    notificationService.requestPermission();
-    window.history.pushState(null, document.title, window.location.href);
-    
-    const handlePopState = (event: PopStateEvent) => {
-      const currentUi = uiRef.current;
-      if (currentUi.activeModal) { currentUi.closeModal(); window.history.pushState(null, '', window.location.href); return; }
-      if (currentUi.showNavHub) { currentUi.setShowNavHub(false); window.history.pushState(null, '', window.location.href); return; }
-      if (activeTab !== 'DASHBOARD' && !portalLoanId && !legalSignToken && activeUser?.accessLevel !== 1) { 
-          setActiveTab('DASHBOARD'); 
-          window.history.pushState(null, '', window.location.href); 
-          return; 
-      }
-      const confirmExit = window.confirm("Deseja mesmo sair do sistema?");
-      if (!confirmExit) { window.history.pushState(null, '', window.location.href); } else { handleLogout(); }
-    };
-    
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, [activeUser === null, !!portalLoanId, !!legalSignToken, activeTab]);
+    if (activeUser && !isPublicView) {
+        notificationService.requestPermission();
+    }
+  }, [activeUser, isPublicView]);
 
-  const effectiveSelectedStaffId = (activeUser && activeUser.accessLevel === 2) ? activeUser.id : selectedStaffId;
-
-  // Lógica de Rotas de Convite (Acesso Público)
+  const effectiveSelectedStaffId = activeUser && activeUser.accessLevel === 2 ? activeUser.id : selectedStaffId;
   const isInvitePath = window.location.pathname === '/invite' || window.location.pathname === '/setup-password';
 
   return (
@@ -78,32 +104,112 @@ export const App: React.FC = () => {
           {window.location.pathname === '/setup-password' && <SetupPasswordPage />}
         </>
       ) : (
-        <AppGate portalLoanId={portalLoanId} legalSignToken={legalSignToken} activeProfileId={activeProfileId} activeUser={activeUser} isLoadingData={isLoadingData} loadError={loadError} loginUser={loginUser} setLoginUser={setLoginUser} loginPassword={loginPassword} setLoginPassword={setLoginPassword} submitLogin={submitLogin} savedProfiles={savedProfiles} handleSelectSavedProfile={handleSelectSavedProfile} handleRemoveSavedProfile={handleRemoveSavedProfile} showToast={showToast} setIsLoadingData={setIsLoadingData} toast={toast} >
-          
+        <AppGate
+          portalToken={portalToken}
+          legalSignToken={legalSignToken}
+          activeProfileId={activeProfileId}
+          activeUser={activeUser}
+          isLoadingData={isLoadingData}
+          loadError={loadError}
+          loginUser={loginUser}
+          setLoginUser={setLoginUser}
+          loginPassword={loginPassword}
+          setLoginPassword={setLoginPassword}
+          submitLogin={submitLogin}
+          savedProfiles={savedProfiles}
+          handleSelectSavedProfile={handleSelectSavedProfile}
+          handleRemoveSavedProfile={handleRemoveSavedProfile}
+          showToast={showToast}
+          setIsLoadingData={setIsLoadingData}
+          toast={toast}
+        >
           {activeUser?.accessLevel === 1 ? (
-              <MasterScreen activeUser={activeUser} systemUsers={systemUsers} fetchFullData={fetchFullData} handleLogout={handleLogout} showToast={showToast} />
+            <MasterScreen
+              activeUser={activeUser}
+              systemUsers={systemUsers}
+              fetchFullData={fetchFullData}
+              handleLogout={handleLogout}
+              showToast={showToast}
+            />
           ) : (
-              <AppShell toast={toast} activeTab={activeTab} setActiveTab={setActiveTab} activeUser={activeUser} isLoadingData={isLoadingData} onOpenNav={() => ui.setShowNavHub(true)} onNewLoan={() => { ui.setEditingLoan(null); ui.openModal('LOAN_FORM'); }} isStealthMode={ui.isStealthMode} toggleStealthMode={() => ui.setIsStealthMode(!ui.isStealthMode)} onOpenSupport={() => ui.openModal('SUPPORT_CHAT')} navOrder={navOrder}>
-                
-                <div className="hidden">
-                   <HeaderBar activeTab={activeTab} setActiveTab={setActiveTab} activeUser={activeUser} isLoadingData={isLoadingData} onOpenNav={() => ui.setShowNavHub(true)} onNewLoan={() => ui.openModal('LOAN_FORM')} isStealthMode={ui.isStealthMode} toggleStealthMode={() => ui.setIsStealthMode(!ui.isStealthMode)} navOrder={navOrder} />
-                   <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} onOpenNav={() => ui.setShowNavHub(true)} onNewLoan={() => ui.openModal('LOAN_FORM')} navOrder={navOrder} primaryColor={activeUser?.brandColor} />
-                </div>
+            <AppShell
+              toast={toast}
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+              activeUser={activeUser}
+              isLoadingData={isLoadingData}
+              onOpenNav={() => ui.setShowNavHub(true)}
+              onNewLoan={() => { ui.setEditingLoan(null); ui.openModal('LOAN_FORM'); }}
+              isStealthMode={ui.isStealthMode}
+              toggleStealthMode={() => ui.setIsStealthMode(!ui.isStealthMode)}
+              onOpenSupport={() => ui.openModal('SUPPORT_CHAT')}
+              navOrder={navOrder}
+            >
+              <div className="hidden">
+                 {/* Componentes de layout ocultos mas renderizados para lógica se necessário, ou limpeza futura */}
+              </div>
 
-                {activeTab === 'DASHBOARD' && <DashboardContainer loans={loans} sources={sources} activeUser={activeUser} staffMembers={staffMembers} selectedStaffId={effectiveSelectedStaffId} setSelectedStaffId={setSelectedStaffId} mobileDashboardTab={ui.mobileDashboardTab} setMobileDashboardTab={ui.setMobileDashboardTab} statusFilter={statusFilter} setStatusFilter={setStatusFilter} searchTerm={searchTerm} setSearchTerm={setSearchTerm} ui={ui} loanCtrl={loanCtrl} fileCtrl={fileCtrl} showToast={showToast} onRefresh={() => fetchFullData(activeUser?.id || '')} />}
-                {activeTab === 'CLIENTS' && <ClientsContainer clients={clients} clientSearchTerm={clientSearchTerm} setClientSearchTerm={setClientSearchTerm} clientCtrl={clientCtrl} loanCtrl={loanCtrl} showToast={showToast} ui={ui} />}
-                
-                {/* ABA EQUIPE: O Erison aparecerá aqui devido à correção no hook de dados */}
-                {activeTab === 'TEAM' && !activeUser?.supervisor_id && <TeamPage activeUser={activeUser} showToast={showToast} onRefresh={() => fetchFullData(activeUser?.id || '')} />}
-                
-                {activeTab === 'SOURCES' && <SourcesContainer sources={sources} ui={ui} sourceCtrl={sourceCtrl} loanCtrl={loanCtrl} />}
-                {activeTab === 'PROFILE' && activeUser && <ProfileContainer activeUser={activeUser} clients={clients} loans={loans} sources={sources} ui={ui} profileCtrl={profileCtrl} handleLogout={handleLogout} showToast={showToast} profileEditForm={profileEditForm} setProfileEditForm={setProfileEditForm} fileCtrl={fileCtrl} navOrder={navOrder} hubOrder={hubOrder} saveNavConfig={saveNavConfig} />}
-                {activeTab === 'LEGAL' && <LegalContainer loans={loans} sources={sources} activeUser={activeUser} ui={ui} loanCtrl={loanCtrl} fileCtrl={fileCtrl} showToast={showToast} onRefresh={() => fetchFullData(activeUser?.id || '')} />}
-                
-                <ModalHostContainer ui={ui} activeUser={activeUser} clients={clients} sources={sources} loans={loans} isLoadingData={isLoadingData} loanCtrl={loanCtrl} clientCtrl={clientCtrl} sourceCtrl={sourceCtrl} paymentCtrl={paymentCtrl} profileCtrl={profileCtrl} adminCtrl={null} fileCtrl={fileCtrl} aiCtrl={aiCtrl} showToast={showToast} fetchFullData={fetchFullData} handleLogout={handleLogout} />
-                {ui.activeModal?.type === 'SUPPORT_CHAT' && <OperatorSupportChat activeUser={activeUser} onClose={ui.closeModal} />}
-                <NavHubController ui={ui} setActiveTab={setActiveTab} activeUser={activeUser} hubOrder={hubOrder} />
-              </AppShell>
+              {activeTab === 'DASHBOARD' && (
+                <DashboardContainer
+                  loans={loans} sources={sources} activeUser={activeUser}
+                  staffMembers={staffMembers} selectedStaffId={effectiveSelectedStaffId}
+                  setSelectedStaffId={setSelectedStaffId}
+                  mobileDashboardTab={ui.mobileDashboardTab} setMobileDashboardTab={ui.setMobileDashboardTab}
+                  statusFilter={statusFilter} setStatusFilter={setStatusFilter}
+                  searchTerm={searchTerm} setSearchTerm={setSearchTerm}
+                  ui={ui} loanCtrl={loanCtrl} fileCtrl={fileCtrl}
+                  showToast={showToast} onRefresh={() => fetchFullData(activeUser?.id || '')}
+                />
+              )}
+
+              {activeTab === 'CLIENTS' && (
+                <ClientsContainer
+                  clients={clients} clientSearchTerm={clientSearchTerm}
+                  setClientSearchTerm={setClientSearchTerm}
+                  clientCtrl={clientCtrl} loanCtrl={loanCtrl}
+                  showToast={showToast} ui={ui}
+                />
+              )}
+
+              {activeTab === 'TEAM' && !activeUser?.supervisor_id && (
+                <TeamPage activeUser={activeUser} showToast={showToast} onRefresh={() => fetchFullData(activeUser?.id || '')} />
+              )}
+
+              {activeTab === 'SOURCES' && (
+                <SourcesContainer sources={sources} ui={ui} sourceCtrl={sourceCtrl} loanCtrl={loanCtrl} />
+              )}
+
+              {activeTab === 'PROFILE' && activeUser && (
+                <ProfileContainer
+                  activeUser={activeUser} clients={clients} loans={loans} sources={sources}
+                  ui={ui} profileCtrl={profileCtrl} handleLogout={handleLogout} showToast={showToast}
+                  profileEditForm={profileEditForm} setProfileEditForm={setProfileEditForm}
+                  fileCtrl={fileCtrl} navOrder={navOrder} hubOrder={hubOrder} saveNavConfig={saveNavConfig}
+                />
+              )}
+
+              {activeTab === 'LEGAL' && (
+                <LegalContainer
+                  loans={loans} sources={sources} activeUser={activeUser}
+                  ui={ui} loanCtrl={loanCtrl} fileCtrl={fileCtrl}
+                  showToast={showToast} onRefresh={() => fetchFullData(activeUser?.id || '')}
+                />
+              )}
+
+              <ModalHostContainer
+                ui={ui} activeUser={activeUser} clients={clients} sources={sources} loans={loans}
+                isLoadingData={isLoadingData} loanCtrl={loanCtrl} clientCtrl={clientCtrl}
+                sourceCtrl={sourceCtrl} paymentCtrl={paymentCtrl} profileCtrl={profileCtrl}
+                adminCtrl={adminCtrl} fileCtrl={fileCtrl} aiCtrl={aiCtrl}
+                showToast={showToast} fetchFullData={fetchFullData} handleLogout={handleLogout}
+              />
+
+              {ui.activeModal?.type === 'SUPPORT_CHAT' && (
+                <OperatorSupportChat activeUser={activeUser} onClose={ui.closeModal} />
+              )}
+
+              <NavHubController ui={ui} setActiveTab={setActiveTab} activeUser={activeUser} hubOrder={hubOrder} />
+            </AppShell>
           )}
         </AppGate>
       )}

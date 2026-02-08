@@ -1,14 +1,16 @@
 
 import { getDaysUntilDue } from '../../../components/cards/LoanCardComposition/helpers';
+import { LoanStatus, Installment } from '../../../types';
 
-export const getInstallmentStatus = (installment: any) => {
-    const daysDiff = getDaysUntilDue(installment.data_vencimento);
+export const getInstallmentStatus = (installment: Installment) => {
+    const dueDate = installment.dueDate;
+    const daysDiff = getDaysUntilDue(dueDate);
     let label = '';
     let statusColor = 'text-slate-500';
     let dateColor = 'text-slate-300';
     let bgIcon = 'bg-slate-800 text-slate-400';
 
-    if (installment.status === 'PAID') {
+    if (installment.status === LoanStatus.PAID) {
         label = 'Pago';
         statusColor = 'text-emerald-500';
         dateColor = 'text-slate-500';

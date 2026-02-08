@@ -1,278 +1,121 @@
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { portalService, PortalSession } from '../../../services/portal.service';
-import { supabase } from '../../../lib/supabase';
-import { legalPublicService } from '../../legal/services/legalPublic.service';
+import { useState, useEffect, useCallback } from 'react';
+import { portalService } from '../../../services/portal.service';
+import { mapLoanFromDB } from '../../../services/adapters/loanAdapter';
+import { Loan, Installment } from '../../../types';
 
-export const useClientPortalLogic = (initialLoanId: string) => {
+export const useClientPortalLogic = (initialToken: string) => {
   const [isLoading, setIsLoading] = useState(true);
-  const [isSigning, setIsSigning] = useState(false);
   const [portalError, setPortalError] = useState<string | null>(null);
-  const [portalInfo, setPortalInfo] = useState<string | null>(null);
-
-  const [loginIdentifier, setLoginIdentifier] = useState('');
-  const [loggedClient, setLoggedClient] = useState<any | null>(null);
-  const [byeName, setByeName] = useState<string | null>(null);
-
-  const [selectedLoanId, setSelectedLoanId] = useState<string>(initialLoanId);
-  const [loan, setLoan] = useState<any | null>(null);
-  const [pixKey, setPixKey] = useState('');
-  const [installments, setInstallments] = useState<any[]>([]);
-  const [portalSignals, setPortalSignals] = useState<any[]>([]);
-  const [isAgreementActive, setIsAgreementActive] = useState(false);
   
-  // Lista de todos os contratos do cliente para o switcher
+  // Estado de Dados
+  const [loan, setLoan] = useState<Loan | null>(null);
+  const [installments, setInstallments] = useState<Installment[]>([]);
   const [clientContracts, setClientContracts] = useState<any[]>([]);
+  const [loggedClient, setLoggedClient] = useState<any>(null);
+  
+  // Estado de UI - Token Ativo (Fonte da Verdade)
+  const [activeToken, setActiveToken] = useState<string>(initialToken);
+  const [isSigning, setIsSigning] = useState(false);
 
-  const [intentId, setIntentId] = useState<string | null>(null);
-  const [intentType, setIntentType] = useState<string | null>(null);
-  const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
-
-  const abortControllerRef = useRef<AbortController | null>(null);
-
-  // Função principal de carregamento
-  const loadFullPortalData = useCallback(async (loanId: string, clientId: string) => {
-    if (abortControllerRef.current) abortControllerRef.current.abort();
-    abortControllerRef.current = new AbortController();
-
+  // 1. Carrega dados baseados no TOKEN ativo
+  const loadPortalData = useCallback(async (token: string) => {
+    if (!token) return;
+    
     setIsLoading(true);
     setPortalError(null);
 
-    // Atualiza URL sem recarregar para consistência (Link na barra muda)
-    const newUrl = new URL(window.location.href);
-    if (newUrl.searchParams.get('portal') !== loanId) {
-        newUrl.searchParams.set('portal', loanId);
-        window.history.replaceState(null, '', newUrl.toString());
-    }
-
     try {
-      // 1. Carrega os dados do contrato selecionado E a lista completa de contratos deste cliente
-      const [loanData, contractsList] = await Promise.all([
-          portalService.fetchLoanData(loanId, clientId),
-          portalService.fetchClientContracts(clientId)
-      ]);
-
-      setLoan(loanData.loan);
-      setPixKey(loanData.pixKey);
-      setPortalSignals(loanData.signals || []);
-      setInstallments(loanData.installments || []);
-      setIsAgreementActive(!!loanData.isAgreementActive);
+      // A) Busca Contrato pelo Token (Segurança: Token é a chave)
+      const rawLoan = await portalService.fetchLoanByToken(token);
       
-      // Atualiza a lista de contratos para garantir que o dropdown não fique trancado
-      setClientContracts(contractsList);
+      // B) Identifica Cliente e Operador
+      const clientData = rawLoan.clients;
+      if (!clientData) throw new Error("Dados do cliente não encontrados.");
 
-    } catch (e: any) {
-      if (e.name !== 'AbortError') {
-        setPortalError('Falha ao carregar contrato. Tente atualizar a página.');
-        console.error('Portal Data Sync Error:', e);
-      }
+      setLoggedClient({
+        id: clientData.id,
+        name: clientData.name,
+        document: clientData.document || '',
+        phone: clientData.phone
+      });
+
+      // C) Carrega detalhes do contrato (Parcelas, Sinais)
+      const { installments: rawInst, signals } = await portalService.fetchLoanDetails(rawLoan.id);
+
+      // D) Mapeia para o padrão do Frontend (CamelCase)
+      const mappedLoan = mapLoanFromDB(rawLoan, rawInst, undefined, []);
+      
+      // Injeta sinais mapeados e token para consistência
+      mappedLoan.paymentSignals = signals;
+      // Garante que o token atual esteja no objeto, útil para UI
+      (mappedLoan as any).portal_token = token;
+
+      setLoan(mappedLoan);
+      setInstallments(mappedLoan.installments);
+
+      // E) Carrega lista de outros contratos deste cliente (para o dropdown)
+      const contracts = await portalService.fetchClientContracts(clientData.id);
+      setClientContracts(contracts);
+
+    } catch (err: any) {
+      console.error("Portal Load Error:", err);
+      setPortalError(err.message || "Não foi possível carregar o contrato.");
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  // Inicialização da Sessão (Acesso Direto via Link)
+  // Inicialização e Reação a Troca de Token
   useEffect(() => {
-    const checkSession = async () => {
-      // Prioridade total para o link único (initialLoanId)
-      if (initialLoanId) {
-        try {
-          // 1. Valida existência do contrato e descobre o cliente dono
-          const { data: loanRef, error: loanError } = await supabase
-            .from('contratos')
-            .select('client_id')
-            .eq('id', initialLoanId)
-            .maybeSingle();
-
-          if (loanError || !loanRef) throw new Error('Link inválido ou contrato não encontrado.');
-
-          // 2. Carrega o cliente automaticamente (sem pedir código)
-          const { data: clientRef, error: clientError } = await supabase
-            .from('clientes')
-            .select('*')
-            .eq('id', loanRef.client_id)
-            .single();
-
-          if (clientError || !clientRef) throw new Error('Cliente associado não identificado.');
-
-          // 3. Login automático
-          setLoggedClient(clientRef);
-          setSelectedLoanId(initialLoanId);
-          // O useEffect [selectedLoanId, loggedClient] abaixo disparará o loadFullPortalData
-          
-        } catch (e: any) {
-          console.error("Portal Auto-Login Error:", e);
-          setPortalError(e.message || 'Erro ao acessar informações.');
-          setIsLoading(false);
-        }
-      } else {
-        setPortalError('Link de acesso inválido.');
-        setIsLoading(false);
-      }
-    };
-
-    checkSession();
-    return () => abortControllerRef.current?.abort();
-  }, [initialLoanId]);
-
-  // Trigger de Carregamento de Dados (Sempre que ID ou Cliente mudar)
-  useEffect(() => {
-    if (selectedLoanId && loggedClient) {
-      loadFullPortalData(selectedLoanId, loggedClient.id);
+    if (activeToken) {
+      loadPortalData(activeToken);
     }
-  }, [selectedLoanId, loggedClient, loadFullPortalData]);
+  }, [activeToken, loadPortalData]);
 
-  const handleLogin = async () => {
-    // Método mantido para compatibilidade, mas sem ação no novo fluxo direto
-    setPortalError('Por favor, utilize o link fornecido pelo seu gestor.');
+  // Função para trocar de contrato
+  const handleSwitchContract = (newToken: string) => {
+    if (!newToken || newToken === activeToken) return;
+    
+    // Atualiza URL silenciosamente para permitir refresh/bookmark
+    const newUrl = new URL(window.location.href);
+    newUrl.searchParams.set('portal', newToken);
+    window.history.pushState({}, '', newUrl);
+    
+    // Atualiza estado para disparar reload
+    setActiveToken(newToken);
   };
 
-  const handleLogout = () => {
-    // Apenas limpa o estado local
-    setByeName(loggedClient?.name || 'Cliente');
-    setLoggedClient(null);
-    setLoan(null);
-    setPortalError(null);
-    setClientContracts([]);
-  };
-
-  const handleSignalIntent = async (tipo: string) => {
-    if (!loggedClient || !loan) return;
-
-    setPortalError(null);
-    setIntentType(tipo);
-
-    if (tipo === 'PAGAR_PIX' && pixKey) {
-      navigator.clipboard.writeText(pixKey);
-      setPortalInfo('Chave PIX copiada!');
-    }
-
-    try {
-      const id = await portalService.submitPaymentIntent(
-        loggedClient.id,
-        selectedLoanId,
-        loan.profile_id,
-        tipo
-      );
-      setIntentId(id);
-    } catch (e: any) {
-      setPortalError(e.message);
-    }
-  };
-
-  const handleReceiptUpload = async (file: File) => {
-    if (!intentId || !loggedClient || !loan) return;
-
-    try {
-      setReceiptPreview(URL.createObjectURL(file));
-      await portalService.uploadReceipt(file, intentId, loan.profile_id, loggedClient.id);
-      setPortalInfo('Comprovante enviado com sucesso!');
-    } catch (e: any) {
-      setPortalError(e.message);
-    }
-  };
-
-  const handleSignDocument = async (type: 'CONFISSAO' | 'PROMISSORIA') => {
-    if (!loggedClient || !loan || isSigning) return;
-
+  const handleSignDocument = async (type: string) => {
     setIsSigning(true);
-
-    try {
-      const { data: records, error } = await supabase.rpc(
-        'get_documento_juridico_by_loan',
-        { p_loan_id: loan.id }
-      );
-
-      if (error || !records?.length) {
-        throw new Error('Nenhum documento localizado.');
-      }
-
-      const token = records[0]?.view_token;
-      if (!token) {
-        throw new Error('Documento sem token público disponível.');
-      }
-
-      let ip = '0.0.0.0';
-      try {
-        const r = await fetch('https://api.ipify.org?format=json');
-        const j = await r.json();
-        ip = j.ip;
-      } catch {}
-
-      await legalPublicService.signDocumentPublicly(
-        token,
-        {
-          name: loggedClient.name,
-          doc: loggedClient.document || loggedClient.cpf || loggedClient.cnpj || 'N/A',
-          role: 'DEVEDOR',
-        },
-        { ip, userAgent: navigator.userAgent }
-      );
-
-      alert(
-        type === 'CONFISSAO'
-          ? 'Confissão de Dívida assinada com sucesso!'
-          : 'Nota Promissória assinada com sucesso!'
-      );
-
-      loadFullPortalData(selectedLoanId, loggedClient.id);
-    } catch (e: any) {
-      alert(e.message);
-    } finally {
-      setIsSigning(false);
-    }
+    // Simulação por enquanto
+    await new Promise(r => setTimeout(r, 1500));
+    setIsSigning(false);
+    alert("Funcionalidade de assinatura em desenvolvimento.");
   };
 
-  const handleViewDocument = async () => {
-      if (!loan) return;
-      try {
-          const { data: records, error } = await supabase.rpc(
-            'get_documento_juridico_by_loan',
-            { p_loan_id: loan.id }
-          );
-
-          if (error || !records?.length) {
-            alert('Documento ainda não gerado pelo gestor.');
-            return;
-          }
-
-          const token = records[0]?.view_token;
-          if (token) {
-              const url = `${window.location.origin}/?legal_sign=${token}&role=DEVEDOR`;
-              window.open(url, '_blank');
-          }
-      } catch (e: any) {
-          console.error(e);
-          alert("Erro ao abrir documento.");
-      }
+  const handleViewDocument = () => {
+    // Placeholder
   };
 
   return {
     isLoading,
-    isSigning,
     portalError,
-    portalInfo,
-    loginIdentifier,
-    setLoginIdentifier,
-    loggedClient,
-    byeName,
-    selectedLoanId,
-    setSelectedLoanId,
-    clientContracts,
+    
+    // Dados
     loan,
     installments,
-    portalSignals,
-    isAgreementActive,
-    intentId,
-    intentType,
-    receiptPreview,
-    pixKey,
-    handleLogin,
-    handleLogout,
-    handleSignalIntent,
-    handleReceiptUpload,
+    loggedClient,
+    clientContracts,
+    
+    // Controle
+    activeToken,
+    setActiveToken: handleSwitchContract, // Exposto wrapper seguro
+    
+    // Ações
+    loadFullPortalData: () => loadPortalData(activeToken), // Recarregar atual
     handleSignDocument,
     handleViewDocument,
-    loadFullPortalData,
+    isSigning
   };
 };

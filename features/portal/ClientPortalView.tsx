@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { ShieldCheck, RefreshCw, X, Building, MapPin, Gavel, MessageCircle, FileSignature, Lock, FileText, ChevronDown, LogOut, Calendar, DollarSign, Wallet, Eye, Download, Paperclip } from 'lucide-react';
 import { useClientPortalLogic } from './hooks/useClientPortalLogic';
@@ -8,14 +7,16 @@ import { PortalPaymentModal } from './components/PortalPaymentModal';
 import { PortalChatDrawer } from './components/PortalChatDrawer';
 import { supabase } from '../../lib/supabase';
 import { getDaysUntilDue } from '../../components/cards/LoanCardComposition/helpers';
+import { LoanStatus } from '../../types';
 
 export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) => {
     const {
         isLoading, isSigning, portalError,
-        loginIdentifier, setLoginIdentifier,
-        loggedClient, selectedLoanId, setSelectedLoanId,
-        loan, installments, pixKey, clientContracts,
-        handleLogin, handleLogout, handleSignDocument, handleViewDocument,
+        loggedClient, 
+        activeToken: selectedLoanId, 
+        setActiveToken: setSelectedLoanId,
+        loan, installments, clientContracts,
+        handleSignDocument, handleViewDocument,
         loadFullPortalData 
     } = useClientPortalLogic(initialLoanId);
 
@@ -24,20 +25,26 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
 
+    const handleLogout = () => {
+        window.location.href = '/';
+    };
+
     const creditorInfo = useMemo(() => {
         if (!loan) return null;
         // Usa os dados mapeados do serviço (join com perfis)
+        const l = loan as any;
         return {
-            name: loan.creditorName || 'Credor Responsável',
-            doc: loan.creditorDoc || '',
-            address: loan.creditorAddress || ''
+            name: l.creditorName || 'Credor Responsável',
+            doc: l.creditorDoc || '',
+            address: l.creditorAddress || ''
         };
     }, [loan]);
 
     // Documentos visíveis (Uploads do Operador)
     const activeDocuments = useMemo(() => {
-        if (!loan?.policies_snapshot?.customDocuments) return [];
-        return (loan.policies_snapshot.customDocuments as any[]).filter(d => d.visibleToClient);
+        const docs = (loan?.policiesSnapshot as any)?.customDocuments || (loan as any)?.customDocuments;
+        if (!docs) return [];
+        return (docs as any[]).filter(d => d.visibleToClient);
     }, [loan]);
 
     useEffect(() => {
@@ -83,23 +90,25 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
                             <ShieldCheck size={40} className="text-blue-500" />
                         </div>
                         <h1 className="text-2xl font-black text-white uppercase tracking-tighter mb-2">Portal do Cliente</h1>
-                        <p className="text-slate-500 text-xs font-bold uppercase tracking-widest leading-relaxed">Acesse seus contratos e realize pagamentos com segurança.</p>
+                        <p className="text-slate-500 text-xs font-bold uppercase tracking-widest leading-relaxed">Acesso Restrito.</p>
                     </div>
                     {portalError && (
                         <div className="mx-8 mb-4 p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-center">
                             <p className="text-rose-400 text-xs font-bold">{portalError}</p>
                         </div>
                     )}
-                    <PortalLogin loginIdentifier={loginIdentifier} setLoginIdentifier={setLoginIdentifier} handleLogin={handleLogin} isLoading={isLoading} selectedLoanId={selectedLoanId} />
+                    <div className="p-8 text-center">
+                        <p className="text-slate-400 text-sm">O link utilizado é inválido ou expirou.</p>
+                    </div>
                 </div>
             </div>
         );
     }
 
     // Cálculo de Totais
-    const pendingInstallments = installments.filter(i => i.status !== 'PAID');
-    const totalJuridicoDevido = pendingInstallments.reduce((acc, i) => acc + i.valor_parcela, 0);
-    const nextDueDate = pendingInstallments.length > 0 ? new Date(pendingInstallments[0].data_vencimento) : null;
+    const pendingInstallments = installments.filter(i => String(i.status) !== 'PAID');
+    const totalJuridicoDevido = pendingInstallments.reduce((acc, i) => acc + i.amount, 0);
+    const nextDueDate = pendingInstallments.length > 0 ? new Date(pendingInstallments[0].dueDate) : null;
 
     return (
         <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 relative">
@@ -133,8 +142,8 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
                                 disabled={clientContracts.length <= 1}
                             >
                                 {clientContracts.map((c) => (
-                                    <option key={c.id} value={c.id}>
-                                        {c.code ? `CONTRATO #${c.code}` : `CONTRATO ...${c.id.substring(0, 6).toUpperCase()}`} - {new Date(c.start_date || c.created_at).toLocaleDateString('pt-BR')}
+                                    <option key={c.portal_token || c.id} value={c.portal_token || c.id}>
+                                        {c.code ? `CONTRATO #${c.code}` : `CONTRATO ...${(c.id || '').substring(0, 6).toUpperCase()}`} - {new Date(c.start_date || c.created_at).toLocaleDateString('pt-BR')}
                                     </option>
                                 ))}
                             </select>
@@ -230,12 +239,12 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
                                 ) : (
                                     installments.map((p, idx) => {
                                         // LÓGICA DE STATUS UNIFICADA
-                                        const daysDiff = getDaysUntilDue(p.data_vencimento);
+                                        const daysDiff = getDaysUntilDue(p.dueDate);
                                         let statusLabel = '';
                                         let statusColor = 'text-slate-500';
                                         let dateColor = 'text-slate-300';
 
-                                        if (p.status === 'PAID') {
+                                        if (p.status === LoanStatus.PAID) {
                                             statusLabel = 'Pago';
                                             statusColor = 'text-emerald-500';
                                             dateColor = 'text-slate-500';
@@ -263,20 +272,20 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
                                         return (
                                             <div key={idx} className="flex justify-between items-center p-4 border-b border-slate-800 last:border-0 hover:bg-slate-800/50 transition-colors">
                                                 <div className="flex items-center gap-3">
-                                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black ${p.status === 'PAID' ? 'bg-emerald-500/10 text-emerald-500' : (daysDiff < 0 && p.status !== 'PAID') ? 'bg-rose-500/10 text-rose-500' : 'bg-slate-800 text-slate-400'}`}>
-                                                        {p.numero_parcela}
+                                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black ${p.status === LoanStatus.PAID ? 'bg-emerald-500/10 text-emerald-500' : (daysDiff < 0 && p.status !== LoanStatus.PAID) ? 'bg-rose-500/10 text-rose-500' : 'bg-slate-800 text-slate-400'}`}>
+                                                        {p.number}
                                                     </div>
                                                     <div>
                                                         <p className={`text-[10px] font-bold uppercase ${dateColor}`}>
-                                                            {new Date(p.data_vencimento).toLocaleDateString()}
+                                                            {new Date(p.dueDate).toLocaleDateString()}
                                                         </p>
                                                         <p className={`text-[9px] font-bold uppercase ${statusColor}`}>
                                                             {statusLabel}
                                                         </p>
                                                     </div>
                                                 </div>
-                                                <span className={`text-xs font-black ${p.status === 'PAID' ? 'text-emerald-500 decoration-slate-500' : 'text-white'}`}>
-                                                    {formatMoney(p.valor_parcela)}
+                                                <span className={`text-xs font-black ${p.status === LoanStatus.PAID ? 'text-emerald-500 decoration-slate-500' : 'text-white'}`}>
+                                                    {formatMoney(p.amount)}
                                                 </span>
                                             </div>
                                         );
@@ -352,7 +361,7 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
                     loan={loan} 
                     installment={pendingInstallments[0] || installments[installments.length-1]} 
                     clientData={{ name: loggedClient.name, doc: loggedClient.document }} 
-                    onClose={() => { setShowPaymentModal(false); loadFullPortalData(selectedLoanId, loggedClient.id); }} 
+                    onClose={() => { setShowPaymentModal(false); loadFullPortalData(); }} 
                 />
             )}
         </div>

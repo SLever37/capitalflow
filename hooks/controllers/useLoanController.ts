@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { contractsService } from '../../services/contracts.service';
 import { demoService } from '../../services/demo.service';
 import { ledgerService } from '../../services/ledger.service';
+import { getOrCreatePortalLink } from '../../utils/portalLink';
 import { Loan, UserProfile, CapitalSource, Client, LedgerEntry } from '../../types';
 
 export const useLoanController = (
@@ -51,23 +52,26 @@ export const useLoanController = (
       } catch (e: any) { showToast(e?.message || 'Falha ao atualizar status.', 'error'); }
   };
 
-  const handleGenerateLink = (loan: Loan) => { 
-      // Busca o código de acesso do cliente vinculado
-      const client = clients.find(c => c.id === loan.clientId);
-      const accessCode = (client as any)?.access_code || (client as any)?.accessCode;
-      
-      let url = `${window.location.origin}/?portal=${loan.id}`;
-      
-      // Se tiver código, cria o Magic Link
-      if (accessCode) {
-          url += `&code=${accessCode}`;
+  const handleGenerateLink = async (loan: Loan) => { 
+      try {
+          // Busca o código de acesso do cliente vinculado para opcionalmente anexar (Magic Link)
+          const client = clients.find(c => c.id === loan.clientId);
+          const accessCode = (client as any)?.access_code || (client as any)?.accessCode;
+          
+          // Gera ou recupera URL com token seguro
+          let url = await getOrCreatePortalLink(loan.id);
+          
+          // Se tiver código, anexa como parâmetro adicional (opcional, para auto-preenchimento futuro)
+          if (accessCode) {
+              url += `&code=${accessCode}`;
+          }
+          
+          await navigator.clipboard.writeText(url);
+          showToast("Link do Portal copiado!", "success");
+      } catch (e: any) {
+          console.error(e);
+          showToast("Erro ao gerar link do portal.", "error");
       }
-      
-      navigator.clipboard.writeText(url).then(() => {
-          showToast("Link Mágico copiado para a área de transferência!", "success");
-      }).catch(() => {
-          showToast("Erro ao copiar link.", "error");
-      });
   };
 
   const openConfirmation = (config: any) => { 

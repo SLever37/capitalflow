@@ -2,24 +2,20 @@
 import { useState, useEffect } from 'react';
 
 export const usePortalRouting = () => {
-  const [portalLoanId, setPortalLoanId] = useState<string | null>(null);
+  const [portalToken, setPortalToken] = useState<string | null>(null);
   const [legalSignToken, setLegalSignToken] = useState<string | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     
-    // Portal do Cliente (Visualização de Dívida)
-    const portalId = params.get('portal');
-    if (portalId) {
-      setPortalLoanId(portalId);
-    }
+    // Acesso ao Portal Financeiro (Token UUID)
+    const token = params.get('portal');
+    if (token) setPortalToken(token);
 
-    // Portal de Assinatura Jurídica (Título Executivo)
-    const legalToken = params.get('legal_sign');
-    if (legalToken) {
-      setLegalSignToken(legalToken);
-    }
+    // Acesso à Assinatura Jurídica (Token UUID)
+    const legal = params.get('legal_sign');
+    if (legal) setLegalSignToken(legal);
   }, []);
 
-  return { portalLoanId, legalSignToken };
+  return { portalToken, legalSignToken };
 };

@@ -1,80 +1,69 @@
 
 import React from 'react';
-import { Loader2 } from 'lucide-react';
 import { ClientPortalView } from '../containers/ClientPortal/ClientPortalView';
 import { PublicLegalSignPage } from '../features/legal/components/PublicLegalSignPage';
 import { AuthScreen } from '../features/auth/AuthScreen';
-import { UserProfile } from '../types';
 
 interface AppGateProps {
-  portalLoanId: string | null;
+  portalToken?: string | null;
+  legalSignToken?: string | null;
   activeProfileId: string | null;
-  activeUser: UserProfile | null;
+  activeUser: any | null;
   isLoadingData: boolean;
-  loadError?: string | null;
+  loadError: string | null;
   loginUser: string;
   setLoginUser: (v: string) => void;
   loginPassword: string;
   setLoginPassword: (v: string) => void;
-  submitLogin: (setLoading: (v: boolean) => void, toast: any) => void;
+  submitLogin: (setLoading: any, setToast: any) => void;
   savedProfiles: any[];
   handleSelectSavedProfile: (p: any, toast: any) => void;
   handleRemoveSavedProfile: (id: string) => void;
-  showToast: any;
+  showToast: (msg: string, type?: any) => void;
   setIsLoadingData: (v: boolean) => void;
+  toast: any;
   children: React.ReactNode;
-  legalSignToken?: string | null;
-  toast: { msg: string; type: 'success' | 'error' | 'info' | 'warning' } | null;
 }
 
 export const AppGate: React.FC<AppGateProps> = ({
-  portalLoanId, activeProfileId, activeUser, isLoadingData, loadError,
-  loginUser, setLoginUser, loginPassword, setLoginPassword,
-  submitLogin, savedProfiles, handleSelectSavedProfile, handleRemoveSavedProfile,
-  showToast, setIsLoadingData, children, legalSignToken, toast
+  portalToken,
+  legalSignToken,
+  activeUser,
+  children,
+  // Props de Login
+  loginUser, setLoginUser, loginPassword, setLoginPassword, submitLogin,
+  savedProfiles, handleSelectSavedProfile, handleRemoveSavedProfile,
+  isLoadingData, setIsLoadingData, showToast
 }) => {
   
-  const ToastOverlay = () => {
-    if (!toast) return null;
-    const bg = toast.type === 'error' ? 'bg-rose-600' : toast.type === 'warning' ? 'bg-amber-500 text-black' : 'bg-blue-600';
-    return (
-      <div className={`fixed z-[999] px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-top-4 left-4 right-4 top-4 md:left-auto md:right-4 md:w-auto text-white ${bg}`}>
-        <span className="font-bold text-sm leading-tight">{toast.msg}</span>
-      </div>
-    );
-  };
+  // 1. Rota Pública: Portal Financeiro (Acesso via Token)
+  if (portalToken) {
+    return <ClientPortalView initialPortalToken={portalToken} />;
+  }
 
-  // Vistas Públicas
-  if (legalSignToken) return <><ToastOverlay/><PublicLegalSignPage token={legalSignToken}/></>;
-  if (portalLoanId) return <><ToastOverlay/><ClientPortalView initialLoanId={portalLoanId}/></>;
+  // 2. Rota Pública: Assinatura Jurídica
+  if (legalSignToken) {
+     return <PublicLegalSignPage token={legalSignToken} />;
+  }
 
-  // Se houver sessão mas dados ainda carregando (Splash rápido)
-  if (activeProfileId && !activeUser && isLoadingData) {
+  // 3. Rota Privada: Sistema (Requer Login)
+  if (!activeUser) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
-        <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
-      </div>
+      <AuthScreen
+        loginUser={loginUser}
+        setLoginUser={setLoginUser}
+        loginPassword={loginPassword}
+        setLoginPassword={setLoginPassword}
+        submitLogin={() => submitLogin(setIsLoadingData, showToast)}
+        savedProfiles={savedProfiles}
+        handleSelectSavedProfile={(p) => handleSelectSavedProfile(p, showToast)}
+        handleRemoveSavedProfile={handleRemoveSavedProfile}
+        isLoading={isLoadingData}
+        showToast={showToast}
+      />
     );
   }
 
-  // Sem Sessão: Tela de Login Imediata
-  if (!activeProfileId || !activeUser) {
-    return (
-      <>
-        <ToastOverlay />
-        <AuthScreen
-          loginUser={loginUser} setLoginUser={setLoginUser}
-          loginPassword={loginPassword} setLoginPassword={setLoginPassword}
-          submitLogin={() => submitLogin(setIsLoadingData, showToast)}
-          isLoading={isLoadingData}
-          savedProfiles={savedProfiles || []}
-          handleSelectSavedProfile={(p) => handleSelectSavedProfile(p, showToast)}
-          handleRemoveSavedProfile={handleRemoveSavedProfile}
-          showToast={showToast}
-        />
-      </>
-    );
-  }
-
+  // 4. Usuário Autenticado: Renderiza o App Shell
   return <>{children}</>;
 };
