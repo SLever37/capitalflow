@@ -31,8 +31,14 @@ interface ClientPortalViewProps {
   initialPortalToken: string;
 }
 
+interface ContractBlockProps {
+    loan: any;
+    onPay: () => void;
+    onChat: () => void;
+}
+
 // Componente Interno: Bloco de Contrato Individual
-const ContractBlock = ({ loan, onPay, onChat }: { loan: any, onPay: () => void, onChat: () => void }) => {
+const ContractBlock: React.FC<ContractBlockProps> = ({ loan, onPay, onChat }) => {
     const summary = useMemo(() => resolveDebtSummary(loan, loan.installments), [loan]);
     const { hasLateInstallments, totalDue, pendingCount, nextDueDate } = summary;
 
