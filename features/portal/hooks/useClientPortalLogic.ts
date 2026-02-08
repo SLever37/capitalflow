@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { portalService } from '../../../services/portal.service';
 import { mapLoanFromDB } from '../../../services/adapters/loanAdapter';
@@ -35,6 +36,8 @@ export const useClientPortalLogic = (initialToken: string) => {
 
       // B) dados do cliente (preferir embed, mas com fallback seguro)
       const embeddedClient = (rawLoan as any)?.clients ?? null;
+      
+      // Se não veio no embed, busca explicitamente (método adicionado ao service)
       const clientData =
         embeddedClient && typeof embeddedClient === 'object'
           ? embeddedClient
@@ -60,18 +63,17 @@ export const useClientPortalLogic = (initialToken: string) => {
       setLoan(mappedLoan);
       setInstallments(mappedLoan.installments);
 
-      // E) lista contratos do MESMO cliente (com filtro defensivo)
+      // E) lista contratos do MESMO cliente
       const contracts = await portalService.fetchClientContracts(clientId);
-      const safeContracts = (contracts || []).filter((c: any) => String(c.client_id) === String(clientId));
+      
+      // ✅ FILTRO DE SEGURANÇA: Garante que apenas contratos com o MESMO client_id entrem na lista
+      // Isso previne que contratos de outros clientes vazem caso a query tenha retornado dados indevidos.
+      const safeContracts = (contracts || []).filter((c: any) => 
+          c.client_id && String(c.client_id) === String(clientId)
+      );
 
       setClientContracts(safeContracts);
 
-      // ✅ se a lista vier vazia (erro de dados), não mostra dropdown com lixo
-      if (!safeContracts.length) {
-        // não é “erro fatal”, mas evita mostrar coisas erradas
-        // (se quiser, você pode comentar essas 2 linhas)
-        // setPortalError('Falha ao listar contratos.');
-      }
     } catch (err: any) {
       console.error('Portal Load Error:', err);
       setPortalError(err?.message || 'Não foi possível carregar o contrato.');

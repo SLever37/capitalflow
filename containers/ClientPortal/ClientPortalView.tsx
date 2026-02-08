@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   ShieldCheck,
@@ -72,7 +71,7 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({
   const activeDocuments = useMemo(() => {
     const docs = (loan as any)?.policiesSnapshot?.customDocuments || (loan as any)?.customDocuments;
     if (!docs) return [];
-    return (docs as any[]).filter((d) => d.visibleToClient);
+    return (docs as any[]).filter((d: any) => d.visibleToClient);
   }, [loan]);
 
   // Cálculo Centralizado de Dívida (Fonte da Verdade)
@@ -154,7 +153,7 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({
 
   // Ordena parcelas: Vencidas primeiro, depois futuras
   const sortedInstallments = [...installments].sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
-  const pendingInstallmentsList = sortedInstallments.filter(i => i.status !== 'PAID');
+  const pendingInstallmentsList = sortedInstallments.filter(i => (i.status as string) !== 'PAID');
 
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden transition-colors duration-700">

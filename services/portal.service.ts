@@ -1,3 +1,4 @@
+
 import { supabase } from '../lib/supabase';
 
 export const portalService = {
@@ -20,14 +21,29 @@ export const portalService = {
   },
 
   /**
+   * Busca dados básicos do cliente pelo ID (para preencher o header do portal)
+   */
+  async fetchClientById(clientId: string) {
+    const { data, error } = await supabase
+        .from('clientes')
+        .select('id, name, document, phone')
+        .eq('id', clientId)
+        .single();
+    
+    if (error) return null;
+    return data;
+  },
+
+  /**
    * Lista contratos do cliente para dropdown/switcher.
-   * (SELECT mínimo para não quebrar quando colunas opcionais não existem no DB)
+   * CORREÇÃO: Incluído client_id e code na seleção para validação de segurança no frontend.
    */
   async fetchClientContracts(clientId: string) {
     const { data, error } = await supabase
       .from('contratos')
-      .select('id, created_at, portal_token')
+      .select('id, created_at, portal_token, client_id, code, start_date')
       .eq('client_id', clientId)
+      .neq('is_archived', true) // Opcional: Não mostrar arquivados no portal
       .order('created_at', { ascending: false });
 
     if (error) throw new Error('Falha ao listar contratos.');
