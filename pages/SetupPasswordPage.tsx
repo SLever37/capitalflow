@@ -1,10 +1,8 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Lock, Loader2, CheckCircle } from 'lucide-react';
 
 export const SetupPasswordPage = () => {
-  const navigate = useNavigate();
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
@@ -28,7 +26,9 @@ export const SetupPasswordPage = () => {
         // Por enquanto, marcamos como 'token usado' removendo-o
         localStorage.removeItem('pending_invite_token');
         setDone(true);
-        setTimeout(() => navigate('/login'), 2000);
+        setTimeout(() => {
+            window.location.href = '/login'; // Redirecionamento nativo
+        }, 2000);
       }
     } finally {
       setLoading(false);

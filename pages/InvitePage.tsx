@@ -1,15 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Loader2, ShieldCheck } from 'lucide-react';
 
 export const InvitePage = () => {
-  const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const [status, setStatus] = useState<'loading' | 'error' | 'success'>('loading');
-  const token = searchParams.get('token');
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+
     const validateInvite = async () => {
       if (!token) {
         setStatus('error');
@@ -35,12 +34,12 @@ export const InvitePage = () => {
       setStatus('success');
       
       setTimeout(() => {
-        navigate('/setup-password'); // Página onde ela criará a senha
+        window.location.href = '/setup-password'; // Redirecionamento nativo
       }, 2000);
     };
 
     validateInvite();
-  }, [token, navigate]);
+  }, []);
 
   if (status === 'error') return <div className="text-white p-20 text-center font-bold">Link de convite inválido ou expirado.</div>;
 
