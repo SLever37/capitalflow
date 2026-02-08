@@ -121,11 +121,11 @@ export const PortalPaymentModal: React.FC<PortalPaymentModalProps> = ({ loan, in
                             <div className="grid grid-cols-2 gap-3 opacity-60">
                                 <button disabled className="bg-slate-800 border border-slate-700 text-slate-500 p-3 rounded-xl flex flex-col items-center gap-1 cursor-not-allowed">
                                     <QrCode size={16}/>
-                                    <span className="text-[8px] font-black uppercase text-center">PIX Automático<br/>(Em Breve)</span>
+                                    <span className="text-[8px] font-black uppercase text-center">Pagamento via PIX<br/>Automático (Em Breve)</span>
                                 </button>
                                 <button disabled className="bg-slate-800 border border-slate-700 text-slate-500 p-3 rounded-xl flex flex-col items-center gap-1 cursor-not-allowed">
                                     <CreditCard size={16}/>
-                                    <span className="text-[8px] font-black uppercase text-center">Cartão de Crédito<br/>(Em Construção)</span>
+                                    <span className="text-[8px] font-black uppercase text-center">Pagar com Cartão<br/>(Em Construção)</span>
                                 </button>
                             </div>
                         </div>
