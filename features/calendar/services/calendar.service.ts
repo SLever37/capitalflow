@@ -15,12 +15,33 @@ export const calendarService = {
 
     if (loans) {
       loans.forEach((loan: any) => {
+        // [FIX] Validação de Integridade Financeira:
+        // Verifica se o contrato realmente tem saldo devedor.
+        // Se a soma de Principal + Juros restantes for zero (ou residual < 0.10), 
+        // o contrato é considerado FINALIZADO e não gera eventos na agenda.
+        const totalLoanDebt = (loan.parcelas || []).reduce((acc: number, item: any) => {
+            return acc + (Number(item.principal_remaining) || 0) + (Number(item.interest_remaining) || 0);
+        }, 0);
+
+        if (totalLoanDebt < 0.10) {
+            return; // Pula contrato finalizado
+        }
+
         // A.2) Parcelas (Ação de Cobrança/Pagamento)
         loan.parcelas?.forEach((p: any) => {
-          if (p.status !== 'PAID') {
+          // [FIX] Verifica também se a parcela específica tem valor a receber (> 5 centavos)
+          const installmentTotal = (Number(p.principal_remaining) || 0) + (Number(p.interest_remaining) || 0) + (Number(p.late_fee_accrued) || 0);
+
+          if (p.status !== 'PAID' && installmentTotal > 0.05) {
               const dueDate = p.data_vencimento;
-              const isLate = new Date(dueDate).getTime() < new Date().setHours(0,0,0,0);
-              const totalDue = (p.principal_remaining || 0) + (p.interest_remaining || 0) + (p.late_fee_accrued || 0);
+              // Ajuste de fuso horário simples para comparação de data (apenas dia)
+              const today = new Date();
+              today.setHours(0,0,0,0);
+              const due = new Date(dueDate);
+              due.setHours(0,0,0,0);
+              
+              const isLate = due.getTime() < today.getTime();
+              
               const safeAmount = Number(p.amount) || 0;
 
               events.push({
@@ -37,7 +58,7 @@ export const calendarService = {
                       loanId: loan.id, 
                       installmentId: p.id, 
                       clientId: loan.client_id, 
-                      amount: totalDue,
+                      amount: installmentTotal, // Usa o total real devido (incluindo multas) para o evento
                       clientName: loan.debtor_name,
                       clientPhone: loan.debtor_phone
                   },
