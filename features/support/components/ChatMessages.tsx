@@ -1,8 +1,7 @@
-
 import React from 'react';
 import { SupportMessage } from '../../../services/supportChat.service';
 import { AudioPlayer } from './AudioPlayer';
-import { Check, CheckCheck, FileText, Image as ImageIcon, MapPin, User } from 'lucide-react';
+import { Check, CheckCheck, FileText, Image as ImageIcon, MapPin, User, ExternalLink } from 'lucide-react';
 
 interface ChatMessagesProps {
   messages: SupportMessage[];
@@ -12,14 +11,41 @@ interface ChatMessagesProps {
   scrollRef: React.RefObject<HTMLDivElement>;
 }
 
-export const ChatMessages: React.FC<ChatMessagesProps> = ({ 
-  messages, 
-  currentUserId, 
-  senderType, 
-  operatorId, 
-  scrollRef 
-}) => {
+function buildMapsUrlFromMessage(m: SupportMessage): { url: string | null; lat?: number; lng?: number } {
+  // 1) Prefer metadata
+  const lat = (m as any)?.metadata?.lat;
+  const lng = (m as any)?.metadata?.lng;
 
+  if (typeof lat === 'number' && typeof lng === 'number') {
+    return { url: `https://maps.google.com/?q=${lat},${lng}`, lat, lng };
+  }
+
+  // 2) Try extract from content: https://maps.google.com/?q=LAT,LNG
+  const content = String(m.content || m.text || '').trim();
+  const match = content.match(/q=([-0-9.]+),\s*([-0-9.]+)/i);
+  if (match) {
+    const lat2 = Number(match[1]);
+    const lng2 = Number(match[2]);
+    if (Number.isFinite(lat2) && Number.isFinite(lng2)) {
+      return { url: `https://maps.google.com/?q=${lat2},${lng2}`, lat: lat2, lng: lng2 };
+    }
+  }
+
+  // 3) If content itself is a URL, use it
+  if (content.startsWith('http://') || content.startsWith('https://')) {
+    return { url: content };
+  }
+
+  return { url: null };
+}
+
+export const ChatMessages: React.FC<ChatMessagesProps> = ({
+  messages,
+  currentUserId,
+  senderType,
+  operatorId,
+  scrollRef
+}) => {
   const renderContent = (m: SupportMessage) => {
     switch (m.type) {
       case 'image':
@@ -45,7 +71,10 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
         return (
           <div className="min-w-[220px]">
             {m.file_url ? (
-              <AudioPlayer src={m.file_url} duration={m.metadata?.duration_ms ? m.metadata.duration_ms / 1000 : undefined} />
+              <AudioPlayer
+                src={m.file_url}
+                duration={m.metadata?.duration_ms ? m.metadata.duration_ms / 1000 : undefined}
+              />
             ) : (
               <div className="bg-white/5 p-3 rounded-xl text-[10px] opacity-70">
                 Áudio indisponível.
@@ -55,18 +84,49 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
           </div>
         );
 
-      case 'location':
-        return (
-          <div className="bg-black/20 p-2 rounded-xl min-w-[200px]">
-            <div className="flex items-center gap-2">
-              <MapPin className="text-rose-500" size={18} />
-              <div>
-                <p className="text-xs font-bold text-white">Localização</p>
-                <p className="text-[9px] opacity-70">Compartilhada no chat</p>
+      case 'location': {
+        const maps = buildMapsUrlFromMessage(m);
+        const label =
+          typeof maps.lat === 'number' && typeof maps.lng === 'number'
+            ? `${maps.lat.toFixed(6)}, ${maps.lng.toFixed(6)}`
+            : 'Abrir no mapa';
+
+        if (!maps.url) {
+          return (
+            <div className="bg-black/20 p-3 rounded-xl min-w-[220px] border border-white/5">
+              <div className="flex items-center gap-2">
+                <MapPin className="text-rose-400" size={18} />
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-white">Localização</p>
+                  <p className="text-[9px] opacity-70">Indisponível (sem link/coords)</p>
+                </div>
               </div>
             </div>
-          </div>
+          );
+        }
+
+        return (
+          <a
+            href={maps.url}
+            target="_blank"
+            rel="noreferrer"
+            className="block bg-black/20 p-3 rounded-xl min-w-[220px] border border-white/5 hover:bg-black/30 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <MapPin className="text-rose-400" size={18} />
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-bold text-white">Localização</p>
+                <p className="text-[9px] opacity-70 truncate">{label}</p>
+              </div>
+              <ExternalLink size={14} className="opacity-70" />
+            </div>
+
+            <div className="mt-2 text-[9px] font-black uppercase tracking-wider text-rose-200/80">
+              📍 Ver no mapa
+            </div>
+          </a>
         );
+      }
 
       case 'file':
         return (
@@ -87,7 +147,11 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
         );
 
       default:
-        return <p className="text-sm leading-relaxed whitespace-pre-wrap font-medium">{m.content || m.text}</p>;
+        return (
+          <p className="text-sm leading-relaxed whitespace-pre-wrap font-medium">
+            {m.content || (m as any).text}
+          </p>
+        );
     }
   };
 
@@ -108,17 +172,19 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
               }`}
             >
               {renderContent(m)}
-              
-              <div className={`flex items-center justify-end gap-1 mt-1 text-[9px] font-bold uppercase tracking-wider ${isMe ? 'opacity-70 text-blue-100' : 'opacity-50 text-slate-400'}`}>
+
+              <div
+                className={`flex items-center justify-end gap-1 mt-1 text-[9px] font-bold uppercase tracking-wider ${
+                  isMe ? 'opacity-70 text-blue-100' : 'opacity-50 text-slate-400'
+                }`}
+              >
                 {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                
+
                 {m.sender_type === 'OPERATOR' && m.operator_id && !isMe && (
-                   <User size={8} className="ml-1" />
+                  <User size={8} className="ml-1" />
                 )}
 
-                {isMe && (
-                  m.read ? <CheckCheck size={12} className="text-white" /> : <Check size={12} />
-                )}
+                {isMe && (m.read ? <CheckCheck size={12} className="text-white" /> : <Check size={12} />)}
               </div>
             </div>
           </div>
