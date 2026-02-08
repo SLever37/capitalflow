@@ -18,6 +18,7 @@ export const PortalPaymentModal: React.FC<PortalPaymentModalProps> = ({ loan, in
     const [error, setError] = useState<string | null>(null);
 
     // Cálculos em tempo real da dívida (Total final com multas e juros, se houver)
+    // Isso garante que o cliente veja o valor real que ele deve pagar hoje
     const debt = useMemo(() => calculateTotalDue(loan, installment), [loan, installment]);
     
     // O valor total sempre inclui juros e multas se estiver atrasado.
@@ -65,7 +66,7 @@ export const PortalPaymentModal: React.FC<PortalPaymentModalProps> = ({ loan, in
 
                 {step === 'BILLING' && (
                     <div className="space-y-6">
-                        {/* VALOR EM DESTAQUE */}
+                        {/* VALOR EM DESTAQUE - Mostra o Total Real */}
                         <div className="text-center space-y-1">
                             <p className="text-slate-400 text-xs uppercase font-bold tracking-widest">Valor Total a Pagar</p>
                             <div className="flex items-center justify-center gap-2">
@@ -119,13 +120,14 @@ export const PortalPaymentModal: React.FC<PortalPaymentModalProps> = ({ loan, in
                             </button>
 
                             <div className="grid grid-cols-2 gap-3 opacity-60">
+                                {/* Botões desabilitados conforme solicitado */}
                                 <button disabled className="bg-slate-800 border border-slate-700 text-slate-500 p-3 rounded-xl flex flex-col items-center gap-1 cursor-not-allowed">
                                     <QrCode size={16}/>
-                                    <span className="text-[8px] font-black uppercase text-center">Pagamento via PIX<br/>Automático (Em Breve)</span>
+                                    <span className="text-[8px] font-black uppercase text-center">Pagamento via PIX<br/>automático (Em Breve)</span>
                                 </button>
                                 <button disabled className="bg-slate-800 border border-slate-700 text-slate-500 p-3 rounded-xl flex flex-col items-center gap-1 cursor-not-allowed">
                                     <CreditCard size={16}/>
-                                    <span className="text-[8px] font-black uppercase text-center">Pagar com Cartão<br/>(Em Construção)</span>
+                                    <span className="text-[8px] font-black uppercase text-center">Pagar com cartão<br/>de crédito (Em Construção)</span>
                                 </button>
                             </div>
                         </div>

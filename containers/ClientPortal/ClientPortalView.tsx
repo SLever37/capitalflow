@@ -192,6 +192,7 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
                 <PortalPaymentModal 
                     loan={loan} 
                     installment={pendingInstallments[0] || installments[installments.length-1]} 
+                    // CHANGE: Passando ID do cliente para permitir notificação
                     clientData={{ name: loggedClient.name, doc: loggedClient.document, id: loggedClient.id }} 
                     onClose={() => { setShowPaymentModal(false); loadFullPortalData(selectedLoanId, loggedClient.id); }} 
                 />
