@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, Plus, ShieldAlert, MessageSquare, DollarSign, CheckCircle2, Calendar as CalIcon } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, ShieldAlert, MessageSquare, DollarSign, CheckCircle2, Calendar as CalIcon, X } from 'lucide-react';
 import { useCalendar } from './hooks/useCalendar';
 import { useCalendarComputed } from './hooks/useCalendarComputed';
 import { EventModal } from './components/EventModal';
