@@ -43,76 +43,18 @@ export const useClientPortalLogic = (initialToken: string) => {
         email: clientData.email
       });
 
-      // 3. Buscar TODOS os contratos deste cliente (Lista Resumida)
-      // Tenta listar todos. Se falhar (RLS/Permissão), usa apenas o atual (Fallback)
-      let rawContractsList: any[] = [];
-      try {
-          rawContractsList = await portalService.fetchClientContracts(clientId);
-      } catch (e) {
-          console.warn("Aviso Portal: Falha ao listar múltiplos contratos (provável restrição RLS). Carregando apenas o atual.");
-          rawContractsList = [entryLoan];
-      }
-
-      // Se a lista vier vazia por algum motivo estranho, garante o atual
-      if (rawContractsList.length === 0) {
-          rawContractsList = [entryLoan];
-      }
-      
-      // 4. Hidratação Profunda (Carregar parcelas e detalhes para CADA contrato)
-      const hydratedContracts: Loan[] = await Promise.all(
-        rawContractsList.map(async (contractHeader: any) => {
-            // OTIMIZAÇÃO CRÍTICA: Se for o contrato de entrada, usamos os dados que já baixamos com o token.
-            // Isso evita erro de RLS ao tentar fazer "select * from contratos where id=..." sem token.
-            if (contractHeader.id === entryLoan.id) {
-                return mapLoanFromDB(
-                    entryLoan, 
-                    entryLoan.parcelas || [], 
-                    undefined, // acordos (se necessário, expandir query)
-                    entryLoan.sinalizacoes_pagamento || []
-                );
-            }
-
-            try {
-                // Para OUTROS contratos do mesmo cliente (se RLS permitir)
-                const { data: fullLoanData, error } = await import('../../../lib/supabase').then(m => 
-                    m.supabase.from('contratos')
-                    .select('*, parcelas(*), sinalizacoes_pagamento(*)')
-                    .eq('id', contractHeader.id)
-                    .single()
-                );
-                
-                if (error || !fullLoanData) return null;
-
-                return mapLoanFromDB(
-                    fullLoanData, 
-                    fullLoanData.parcelas, 
-                    undefined, 
-                    [] 
-                );
-            } catch (innerErr) {
-                console.warn(`Erro ao hidratar contrato extra ${contractHeader.id}`, innerErr);
-                return null;
-            }
-        })
+      // 3. SEGURANÇA E ISOLAMENTO:
+      // Carregamos EXCLUSIVAMENTE o contrato vinculado ao token.
+      // Removemos qualquer busca por outros contratos do cliente para evitar vazamento de dados.
+      const loanObject = mapLoanFromDB(
+          entryLoan, 
+          entryLoan.parcelas || [], 
+          undefined, // acordos (se necessário, expandir query)
+          entryLoan.sinalizacoes_pagamento || []
       );
 
-      // Filtra nulos e ordena por status (atrasados primeiro)
-      const validContracts = hydratedContracts.filter(Boolean) as Loan[];
-      
-      // Ordenação Inteligente
-      const sortedContracts = validContracts.sort((a, b) => {
-          const summaryA = resolveDebtSummary(a, a.installments);
-          const summaryB = resolveDebtSummary(b, b.installments);
-          
-          if (summaryA.hasLateInstallments && !summaryB.hasLateInstallments) return -1;
-          if (!summaryA.hasLateInstallments && summaryB.hasLateInstallments) return 1;
-          
-          const dateA = summaryA.nextDueDate?.getTime() || 9999999999999;
-          const dateB = summaryB.nextDueDate?.getTime() || 9999999999999;
-          return dateA - dateB;
-      });
-
-      setClientContracts(sortedContracts);
+      // Define lista com apenas o contrato autorizado pelo token
+      setClientContracts([loanObject]);
 
     } catch (err: any) {
       console.error('Portal Load Error:', err);
@@ -139,7 +81,7 @@ export const useClientPortalLogic = (initialToken: string) => {
     isLoading,
     portalError,
     loggedClient,
-    clientContracts, // Array completo de contratos
+    clientContracts, // Array contendo apenas o contrato do token
     loadFullPortalData,
     handleSignDocument,
     handleViewDocument,
