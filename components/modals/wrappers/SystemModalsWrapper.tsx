@@ -2,7 +2,7 @@
 import React from 'react';
 import { useModal } from '../../../contexts/ModalContext';
 import { Modal } from '../../ui/Modal';
-import { CheckSquare, Square, Table, ArrowRight, AlertTriangle, CheckCircle2, Info, Loader2 } from 'lucide-react';
+import { CheckSquare, Square, Table, ArrowRight, AlertTriangle, CheckCircle2, Info, Loader2, ChevronDown } from 'lucide-react';
 import { FIELD_MAPS } from '../../../features/profile/import/domain/importSchema';
 import { AgendaModal } from '../AgendaModal';
 import { CalculatorModal } from '../CalculatorModal';
@@ -68,16 +68,19 @@ export const SystemModalsWrapper = () => {
                                     <div className="flex-1">
                                         <p className="text-[10px] font-black text-blue-500 uppercase">{field.key.replace('_', ' ')}</p>
                                     </div>
-                                    <select 
-                                        value={ui.importMapping?.[field.key] ?? ''} 
-                                        onChange={e => ui.setImportMapping({...ui.importMapping, [field.key]: e.target.value === '' ? undefined : parseInt(e.target.value)})}
-                                        className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-blue-500 min-w-[150px]"
-                                    >
-                                        <option value="">Ignorar</option>
-                                        {(ui.importCurrentSheet?.headers || []).map((h: string, i: number) => (
-                                            <option key={i} value={i}>{h || `Coluna ${i + 1}`}</option>
-                                        ))}
-                                    </select>
+                                    <div className="relative group">
+                                        <select 
+                                            value={ui.importMapping?.[field.key] ?? ''} 
+                                            onChange={e => ui.setImportMapping({...ui.importMapping, [field.key]: e.target.value === '' ? undefined : parseInt(e.target.value)})}
+                                            className="appearance-none bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 pr-8 text-xs text-white outline-none focus:border-blue-500 min-w-[150px] cursor-pointer"
+                                        >
+                                            <option value="">Ignorar</option>
+                                            {(ui.importCurrentSheet?.headers || []).map((h: string, i: number) => (
+                                                <option key={i} value={i}>{h || `Coluna ${i + 1}`}</option>
+                                            ))}
+                                        </select>
+                                        <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" size={14}/>
+                                    </div>
                                 </div>
                             ))}
                         </div>

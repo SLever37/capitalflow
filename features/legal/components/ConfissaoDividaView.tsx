@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, Scroll, UserCheck, ShieldCheck, Link as LinkIcon, FileSignature, Users, User, MapPin, Save, Loader2, Scale } from 'lucide-react';
+import { ArrowLeft, Scroll, UserCheck, ShieldCheck, Link as LinkIcon, FileSignature, Users, User, MapPin, Save, Loader2, Scale, ChevronDown } from 'lucide-react';
 import { Loan, UserProfile, LegalWitness, LegalDocumentParams } from '../../../types';
 import { formatMoney } from '../../../utils/formatters';
 import { DocumentTemplates } from '../templates/DocumentTemplates';
@@ -180,25 +180,31 @@ export const ConfissaoDividaView: React.FC<ConfissaoDividaViewProps> = ({ loans,
                             <div className="space-y-3">
                                 <div className="space-y-1">
                                     <label className="text-[9px] text-slate-500 font-black uppercase ml-1">Testemunha 01</label>
-                                    <select 
-                                        value={selectedW1} 
-                                        onChange={e => setSelectedW1(e.target.value)}
-                                        className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-xs text-white outline-none focus:border-indigo-500"
-                                    >
-                                        <option value="">Selecione...</option>
-                                        {availableWitnesses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-                                    </select>
+                                    <div className="relative group">
+                                        <select 
+                                            value={selectedW1} 
+                                            onChange={e => setSelectedW1(e.target.value)}
+                                            className="w-full appearance-none bg-slate-900 border border-slate-800 rounded-xl px-3 py-3 pr-10 text-xs text-white outline-none focus:border-indigo-500 cursor-pointer"
+                                        >
+                                            <option value="">Selecione...</option>
+                                            {availableWitnesses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                                        </select>
+                                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none group-hover:text-indigo-500" size={14}/>
+                                    </div>
                                 </div>
                                 <div className="space-y-1">
                                     <label className="text-[9px] text-slate-500 font-black uppercase ml-1">Testemunha 02</label>
-                                    <select 
-                                        value={selectedW2} 
-                                        onChange={e => setSelectedW2(e.target.value)}
-                                        className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-xs text-white outline-none focus:border-indigo-500"
-                                    >
-                                        <option value="">Selecione...</option>
-                                        {availableWitnesses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-                                    </select>
+                                    <div className="relative group">
+                                        <select 
+                                            value={selectedW2} 
+                                            onChange={e => setSelectedW2(e.target.value)}
+                                            className="w-full appearance-none bg-slate-900 border border-slate-800 rounded-xl px-3 py-3 pr-10 text-xs text-white outline-none focus:border-indigo-500 cursor-pointer"
+                                        >
+                                            <option value="">Selecione...</option>
+                                            {availableWitnesses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                                        </select>
+                                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none group-hover:text-indigo-500" size={14}/>
+                                    </div>
                                 </div>
                             </div>
                         </div>

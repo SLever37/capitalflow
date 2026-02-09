@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ShieldAlert, ArrowDownWideNarrow, Search, X, Users, User } from 'lucide-react';
+import { ShieldAlert, ArrowDownWideNarrow, Search, X, Users, ChevronDown } from 'lucide-react';
 import { SortOption, UserProfile } from '../../types';
 
 interface DashboardControlsProps {
@@ -32,11 +32,11 @@ export const DashboardControls: React.FC<DashboardControlsProps> = ({
                     <div className="p-2 bg-indigo-600 rounded-xl text-white shadow-lg shadow-indigo-600/20">
                         <Users size={16}/>
                     </div>
-                    <div className="flex-1">
+                    <div className="flex-1 relative group">
                         <select 
                             value={selectedStaffId}
                             onChange={e => onStaffChange(e.target.value)}
-                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-[10px] font-black uppercase text-white outline-none focus:border-indigo-500 transition-all cursor-pointer"
+                            className="w-full appearance-none bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 pr-10 text-[10px] font-black uppercase text-white outline-none focus:border-indigo-500 transition-all cursor-pointer hover:bg-slate-800"
                         >
                             <option value="ALL">Visualizar: Toda a Equipe</option>
                             <option value="ONLY_MASTER">Visualizar: Meus Contratos</option>
@@ -46,6 +46,7 @@ export const DashboardControls: React.FC<DashboardControlsProps> = ({
                                 ))}
                             </optgroup>
                         </select>
+                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none group-hover:text-indigo-500" size={16}/>
                     </div>
                 </div>
             )}
@@ -79,18 +80,19 @@ export const DashboardControls: React.FC<DashboardControlsProps> = ({
                     ))}
                 </div>
 
-                <div className="hidden md:flex items-center gap-2 bg-slate-900 border border-slate-800 p-1 rounded-xl min-w-fit">
+                <div className="hidden md:flex items-center gap-2 bg-slate-900 border border-slate-800 p-1 rounded-xl min-w-fit relative group">
                     <div className="px-3 text-slate-500"><ArrowDownWideNarrow size={16}/></div>
                     <select 
                         value={sortOption} 
                         onChange={e => setSortOption(e.target.value as SortOption)}
-                        className="bg-transparent text-white text-[10px] font-black uppercase outline-none p-2 cursor-pointer"
+                        className="appearance-none bg-transparent text-white text-[10px] font-black uppercase outline-none p-2 pr-8 cursor-pointer"
                     >
                         <option value="DUE_DATE_ASC">Vencimento Próximo</option>
                         <option value="NAME_ASC">Nome (A-Z)</option>
                         <option value="CREATED_DESC">Entrada (Novo)</option>
                         <option value="UPDATED_DESC">Alteração (Recente)</option>
                     </select>
+                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none group-hover:text-white" size={14}/>
                 </div>
             </div>
 
@@ -110,18 +112,19 @@ export const DashboardControls: React.FC<DashboardControlsProps> = ({
 
             {/* Mobile Sort Dropdown */}
             {isMobileSortOpen && (
-                <div className="md:hidden bg-slate-900 border border-slate-800 p-2 rounded-2xl flex items-center gap-2 animate-in slide-in-from-top-2 duration-200">
+                <div className="md:hidden bg-slate-900 border border-slate-800 p-2 rounded-2xl flex items-center gap-2 animate-in slide-in-from-top-2 duration-200 relative">
                     <div className="px-3 text-slate-500"><ArrowDownWideNarrow size={16}/></div>
                     <select 
                         value={sortOption} 
                         onChange={e => { setSortOption(e.target.value as SortOption); setIsMobileSortOpen(false); }}
-                        className="bg-transparent text-white text-[10px] font-black uppercase outline-none p-2 cursor-pointer w-full"
+                        className="appearance-none bg-transparent text-white text-[10px] font-black uppercase outline-none p-2 w-full cursor-pointer"
                     >
                         <option value="DUE_DATE_ASC">Vencimento Próximo</option>
                         <option value="NAME_ASC">Nome (A-Z)</option>
                         <option value="CREATED_DESC">Entrada (Novo)</option>
                         <option value="UPDATED_DESC">Alteração (Recente)</option>
                     </select>
+                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" size={16}/>
                 </div>
             )}
         </div>

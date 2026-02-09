@@ -1,7 +1,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { Loan, Installment } from '../../../../types';
-import { parseDateOnlyUTC, addDaysUTC, todayDateOnlyUTC } from '../../../../utils/dateHelpers';
+import { parseDateOnlyUTC, addDaysUTC, todayDateOnlyUTC, toISODateOnlyUTC } from '../../../../utils/dateHelpers';
 import { paymentModalityDispatcher } from '../../../../features/payments/modality/index';
 
 interface UsePaymentManagerProps {
@@ -49,13 +49,12 @@ export const usePaymentManagerState = ({ data, paymentType, setPaymentType, avAm
 
     useEffect(() => {
         if (data) {
+            // Configuração inicial do tipo de pagamento
             if (data.loan.billingCycle === 'DAILY_FREE' || data.loan.billingCycle === ('DAILY_FIXED' as any)) {
                 setPaymentType('CUSTOM');
-                setManualDateStr('');
                 setSubMode('DAYS');
             } else if (data.loan.billingCycle === 'DAILY_FIXED_TERM') {
                 setPaymentType('RENEW_AV');
-                
                 // Cálculo estável para sugestão de valor
                 const start = parseDateOnlyUTC(data.loan.startDate);
                 const due = parseDateOnlyUTC(data.inst.dueDate);
@@ -73,6 +72,20 @@ export const usePaymentManagerState = ({ data, paymentType, setPaymentType, avAm
                 setAvAmount('');
             }
             setCustomAmount('');
+
+            // --- LÓGICA DE DATA AUTOMÁTICA ---
+            // Se não for quitação total, sugere a próxima data
+            // Mensal: +30 dias da data de vencimento atual
+            // Diário: +1 dia (ou manter a lógica do sistema se for diário livre)
+            const currentDueDate = parseDateOnlyUTC(data.inst.dueDate);
+            let daysToAdd = 30; // Default Mensal
+            
+            if (data.loan.billingCycle.includes('DAILY')) {
+                daysToAdd = 1;
+            }
+
+            const nextDate = addDaysUTC(currentDueDate, daysToAdd);
+            setManualDateStr(toISODateOnlyUTC(nextDate));
         }
     }, [data?.loan?.id, data?.inst?.id]);
 

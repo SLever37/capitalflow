@@ -1,8 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Modal } from '../ui/Modal';
-import { UserProfile } from '../../types';
-import { Shield, KeyRound, User, Briefcase, Mail, Loader2, Save, CreditCard } from 'lucide-react';
+import { Shield, KeyRound, User, Briefcase, Mail, Loader2, Save, CreditCard, ChevronDown } from 'lucide-react';
 
 interface MasterEditUserModalProps {
     user: any;
@@ -61,16 +60,19 @@ export const MasterEditUserModal: React.FC<MasterEditUserModalProps> = ({ user, 
                     <div className={`p-3 rounded-xl ${formData.access_level === 1 ? 'bg-rose-500/20 text-rose-500' : 'bg-blue-500/20 text-blue-500'}`}>
                         <Shield size={24} />
                     </div>
-                    <div>
-                        <p className="text-[10px] font-black uppercase text-slate-500">Nível de Acesso</p>
-                        <select 
-                            value={formData.access_level}
-                            onChange={e => setFormData({...formData, access_level: Number(e.target.value)})}
-                            className="bg-transparent text-white font-bold outline-none text-sm cursor-pointer hover:text-blue-400 transition-colors"
-                        >
-                            <option value={2}>Operador (Padrão)</option>
-                            <option value={1}>Master / Admin</option>
-                        </select>
+                    <div className="flex-1">
+                        <p className="text-[10px] font-black uppercase text-slate-500 mb-1">Nível de Acesso</p>
+                        <div className="relative group">
+                            <select 
+                                value={formData.access_level}
+                                onChange={e => setFormData({...formData, access_level: Number(e.target.value)})}
+                                className="w-full appearance-none bg-transparent text-white font-bold outline-none text-sm cursor-pointer hover:text-blue-400 transition-colors pr-6"
+                            >
+                                <option value={2}>Operador (Padrão)</option>
+                                <option value={1}>Master / Admin</option>
+                            </select>
+                            <ChevronDown className="absolute right-0 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none group-hover:text-blue-400" size={14}/>
+                        </div>
                     </div>
                 </div>
 

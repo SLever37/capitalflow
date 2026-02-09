@@ -1,6 +1,6 @@
 
 import React, { useMemo } from 'react';
-import { Wallet, CalendarX, Clock, CreditCard, AlertTriangle, CalendarDays } from 'lucide-react';
+import { Wallet, CalendarX, Clock, CreditCard, AlertTriangle, CalendarDays, ChevronDown } from 'lucide-react';
 import { CapitalSource, LoanBillingModality } from '../../types';
 import { formatMoney } from '../../utils/formatters';
 
@@ -50,14 +50,17 @@ export const LoanFormFinancialSection: React.FC<LoanFormFinancialSectionProps> =
             <div className="space-y-4 animate-in slide-in-from-top-2">
                 <div className="space-y-2">
                     <label className="text-[9px] text-purple-400 font-black uppercase ml-2">Tipo de Diária</label>
-                    <select 
-                        value={formData.billingCycle} 
-                        onChange={(e) => setFormData({...formData, billingCycle: e.target.value as LoanBillingModality})} 
-                        className="w-full bg-slate-900 border border-purple-500/30 rounded-2xl px-4 py-3 text-white text-xs outline-none focus:border-purple-500"
-                    >
-                        <option value="DAILY_FREE">Diária Livre (Somente Juros)</option>
-                        <option value="DAILY_FIXED_TERM">Prazo Fixo (Parcela Fixa)</option>
-                    </select>
+                    <div className="relative group">
+                        <select 
+                            value={formData.billingCycle} 
+                            onChange={(e) => setFormData({...formData, billingCycle: e.target.value as LoanBillingModality})} 
+                            className="w-full appearance-none bg-slate-900 border border-purple-500/30 rounded-2xl px-4 py-3 pr-10 text-white text-xs outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/20 transition-all cursor-pointer"
+                        >
+                            <option value="DAILY_FREE">Diária Livre (Somente Juros)</option>
+                            <option value="DAILY_FIXED_TERM">Prazo Fixo (Parcela Fixa)</option>
+                        </select>
+                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-purple-500 pointer-events-none" size={16}/>
+                    </div>
                 </div>
 
                 {formData.billingCycle === 'DAILY_FIXED_TERM' && (
@@ -136,9 +139,16 @@ export const LoanFormFinancialSection: React.FC<LoanFormFinancialSectionProps> =
 
         <div className="space-y-2">
             <label className="text-[9px] text-slate-500 font-black uppercase ml-2">Fonte de Capital</label>
-            <select value={formData.sourceId} onChange={e => setFormData({...formData, sourceId: e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-white text-sm outline-none">
-              {sources.map(s => <option key={s.id} value={s.id}>{s.name} ({s.type === 'CARD' ? 'Crédito' : `R$ ${s.balance.toLocaleString()}`})</option>)}
-            </select>
+            <div className="relative group">
+                <select 
+                    value={formData.sourceId} 
+                    onChange={e => setFormData({...formData, sourceId: e.target.value})} 
+                    className="w-full appearance-none bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 pr-10 text-white text-sm outline-none focus:border-purple-500 transition-all cursor-pointer"
+                >
+                  {sources.map(s => <option key={s.id} value={s.id}>{s.name} ({s.type === 'CARD' ? 'Crédito' : `R$ ${s.balance.toLocaleString()}`})</option>)}
+                </select>
+                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none group-hover:text-purple-500 transition-colors" size={18} />
+            </div>
         </div>
 
         {isCardSource && (

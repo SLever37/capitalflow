@@ -1,6 +1,7 @@
+
 // src/components/modals/NewAporteModal.tsx
 import React, { useMemo, useState } from 'react';
-import { X, PlusCircle } from 'lucide-react';
+import { X, PlusCircle, ChevronDown } from 'lucide-react';
 import { Loan, UserProfile, CapitalSource, Installment } from '../../types';
 import { contractsService } from '../../services/contracts.service';
 import { formatMoney } from '../../utils/formatters';
@@ -12,7 +13,7 @@ type Props = {
   activeUser: UserProfile;
   sources: CapitalSource[];
   installments: Installment[];
-  onSuccess?: () => void; // pra você recarregar o contrato/tela
+  onSuccess?: () => void;
   isStealthMode?: boolean;
 };
 
@@ -38,7 +39,6 @@ export const NewAporteModal: React.FC<Props> = ({
   }, [installments]);
 
   const defaultTargetInstallmentId = useMemo(() => {
-    // pega a menor numero_parcela PENDING, ou fallback
     const sorted = [...pendingInstallments].sort((a: any, b: any) => {
       const an = Number(a.numero_parcela ?? a.number ?? 999999);
       const bn = Number(b.numero_parcela ?? b.number ?? 999999);
@@ -51,7 +51,6 @@ export const NewAporteModal: React.FC<Props> = ({
   }, [pendingInstallments]);
 
   const parsedAmount = useMemo(() => {
-    // aceita "1000", "1.000", "1.000,50", "1000,50"
     const raw = amount.trim();
     if (!raw) return 0;
     const normalized = raw.replace(/\./g, '').replace(',', '.');
@@ -142,40 +141,46 @@ export const NewAporteModal: React.FC<Props> = ({
           {/* Fonte */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3">
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Fonte (Carteira de Origem)</p>
-            <select
-              value={sourceId}
-              onChange={(e) => setSourceId(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold outline-none focus:border-blue-600"
-            >
-              <option value="" disabled>Selecione uma fonte</option>
-              {sources.map((s: any) => (
-                <option key={s.id} value={s.id}>
-                  {s.name} — saldo {formatMoney(Number(s.balance || 0), isStealthMode)}
-                </option>
-              ))}
-            </select>
+            <div className="relative group">
+                <select
+                  value={sourceId}
+                  onChange={(e) => setSourceId(e.target.value)}
+                  className="w-full appearance-none bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 pr-10 text-white font-bold outline-none focus:border-blue-600 cursor-pointer"
+                >
+                  <option value="" disabled>Selecione uma fonte</option>
+                  {sources.map((s: any) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} — saldo {formatMoney(Number(s.balance || 0), isStealthMode)}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none group-hover:text-blue-500 transition-colors" size={16}/>
+            </div>
           </div>
 
           {/* Parcela alvo (opcional) */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3">
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Aplicar em qual parcela?</p>
-            <select
-              value={installmentId}
-              onChange={(e) => setInstallmentId(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold outline-none focus:border-blue-600"
-            >
-              <option value="">Automático (próxima pendente)</option>
-              {pendingInstallments.map((i: any) => {
-                const n = i.numero_parcela ?? i.number ?? '?';
-                const due = i.data_vencimento ?? i.due_date ?? i.dueDate ?? '';
-                const val = i.valor_parcela ?? i.amount ?? 0;
-                return (
-                  <option key={i.id} value={i.id}>
-                    Parcela {n} — venc {String(due).slice(0, 10)} — {formatMoney(Number(val || 0), isStealthMode)}
-                  </option>
-                );
-              })}
-            </select>
+            <div className="relative group">
+                <select
+                  value={installmentId}
+                  onChange={(e) => setInstallmentId(e.target.value)}
+                  className="w-full appearance-none bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 pr-10 text-white font-bold outline-none focus:border-blue-600 cursor-pointer"
+                >
+                  <option value="">Automático (próxima pendente)</option>
+                  {pendingInstallments.map((i: any) => {
+                    const n = i.numero_parcela ?? i.number ?? '?';
+                    const due = i.data_vencimento ?? i.due_date ?? i.dueDate ?? '';
+                    const val = i.valor_parcela ?? i.amount ?? 0;
+                    return (
+                      <option key={i.id} value={i.id}>
+                        Parcela {n} — venc {String(due).slice(0, 10)} — {formatMoney(Number(val || 0), isStealthMode)}
+                      </option>
+                    );
+                  })}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none group-hover:text-blue-500 transition-colors" size={16}/>
+            </div>
             <p className="text-[10px] text-slate-500 mt-2">
               Se deixar automático, vai na próxima parcela PENDING.
             </p>

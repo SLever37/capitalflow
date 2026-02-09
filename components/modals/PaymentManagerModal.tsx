@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Loader2, MessageSquare, DollarSign, CheckSquare, RefreshCcw, ArrowRightLeft, Info, Coins, CalendarClock, Calendar } from 'lucide-react';
+import { Loader2, MessageSquare, DollarSign, CheckSquare, RefreshCcw, Info, Coins, CalendarClock, Calendar } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Loan, Installment } from '../../types';
 import { parseDateOnlyUTC, formatBRDate, addDaysUTC } from '../../utils/dateHelpers';
@@ -123,9 +123,9 @@ export const PaymentManagerModal: React.FC<PaymentManagerModalProps> = ({
                             <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex items-center justify-between group focus-within:border-blue-500 transition-colors">
                                 <div className="flex-1">
                                     <label className="text-[10px] font-black uppercase text-slate-500 block mb-1 flex items-center gap-1"><CalendarClock size={12}/> Próximo Vencimento</label>
-                                    <input type="date" className="bg-transparent text-white font-bold text-sm outline-none w-full" value={manualDateStr} onChange={e => setManualDateStr(e.target.value)} />
+                                    <input type="date" className="bg-transparent text-white font-bold text-sm outline-none w-full appearance-none cursor-pointer" value={manualDateStr} onChange={e => setManualDateStr(e.target.value)} />
                                 </div>
-                                <div className="p-2 bg-slate-800 rounded-xl text-blue-500 group-focus-within:text-white transition-colors"><Calendar size={18}/></div>
+                                <div className="p-2 bg-slate-800 rounded-xl text-blue-500 group-focus-within:text-white transition-colors pointer-events-none"><Calendar size={18}/></div>
                             </div>
                         )}
                         {!manualDateStr && paymentType === 'RENEW_INTEREST' && (
