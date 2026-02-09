@@ -60,7 +60,7 @@ export function agreementAdapter(rawAgreement: any, rawInstallments?: any[]): Ag
       status: normalizeAgreementInstallmentStatus(p?.status),
       paidAmount: asNumber(p?.paid_amount ?? p?.valor_pago ?? 0),
     } as AgreementInstallment;
-  });
+  }).sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()); // Garante ordem cronológica
 
   const agreement: Agreement = {
     id: asString(a?.id),
@@ -92,6 +92,8 @@ export function mapLoanFromDB(
 ): Loan {
   const l = rawLoan ?? {};
 
+  // Mapeia e ORDENA as parcelas por data (Ascendente)
+  // Isso corrige o bug onde o portal pegava a parcela errada como "próxima"
   const installments: Installment[] = asArray(rawInstallments).map((inst: any) => {
     const status = normalizeLoanInstallmentStatus(inst?.status);
 
@@ -116,7 +118,7 @@ export function mapLoanFromDB(
       renewalCount: asNumber(inst?.renewal_count ?? inst?.renewalCount),
       number: asNumber(inst?.number ?? inst?.numero ?? inst?.n),
     } as Installment;
-  });
+  }).sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
 
   const startDate = safeDateString(l?.start_date ?? l?.startDate, 'startDate');
 
