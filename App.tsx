@@ -21,10 +21,9 @@ import { OperatorSupportChat } from './features/support/OperatorSupportChat';
 import { TeamPage } from './pages/TeamPage';
 import { InvitePage } from './pages/InvitePage';
 import { SetupPasswordPage } from './pages/SetupPasswordPage';
-import { HeaderBar } from './layout/HeaderBar';
-import { BottomNav } from './layout/BottomNav';
 import { notificationService } from './services/notification.service';
 import { MasterScreen } from './features/master/MasterScreen';
+import { LoadingScreen } from './components/ui/LoadingScreen';
 
 export const App: React.FC = () => {
   // Hooks de Infraestrutura
@@ -86,6 +85,21 @@ export const App: React.FC = () => {
     disabled: isPublicView,
   });
 
+  // 1. Anti-Saída Acidental (Proteção contra fechamento de aba)
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      // Só ativa se estiver logado e não for uma visão pública
+      if (activeUser && !isPublicView) {
+        e.preventDefault();
+        e.returnValue = ''; // Padrão para navegadores modernos exibirem o alerta
+        return '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [activeUser, isPublicView]);
+
   // Init Notifications Permissions (apenas se logado E não for view pública)
   useEffect(() => {
     if (activeUser && !isPublicView) {
@@ -95,6 +109,15 @@ export const App: React.FC = () => {
 
   const effectiveSelectedStaffId = activeUser && activeUser.accessLevel === 2 ? activeUser.id : selectedStaffId;
   const isInvitePath = window.location.pathname === '/invite' || window.location.pathname === '/setup-password';
+
+  // 2. Tela de Carregamento Global (Splash Screen)
+  // Exibe se: Temos um ID de perfil (tentando restaurar sessão) MAS ainda não temos o objeto user carregado
+  // OU se estamos carregando dados iniciais críticos.
+  const isInitializing = (!!activeProfileId && !activeUser) || (!!activeUser && isLoadingData && loans.length === 0 && !loadError);
+
+  if (isInitializing && !isPublicView && !isInvitePath) {
+    return <LoadingScreen />;
+  }
 
   return (
     <>
