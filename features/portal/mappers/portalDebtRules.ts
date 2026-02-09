@@ -46,6 +46,7 @@ export interface PaymentOptions {
 export const getPortalDueLabel = (daysLateInput: number, dueDateISO: string) => {
     // Cálculo Cronológico Direto: (Hoje - Vencimento)
     // Se positivo: Atrasado. Se zero: Hoje. Se negativo: Futuro.
+    // getDaysDiff já normaliza fusos para meia-noite local, corrigindo erro de "dia anterior"
     const chronologicalDaysLate = getDaysDiff(dueDateISO);
 
     // 1. Atrasado real
@@ -101,8 +102,9 @@ export const resolveDebtSummary = (loan: Loan, installments: Installment[]): Por
         }
     });
 
+    // Como as parcelas agora vêm ordenadas do Adapter, pending[0] é garantidamente a mais antiga
     const nextDueDate = pending.length > 0 
-        ? new Date(pending[0].dueDate) // Assume ordenação por data vinda do service
+        ? new Date(pending[0].dueDate) 
         : null;
 
     return {

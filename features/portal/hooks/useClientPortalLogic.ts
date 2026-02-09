@@ -48,9 +48,7 @@ export const useClientPortalLogic = (initialToken: string) => {
       // Removemos qualquer busca por outros contratos do cliente para evitar vazamento de dados.
       const loanObject = mapLoanFromDB(
           entryLoan, 
-          entryLoan.parcelas || [], 
-          undefined, // acordos (se necessário, expandir query)
-          entryLoan.sinalizacoes_pagamento || []
+          [clientData]
       );
 
       // Define lista com apenas o contrato autorizado pelo token
