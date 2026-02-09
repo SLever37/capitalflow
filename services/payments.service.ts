@@ -1,3 +1,4 @@
+
 import { supabase } from '../lib/supabase';
 import type { Loan, Installment, UserProfile, CapitalSource } from '../types';
 import { allocatePayment } from '../domain/finance/calculations';
@@ -59,8 +60,9 @@ export const paymentsService = {
     }
 
     // =========================
-    // IDEMPOTENCY KEY (NOVO)
+    // IDEMPOTENCY KEY
     // =========================
+    // Utilizar UUID válido para garantir compatibilidade com a assinatura da função no banco
     const idempotencyKey = generateUUID();
 
     // =========================
@@ -71,7 +73,7 @@ export const paymentsService = {
       if (lendAmount <= 0) throw new Error('Valor do aporte inválido.');
 
       const { error } = await supabase.rpc('process_lend_more_atomic', {
-        p_idempotency_key: idempotencyKey, // ✅ novo
+        p_idempotency_key: idempotencyKey,
         p_loan_id: loan.id,
         p_installment_id: inst.id,
         p_profile_id: ownerId,
@@ -150,10 +152,10 @@ export const paymentsService = {
     );
 
     // =========================
-    // PERSISTÊNCIA (RPC IDEMPOTENTE)
+    // PERSISTÊNCIA (RPC ATÔMICA)
     // =========================
     const { error } = await supabase.rpc('process_payment_atomic', {
-      p_idempotency_key: idempotencyKey, // ✅ novo
+      p_idempotency_key: idempotencyKey,
       p_loan_id: loan.id,
       p_installment_id: inst.id,
       p_profile_id: ownerId,

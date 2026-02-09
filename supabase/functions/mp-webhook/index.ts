@@ -100,10 +100,14 @@ serve(async (req) => {
         const sourceId = metadata.source_id || loan.source_id;
 
         // B. Calcular "Próximo Estado"
+        // Usa string simples para garantir compatibilidade com sobrecarga TEXT se existir
+        // ou falhar claramente se exigir UUID (mas preferimos tentar TEXT primeiro para evitar ambiguidade dupla)
         let rpcParams: any = {
+            p_idempotency_key: String(paymentId), 
             p_loan_id: loan.id,
             p_installment_id: inst.id,
             p_profile_id: profileId,
+            p_operator_id: profileId, // No webhook usamos o próprio dono
             p_source_id: sourceId,
             p_amount_to_pay: amountPaid,
             p_notes: `Pagamento via PIX Portal (${paymentType === 'FULL' ? 'Quitação' : 'Renovação'})`,
@@ -136,7 +140,10 @@ serve(async (req) => {
 
         } else {
             const currentDueDate = inst.due_date || loan.start_date;
-            const newDate = addDays(currentDueDate, 30);
+            // Simplificação para webhook: assume ciclo 30 dias (para Giro/Mensal)
+            const d = new Date(currentDueDate);
+            d.setUTCDate(d.getUTCDate() + 30);
+            const newDate = d.toISOString().split('T')[0];
             
             const principalBase = Number(inst.principal_remaining);
             const nextInterest = principalBase * (Number(loan.interest_rate) / 100);
@@ -191,12 +198,6 @@ serve(async (req) => {
             });
 
             // 2. Deduzir do Lucro Líquido (Interest Balance) do Perfil
-            // A RPC process_payment_atomic já somou o lucro bruto. Agora subtraímos a taxa.
-            // Não alteramos o 'balance' da fonte pois o dinheiro líquido que entra lá já deveria ser descontado, 
-            // mas como a RPC assume valor cheio na fonte, podemos ajustar aqui ou assumir que a fonte recebe bruto e a taxa sai depois.
-            // Padrão CapitalFlow: InterestBalance é o lucro disponível. Taxa reduz lucro.
-            
-            // Ajuste manual de saldo de lucro
             const { data: profile } = await supabase.from('perfis').select('interest_balance').eq('id', profileId).single();
             if (profile) {
                 await supabase.from('perfis')
