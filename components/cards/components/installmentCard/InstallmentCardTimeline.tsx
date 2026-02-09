@@ -41,7 +41,7 @@ export const InstallmentCardTimeline: React.FC<InstallmentCardTimelineProps> = (
             {/* DATA DO EMPRÉSTIMO / CONTRATO (Conectado à data real de início do contrato) */}
             <div className="relative">
                 <div className="absolute -left-[18px] top-1.5 w-2.5 h-2.5 rounded-full bg-slate-800 border-2 border-slate-900"></div>
-                <p className="text-[9px] font-bold text-slate-500 uppercase leading-none tracking-wider">Data do Contrato</p>
+                <p className="text-[9px] font-bold text-slate-500 uppercase leading-none tracking-wider">Início do Contrato</p>
                 <p className="text-xs font-bold text-slate-300 mt-0.5">{formatBRDate(loan.startDate)}</p>
             </div>
 

@@ -1,3 +1,4 @@
+
 import React from 'react';
 import {
   CheckCircle2,
@@ -29,16 +30,23 @@ interface HeaderProps {
    Texto do Badge (regra solicitada)
 ========================= */
 function getDueBadgeLabel(daysUntilDue: number) {
+  // Dias negativos significam que a data de vencimento já passou (Hoje > Vencimento)
+  // Portanto, está atrasado.
   if (daysUntilDue < 0) {
     const d = Math.abs(daysUntilDue);
-    return `Vencido há ${d} dia${d === 1 ? '' : 's'}`;
+    return `Atrasado há ${d} dia${d === 1 ? '' : 's'}`;
   }
+  
+  // Zero exato significa que vence hoje
   if (daysUntilDue === 0) {
     return 'Vence hoje';
   }
+  
+  // Positivo significa futuro (Vencimento > Hoje)
   if (daysUntilDue <= 3) {
     return `Faltam ${daysUntilDue} dia${daysUntilDue === 1 ? '' : 's'}`;
   }
+  
   return 'Em dia';
 }
 
@@ -62,14 +70,14 @@ function getDueBadgeStyle(daysUntilDue: number) {
   // faltam 1-3 dias (alerta)
   if (daysUntilDue <= 3) {
     return {
-      cls: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
+      cls: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
       icon: <Calendar size={12} className="shrink-0" />
     };
   }
 
   // em dia (longe)
   return {
-    cls: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+    cls: 'bg-slate-800 text-slate-400 border-slate-700',
     icon: <Calendar size={12} className="shrink-0" />
   };
 }

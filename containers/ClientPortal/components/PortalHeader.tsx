@@ -37,14 +37,18 @@ export const PortalHeader: React.FC<PortalHeaderProps> = ({
                     <select 
                         value={selectedLoanId}
                         onChange={(e) => setSelectedLoanId(e.target.value)}
-                        className="w-full appearance-none bg-slate-900 border border-slate-800 rounded-xl pl-4 pr-10 py-3 text-white text-xs font-bold uppercase outline-none focus:border-blue-500 cursor-pointer hover:bg-slate-800 transition-colors shadow-sm"
+                        className="w-full appearance-none bg-slate-900 border border-slate-800 rounded-xl pl-4 pr-10 py-3 text-white text-xs font-bold uppercase outline-none focus:border-blue-500 appearance-none cursor-pointer hover:bg-slate-800 transition-colors shadow-sm"
                         disabled={clientContracts.length <= 1}
                     >
-                        {clientContracts.map((c) => (
-                            <option key={c.id} value={c.id}>
-                                {c.code ? `CONTRATO #${c.code}` : `CONTRATO ...${c.id.substring(0, 6).toUpperCase()}`} - {new Date(c.start_date || c.created_at).toLocaleDateString('pt-BR')}
-                            </option>
-                        ))}
+                        {clientContracts.map((c) => {
+                            const dateStr = new Date(c.start_date || c.created_at).toLocaleDateString('pt-BR');
+                            const label = c.code ? `CONTRATO #${c.code}` : `CONTRATO ...${c.id.substring(0, 6).toUpperCase()}`;
+                            return (
+                                <option key={c.id} value={c.id}>
+                                    {label} | Início: {dateStr}
+                                </option>
+                            );
+                        })}
                     </select>
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500 group-hover:text-white transition-colors">
                         {clientContracts.length > 1 ? <ChevronDown size={16} /> : <Lock size={14} className="opacity-50"/>}

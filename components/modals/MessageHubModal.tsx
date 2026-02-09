@@ -4,6 +4,7 @@ import { HandCoins, CalendarClock, ShieldAlert, CheckCircle2 } from 'lucide-reac
 import { Loan } from '../../types';
 import { Modal } from '../ui/Modal';
 import { calculateTotalDue } from '../../domain/finance/calculations';
+import { getDaysDiff } from '../../utils/dateHelpers';
 
 // Função auxiliar de saudação
 const getGreeting = (): string => {
@@ -21,11 +22,29 @@ export const MessageHubModal = ({ loan, client, onClose }: { loan: Loan, client?
         const portalLink = `${window.location.origin}/?portal=${loan.id}`;
 
         const pendingInst = loan.installments.find(i => i.status !== 'PAID');
-        const nextDate = pendingInst ? new Date(pendingInst.dueDate).toLocaleDateString('pt-BR') : 'Finalizado';
-        const amount = pendingInst ? calculateTotalDue(loan, pendingInst).total.toFixed(2) : '0,00';
+        
+        let dateContext = '';
+        let amount = '0,00';
+        let daysLate = 0;
+
+        if (pendingInst) {
+            const debt = calculateTotalDue(loan, pendingInst);
+            amount = debt.total.toFixed(2);
+            daysLate = debt.daysLate;
+            
+            const dueDateObj = new Date(pendingInst.dueDate);
+            const dateStr = dueDateObj.toLocaleDateString('pt-BR');
+            
+            // Lógica de contexto temporal para a mensagem
+            const diff = getDaysDiff(pendingInst.dueDate); // >0 atrasado, 0 hoje, <0 futuro
+
+            if (diff === 0) dateContext = `hoje (${dateStr})`;
+            else if (diff > 0) dateContext = `dia ${dateStr} (há ${diff} dias)`;
+            else dateContext = `dia ${dateStr}`;
+        }
 
         // Bloco padrão de acesso via Link Seguro
-        const accessBlock = `\n\n🔒 *Acesso Seguro ao Portal:*\n${portalLink}\n\n(Clique no link para ver seus contratos e comprovantes)`;
+        const accessBlock = `\n\n🔒 *Acesso Seguro ao Portal:*\n${portalLink}\n\n(Clique no link para ver detalhes e comprovantes)`;
 
         let text = '';
 
@@ -42,19 +61,21 @@ export const MessageHubModal = ({ loan, client, onClose }: { loan: Loan, client?
                 break;
 
             case 'REMINDER':
+                // Mensagem preventiva ou do dia
                 text =
                   `*${greeting}, ${firstName}!* Tudo certo?\n\n` +
-                  `Lembrete amigo: sua parcela de *R$ ${amount}* vence em *${nextDate}*.\n` +
+                  `Lembrete amigo: sua parcela de *R$ ${amount}* vence *${dateContext}*.\n` +
                   `Para facilitar, você pode pegar o código PIX ou enviar o comprovante direto pelo portal.` +
                   accessBlock;
                 break;
 
             case 'LATE':
+                // Mensagem de cobrança reativa
                 text =
                   `*${greeting}, Sr(a). ${loan.debtorName}.*\n\n` +
                   `⚠️ *AVISO DE COBRANÇA*\n` +
-                  `Consta em nosso sistema uma pendência de *R$ ${amount}* com vencimento original em *${nextDate}*.\n` +
-                  `Por favor, regularize sua situação através do link abaixo para evitar bloqueios.` +
+                  `Consta em nosso sistema uma pendência de *R$ ${amount}* com vencimento original no *${dateContext}*.\n` +
+                  `Por favor, regularize sua situação através do link abaixo para evitar bloqueios e multas adicionais.` +
                   accessBlock;
                 break;
 
@@ -90,7 +111,7 @@ export const MessageHubModal = ({ loan, client, onClose }: { loan: Loan, client?
                         <div className="p-2 bg-amber-500/10 text-amber-500 rounded-xl group-hover:bg-amber-500 group-hover:text-white transition-colors"><CalendarClock size={20}/></div>
                         <span className="font-bold text-white uppercase text-xs">Lembrete Vencimento</span>
                     </div>
-                    <p className="text-[10px] text-slate-500">Aviso suave com link do portal.</p>
+                    <p className="text-[10px] text-slate-500">Aviso suave ou do dia.</p>
                 </button>
                 <button onClick={() => handleSend('LATE')} className="p-4 bg-slate-900 border border-slate-800 rounded-2xl hover:border-rose-500 transition-all text-left group">
                     <div className="flex items-center gap-3 mb-2">
