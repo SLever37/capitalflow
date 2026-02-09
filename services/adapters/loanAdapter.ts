@@ -107,10 +107,18 @@ export const mapLoanFromDB = (l: any, clientsData: any[] = []): Loan => {
     }
 
     let phone = l.debtor_phone || l.phone || l.telefone || l.celular;
-    if ((!phone || String(phone).trim() === '') && l.client_id && asArray(clientsData).length > 0) {
+    let debtorClientNumber = null;
+
+    // Busca dados enriquecidos do cliente (Número/Código) se disponível na lista carregada
+    if (l.client_id && asArray(clientsData).length > 0) {
         const linkedClient = clientsData.find((c: any) => c.id === l.client_id);
         if (linkedClient) {
-            phone = linkedClient.phone || linkedClient.telefone || linkedClient.celular;
+            // Se não tinha telefone no contrato, pega do cliente
+            if (!phone || String(phone).trim() === '') {
+                phone = linkedClient.phone || linkedClient.telefone || linkedClient.celular;
+            }
+            // Pega o número do cliente (Código) para agrupamento correto
+            debtorClientNumber = linkedClient.client_number || linkedClient.clientNumber;
         }
     }
     
@@ -121,6 +129,7 @@ export const mapLoanFromDB = (l: any, clientsData: any[] = []): Loan => {
         debtorName: asString(l.debtor_name, 'Cliente Desconhecido'),
         debtorPhone: maskPhone(asString(phone, '00000000000')),
         debtorDocument: l.debtor_document,
+        debtorClientNumber, // Propriedade injetada para agrupamento por código
         debtorAddress: l.debtor_address,
         clientAvatarUrl: l.cliente_foto_url,
         sourceId: asString(l.source_id),
@@ -153,5 +162,5 @@ export const mapLoanFromDB = (l: any, clientsData: any[] = []): Loan => {
         attachments: [], 
         documentPhotos: [],
         activeAgreement
-    };
+    } as Loan;
 };

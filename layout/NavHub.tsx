@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LayoutGrid, X, User, Calendar, Calculator, ArrowRightLeft, Shield, Scale, Wallet, Briefcase, Users, LayoutDashboard } from 'lucide-react';
+import { LayoutGrid, X, User, Calendar, Calculator, ArrowRightLeft, Shield, Scale, Wallet, Briefcase, Users, LayoutDashboard, PiggyBank } from 'lucide-react';
 import { AppTab } from '../types';
 
 interface NavHubProps {
@@ -20,9 +20,15 @@ export const NavHub: React.FC<NavHubProps> = ({ onClose, onNavigate, userLevel, 
             case 'TEAM': return { icon: <Briefcase size={32}/>, label: 'Minha Equipe', color: 'text-purple-500', hover: 'hover:border-purple-600' };
             case 'CLIENTS': return { icon: <Users size={32}/>, label: 'Clientes', color: 'text-amber-500', hover: 'hover:border-amber-600' };
             case 'DASHBOARD': return { icon: <LayoutDashboard size={32}/>, label: 'Painel Geral', color: 'text-cyan-500', hover: 'hover:border-cyan-600' };
+            case 'PERSONAL_FINANCE': return { icon: <PiggyBank size={32}/>, label: 'Minhas Finanças', color: 'text-pink-500', hover: 'hover:border-pink-600' };
             default: return { icon: <LayoutGrid size={32}/>, label: tab, color: 'text-slate-500', hover: 'hover:border-slate-600' };
         }
     };
+
+    // Mescla a ordem salva com o novo item se ele não existir
+    const finalHubOrder = hubOrder.includes('PERSONAL_FINANCE') 
+        ? hubOrder 
+        : [...hubOrder, 'PERSONAL_FINANCE' as AppTab];
 
     return (
         <div className="fixed inset-0 z-[60] bg-slate-950/40 backdrop-blur-xl flex items-center justify-center p-4 animate-in fade-in zoom-in-95 duration-200">
@@ -33,7 +39,7 @@ export const NavHub: React.FC<NavHubProps> = ({ onClose, onNavigate, userLevel, 
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4">
-                    {hubOrder.map(tab => {
+                    {finalHubOrder.map(tab => {
                         const meta = getTabMeta(tab);
                         if (tab === 'MASTER' && userLevel !== 1) return null;
                         return (

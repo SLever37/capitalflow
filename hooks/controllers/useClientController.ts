@@ -97,26 +97,41 @@ export const useClientController = (
     try {
         const ownerId = (activeUser as any).supervisor_id || activeUser.id;
         const cleanDoc = onlyDigits(document);
+        const trimmedName = name.trim();
         
-        // --- VERIFICAÇÃO DE DUPLICIDADE DE CPF/CNPJ ---
-        // Regra: Não permite duplicidade, EXCETO se for o CPF genérico legado (00000000000)
-        // Se for edição, ignora o próprio ID.
+        // 1. VERIFICAÇÃO DE DUPLICIDADE DE CPF/CNPJ
         if (cleanDoc && cleanDoc !== '00000000000' && cleanDoc.length >= 11) {
             let query = supabase
                 .from('clientes')
                 .select('id, name')
                 .eq('profile_id', ownerId)
-                .eq('document', document); // Com formatação original ou limpa, dependendo de como salvou. Idealmente limpar antes.
+                .eq('document', document);
             
-            // Se for edição, exclui o cliente atual da busca
-            if (ui.editingClient) {
-                query = query.neq('id', ui.editingClient.id);
+            if (ui.editingClient) query = query.neq('id', ui.editingClient.id);
+
+            const { data: existingDoc } = await query.maybeSingle();
+
+            if (existingDoc) {
+                showToast(`Documento já cadastrado para: ${existingDoc.name}.`, "error");
+                ui.setIsSaving(false);
+                return;
             }
+        }
 
-            const { data: existing } = await query.maybeSingle();
+        // 2. VERIFICAÇÃO DE DUPLICIDADE DE NOME (Novo requisito)
+        {
+            let nameQuery = supabase
+                .from('clientes')
+                .select('id')
+                .eq('profile_id', ownerId)
+                .ilike('name', trimmedName); // Case insensitive check
+            
+            if (ui.editingClient) nameQuery = nameQuery.neq('id', ui.editingClient.id);
 
-            if (existing) {
-                showToast(`Documento já cadastrado para: ${existing.name}.`, "error");
+            const { data: existingName } = await nameQuery.maybeSingle();
+
+            if (existingName) {
+                showToast(`O cliente "${trimmedName}" já existe. Use um nome diferente para diferenciar.`, "error");
                 ui.setIsSaving(false);
                 return;
             }
@@ -126,7 +141,7 @@ export const useClientController = (
         const payload: any = {
             id,
             profile_id: ownerId,
-            name: name.trim(),
+            name: trimmedName,
             phone: normalizeBrazilianPhone(phone),
             document: document,
             email: email,

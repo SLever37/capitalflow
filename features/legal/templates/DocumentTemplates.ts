@@ -1,6 +1,19 @@
 
 import { formatMoney, numberToWordsBRL } from "../../../utils/formatters";
 
+// Helper para data segura
+const formatDateSafe = (dateInput: string | Date) => {
+    if (!dateInput) return new Date().toLocaleDateString('pt-BR');
+    
+    let isoStr = typeof dateInput === 'string' ? dateInput : dateInput.toISOString();
+    // Pega apenas a parte da data YYYY-MM-DD
+    const datePart = isoStr.split('T')[0];
+    const [y, m, d] = datePart.split('-');
+    
+    // Retorna formatado dia/mes/ano
+    return `${d}/${m}/${y}`;
+};
+
 export const DocumentTemplates = {
     // 1. CONFISSÃO DE DÍVIDA (Art. 784, III CPC)
     confissaoDivida: (data: any) => `
@@ -52,7 +65,7 @@ export const DocumentTemplates = {
             </div>
             
             <p style="font-size: 16pt; line-height: 2.2; text-align: justify; margin-bottom: 40px; text-indent: 50px;">
-                Aos <b>${new Date(data.dueDate).toLocaleDateString('pt-BR')}</b>, pagarei por esta única via de <b>NOTA PROMISSÓRIA</b> a <b>${data.creditorName}</b>, CPF/CNPJ nº ${data.creditorDoc}, ou à sua ordem, a quantia líquida e certa de <b>${formatMoney(data.amount)} (${numberToWordsBRL(data.amount)})</b> em moeda corrente nacional, pagável na praça de <b>${data.city}</b>.
+                Aos <b>${formatDateSafe(data.dueDate)}</b>, pagarei por esta única via de <b>NOTA PROMISSÓRIA</b> a <b>${data.creditorName}</b>, CPF/CNPJ nº ${data.creditorDoc}, ou à sua ordem, a quantia líquida e certa de <b>${formatMoney(data.amount)} (${numberToWordsBRL(data.amount)})</b> em moeda corrente nacional, pagável na praça de <b>${data.city}</b>.
             </p>
 
             <div style="margin-top: 40px; display: grid; grid-template-columns: 1.5fr 1fr; gap: 40px; font-size: 11pt;">
@@ -82,7 +95,7 @@ export const DocumentTemplates = {
             
             <p><strong>A/C Sr(a). ${data.debtorName}</strong><br/>CPF/CNPJ: ${data.debtorDoc}</p>
             
-            <p style="margin-top: 30px;">Pela presente notificação, informamos que consta em aberto o débito referente ao contrato <strong>${data.loanId.substring(0,8)}</strong>, vencido em ${new Date(data.dueDate).toLocaleDateString('pt-BR')}, no valor total atualizado de <strong>${formatMoney(data.totalDue)}</strong>.</p>
+            <p style="margin-top: 30px;">Pela presente notificação, informamos que consta em aberto o débito referente ao contrato <strong>${data.loanId.substring(0,8)}</strong>, vencido em ${formatDateSafe(data.dueDate)}, no valor total atualizado de <strong>${formatMoney(data.totalDue)}</strong>.</p>
             
             <p>Solicitamos a regularização do pagamento em até 48 horas para evitar a adoção de medidas judiciais cabíveis e registro em órgãos de proteção ao crédito.</p>
             

@@ -1,3 +1,4 @@
+
 // services/ledger/ledgerActions.ts
 import { supabase } from '../../lib/supabase';
 import { Loan, UserProfile, CapitalSource } from '../../types';
@@ -82,9 +83,31 @@ export async function executeLedgerAction(params: {
   }
 
   if (type === 'DELETE_CLIENT') {
+    // CORREÇÃO: Limpeza em cascata manual para garantir exclusão
+    // 1. Busca contratos do cliente
+    const { data: loanIds } = await supabase
+        .from('contratos')
+        .select('id')
+        .eq('client_id', targetId)
+        .eq('profile_id', ownerId);
+        
+    if (loanIds && loanIds.length > 0) {
+        const ids = loanIds.map(l => l.id);
+        
+        // 2. Remove itens dependentes dos contratos
+        await supabase.from('transacoes').delete().in('loan_id', ids);
+        await supabase.from('parcelas').delete().in('loan_id', ids);
+        await supabase.from('sinalizacoes_pagamento').delete().in('loan_id', ids);
+        await supabase.from('acordos_inadimplencia').delete().in('loan_id', ids);
+        
+        // 3. Remove os contratos
+        await supabase.from('contratos').delete().in('id', ids);
+    }
+
+    // 4. Remove o cliente
     const { error } = await supabase.from('clientes').delete().eq('id', targetId).eq('profile_id', ownerId);
     if (error) throw error;
-    return 'Cliente removido.';
+    return 'Cliente removido com sucesso.';
   }
 
   if (type === 'DELETE_SOURCE') {

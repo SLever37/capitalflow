@@ -24,6 +24,7 @@ import { SetupPasswordPage } from './pages/SetupPasswordPage';
 import { notificationService } from './services/notification.service';
 import { MasterScreen } from './features/master/MasterScreen';
 import { LoadingScreen } from './components/ui/LoadingScreen';
+import { PersonalFinancesPage } from './pages/PersonalFinancesPage';
 
 export const App: React.FC = () => {
   // Hooks de Infraestrutura
@@ -217,6 +218,11 @@ export const App: React.FC = () => {
                   ui={ui} loanCtrl={loanCtrl} fileCtrl={fileCtrl}
                   showToast={showToast} onRefresh={() => fetchFullData(activeUser?.id || '')}
                 />
+              )}
+
+              {/* ROTA MINHAS FINANÇAS */}
+              {activeTab === 'PERSONAL_FINANCE' && activeUser && (
+                  <PersonalFinancesPage activeUser={activeUser} />
               )}
 
               <ModalHostContainer

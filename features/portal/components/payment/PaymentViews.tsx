@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { CheckCircle2, Copy, Loader2, QrCode, AlertTriangle, Wallet, CreditCard, MessageSquare, Clock, Calendar } from 'lucide-react';
+import { CheckCircle2, Copy, Loader2, QrCode, AlertTriangle, Wallet, CreditCard, MessageSquare, Clock, Calendar, Zap, CreditCard as CardIcon } from 'lucide-react';
 import { formatMoney } from '../../../../utils/formatters';
 import { getPortalDueLabel } from '../../mappers/portalDebtRules';
 
@@ -14,11 +14,12 @@ interface BillingViewProps {
     pixKey: string;
     onCopyPix: () => void;
     onNotify: () => void;
+    onGeneratePixMP: () => void; // Novo Callback
     error: string | null;
 }
 
 export const BillingView: React.FC<BillingViewProps> = ({
-    totalToPay, interestOnlyWithFees, dueDateISO, daysLateRaw, pixKey, onCopyPix, onNotify, error
+    totalToPay, interestOnlyWithFees, dueDateISO, daysLateRaw, pixKey, onCopyPix, onNotify, onGeneratePixMP, error
 }) => {
     // Usa o helper centralizado para determinar a mensagem
     const { label, variant, detail } = getPortalDueLabel(daysLateRaw, dueDateISO);
@@ -64,12 +65,37 @@ export const BillingView: React.FC<BillingViewProps> = ({
                 )}
             </div>
 
+            {/* BOTÕES DE AÇÃO RÁPIDA (Mercado Pago e Cartão) */}
+            <div className="grid grid-cols-1 gap-3">
+                 <button 
+                    onClick={onGeneratePixMP}
+                    className="w-full bg-blue-600 hover:bg-blue-500 text-white p-4 rounded-2xl font-black uppercase text-xs shadow-lg shadow-blue-900/20 transition-all active:scale-95 flex items-center justify-center gap-2 group"
+                 >
+                    <div className="p-1 bg-white/20 rounded-full group-hover:scale-110 transition-transform"><Zap size={14}/></div>
+                    Pagar com PIX (Automático)
+                 </button>
+
+                 <button 
+                    disabled={true}
+                    className="w-full bg-slate-800 text-slate-500 p-4 rounded-2xl font-black uppercase text-xs border border-slate-700 cursor-not-allowed flex items-center justify-center gap-2 opacity-60"
+                 >
+                    <div className="p-1 bg-slate-700 rounded-full"><CardIcon size={14}/></div>
+                    Cartão de Crédito (Em breve)
+                 </button>
+            </div>
+
+            <div className="flex items-center gap-4 text-xs text-slate-500 font-bold uppercase tracking-widest my-2">
+                <div className="h-px bg-slate-800 flex-1"></div>
+                ou Pagamento Manual
+                <div className="h-px bg-slate-800 flex-1"></div>
+            </div>
+
             <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800">
                 <div className="flex items-center justify-between mb-3">
                     <p className="text-[10px] text-emerald-500 font-black uppercase tracking-widest flex items-center gap-1">
-                        <QrCode size={12} /> PIX Convencional
+                        <QrCode size={12} /> PIX (Chave do Gestor)
                     </p>
-                    <span className="text-[9px] text-slate-500 font-bold">Copie a chave abaixo</span>
+                    <span className="text-[9px] text-slate-500 font-bold">Transferência Direta</span>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -83,24 +109,18 @@ export const BillingView: React.FC<BillingViewProps> = ({
                     <button
                         onClick={onCopyPix}
                         disabled={!pixKey}
-                        className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-500 transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                        className="p-3 bg-slate-800 text-white rounded-xl hover:bg-slate-700 transition-all shadow-lg active:scale-95 disabled:opacity-50"
                         title="Copiar Chave"
                     >
                         <Copy size={18} />
                     </button>
                 </div>
-
-                <p className="text-[10px] text-slate-500 mt-3 leading-relaxed text-center">
-                    Utilize o aplicativo do seu banco para transferir o valor exato para a chave acima.
-                </p>
-            </div>
-
-            <div className="space-y-3">
+                
                 <button
                     onClick={onNotify}
-                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white p-4 rounded-2xl font-black uppercase text-xs shadow-lg shadow-emerald-900/20 transition-all active:scale-95 flex items-center justify-center gap-2"
+                    className="w-full mt-4 bg-emerald-600/10 border border-emerald-500/20 text-emerald-500 hover:bg-emerald-600 hover:text-white p-3 rounded-xl font-bold uppercase text-[10px] transition-all active:scale-95 flex items-center justify-center gap-2"
                 >
-                    <CheckCircle2 size={16} /> Informar Pagamento Realizado
+                    <CheckCircle2 size={14} /> Já fiz o PIX Manual (Enviar Comprovante)
                 </button>
             </div>
 

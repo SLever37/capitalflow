@@ -1,126 +1,32 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   ShieldCheck,
   RefreshCw,
-  MessageCircle,
-  AlertTriangle,
   BellRing,
+  RefreshCw as LoadIcon,
   FileSignature,
   X,
   Lock,
-  Gavel,
-  ChevronRight,
-  Wallet,
-  Calendar,
-  LogOut,
-  Building,
-  CheckCircle2
+  Gavel
 } from 'lucide-react';
 
 import { useClientPortalLogic } from '../../features/portal/hooks/useClientPortalLogic';
 import { usePortalClientNotifications } from '../../features/portal/hooks/usePortalClientNotifications';
 import { PortalPaymentModal } from '../../features/portal/components/PortalPaymentModal';
 import { PortalChatDrawer } from '../../features/portal/components/PortalChatDrawer';
-import { resolveDebtSummary, resolveInstallmentDebt, getPortalDueLabel } from '../../features/portal/mappers/portalDebtRules';
-import { PortalInstallmentItem } from './components/PortalInstallmentItem';
-import { formatMoney } from '../../utils/formatters';
+import { resolveDebtSummary } from '../../features/portal/mappers/portalDebtRules';
 
-// Define the missing props interface
+// Novos Componentes Modulares
+import { PortalHeader } from './components/PortalHeader';
+import { PortalSummaryCard } from './components/PortalSummaryCard';
+import { PortalActions } from './components/PortalActions';
+import { PortalContractItem } from './components/PortalContractItem';
+import { PortalCreditorInfo } from './components/PortalCreditorInfo';
+
 interface ClientPortalViewProps {
   initialPortalToken: string;
 }
-
-interface ContractBlockProps {
-    loan: any;
-    onPay: () => void;
-    onChat: () => void;
-}
-
-// Componente Interno: Bloco de Contrato Individual
-const ContractBlock: React.FC<ContractBlockProps> = ({ loan, onPay, onChat }) => {
-    const summary = useMemo(() => resolveDebtSummary(loan, loan.installments), [loan]);
-    const { hasLateInstallments, totalDue, pendingCount, nextDueDate } = summary;
-
-    // Pega o status da próxima parcela ou da mais atrasada
-    const nextInst = loan.installments.find((i: any) => i.status !== 'PAID');
-    const statusInfo = nextInst ? getPortalDueLabel(resolveInstallmentDebt(loan, nextInst).daysLate, nextInst.dueDate) : { label: 'Quitado', variant: 'OK' };
-
-    const isPaidOff = pendingCount === 0;
-
-    return (
-        <div className={`border rounded-2xl p-4 transition-all ${hasLateInstallments ? 'bg-rose-950/10 border-rose-500/30' : isPaidOff ? 'bg-emerald-950/10 border-emerald-500/20' : 'bg-slate-900 border-slate-800'}`}>
-            <div className="flex justify-between items-start mb-3">
-                <div>
-                    <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Contrato</span>
-                        <span className="text-[10px] font-mono text-slate-600">#{loan.id.substring(0,6).toUpperCase()}</span>
-                    </div>
-                    <h4 className="text-white font-bold text-sm mt-0.5">{loan.billingCycle === 'DAILY_FREE' ? 'Modalidade Diária' : 'Crédito Mensal'}</h4>
-                </div>
-                <div className={`px-2 py-1 rounded text-[9px] font-black uppercase border ${
-                    statusInfo.variant === 'OVERDUE' ? 'bg-rose-500 text-white border-rose-600' :
-                    statusInfo.variant === 'DUE_TODAY' ? 'bg-amber-500 text-black border-amber-600' :
-                    isPaidOff ? 'bg-emerald-500 text-white border-emerald-600' :
-                    'bg-slate-800 text-slate-400 border-slate-700'
-                }`}>
-                    {isPaidOff ? 'Finalizado' : statusInfo.label}
-                </div>
-            </div>
-
-            {/* Conteúdo Principal do Card */}
-            {!isPaidOff && (
-                <div className="flex justify-between items-end mb-4">
-                    <div>
-                        <p className="text-[10px] text-slate-500 uppercase font-bold">Total Aberto</p>
-                        <p className={`text-xl font-black ${hasLateInstallments ? 'text-rose-400' : 'text-white'}`}>
-                            {formatMoney(totalDue)}
-                        </p>
-                    </div>
-                    {nextDueDate && (
-                        <div className="text-right">
-                            <p className="text-[9px] text-slate-500 uppercase font-bold">Próx. Vencimento</p>
-                            <p className="text-xs text-white font-bold">{new Date(nextDueDate).toLocaleDateString('pt-BR')}</p>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* Lista de Parcelas (Apenas as próximas 2 para economizar espaço) */}
-            {!isPaidOff && (
-                <div className="space-y-2 mb-4 bg-slate-950/50 p-2 rounded-xl border border-slate-800/50">
-                    {loan.installments.filter((i:any) => i.status !== 'PAID').slice(0, 2).map((inst: any) => (
-                         <PortalInstallmentItem key={inst.id} loan={loan} installment={inst} />
-                    ))}
-                    {pendingCount > 2 && (
-                        <p className="text-[9px] text-center text-slate-500 italic py-1">...e mais {pendingCount - 2} parcelas</p>
-                    )}
-                </div>
-            )}
-
-            {/* Ações */}
-            <div className="grid grid-cols-2 gap-2 mt-2">
-                <button 
-                    onClick={onPay}
-                    disabled={isPaidOff}
-                    className={`py-2.5 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-2 transition-all ${
-                        isPaidOff ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 
-                        hasLateInstallments ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-900/20' : 
-                        'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/20'
-                    }`}
-                >
-                    <Wallet size={14}/> {isPaidOff ? 'Quitado' : 'Pagar Agora'}
-                </button>
-                <button 
-                    onClick={onChat}
-                    className="py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-2 transition-all"
-                >
-                    <MessageCircle size={14}/> Ajuda
-                </button>
-            </div>
-        </div>
-    );
-};
 
 export const ClientPortalView: React.FC<ClientPortalViewProps> = ({ initialPortalToken }) => {
   const {
@@ -205,21 +111,13 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({ initialPorta
 
       <div className="w-full max-w-lg bg-slate-900 sm:rounded-[2.5rem] flex flex-col h-full sm:h-[90vh] sm:border border-slate-800 shadow-2xl overflow-hidden relative">
         
-        {/* HEADER CLIENTE */}
-        <div className="bg-slate-950 border-b border-slate-800 p-5 flex items-center justify-between shrink-0 relative z-10">
-            <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white font-black text-sm shadow-lg border-2 border-slate-900">
-                    {loggedClient.name.charAt(0)}
-                </div>
-                <div>
-                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Portal do Cliente</p>
-                    <h3 className="text-white font-bold text-sm leading-none">{loggedClient.name.split(' ')[0]}</h3>
-                </div>
-            </div>
-            <button onClick={() => window.location.href = '/'} className="p-2 bg-slate-900 border border-slate-800 text-slate-400 rounded-xl hover:text-white transition-colors">
-                <LogOut size={18}/>
-            </button>
-        </div>
+        {/* Adicionado checagem loggedClient para segurança */}
+        {loggedClient && (
+            <PortalHeader 
+                loggedClient={loggedClient} 
+                handleLogout={() => window.location.href = '/'} 
+            />
+        )}
 
         {/* CONTEÚDO SCROLLÁVEL */}
         <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-6 relative">
@@ -227,42 +125,12 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({ initialPorta
             {/* Efeito Background Alerta */}
             {alertTheme && <div className="absolute top-0 right-0 w-full h-64 bg-rose-900/10 blur-[80px] pointer-events-none"></div>}
 
-            {/* RESUMO GLOBAL */}
-            <div className={`p-6 rounded-[2rem] border relative overflow-hidden transition-all ${alertTheme ? 'bg-gradient-to-br from-rose-950 to-slate-900 border-rose-500/30' : 'bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700'}`}>
-                 <div className="relative z-10">
-                     <p className={`text-[10px] font-black uppercase mb-1 flex items-center gap-1 ${alertTheme ? 'text-rose-300' : 'text-slate-400'}`}>
-                        {alertTheme ? <AlertTriangle size={12}/> : <ShieldCheck size={12}/>} Total Consolidado
-                     </p>
-                     <p className="text-3xl font-black text-white tracking-tight">{formatMoney(globalSummary.total)}</p>
-                     
-                     <div className="mt-4 flex gap-2">
-                        {globalSummary.lateCount > 0 ? (
-                            <span className="text-[9px] font-black uppercase bg-rose-500 text-white px-2 py-1 rounded-lg animate-pulse">
-                                {globalSummary.lateCount} Contratos em Atraso
-                            </span>
-                        ) : (
-                            <span className="text-[9px] font-black uppercase bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded-lg flex items-center gap-1">
-                                <CheckCircle2 size={10}/> Situação Regular
-                            </span>
-                        )}
-                        <span className="text-[9px] font-black uppercase bg-slate-950/50 text-slate-400 px-2 py-1 rounded-lg">
-                            {clientContracts.length} Contratos
-                        </span>
-                     </div>
-                 </div>
-            </div>
+            <PortalSummaryCard 
+                summary={globalSummary} 
+                contractCount={clientContracts.length} 
+            />
 
-            {/* AÇÕES GERAIS */}
-            <button onClick={() => setIsLegalOpen(true)} className="w-full bg-slate-800 border border-slate-700 p-4 rounded-2xl flex items-center justify-between group hover:bg-slate-700 transition-all">
-                <div className="flex items-center gap-3">
-                    <div className="p-2 bg-indigo-500/10 text-indigo-400 rounded-xl group-hover:bg-indigo-500 group-hover:text-white transition-all"><FileSignature size={18}/></div>
-                    <div className="text-left">
-                        <p className="text-xs font-bold text-white uppercase">Meus Documentos</p>
-                        <p className="text-[10px] text-slate-500">Visualizar contratos e termos</p>
-                    </div>
-                </div>
-                <ChevronRight size={16} className="text-slate-500"/>
-            </button>
+            <PortalActions onOpenLegal={() => setIsLegalOpen(true)} />
 
             {/* LISTA DE CONTRATOS */}
             <div className="space-y-4">
@@ -273,7 +141,7 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({ initialPorta
                     </div>
                 ) : (
                     clientContracts.map(contract => (
-                        <ContractBlock 
+                        <PortalContractItem 
                             key={contract.id} 
                             loan={contract}
                             onPay={() => setActiveLoanForPayment(contract)}
@@ -283,32 +151,28 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({ initialPorta
                 )}
             </div>
             
-            {/* CREDOR INFO (Geral, pega do primeiro contrato ativo) */}
             {clientContracts.length > 0 && (
-                <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800/50 flex items-center gap-3 opacity-60">
-                    <div className="p-2 bg-slate-800 rounded-xl text-slate-400"><Building size={16}/></div>
-                    <div className="overflow-hidden flex-1">
-                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-0.5">Credor Responsável</p>
-                        <p className="text-[10px] text-white font-bold truncate">{(clientContracts[0] as any).creditorName || 'Empresa'}</p>
-                    </div>
-                </div>
+                <PortalCreditorInfo 
+                    creditorName={(clientContracts[0] as any).creditorName || 'Empresa'} 
+                />
             )}
         </div>
       </div>
 
-      {/* MODAL PAGAMENTO (Contextualizado) */}
-      {activeLoanForPayment && (
+      {/* MODAL PAGAMENTO */}
+      {activeLoanForPayment && loggedClient && (
           <PortalPaymentModal 
               loan={activeLoanForPayment} 
               installment={activeLoanForPayment.installments.find((i:any) => i.status!=='PAID') || activeLoanForPayment.installments[0]} 
-              clientData={{ name: loggedClient.name, doc: loggedClient.document, id: loggedClient.id }} 
+              clientData={{ name: loggedClient.name, doc: loggedClient.document, id: loggedClient.id, email: loggedClient.email }} 
               onClose={() => { setActiveLoanForPayment(null); loadFullPortalData(); }} 
           />
       )}
 
-      {/* DRAWER CHAT (Contextualizado) */}
+      {/* DRAWER CHAT */}
       <PortalChatDrawer 
           loan={activeLoanForChat} 
+          client={loggedClient}
           isOpen={!!activeLoanForChat} 
           onClose={() => setActiveLoanForChat(null)} 
       />
@@ -321,13 +185,13 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({ initialPorta
             <div className="flex flex-col items-center text-center py-6">
                 <Lock size={40} className="text-indigo-500 mb-4"/>
                 <h2 className="text-white font-black uppercase text-lg mb-2">Central Jurídica</h2>
-                <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 w-full mb-6">
+                <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 w-full mb-6">
                     <Gavel className="mx-auto text-indigo-400 mb-2" size={24}/>
                     <h4 className="text-white font-bold text-sm uppercase">Assinatura Pendente</h4>
                     <p className="text-[10px] text-slate-500 mt-1">Seus contratos estão disponíveis para regularização.</p>
                 </div>
                 <button onClick={() => handleSignDocument('CONFISSAO')} disabled={isSigning} className="w-full p-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black uppercase text-xs flex justify-center gap-2 items-center">
-                    {isSigning ? <RefreshCw className="animate-spin" size={16}/> : <><FileSignature size={16}/> Assinar Digitalmente</>}
+                    {isSigning ? <LoadIcon className="animate-spin" size={16}/> : <><FileSignature size={16}/> Assinar Digitalmente</>}
                 </button>
             </div>
           </div>

@@ -5,11 +5,12 @@ import { ChatContainer } from '../../support/ChatContainer';
 
 interface PortalChatDrawerProps {
     loan: any;
+    client: any; // Adicionado prop client
     isOpen: boolean;
     onClose: () => void;
 }
 
-export const PortalChatDrawer: React.FC<PortalChatDrawerProps> = ({ loan, isOpen, onClose }) => {
+export const PortalChatDrawer: React.FC<PortalChatDrawerProps> = ({ loan, client, isOpen, onClose }) => {
     if (!isOpen) return null;
 
     return (
@@ -36,8 +37,11 @@ export const PortalChatDrawer: React.FC<PortalChatDrawerProps> = ({ loan, isOpen
                 <div className="flex-1 overflow-hidden">
                     <ChatContainer 
                         loanId={loan.id} 
-                        profileId={loan.profile_id} 
+                        // CORREÇÃO CRÍTICA: O profileId deve ser o do CLIENTE logado, não o do contrato (operador)
+                        profileId={client?.id} 
+                        operatorId={loan.profile_id}
                         senderType="CLIENT"
+                        clientName={client?.name || 'Cliente'}
                         placeholder="Digite sua dúvida ou envie um comprovante..."
                     />
                 </div>

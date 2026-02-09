@@ -19,6 +19,15 @@ export const ClientsContainer: React.FC<ClientsContainerProps> = ({
 }) => {
   const filteredClients = useMemo(() => filterClients(clients, clientSearchTerm), [clients, clientSearchTerm]);
 
+  const handleDeleteClient = (id: string) => {
+      loanCtrl.openConfirmation({
+          type: 'DELETE_CLIENT',
+          target: id,
+          title: 'Excluir Cliente?',
+          message: 'Isso excluirá o cliente e todos os seus contratos e histórico financeiro permanentemente.'
+      });
+  };
+
   return (
     <ClientsPage 
         filteredClients={filteredClients} clientSearchTerm={clientSearchTerm} setClientSearchTerm={setClientSearchTerm}
@@ -28,6 +37,7 @@ export const ClientsContainer: React.FC<ClientsContainerProps> = ({
         selectedClientsToDelete={ui.selectedClientsToDelete}
         toggleClientSelection={clientCtrl.toggleClientSelection}
         executeBulkDelete={clientCtrl.executeBulkDelete}
+        onDeleteClient={handleDeleteClient}
     />
   );
 };
