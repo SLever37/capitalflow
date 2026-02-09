@@ -98,11 +98,33 @@ export const useLoanController = (
             await ledgerService.reverseTransaction(ui.confirmation.target as LedgerEntry, activeUser, ui.confirmation.extraData);
             showToast("Transação estornada com sucesso!", "success");
         } else {
-            let targetId = typeof ui.confirmation.target === 'string' ? ui.confirmation.target : ui.confirmation.target.id;
-            const msg = await ledgerService.executeLedgerAction({ type: ui.confirmation.type, targetId, loan: typeof ui.confirmation.target === 'string' ? undefined : ui.confirmation.target, activeUser, sources, refundChecked: ui.confirmation.showRefundOption ? ui.refundChecked : false });
+            // GUARDS: Evita erro de UUID undefined se o objeto target vier incompleto ou for um Evento
+            const target = ui.confirmation.target;
+            if (!target) throw new Error("Alvo da ação não definido.");
+            
+            const targetId = typeof target === 'string' ? target : target.id;
+            
+            if (!targetId || targetId === 'undefined' || typeof targetId !== 'string') {
+                throw new Error("ID inválido para execução. Tente recarregar a página.");
+            }
+
+            const msg = await ledgerService.executeLedgerAction({ 
+                type: ui.confirmation.type, 
+                targetId, 
+                loan: typeof target === 'string' ? undefined : target, 
+                activeUser, 
+                sources, 
+                refundChecked: ui.confirmation.showRefundOption ? ui.refundChecked : false 
+            });
             showToast(msg);
         }
-    } catch (err: any) { if(!ui.confirmation.type.includes('DELETE_CLIENT')) showToast("Erro ao executar ação: " + err.message, "error"); } finally { ui.closeModal(); ui.setSelectedLoanId(null); await fetchFullData(activeUser.id); }
+    } catch (err: any) { 
+        if(!ui.confirmation.type.includes('DELETE_CLIENT')) showToast("Erro ao executar ação: " + err.message, "error"); 
+    } finally { 
+        ui.closeModal(); 
+        ui.setSelectedLoanId(null); 
+        await fetchFullData(activeUser.id); 
+    }
   };
 
   const openReverseTransaction = (t: LedgerEntry, loan: Loan) => {

@@ -1,15 +1,17 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { BarChart3, Banknote, CheckCircle2, Briefcase, PieChart as PieIcon, TrendingUp, Users, Calendar, Percent } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, LineChart, Line, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
 import { Loan, CapitalSource, LedgerEntry, Agreement, AgreementInstallment, SortOption, UserProfile } from '../types';
 import { LoanCard } from '../components/cards/LoanCard';
+import { ClientGroupCard } from '../components/cards/ClientGroupCard';
 import { StatCard } from '../components/StatCard';
 import { ProfitCard } from '../components/cards/ProfitCard';
 import { DashboardAlerts } from '../features/dashboard/DashboardAlerts';
 import { DashboardControls } from '../components/dashboard/DashboardControls';
 import { AIBalanceInsight } from '../features/dashboard/AIBalanceInsight';
 import { formatMoney } from '../utils/formatters';
+import { groupLoansByClient } from '../domain/dashboard/loanGrouping';
 
 interface DashboardPageProps {
   loans: Loan[];
@@ -62,6 +64,18 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   onViewDoc, onReviewSignal, onOpenComprovante, onReverseTransaction, setWithdrawModal, showToast, 
   isStealthMode, onRenegotiate, onNewAporte, onAgreementPayment, onRefresh
 }) => {
+  
+  // Agrupa os empréstimos filtrados por cliente, respeitando a ordenação selecionada
+  const groupedLoans = useMemo(() => groupLoansByClient(filteredLoans, sortOption), [filteredLoans, sortOption]);
+
+  // Objeto com todas as props necessárias para o LoanCard (para passar via drill-down)
+  const loanCardProps = {
+      sources, activeUser, selectedLoanId, setSelectedLoanId, onEdit, onMessage, onArchive,
+      onRestore, onDelete, onNote, onPayment, onPortalLink, onUploadPromissoria, onUploadDoc,
+      onViewPromissoria, onViewDoc, onReviewSignal, onOpenComprovante, onReverseTransaction,
+      onRenegotiate, onNewAporte, onAgreementPayment, onRefresh, isStealthMode
+  };
+
   return (
     <div className="flex flex-col gap-6">
       <div className="md:hidden bg-slate-900 p-1 rounded-2xl border border-slate-800 flex relative">
@@ -83,40 +97,20 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 onStaffChange={onStaffChange}
               />
 
-              {/* Lista de Contratos: Renderização Condicional */}
-              {filteredLoans.length > 0 ? (
+              {/* Lista de Contratos: Renderização Agrupada */}
+              {groupedLoans.length > 0 ? (
                   <div className="columns-1 md:columns-2 xl:columns-3 gap-4">
-                      {filteredLoans.map(loan => (
-                        <div key={loan.id} className="break-inside-avoid mb-4">
-                            <LoanCard 
-                                loan={loan} 
-                                sources={sources} 
-                                activeUser={activeUser} 
-                                isExpanded={selectedLoanId === loan.id} 
-                                onToggleExpand={() => setSelectedLoanId(selectedLoanId === loan.id ? null : loan.id)} 
-                                onEdit={(e) => { e.stopPropagation(); onEdit(loan); }} 
-                                onMessage={(e) => { e.stopPropagation(); onMessage(loan); }} 
-                                onArchive={(e) => { e.stopPropagation(); onArchive(loan); }} 
-                                onRestore={(e) => { e.stopPropagation(); onRestore(loan); }} 
-                                onDelete={(e) => { e.stopPropagation(); onDelete(loan); }} 
-                                onNote={(e) => { e.stopPropagation(); onNote(loan); }} 
-                                onPayment={(l, i, c) => onPayment(l, i, c)} 
-                                onPortalLink={(e) => { e.stopPropagation(); onPortalLink(loan); }} 
-                                onUploadPromissoria={(e) => { e.stopPropagation(); onUploadPromissoria(loan); }} 
-                                onUploadDoc={(e) => { e.stopPropagation(); onUploadDoc(loan); }} 
-                                onViewPromissoria={(e, url) => { e.stopPropagation(); onViewPromissoria(url); }} 
-                                onViewDoc={(e, url) => { e.stopPropagation(); onViewDoc(url); }} 
-                                onReviewSignal={onReviewSignal} 
-                                onOpenComprovante={onOpenComprovante} 
-                                onReverseTransaction={onReverseTransaction} 
-                                onRenegotiate={onRenegotiate} 
-                                onNewAporte={onNewAporte} 
-                                onAgreementPayment={onAgreementPayment} 
-                                onRefresh={onRefresh} 
-                                isStealthMode={isStealthMode} 
-                            />
-                        </div>
-                      ))}
+                      {groupedLoans.map(group => {
+                          return (
+                              <div key={group.clientId || group.clientName} className="break-inside-avoid mb-4">
+                                  <ClientGroupCard 
+                                      group={group}
+                                      passThroughProps={loanCardProps}
+                                      isStealthMode={isStealthMode}
+                                  />
+                              </div>
+                          );
+                      })}
                   </div>
               ) : (
                   // Empty State Otimizado

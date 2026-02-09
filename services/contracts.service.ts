@@ -40,34 +40,52 @@ export const contractsService = {
 
     let finalClientId = safeUUID(loan.clientId);
 
-    // --- AUTO-CRIAÇÃO CLIENTE (Simplificada) ---
-    // A lógica pesada de validação de duplicidade deve estar no Controller/Hook
+    // --- LÓGICA DE CLIENTE (Criação ou Busca Inteligente) ---
     if (!finalClientId && loan.debtorName) {
-      if (loan.debtorDocument) {
-        const { data: existing } = await supabase
+      const cleanName = loan.debtorName.trim();
+      const cleanDoc = loan.debtorDocument?.replace(/\D/g, '');
+
+      // 1. Tenta encontrar cliente existente pelo Documento (se houver)
+      if (cleanDoc && cleanDoc.length >= 11) {
+        const { data: existingByDoc } = await supabase
           .from('clientes')
           .select('id')
           .eq('profile_id', ownerId)
-          .eq('document', loan.debtorDocument)
+          .eq('document', loan.debtorDocument) // Busca pelo formato salvo
           .maybeSingle();
-        if (existing) finalClientId = existing.id;
+        
+        if (existingByDoc) finalClientId = existingByDoc.id;
       }
 
+      // 2. Se não achou por Doc, tenta encontrar pelo Nome (Case Insensitive)
+      if (!finalClientId) {
+         const { data: existingByName } = await supabase
+          .from('clientes')
+          .select('id')
+          .eq('profile_id', ownerId)
+          .ilike('name', cleanName)
+          .maybeSingle();
+          
+         if (existingByName) finalClientId = existingByName.id;
+      }
+
+      // 3. Se realmente não existe, CRIA UM NOVO CLIENTE
       if (!finalClientId) {
         const newId = generateUUID();
-        const { error } = await supabase.from('clientes').insert({
+        const { error: createError } = await supabase.from('clientes').insert({
           id: newId,
           profile_id: ownerId,
-          name: loan.debtorName,
+          name: cleanName,
           phone: loan.debtorPhone || null,
           document: loan.debtorDocument || null,
           address: loan.debtorAddress || null,
           access_code: String(Math.floor(Math.random() * 10000)).padStart(4, '0'),
           client_number: String(Math.floor(100000 + Math.random() * 900000)),
-          notes: 'Criado automaticamente via Novo Contrato',
+          notes: 'Gerado automaticamente ao criar contrato',
           created_at: new Date().toISOString()
         });
-        if (error) throw new Error("Erro ao criar cliente: " + error.message);
+
+        if (createError) throw new Error("Erro ao criar ficha do cliente: " + createError.message);
         finalClientId = newId;
       }
     }
@@ -80,9 +98,9 @@ export const contractsService = {
       id: loanId,
       profile_id: ownerId,
       operador_responsavel_id: activeUser.accessLevel === 1 ? null : safeUUID(activeUser.id),
-      client_id: finalClientId,
+      client_id: finalClientId, // Aqui garantimos o vínculo
       source_id: safeUUID(loan.sourceId),
-      debtor_name: loan.debtorName,
+      debtor_name: loan.debtorName, // Mantemos redundância para performance
       debtor_phone: loan.debtorPhone,
       debtor_document: loan.debtorDocument,
       debtor_address: loan.debtorAddress,
