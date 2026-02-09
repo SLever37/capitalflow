@@ -3,18 +3,24 @@ import { supabase } from '../lib/supabase';
 
 export const portalService = {
   /**
-   * Busca um contrato específico pelo TOKEN PÚBLICO.
-   * Usado na entrada do portal.
+   * Busca um contrato específico pelo TOKEN PÚBLICO com tratamento de erro resiliente.
    */
   async fetchLoanByToken(token: string) {
+    if (!token) throw new Error('Token não fornecido.');
+
     const { data: loan, error } = await supabase
       .from('contratos')
       .select('*, clients:client_id(*), parcelas(*), sinalizacoes_pagamento(*)')
       .eq('portal_token', token)
-      .single();
+      .maybeSingle();
 
-    if (error || !loan) {
-      throw new Error('Contrato não encontrado ou link inválido.');
+    if (error) {
+      console.error("Erro técnico ao buscar contrato:", error);
+      throw new Error('Erro de conexão com o servidor de dados.');
+    }
+
+    if (!loan) {
+      throw new Error('Contrato não localizado. O link pode ter expirado ou ser inválido.');
     }
 
     return loan;
@@ -28,7 +34,7 @@ export const portalService = {
         .from('clientes')
         .select('id, name, document, phone')
         .eq('id', clientId)
-        .single();
+        .maybeSingle();
     
     if (error) return null;
     return data;
@@ -42,12 +48,12 @@ export const portalService = {
       .from('contratos')
       .select('id, created_at, portal_token, client_id, start_date, principal, total_to_receive')
       .eq('client_id', clientId)
-      .neq('is_archived', true) // Opcional: Não mostrar arquivados no portal
+      .neq('is_archived', true)
       .order('created_at', { ascending: false });
 
     if (error) {
-        console.error("Erro Supabase fetchClientContracts:", error);
-        throw new Error('Falha ao listar contratos.');
+        console.error("Erro ao listar contratos do cliente:", error);
+        return [];
     }
     return data || [];
   },
@@ -60,7 +66,7 @@ export const portalService = {
       .from('parcelas')
       .select('*')
       .eq('loan_id', loanId)
-      .order('numero_parcela', { ascending: true });
+      .order('data_vencimento', { ascending: true });
 
     if (instErr) throw new Error('Erro ao carregar parcelas.');
 
@@ -81,32 +87,21 @@ export const portalService = {
    * Registra intenção de pagamento
    */
   async submitPaymentIntent(clientId: string, loanId: string, profileId: string, tipo: string) {
-    try {
-      const { data, error } = await supabase.rpc('portal_submit_payment_intent', {
-        p_client_id: clientId,
-        p_loan_id: loanId,
-        p_profile_id: profileId,
-        p_tipo: tipo,
-      });
-      if (error) throw error;
-      return data;
-    } catch {
-      const { data, error } = await supabase
-        .from('sinalizacoes_pagamento')
-        .insert({
-          client_id: clientId,
-          loan_id: loanId,
-          profile_id: profileId,
-          tipo_intencao: tipo,
-          status: 'PENDENTE',
-          created_at: new Date().toISOString(),
-        })
-        .select('id')
-        .single();
+    const { data, error } = await supabase
+      .from('sinalizacoes_pagamento')
+      .insert({
+        client_id: clientId,
+        loan_id: loanId,
+        profile_id: profileId,
+        tipo_intencao: tipo,
+        status: 'PENDENTE',
+        created_at: new Date().toISOString(),
+      })
+      .select('id')
+      .single();
 
-      if (error) throw new Error('Falha ao registrar intenção.');
-      return data?.id;
-    }
+    if (error) throw new Error('Falha ao registrar intenção de pagamento.');
+    return data?.id;
   },
 
   /**

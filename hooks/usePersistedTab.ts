@@ -19,18 +19,23 @@ export const usePersistedTab = (
       setActiveTab(lastTab);
     }
 
-    // Inicializa o estado do histórico para evitar fechar o browser no primeiro "voltar"
+    // Inicializa o estado do histórico preservando query params
     if (!window.history.state) {
-      window.history.replaceState({ tab: activeTab }, '', `#${activeTab}`);
+      const currentQuery = window.location.search;
+      window.history.replaceState({ tab: activeTab }, '', `${currentQuery}#${activeTab}`);
     }
   }, []);
 
   useEffect(() => {
     if (activeTab) {
       localStorage.setItem('cm_last_tab', activeTab);
-      // Sincroniza o hash da URL sem disparar um novo evento de popstate
-      if (window.location.hash !== `#${activeTab}`) {
-        window.history.pushState({ tab: activeTab }, '', `#${activeTab}`);
+      
+      const currentHash = window.location.hash;
+      const currentSearch = window.location.search;
+      
+      // Sincroniza o hash da URL preservando os parâmetros de busca (?portal=...)
+      if (currentHash !== `#${activeTab}`) {
+        window.history.pushState({ tab: activeTab }, '', `${currentSearch}#${activeTab}`);
       }
     }
   }, [activeTab]);

@@ -5,16 +5,27 @@ export const usePortalRouting = () => {
   const [portalToken, setPortalToken] = useState<string | null>(null);
   const [legalSignToken, setLegalSignToken] = useState<string | null>(null);
 
-  useEffect(() => {
+  const updateTokensFromUrl = () => {
+    // Usamos URLSearchParams no search (antes do hash)
     const params = new URLSearchParams(window.location.search);
     
-    // Acesso ao Portal Financeiro (Token UUID)
-    const token = params.get('portal');
-    if (token) setPortalToken(token);
+    const pToken = params.get('portal');
+    const lToken = params.get('legal_sign');
 
-    // Acesso à Assinatura Jurídica (Token UUID)
-    const legal = params.get('legal_sign');
-    if (legal) setLegalSignToken(legal);
+    if (pToken) setPortalToken(pToken);
+    else setPortalToken(null);
+
+    if (lToken) setLegalSignToken(lToken);
+    else setLegalSignToken(null);
+  };
+
+  useEffect(() => {
+    // Carregamento inicial
+    updateTokensFromUrl();
+
+    // Ouve mudanças no histórico para ser reativo
+    window.addEventListener('popstate', updateTokensFromUrl);
+    return () => window.removeEventListener('popstate', updateTokensFromUrl);
   }, []);
 
   return { portalToken, legalSignToken };
