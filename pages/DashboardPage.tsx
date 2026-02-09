@@ -68,7 +68,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   // Agrupa os empréstimos filtrados por cliente, respeitando a ordenação selecionada
   const groupedLoans = useMemo(() => groupLoansByClient(filteredLoans, sortOption), [filteredLoans, sortOption]);
 
-  // Objeto com todas as props necessárias para o LoanCard (para passar via drill-down)
+  // Objeto com todas as props necessárias para o LoanCard (para passar via drill-down no GroupCard)
   const loanCardProps = {
       sources, activeUser, selectedLoanId, setSelectedLoanId, onEdit, onMessage, onArchive,
       onRestore, onDelete, onNote, onPayment, onPortalLink, onUploadPromissoria, onUploadDoc,
@@ -97,10 +97,49 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 onStaffChange={onStaffChange}
               />
 
-              {/* Lista de Contratos: Renderização Agrupada */}
+              {/* Lista de Contratos: Renderização Agrupada ou Direta */}
               {groupedLoans.length > 0 ? (
                   <div className="columns-1 md:columns-2 xl:columns-3 gap-4">
                       {groupedLoans.map(group => {
+                          // UX IMPROVEMENT: Se o cliente tem apenas 1 contrato, mostra o Card direto sem agrupar
+                          if (group.loans.length === 1) {
+                              const loan = group.loans[0];
+                              return (
+                                  <div key={loan.id} className="break-inside-avoid mb-4">
+                                      <LoanCard 
+                                          loan={loan}
+                                          sources={sources}
+                                          activeUser={activeUser}
+                                          isStealthMode={isStealthMode}
+                                          isExpanded={selectedLoanId === loan.id}
+                                          onToggleExpand={(e) => { e?.stopPropagation(); setSelectedLoanId(selectedLoanId === loan.id ? null : loan.id); }}
+                                          
+                                          // Wrappers de Eventos para LoanCard direto
+                                          onEdit={(e) => { e?.stopPropagation(); onEdit(loan); }}
+                                          onMessage={(e) => { e?.stopPropagation(); onMessage(loan); }}
+                                          onNote={(e) => { e?.stopPropagation(); onNote(loan); }}
+                                          onArchive={(e) => { e?.stopPropagation(); onArchive(loan); }}
+                                          onRestore={(e) => { e?.stopPropagation(); onRestore(loan); }}
+                                          onDelete={(e) => { e?.stopPropagation(); onDelete(loan); }}
+                                          onPayment={onPayment}
+                                          onPortalLink={(e) => { e?.stopPropagation(); onPortalLink(loan); }}
+                                          onUploadPromissoria={(e) => { e?.stopPropagation(); onUploadPromissoria(loan); }}
+                                          onUploadDoc={(e) => { e?.stopPropagation(); onUploadDoc(loan); }}
+                                          onViewPromissoria={(e, url) => { e?.stopPropagation(); onViewPromissoria(url); }}
+                                          onViewDoc={(e, url) => { e?.stopPropagation(); onViewDoc(url); }}
+                                          onReviewSignal={onReviewSignal}
+                                          onOpenComprovante={onOpenComprovante}
+                                          onReverseTransaction={onReverseTransaction}
+                                          onRenegotiate={() => onRenegotiate(loan)}
+                                          onNewAporte={() => onNewAporte(loan)}
+                                          onAgreementPayment={onAgreementPayment}
+                                          onRefresh={onRefresh}
+                                      />
+                                  </div>
+                              );
+                          }
+
+                          // Se tem > 1 contrato, usa o Agrupador
                           return (
                               <div key={group.clientId || group.clientName} className="break-inside-avoid mb-4">
                                   <ClientGroupCard 

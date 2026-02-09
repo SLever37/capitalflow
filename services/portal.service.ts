@@ -9,7 +9,7 @@ export const portalService = {
   async fetchLoanByToken(token: string) {
     const { data: loan, error } = await supabase
       .from('contratos')
-      .select('*, clients:client_id(*)')
+      .select('*, clients:client_id(*), parcelas(*), sinalizacoes_pagamento(*)')
       .eq('portal_token', token)
       .single();
 
@@ -36,8 +36,6 @@ export const portalService = {
 
   /**
    * Lista contratos do cliente para dropdown/switcher.
-   * CORREÇÃO: Removido 'code' da query para evitar erros caso a coluna não exista.
-   * Adicionado log de erro para debug.
    */
   async fetchClientContracts(clientId: string) {
     const { data, error } = await supabase

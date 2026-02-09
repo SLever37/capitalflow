@@ -25,6 +25,7 @@ export const useClientPortalLogic = (initialToken: string) => {
 
     try {
       // 1. Validação de Acesso (Usa o token para achar o contrato "porta de entrada")
+      // Agora já traz parcelas e sinais, evitando round-trips falhos
       const entryLoan = await portalService.fetchLoanByToken(initialToken);
       const clientId = (entryLoan as any)?.client_id;
       
@@ -60,11 +61,19 @@ export const useClientPortalLogic = (initialToken: string) => {
       // 4. Hidratação Profunda (Carregar parcelas e detalhes para CADA contrato)
       const hydratedContracts: Loan[] = await Promise.all(
         rawContractsList.map(async (contractHeader: any) => {
+            // OTIMIZAÇÃO CRÍTICA: Se for o contrato de entrada, usamos os dados que já baixamos com o token.
+            // Isso evita erro de RLS ao tentar fazer "select * from contratos where id=..." sem token.
+            if (contractHeader.id === entryLoan.id) {
+                return mapLoanFromDB(
+                    entryLoan, 
+                    entryLoan.parcelas || [], 
+                    undefined, // acordos (se necessário, expandir query)
+                    entryLoan.sinalizacoes_pagamento || []
+                );
+            }
+
             try {
-                // Se for o contrato de entrada, já temos os dados? Não, fetchLoanByToken traz JOIN, mas fetchClientContracts não.
-                // Mas se caiu no catch acima, rawContractsList[0] é entryLoan (que tem parcelas via fetchLoanDetails?) Não, fetchLoanByToken é básico.
-                
-                // Vamos buscar fresh data para garantir
+                // Para OUTROS contratos do mesmo cliente (se RLS permitir)
                 const { data: fullLoanData, error } = await import('../../../lib/supabase').then(m => 
                     m.supabase.from('contratos')
                     .select('*, parcelas(*), sinalizacoes_pagamento(*)')
@@ -72,24 +81,16 @@ export const useClientPortalLogic = (initialToken: string) => {
                     .single()
                 );
                 
-                // Se falhar (ex: RLS bloqueia ID direto), mas é o contrato do token, usamos o entryLoan se ele tiver dados suficientes
-                if (error || !fullLoanData) {
-                    if (contractHeader.id === entryLoan.id) {
-                         // Fallback final: Buscar parcelas isoladamente se o select full falhar
-                         const details = await portalService.fetchLoanDetails(entryLoan.id);
-                         return mapLoanFromDB(entryLoan, details.installments, undefined, []);
-                    }
-                    return null;
-                }
+                if (error || !fullLoanData) return null;
 
                 return mapLoanFromDB(
                     fullLoanData, 
                     fullLoanData.parcelas, 
-                    undefined, // acordos (se necessário, expandir query)
+                    undefined, 
                     [] 
                 );
             } catch (innerErr) {
-                console.warn(`Erro ao hidratar contrato ${contractHeader.id}`, innerErr);
+                console.warn(`Erro ao hidratar contrato extra ${contractHeader.id}`, innerErr);
                 return null;
             }
         })

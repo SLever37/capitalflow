@@ -25,6 +25,11 @@ export const dailyFixedTermStrategy: ModalityStrategy = {
         dueDateLabel: (inst, loan) => {
             if (!loan) return "Fim do Prazo";
             
+            // VERIFICAÇÃO DE QUITAÇÃO:
+            // Se o saldo total (Principal + Juros) for zerado, interrompe a contagem de dias do prazo.
+            const totalDebt = loan.installments.reduce((acc, i) => acc + (Number(i.principalRemaining)||0) + (Number(i.interestRemaining)||0), 0);
+            if (totalDebt < 0.10) return "Prazo Finalizado";
+
             // Lógica específica para mostrar dia X de Y
             try {
                 const start = parseDateOnlyUTC(loan.startDate).getTime();
