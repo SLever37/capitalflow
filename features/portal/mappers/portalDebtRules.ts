@@ -41,22 +41,24 @@ export interface PaymentOptions {
 
 /**
  * HELPER DE LABEL DE VENCIMENTO (Regra Centralizada)
+ * Ajustado para usar cálculo cronológico direto (Igual ao LoanCard)
  */
-export const getPortalDueLabel = (daysLate: number, dueDateISO: string) => {
-    // 1. Atrasado real (multa aplicável ou passado)
-    if (daysLate > 0) {
+export const getPortalDueLabel = (daysLateInput: number, dueDateISO: string) => {
+    // Cálculo Cronológico Direto: (Hoje - Vencimento)
+    // Se positivo: Atrasado. Se zero: Hoje. Se negativo: Futuro.
+    const chronologicalDaysLate = getDaysDiff(dueDateISO);
+
+    // 1. Atrasado real
+    if (chronologicalDaysLate > 0) {
         return { 
-            label: `Vencido há ${daysLate} dia${daysLate === 1 ? '' : 's'}`, 
+            label: `Vencido há ${chronologicalDaysLate} dia${chronologicalDaysLate === 1 ? '' : 's'}`, 
             detail: '(+ Taxas e Multas inclusas)',
             variant: 'OVERDUE' 
         };
     }
 
-    // Calcula diferença real (negativo = futuro) para labels de "Vence em..."
-    const rawDiff = -getDaysDiff(dueDateISO); // getDaysDiff retorna (hoje - data). Invertemos para (data - hoje).
-
     // 2. Vence Hoje
-    if (rawDiff === 0) {
+    if (chronologicalDaysLate === 0) {
         return { 
             label: 'Vence hoje', 
             detail: '',
@@ -64,17 +66,13 @@ export const getPortalDueLabel = (daysLate: number, dueDateISO: string) => {
         };
     }
 
-    // 3. Futuro
-    if (rawDiff > 0) {
-        return { 
-            label: `Vence em ${rawDiff} dia${rawDiff === 1 ? '' : 's'}`, 
-            detail: '',
-            variant: 'DUE_SOON' 
-        };
-    }
-
-    // Fallback (passado mas sem daysLate > 0, ex: pago ou tolerância)
-    return { label: 'Em dia', detail: '', variant: 'OK' };
+    // 3. Futuro (chronologicalDaysLate é negativo)
+    const daysLeft = Math.abs(chronologicalDaysLate);
+    return { 
+        label: `Vence em ${daysLeft} dia${daysLeft === 1 ? '' : 's'}`, 
+        detail: '',
+        variant: 'DUE_SOON' 
+    };
 };
 
 /**
@@ -96,6 +94,7 @@ export const resolveDebtSummary = (loan: Loan, installments: Installment[]): Por
         const debt = calculateTotalDue(loanCalc, instCalc);
         totalDue += debt.total; // total já inclui multa/mora se houver atraso
         
+        // Usa o cálculo financeiro para detectar se há atraso "pagável"
         if (debt.daysLate > 0) {
             hasLate = true;
             if (debt.daysLate > maxDaysLate) maxDaysLate = debt.daysLate;
@@ -123,7 +122,7 @@ export const resolveInstallmentDebt = (loan: Loan, inst: Installment): Installme
     const instCalc = normalizeInstallmentForCalc(inst);
     const debt = calculateTotalDue(loanCalc, instCalc);
 
-    const isLate = debt.daysLate > 0;
+    // Usa a função corrigida para gerar o label
     const dueInfo = getPortalDueLabel(debt.daysLate, inst.dueDate);
 
     let statusLabel = dueInfo.label;
@@ -145,7 +144,7 @@ export const resolveInstallmentDebt = (loan: Loan, inst: Installment): Installme
         principal: debt.principal,
         interest: debt.interest,
         lateFee: debt.lateFee,
-        isLate,
+        isLate: debt.daysLate > 0,
         daysLate: debt.daysLate,
         dueDateISO: inst.dueDate,
         statusLabel,
