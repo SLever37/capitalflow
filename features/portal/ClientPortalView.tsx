@@ -304,7 +304,6 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
       {/* DRAWER CHAT (Contextualizado) */}
       <PortalChatDrawer 
           loan={activeLoanForChat} 
-          client={loggedClient}
           isOpen={!!activeLoanForChat} 
           onClose={() => setActiveLoanForChat(null)} 
       />
@@ -317,7 +316,7 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
             <div className="flex flex-col items-center text-center py-6">
                 <Lock size={40} className="text-indigo-500 mb-4"/>
                 <h2 className="text-white font-black uppercase text-lg mb-2">Central Jurídica</h2>
-                <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 w-full mb-6">
+                <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 w-full mb-6">
                     <Gavel className="mx-auto text-indigo-400 mb-2" size={24}/>
                     <h4 className="text-white font-bold text-sm uppercase">Assinatura Pendente</h4>
                     <p className="text-[10px] text-slate-500 mt-1">Seus contratos estão disponíveis para regularização.</p>

@@ -28,9 +28,7 @@ export const useLoanController = (
     try {
         await contractsService.saveLoan(loan, activeUser, sources, ui.editingLoan);
         showToast(ui.editingLoan ? 'Contrato Atualizado!' : 'Contrato Salvo!', 'success'); 
-        ui.closeModal(); 
-        ui.setEditingLoan(null); 
-        await fetchFullData(activeUser.id);
+        ui.closeModal(); ui.setEditingLoan(null); fetchFullData(activeUser.id);
     } catch (e: any) { showToast(e.message || "Erro desconhecido ao salvar", "error"); }
   };
 
@@ -40,13 +38,7 @@ export const useLoanController = (
           setLoans(loans.map(l => l.id === ui.noteModalLoan?.id ? { ...l, notes: ui.noteText } : l));
           showToast("Anotação salva (Demo)", "success"); ui.closeModal(); ui.setNoteText(''); return;
       }
-      try { 
-          await contractsService.saveNote(ui.noteModalLoan.id, ui.noteText); 
-          showToast("Anotação salva com sucesso!"); 
-          ui.closeModal(); 
-          ui.setNoteText(''); 
-          await fetchFullData(activeUser.id);
-      } catch (e) { showToast("Erro ao salvar anotação", "error"); }
+      try { await contractsService.saveNote(ui.noteModalLoan.id, ui.noteText); showToast("Anotação salva com sucesso!"); ui.closeModal(); ui.setNoteText(''); fetchFullData(activeUser.id); } catch (e) { showToast("Erro ao salvar anotação", "error"); }
   };
 
   const handleReviewSignal = async (signalId: string, nextStatus: 'APROVADO' | 'NEGADO') => {
@@ -131,8 +123,7 @@ export const useLoanController = (
     } finally { 
         ui.closeModal(); 
         ui.setSelectedLoanId(null); 
-        // Catch potential promise rejection here to avoid Uncaught (in promise)
-        fetchFullData(activeUser.id).catch(console.error); 
+        await fetchFullData(activeUser.id); 
     }
   };
 
