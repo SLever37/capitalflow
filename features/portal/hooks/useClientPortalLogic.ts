@@ -1,9 +1,8 @@
-
-import { useState, useEffect, useCallback, useMemo } from 'react';
+// src/features/portal/hooks/useClientPortalLogic.ts
+import { useState, useEffect, useCallback } from 'react';
 import { portalService } from '../../../services/portal.service';
 import { mapLoanFromDB } from '../../../services/adapters/loanAdapter';
 import { Loan } from '../../../types';
-import { resolveDebtSummary } from '../mappers/portalDebtRules';
 
 export const useClientPortalLogic = (initialToken: string) => {
   const [isLoading, setIsLoading] = useState(true);
@@ -13,26 +12,36 @@ export const useClientPortalLogic = (initialToken: string) => {
   const [loggedClient, setLoggedClient] = useState<any>(null);
   const [clientContracts, setClientContracts] = useState<Loan[]>([]);
 
+  // ✅ NOVO: Bundle com detalhes completos de TODOS os contratos do cliente
+  // Cada item = { loan, installments, signals }
+  const [contractsBundle, setContractsBundle] = useState<any[]>([]);
+
   // Estado Auxiliar
   const [isSigning, setIsSigning] = useState(false);
 
   // Carregamento Unificado
   const loadFullPortalData = useCallback(async () => {
-    if (!initialToken) return;
+    // Se o token for vazio, não tenta carregar para evitar erros de RLS
+    if (!initialToken || initialToken === 'null') {
+      setIsLoading(false);
+      setPortalError('Token de acesso não identificado.');
+      return;
+    }
 
     setIsLoading(true);
     setPortalError(null);
 
     try {
-      // 1. Validação de Acesso (Usa o token para achar o contrato "porta de entrada")
-      // Agora já traz parcelas e sinais, evitando round-trips falhos
+      // 1. Validação de Acesso (Usa o token público 'portal_token')
       const entryLoan = await portalService.fetchLoanByToken(initialToken);
+      if (!entryLoan) throw new Error('Contrato não localizado ou link inválido.');
+
       const clientId = (entryLoan as any)?.client_id;
-      
       if (!clientId) throw new Error('Contrato sem cliente associado.');
 
       // 2. Dados do Cliente
-      const clientData = (entryLoan as any)?.clients || await portalService.fetchClientById(clientId);
+      const clientData =
+        (entryLoan as any)?.clients || (await portalService.fetchClientById(clientId));
       if (!clientData?.id) throw new Error('Dados do cliente não encontrados.');
 
       setLoggedClient({
@@ -40,23 +49,44 @@ export const useClientPortalLogic = (initialToken: string) => {
         name: clientData.name,
         document: clientData.document || '',
         phone: clientData.phone,
-        email: clientData.email
+        email: clientData.email,
       });
 
-      // 3. SEGURANÇA E ISOLAMENTO:
-      // Carregamos EXCLUSIVAMENTE o contrato vinculado ao token.
-      // Removemos qualquer busca por outros contratos do cliente para evitar vazamento de dados.
-      const loanObject = mapLoanFromDB(
-          entryLoan, 
-          [clientData]
+      // 3. Lista de contratos do cliente (NÃO misturar com outro cliente)
+      // Deve buscar pelo client_id retornado do contrato validado pelo token.
+      const rawContracts = await portalService.fetchClientContracts(clientData.id);
+
+      // 4. Monta lista leve (para UI / dropdown / etc.)
+      const mappedContracts: Loan[] = rawContracts.map((c: any) =>
+        mapLoanFromDB(c, [clientData])
       );
+      setClientContracts(mappedContracts);
 
-      // Define lista com apenas o contrato autorizado pelo token
-      setClientContracts([loanObject]);
+      // 5. ✅ Carrega detalhes completos (parcelas/sinais) de TODOS os contratos
+      const bundles: any[] = [];
+      for (const c of rawContracts) {
+        const loanId = (c as any)?.id;
+        if (!loanId) continue;
 
+        try {
+          const { installments: rawInst, signals } = await portalService.fetchLoanDetails(loanId);
+          const mapped = mapLoanFromDB(c, rawInst, undefined, []);
+          (mapped as any).paymentSignals = signals;
+          (mapped as any).portal_token = (c as any).portal_token || null;
+
+          bundles.push({
+            loan: mapped,
+            installments: mapped.installments || [],
+            signals,
+          });
+        } catch {
+          // ignora contrato com erro sem quebrar o portal inteiro
+        }
+      }
+      setContractsBundle(bundles);
     } catch (err: any) {
       console.error('Portal Load Error:', err);
-      setPortalError(err?.message || 'Não foi possível carregar os dados do portal.');
+      setPortalError(err?.message || 'Acesso negado ou link expirado.');
     } finally {
       setIsLoading(false);
     }
@@ -66,51 +96,38 @@ export const useClientPortalLogic = (initialToken: string) => {
     loadFullPortalData();
   }, [loadFullPortalData]);
 
-  const handleSignDocument = async (type: string) => {
-    // Pega o ID do contrato atual
+  const handleSignDocument = async () => {
     const currentLoan = clientContracts[0];
     if (!currentLoan) return;
 
     setIsSigning(true);
     try {
-        const doc = await portalService.getLatestLegalDocument(currentLoan.id);
-        
-        if (!doc || !doc.view_token) {
-            alert("Nenhum documento pendente de assinatura foi encontrado para este contrato. Solicite ao seu gestor.");
-            return;
-        }
+      const doc = await portalService.getLatestLegalDocument(currentLoan.id);
 
-        if (doc.status_assinatura === 'ASSINADO') {
-             // Se já assinado, abre para visualização/download
-             const url = `${window.location.origin}/?legal_sign=${doc.view_token}&role=DEVEDOR`;
-             window.open(url, '_blank');
-        } else {
-             // Se pendente, abre para assinatura
-             const url = `${window.location.origin}/?legal_sign=${doc.view_token}&role=DEVEDOR`;
-             window.location.href = url; // Redireciona na mesma aba ou nova aba conforme preferência
-        }
+      if (!doc || !doc.view_token) {
+        alert('Não há documentos pendentes de assinatura para este contrato.');
+        return;
+      }
 
+      // Redireciona para a página de assinatura pública do sistema
+      const url = `${window.location.origin}/?legal_sign=${doc.view_token}&role=DEVEDOR`;
+      window.location.href = url;
     } catch (e: any) {
-        console.error(e);
-        alert("Erro ao acessar documento: " + e.message);
+      console.error(e);
+      alert('Erro ao acessar documento.');
     } finally {
-        setIsSigning(false);
+      setIsSigning(false);
     }
   };
-
-  const handleViewDocument = () => {};
 
   return {
     isLoading,
     portalError,
     loggedClient,
-    clientContracts, // Array contendo apenas o contrato do token
+    clientContracts,
+    contractsBundle, // ✅ exportado
     loadFullPortalData,
     handleSignDocument,
-    handleViewDocument,
     isSigning,
-    // Compatibilidade temporária
-    activeToken: initialToken,
-    setActiveToken: () => {}, 
   };
 };

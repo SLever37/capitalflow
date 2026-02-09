@@ -6,26 +6,37 @@ export const usePortalRouting = () => {
   const [legalSignToken, setLegalSignToken] = useState<string | null>(null);
 
   const updateTokensFromUrl = () => {
-    // Usamos URLSearchParams no search (antes do hash)
+    // 1. Prioriza parâmetros na Query String (?portal=XXX)
     const params = new URLSearchParams(window.location.search);
+    let pToken = params.get('portal');
+    let lToken = params.get('legal_sign');
+
+    // 2. Fallback para Hash (Legacy ou links antigos formatados incorretamente)
+    if (!pToken && window.location.hash.includes('?portal=')) {
+        const hashParams = new URLSearchParams(window.location.hash.split('?')[1]);
+        pToken = hashParams.get('portal');
+    }
     
-    const pToken = params.get('portal');
-    const lToken = params.get('legal_sign');
+    if (!lToken && window.location.hash.includes('?legal_sign=')) {
+        const hashParams = new URLSearchParams(window.location.hash.split('?')[1]);
+        lToken = hashParams.get('legal_sign');
+    }
 
-    if (pToken) setPortalToken(pToken);
-    else setPortalToken(null);
-
-    if (lToken) setLegalSignToken(lToken);
-    else setLegalSignToken(null);
+    setPortalToken(pToken || null);
+    setLegalSignToken(lToken || null);
   };
 
   useEffect(() => {
-    // Carregamento inicial
     updateTokensFromUrl();
 
-    // Ouve mudanças no histórico para ser reativo
+    // Reage a mudanças de navegação (botão voltar/hash change)
     window.addEventListener('popstate', updateTokensFromUrl);
-    return () => window.removeEventListener('popstate', updateTokensFromUrl);
+    window.addEventListener('hashchange', updateTokensFromUrl);
+    
+    return () => {
+        window.removeEventListener('popstate', updateTokensFromUrl);
+        window.removeEventListener('hashchange', updateTokensFromUrl);
+    };
   }, []);
 
   return { portalToken, legalSignToken };

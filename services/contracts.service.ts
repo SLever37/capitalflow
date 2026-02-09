@@ -1,4 +1,3 @@
-
 import { supabase } from '../lib/supabase';
 import { UserProfile, Loan, CapitalSource } from '../types';
 import { generateUUID } from '../utils/generators';
@@ -35,44 +34,46 @@ export const contractsService = {
   ) {
     if (!activeUser?.id) throw new Error('Usuário não autenticado.');
 
-    const ownerId = safeUUID((activeUser as any).supervisor_id) || safeUUID(activeUser.id);
+    const ownerId =
+      safeUUID((activeUser as any).supervisor_id) ||
+      safeUUID(activeUser.id);
+
     if (!ownerId) throw new Error('Perfil inválido.');
 
     let finalClientId = safeUUID(loan.clientId);
 
-    // --- LÓGICA DE CLIENTE (Criação ou Busca Inteligente) ---
+    /* =========================
+       CLIENTE
+    ========================= */
     if (!finalClientId && loan.debtorName) {
       const cleanName = loan.debtorName.trim();
       const cleanDoc = loan.debtorDocument?.replace(/\D/g, '');
 
-      // 1. Tenta encontrar cliente existente pelo Documento (se houver)
       if (cleanDoc && cleanDoc.length >= 11) {
-        const { data: existingByDoc } = await supabase
+        const { data } = await supabase
           .from('clientes')
           .select('id')
           .eq('profile_id', ownerId)
-          .eq('document', loan.debtorDocument) // Busca pelo formato salvo
+          .eq('document', loan.debtorDocument)
           .maybeSingle();
-        
-        if (existingByDoc) finalClientId = existingByDoc.id;
+
+        if (data) finalClientId = data.id;
       }
 
-      // 2. Se não achou por Doc, tenta encontrar pelo Nome (Case Insensitive)
       if (!finalClientId) {
-         const { data: existingByName } = await supabase
+        const { data } = await supabase
           .from('clientes')
           .select('id')
           .eq('profile_id', ownerId)
           .ilike('name', cleanName)
           .maybeSingle();
-          
-         if (existingByName) finalClientId = existingByName.id;
+
+        if (data) finalClientId = data.id;
       }
 
-      // 3. Se realmente não existe, CRIA UM NOVO CLIENTE
       if (!finalClientId) {
         const newId = generateUUID();
-        const { error: createError } = await supabase.from('clientes').insert({
+        const { error } = await supabase.from('clientes').insert({
           id: newId,
           profile_id: ownerId,
           name: cleanName,
@@ -84,29 +85,69 @@ export const contractsService = {
           notes: 'Gerado automaticamente ao criar contrato',
           created_at: new Date().toISOString()
         });
-
-        if (createError) throw new Error("Erro ao criar ficha do cliente: " + createError.message);
+        if (error) throw error;
         finalClientId = newId;
       }
     }
 
     const loanId = editingLoan ? loan.id : ensureUUID(loan.id);
     const principal = safeFloat(loan.principal);
-    
-    // Payload sanitizado
+
+    /* =========================
+       AJUSTE DE PRINCIPAL (EDIÇÃO)
+    ========================= */
+    if (editingLoan) {
+      const { data: oldLoan } = await supabase
+        .from('contratos')
+        .select('principal, source_id')
+        .eq('id', loanId)
+        .single();
+
+      const oldPrincipal = safeFloat(oldLoan?.principal);
+      const delta = principal - oldPrincipal;
+
+      if (delta !== 0 && safeUUID(oldLoan?.source_id)) {
+        // Ajusta saldo da carteira
+        await supabase.rpc('adjust_source_balance', {
+          p_source_id: oldLoan.source_id,
+          p_delta: -delta
+        });
+
+        // Registra no extrato
+        await supabase.from('transacoes').insert({
+          id: generateUUID(),
+          loan_id: loanId,
+          profile_id: ownerId,
+          source_id: oldLoan.source_id,
+          date: new Date().toISOString(),
+          type: delta > 0 ? 'AJUSTE_POSITIVO' : 'AJUSTE_NEGATIVO',
+          amount: Math.abs(delta),
+          principal_delta: delta,
+          interest_delta: 0,
+          late_fee_delta: 0,
+          category: 'AJUSTE',
+          notes: `Ajuste manual do principal (${oldPrincipal} → ${principal})`
+        });
+      }
+    }
+
+    /* =========================
+       CONTRATO
+    ========================= */
     const loanPayload = {
       id: loanId,
       profile_id: ownerId,
-      operador_responsavel_id: activeUser.accessLevel === 1 ? null : safeUUID(activeUser.id),
-      client_id: finalClientId, // Aqui garantimos o vínculo
+      operador_responsavel_id:
+        activeUser.accessLevel === 1 ? null : safeUUID(activeUser.id),
+      client_id: finalClientId,
       source_id: safeUUID(loan.sourceId),
-      debtor_name: loan.debtorName, // Mantemos redundância para performance
+      debtor_name: loan.debtorName,
       debtor_phone: loan.debtorPhone,
       debtor_document: loan.debtorDocument,
       debtor_address: loan.debtorAddress,
       preferred_payment_method: loan.preferredPaymentMethod,
       pix_key: loan.pixKey,
-      principal: principal,
+      principal,
       interest_rate: safeFloat(loan.interestRate),
       fine_percent: safeFloat(loan.finePercent),
       daily_interest_percent: safeFloat(loan.dailyInterestPercent),
@@ -126,56 +167,23 @@ export const contractsService = {
     };
 
     if (editingLoan) {
-      const { error } = await supabase.from('contratos').update(loanPayload).eq('id', loanId);
-      if (error) throw new Error(error.message);
-
-      // Atualização de parcelas (Upsert para garantir IDs estáveis)
-      if (loan.installments?.length) {
-        const instPayload = loan.installments.map(inst => ({
-          id: ensureUUID(inst.id),
-          loan_id: loanId,
-          profile_id: ownerId,
-          numero_parcela: inst.number || 1,
-          data_vencimento: inst.dueDate,
-          valor_parcela: safeFloat(inst.amount),
-          amount: safeFloat(inst.amount),
-          scheduled_principal: safeFloat(inst.scheduledPrincipal),
-          scheduled_interest: safeFloat(inst.scheduledInterest),
-          principal_remaining: safeFloat(inst.principalRemaining),
-          interest_remaining: safeFloat(inst.interestRemaining),
-          late_fee_accrued: safeFloat(inst.lateFeeAccrued),
-        }));
-        const { error: upsertErr } = await supabase.from('parcelas').upsert(instPayload, { onConflict: 'id' });
-        if (upsertErr) throw upsertErr;
-      }
+      const { error } = await supabase
+        .from('contratos')
+        .update(loanPayload)
+        .eq('id', loanId);
+      if (error) throw error;
     } else {
-      const { error } = await supabase.from('contratos').insert({ ...loanPayload, created_at: new Date().toISOString() });
-      if (error) throw new Error(error.message);
+      const { error } = await supabase
+        .from('contratos')
+        .insert({ ...loanPayload, created_at: new Date().toISOString() });
+      if (error) throw error;
 
-      if (loan.installments?.length) {
-        const instPayload = loan.installments.map(inst => ({
-          id: ensureUUID(inst.id),
-          loan_id: loanId,
-          profile_id: ownerId,
-          numero_parcela: inst.number || 1,
-          data_vencimento: inst.dueDate,
-          valor_parcela: safeFloat(inst.amount),
-          amount: safeFloat(inst.amount),
-          scheduled_principal: safeFloat(inst.scheduledPrincipal),
-          scheduled_interest: safeFloat(inst.scheduledInterest),
-          principal_remaining: safeFloat(inst.principalRemaining),
-          interest_remaining: safeFloat(inst.interestRemaining),
-          late_fee_accrued: safeFloat(inst.lateFeeAccrued),
-          status: 'PENDING',
-          paid_total: 0
-        }));
-        const { error: instErr } = await supabase.from('parcelas').insert(instPayload);
-        if (instErr) throw instErr;
-      }
-
-      // Saída de Caixa (Apenas se houver fonte e for novo)
       if (safeUUID(loan.sourceId)) {
-        await supabase.rpc('adjust_source_balance', { p_source_id: loan.sourceId, p_delta: -principal });
+        await supabase.rpc('adjust_source_balance', {
+          p_source_id: loan.sourceId,
+          p_delta: -principal
+        });
+
         await supabase.from('transacoes').insert({
           id: generateUUID(),
           loan_id: loanId,
@@ -184,41 +192,15 @@ export const contractsService = {
           date: new Date().toISOString(),
           type: 'LEND_MORE',
           amount: principal,
-          principal_delta: 0, interest_delta: 0, late_fee_delta: 0,
+          principal_delta: 0,
+          interest_delta: 0,
+          late_fee_delta: 0,
           category: 'INVESTIMENTO',
           notes: 'Empréstimo Inicial'
         });
       }
     }
-    return true;
-  },
 
-  async saveNote(loanId: string, note: string) {
-    if (!isUUID(loanId)) throw new Error('ID inválido.');
-    const { error } = await supabase.from('contratos').update({ notes: note }).eq('id', loanId);
-    if (error) throw error;
-    return true;
-  },
-
-  async addAporte(params: { loanId: string; amount: number; sourceId?: string; installmentId?: string; notes?: string; activeUser: UserProfile; }) {
-    const { loanId, amount, sourceId, installmentId, notes, activeUser } = params;
-    
-    const ownerId = safeUUID((activeUser as any).supervisor_id) || safeUUID(activeUser.id);
-    const safeAmount = safeFloat(amount);
-
-    if (safeAmount <= 0) throw new Error('Valor inválido.');
-
-    const { error } = await supabase.rpc('apply_new_aporte_atomic', {
-      p_loan_id: loanId,
-      p_profile_id: ownerId,
-      p_amount: safeAmount,
-      p_source_id: safeUUID(sourceId),
-      p_installment_id: safeUUID(installmentId),
-      p_notes: notes || null,
-      p_operator_id: safeUUID(activeUser.id)
-    });
-
-    if (error) throw new Error(error.message);
     return true;
   }
 };

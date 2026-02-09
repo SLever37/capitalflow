@@ -4,7 +4,7 @@ import { Modal } from "../../../components/ui/Modal";
 import { Agreement, Loan, UserProfile, LegalDocumentRecord } from "../../../types";
 import { generateConfissaoDividaHTML } from "../templates/ConfissaoDividaTemplate";
 import { legalService } from "../services/legalService";
-import { Printer, Scale, FileSignature, Loader2, ShieldCheck, Check, FileText, Activity, Users, User, Copy, MessageSquare, Link, Share2 } from "lucide-react";
+import { Printer, Scale, FileSignature, Loader2, ShieldCheck, Check, FileText, Activity, User, Copy, MessageSquare, Share2 } from "lucide-react";
 import { LegalReportView } from './LegalReportView';
 
 interface LegalDocumentModalProps {
@@ -65,6 +65,7 @@ export const LegalDocumentModal: React.FC<LegalDocumentModalProps> = ({ agreemen
     const getLinkForRole = (role: string, index?: number) => {
         if (!docRecord) return '';
         const baseUrl = window.location.origin;
+        // ✅ CORREÇÃO: Usa apenas o public_access_token (view_token) do documento
         let url = `${baseUrl}/?legal_sign=${docRecord.public_access_token}&role=${role}`;
         if (index !== undefined) url += `&idx=${index}`;
         return url;
@@ -72,6 +73,7 @@ export const LegalDocumentModal: React.FC<LegalDocumentModalProps> = ({ agreemen
 
     const copyLink = (role: string, index?: number) => {
         const url = getLinkForRole(role, index);
+        if (!url) return;
         navigator.clipboard.writeText(url);
         setCopiedKey(`${role}${index ?? ''}`);
         setTimeout(() => setCopiedKey(null), 2000);
@@ -79,6 +81,7 @@ export const LegalDocumentModal: React.FC<LegalDocumentModalProps> = ({ agreemen
 
     const sendZapNotification = (role: string, name: string, index?: number) => {
         const url = getLinkForRole(role, index);
+        if (!url) return;
         const phone = role === 'DEVEDOR' ? loan.debtorPhone.replace(/\D/g, '') : '';
         const text = `Olá *${name}*, solicito sua assinatura digital no Título Executivo ID ${docRecord?.id.substring(0,8)}. Acesse o link seguro para assinar: ${url}`;
         window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(text)}`, '_blank');
@@ -116,10 +119,9 @@ export const LegalDocumentModal: React.FC<LegalDocumentModalProps> = ({ agreemen
                                 <h4 className="text-[10px] font-black text-indigo-400 uppercase mb-4 tracking-widest flex items-center gap-2"><Scale size={14}/> Links de Assinatura</h4>
                                 
                                 <div className="space-y-3">
-                                    {/* CREDOR */}
                                     <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 flex items-center justify-between">
                                         <div className="flex items-center gap-3">
-                                            <div className={`p-2 rounded-lg ${getSignatureStatus('CREDOR') ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-slate-500'}`}>
+                                            <div className={`p-2 rounded-lg ${getSignatureStatus('CREDOR') ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-slate-50'}`}>
                                                 {getSignatureStatus('CREDOR') ? <Check size={16}/> : <User size={16}/>}
                                             </div>
                                             <div>
@@ -128,14 +130,13 @@ export const LegalDocumentModal: React.FC<LegalDocumentModalProps> = ({ agreemen
                                             </div>
                                         </div>
                                         {!getSignatureStatus('CREDOR') ? (
-                                            <button onClick={handleSignAsCreditor} disabled={isSigning} className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-[9px] font-black uppercase hover:bg-indigo-500">Assinar</button>
+                                            <button onClick={handleSignAsCreditor} disabled={isSigning} className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-[9px] font-black uppercase hover:bg-indigo-500 transition-colors">Assinar</button>
                                         ) : <span className="text-[9px] font-black text-emerald-500 uppercase">Confirmado</span>}
                                     </div>
 
-                                    {/* DEVEDOR */}
                                     <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 flex items-center justify-between">
                                         <div className="flex items-center gap-3">
-                                            <div className={`p-2 rounded-lg ${getSignatureStatus('DEVEDOR') ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-slate-500'}`}>
+                                            <div className={`p-2 rounded-lg ${getSignatureStatus('DEVEDOR') ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-slate-50'}`}>
                                                 {getSignatureStatus('DEVEDOR') ? <Check size={16}/> : <User size={16}/>}
                                             </div>
                                             <div>
@@ -151,15 +152,14 @@ export const LegalDocumentModal: React.FC<LegalDocumentModalProps> = ({ agreemen
                                         </div>
                                     </div>
 
-                                    {/* TESTEMUNHAS */}
                                     {docRecord?.snapshot.witnesses?.map((w: any, idx: number) => {
                                         const role = `TESTEMUNHA_${idx + 1}`;
                                         const sig = getSignatureStatus(role);
                                         return (
                                             <div key={idx} className="bg-slate-900 p-4 rounded-xl border border-slate-800 flex items-center justify-between">
                                                 <div className="flex items-center gap-3">
-                                                    <div className={`p-2 rounded-lg ${sig ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-slate-500'}`}>
-                                                        {sig ? <Check size={16}/> : <Users size={16}/>}
+                                                    <div className={`p-2 rounded-lg ${sig ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-slate-50'}`}>
+                                                        {sig ? <Check size={16}/> : <User size={16}/>}
                                                     </div>
                                                     <div>
                                                         <p className="text-xs font-bold text-white uppercase">{w.name}</p>

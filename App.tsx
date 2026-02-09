@@ -133,7 +133,8 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     if (activeUser && !isPublicView) {
-        notificationService.requestPermission();
+        // Fix: Catch potential promise rejection to prevent Uncaught errors
+        notificationService.requestPermission().catch(err => console.warn('Notification permission error:', err));
     }
   }, [activeUser, isPublicView]);
 
