@@ -66,11 +66,36 @@ export const useClientPortalLogic = (initialToken: string) => {
     loadFullPortalData();
   }, [loadFullPortalData]);
 
-  const handleSignDocument = async (_type: string) => {
+  const handleSignDocument = async (type: string) => {
+    // Pega o ID do contrato atual
+    const currentLoan = clientContracts[0];
+    if (!currentLoan) return;
+
     setIsSigning(true);
-    await new Promise((r) => setTimeout(r, 1500));
-    setIsSigning(false);
-    alert('Funcionalidade de assinatura em desenvolvimento.');
+    try {
+        const doc = await portalService.getLatestLegalDocument(currentLoan.id);
+        
+        if (!doc || !doc.view_token) {
+            alert("Nenhum documento pendente de assinatura foi encontrado para este contrato. Solicite ao seu gestor.");
+            return;
+        }
+
+        if (doc.status_assinatura === 'ASSINADO') {
+             // Se já assinado, abre para visualização/download
+             const url = `${window.location.origin}/?legal_sign=${doc.view_token}&role=DEVEDOR`;
+             window.open(url, '_blank');
+        } else {
+             // Se pendente, abre para assinatura
+             const url = `${window.location.origin}/?legal_sign=${doc.view_token}&role=DEVEDOR`;
+             window.location.href = url; // Redireciona na mesma aba ou nova aba conforme preferência
+        }
+
+    } catch (e: any) {
+        console.error(e);
+        alert("Erro ao acessar documento: " + e.message);
+    } finally {
+        setIsSigning(false);
+    }
   };
 
   const handleViewDocument = () => {};

@@ -108,4 +108,24 @@ export const portalService = {
       return data?.id;
     }
   },
+
+  /**
+   * Busca o documento jurídico mais recente (ativo) para o contrato.
+   */
+  async getLatestLegalDocument(loanId: string) {
+    const { data, error } = await supabase
+        .from('documentos_juridicos')
+        .select('id, view_token, status, status_assinatura, created_at')
+        .eq('loan_id', loanId)
+        .neq('status', 'CANCELADO')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+    
+    if (error) {
+        console.error("Erro ao buscar docs:", error);
+        return null;
+    }
+    return data;
+  }
 };
