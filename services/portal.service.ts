@@ -36,17 +36,21 @@ export const portalService = {
 
   /**
    * Lista contratos do cliente para dropdown/switcher.
-   * CORREÇÃO: Incluído client_id e code na seleção para validação de segurança no frontend.
+   * CORREÇÃO: Removido 'code' da query para evitar erros caso a coluna não exista.
+   * Adicionado log de erro para debug.
    */
   async fetchClientContracts(clientId: string) {
     const { data, error } = await supabase
       .from('contratos')
-      .select('id, created_at, portal_token, client_id, code, start_date')
+      .select('id, created_at, portal_token, client_id, start_date, principal, total_to_receive')
       .eq('client_id', clientId)
       .neq('is_archived', true) // Opcional: Não mostrar arquivados no portal
       .order('created_at', { ascending: false });
 
-    if (error) throw new Error('Falha ao listar contratos.');
+    if (error) {
+        console.error("Erro Supabase fetchClientContracts:", error);
+        throw new Error('Falha ao listar contratos.');
+    }
     return data || [];
   },
 

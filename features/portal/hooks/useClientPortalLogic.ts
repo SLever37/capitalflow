@@ -43,57 +43,69 @@ export const useClientPortalLogic = (initialToken: string) => {
       });
 
       // 3. Buscar TODOS os contratos deste cliente (Lista Resumida)
-      const rawContractsList = await portalService.fetchClientContracts(clientId);
+      // Tenta listar todos. Se falhar (RLS/Permissão), usa apenas o atual (Fallback)
+      let rawContractsList: any[] = [];
+      try {
+          rawContractsList = await portalService.fetchClientContracts(clientId);
+      } catch (e) {
+          console.warn("Aviso Portal: Falha ao listar múltiplos contratos (provável restrição RLS). Carregando apenas o atual.");
+          rawContractsList = [entryLoan];
+      }
+
+      // Se a lista vier vazia por algum motivo estranho, garante o atual
+      if (rawContractsList.length === 0) {
+          rawContractsList = [entryLoan];
+      }
       
       // 4. Hidratação Profunda (Carregar parcelas e detalhes para CADA contrato)
-      // Isso permite que a UI mostre o status real de todos eles simultaneamente.
       const hydratedContracts: Loan[] = await Promise.all(
         rawContractsList.map(async (contractHeader: any) => {
-            // Busca dados completos no banco para este contrato específico
-            // Precisamos dos dados 'raw' do contrato + parcelas
-            // Como fetchClientContracts retorna parcial, vamos buscar o full loan details de cada um
-            // Otimização: Poderíamos criar uma RPC, mas aqui faremos via loop controlado
-            
-            // Reutiliza a lógica de fetch loan by ID (simulada aqui recuperando o loan completo)
-            // Precisamos buscar o contrato completo no supabase
-            // A portalService não tem "fetchLoanById", vamos usar a lógica interna ou expandir a service
-            // Para simplificar e manter segurança, usamos o fetchDetails que já pega parcelas
-            
-            // A solução mais robusta é buscar o contrato completo
-            const { data: fullLoanData, error } = await import('../../../lib/supabase').then(m => 
-                m.supabase.from('contratos')
-                .select('*, parcelas(*), sinalizacoes_pagamento(*)')
-                .eq('id', contractHeader.id)
-                .single()
-            );
-            
-            if (error || !fullLoanData) return null;
+            try {
+                // Se for o contrato de entrada, já temos os dados? Não, fetchLoanByToken traz JOIN, mas fetchClientContracts não.
+                // Mas se caiu no catch acima, rawContractsList[0] é entryLoan (que tem parcelas via fetchLoanDetails?) Não, fetchLoanByToken é básico.
+                
+                // Vamos buscar fresh data para garantir
+                const { data: fullLoanData, error } = await import('../../../lib/supabase').then(m => 
+                    m.supabase.from('contratos')
+                    .select('*, parcelas(*), sinalizacoes_pagamento(*)')
+                    .eq('id', contractHeader.id)
+                    .single()
+                );
+                
+                // Se falhar (ex: RLS bloqueia ID direto), mas é o contrato do token, usamos o entryLoan se ele tiver dados suficientes
+                if (error || !fullLoanData) {
+                    if (contractHeader.id === entryLoan.id) {
+                         // Fallback final: Buscar parcelas isoladamente se o select full falhar
+                         const details = await portalService.fetchLoanDetails(entryLoan.id);
+                         return mapLoanFromDB(entryLoan, details.installments, undefined, []);
+                    }
+                    return null;
+                }
 
-            return mapLoanFromDB(
-                fullLoanData, 
-                fullLoanData.parcelas, 
-                undefined, // acordos (se necessário, expandir query)
-                [] 
-            );
+                return mapLoanFromDB(
+                    fullLoanData, 
+                    fullLoanData.parcelas, 
+                    undefined, // acordos (se necessário, expandir query)
+                    [] 
+                );
+            } catch (innerErr) {
+                console.warn(`Erro ao hidratar contrato ${contractHeader.id}`, innerErr);
+                return null;
+            }
         })
       );
 
       // Filtra nulos e ordena por status (atrasados primeiro)
       const validContracts = hydratedContracts.filter(Boolean) as Loan[];
       
-      // Ordenação Inteligente:
-      // 1. Atrasados
-      // 2. A Vencer Próximo
-      // 3. Pagos/Arquivados pro final
+      // Ordenação Inteligente
       const sortedContracts = validContracts.sort((a, b) => {
           const summaryA = resolveDebtSummary(a, a.installments);
           const summaryB = resolveDebtSummary(b, b.installments);
           
-          // Prioridade para quem tem atraso
           if (summaryA.hasLateInstallments && !summaryB.hasLateInstallments) return -1;
           if (!summaryA.hasLateInstallments && summaryB.hasLateInstallments) return 1;
           
-          // Se ambos iguais, pelo vencimento mais próximo
           const dateA = summaryA.nextDueDate?.getTime() || 9999999999999;
           const dateB = summaryB.nextDueDate?.getTime() || 9999999999999;
           return dateA - dateB;
