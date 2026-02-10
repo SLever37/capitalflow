@@ -25,11 +25,6 @@ export const NavHub: React.FC<NavHubProps> = ({ onClose, onNavigate, userLevel, 
         }
     };
 
-    // Mescla a ordem salva com o novo item se ele não existir
-    const finalHubOrder = hubOrder.includes('PERSONAL_FINANCE') 
-        ? hubOrder 
-        : [...hubOrder, 'PERSONAL_FINANCE' as AppTab];
-
     return (
         <div className="fixed inset-0 z-[60] bg-slate-950/40 backdrop-blur-xl flex items-center justify-center p-4 animate-in fade-in zoom-in-95 duration-200">
             <div className="w-full max-w-sm relative">
@@ -39,7 +34,7 @@ export const NavHub: React.FC<NavHubProps> = ({ onClose, onNavigate, userLevel, 
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4">
-                    {finalHubOrder.map(tab => {
+                    {hubOrder.map(tab => {
                         const meta = getTabMeta(tab);
                         if (tab === 'MASTER' && userLevel !== 1) return null;
                         return (

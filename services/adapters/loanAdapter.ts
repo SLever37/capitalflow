@@ -1,166 +1,195 @@
 
-import { Loan, LoanStatus, Agreement, AgreementStatus } from '../../types';
-import { maskPhone } from '../../utils/formatters';
+// services/adapters/loanAdapter.ts
+import { Agreement, AgreementInstallment, Installment, Loan, LoanStatus } from '../../types';
 import { asArray, asNumber, asString, safeDateString } from '../../utils/safe';
 
-// --- ADAPTER JURÍDICO (BANCO -> FRONTEND) ---
-export const agreementAdapter = (raw: any): Agreement => {
-    if (!raw) throw new Error("Dados do acordo inválidos");
+/**
+ * Normaliza status de acordo (banco) para o padrão esperado pelo frontend.
+ */
+function normalizeAgreementStatus(statusRaw: unknown): 'ACTIVE' | 'PAID' | 'BROKEN' {
+  const s = asString(statusRaw).toUpperCase().trim();
+  if (!s) return 'ACTIVE';
+  if (['PAGO', 'PAID', 'QUITADO'].includes(s)) return 'PAID';
+  if (['BROKEN', 'QUEBRADO', 'CANCELADO', 'INATIVO'].includes(s)) return 'BROKEN';
+  if (['ATIVO', 'ACTIVE'].includes(s)) return 'ACTIVE';
+  return 'ACTIVE';
+}
 
-    const dbStatus = asString(raw.status, '', 'status').toUpperCase();
-    let normalizedStatus: AgreementStatus = 'ACTIVE';
+/**
+ * Normaliza status de parcela de acordo (banco) para padrão do frontend.
+ */
+function normalizeAgreementInstallmentStatus(
+  statusRaw: unknown
+): 'PENDING' | 'PAID' | 'LATE' | 'PARTIAL' {
+  const s = asString(statusRaw).toUpperCase().trim();
+  if (!s) return 'PENDING';
+  if (s === 'PENDENTE') return 'PENDING';
+  if (s === 'PAGO') return 'PAID';
+  if (s === 'ATRASADO') return 'LATE';
+  if (s === 'PARCIAL') return 'PARTIAL';
+  return 'PENDING';
+}
 
-    if (['PAGO', 'PAID', 'QUITADO'].includes(dbStatus)) normalizedStatus = 'PAID';
-    else if (['BROKEN', 'QUEBRADO', 'CANCELADO', 'INATIVO'].includes(dbStatus)) normalizedStatus = 'BROKEN';
-    else if (['ATIVO', 'ACTIVE'].includes(dbStatus)) normalizedStatus = 'ACTIVE';
-    else normalizedStatus = 'ACTIVE';
+/**
+ * Normaliza status de parcelas do loan (caso existam variações)
+ */
+function normalizeLoanInstallmentStatus(statusRaw: unknown): LoanStatus {
+  const s = asString(statusRaw).toUpperCase().trim();
+  if (!s) return LoanStatus.PENDING;
+  if (s === 'PAID' || s === 'PAGO') return LoanStatus.PAID;
+  if (s === 'OPEN' || s === 'ABERTO') return LoanStatus.PENDING;
+  if (s === 'LATE' || s === 'ATRASADO') return LoanStatus.LATE;
+  if (s === 'PARTIAL' || s === 'PARCIAL') return LoanStatus.PARTIAL;
+  return LoanStatus.PENDING;
+}
 
-    const installments = asArray(raw.acordo_parcelas).map((p: any) => ({
-        id: asString(p.id, `tmp-${Math.random()}`),
-        agreementId: asString(raw.id, '', 'agreement.id'),
-        number: asNumber(p.numero),
-        dueDate: safeDateString(p.due_date || p.data_vencimento, 'dueDate'),
-        amount: asNumber(p.amount || p.valor),
-        status: (['PAGO', 'PAID'].includes(asString(p.status).toUpperCase())) ? 'PAID' : asString(p.status || 'PENDING').toUpperCase(),
-        paidAmount: asNumber(p.paid_amount || p.valor_pago),
-        paidDate: p.paid_at || p.data_pagamento
-    })).sort((a: any, b: any) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()); // Garante ordem cronológica
+/**
+ * Adapter do acordo para o formato Agreement esperado pelo frontend.
+ */
+export function agreementAdapter(rawAgreement: any, rawInstallments?: any[]): Agreement {
+  const a = rawAgreement ?? {};
+
+  const installments: AgreementInstallment[] = asArray(rawInstallments).map((p: any) => {
+    return {
+      id: asString(p?.id),
+      agreementId: asString(p?.acordo_id ?? p?.agreement_id ?? a?.id),
+      number: asNumber(p?.numero ?? p?.installment_number ?? p?.n),
+      amount: asNumber(p?.amount ?? p?.valor ?? p?.valor_parcela),
+      dueDate: safeDateString(p?.due_date ?? p?.dueDate, 'dueDate'),
+      paidDate: safeDateString(p?.paid_at ?? p?.paidAt ?? p?.data_pagamento),
+      status: normalizeAgreementInstallmentStatus(p?.status),
+      paidAmount: asNumber(p?.paid_amount ?? p?.valor_pago ?? 0),
+    } as AgreementInstallment;
+  });
+
+  const agreement: Agreement = {
+    id: asString(a?.id),
+    loanId: asString(a?.loan_id ?? a?.contrato_id),
+    type: asString(a?.tipo ?? a?.type) as any,
+    status: normalizeAgreementStatus(a?.status),
+    negotiatedTotal: asNumber(a?.total_negociado ?? a?.negotiatedTotal ?? a?.total),
+    totalDebtAtNegotiation: asNumber(a?.total_divida_base ?? a?.totalDebtAtNegotiation),
+    installmentsCount: asNumber(a?.num_parcelas ?? a?.installmentsCount ?? installments.length),
+    frequency: asString(a?.periodicidade ?? a?.frequency) as any,
+    startDate: safeDateString(a?.created_at ?? a?.startDate ?? new Date().toISOString()),
+    interestRate: asNumber(a?.juros_aplicado ?? a?.interestRate ?? 0),
+    createdAt: safeDateString(a?.created_at ?? a?.createdAt),
+    installments,
+  } as Agreement;
+
+  return agreement;
+}
+
+/**
+ * Mapeia Loan do formato retornado pelo Supabase para o shape usado no frontend.
+ * IMPORTANTE: saída SEMPRE em camelCase (igual types.ts).
+ */
+export function mapLoanFromDB(
+  rawLoan: any,
+  rawInstallments: any[],
+  rawAgreement?: any,
+  rawAgreementInstallments?: any[]
+): Loan {
+  const l = rawLoan ?? {};
+
+  const installments: Installment[] = asArray(rawInstallments).map((inst: any) => {
+    const status = normalizeLoanInstallmentStatus(inst?.status);
 
     return {
-        id: asString(raw.id, '', 'agreement.id'),
-        loanId: asString(raw.loan_id, '', 'loanId'),
-        type: (raw.tipo || 'PARCELADO_COM_JUROS') as any,
-        totalDebtAtNegotiation: asNumber(raw.total_base),
-        negotiatedTotal: asNumber(raw.total_negociado),
-        interestRate: asNumber(raw.juros_mensal_percent),
-        installmentsCount: asNumber(raw.num_parcelas) || installments.length,
-        frequency: asString(raw.periodicidade, 'MONTHLY'),
-        startDate: safeDateString(raw.created_at),
-        status: normalizedStatus,
-        createdAt: safeDateString(raw.created_at),
-        installments: installments
-    } as Agreement;
-};
+      id: asString(inst?.id),
+      dueDate: safeDateString(inst?.due_date ?? inst?.dueDate ?? inst?.data_vencimento, 'dueDate'),
+      amount: asNumber(inst?.amount ?? inst?.valor_parcela),
+      scheduledPrincipal: asNumber(inst?.scheduled_principal ?? inst?.scheduledPrincipal),
+      scheduledInterest: asNumber(inst?.scheduled_interest ?? inst?.scheduledInterest),
+      principalRemaining: asNumber(inst?.principal_remaining ?? inst?.principalRemaining),
+      interestRemaining: asNumber(inst?.interest_remaining ?? inst?.interestRemaining),
+      lateFeeAccrued: asNumber(inst?.late_fee_accrued ?? inst?.lateFeeAccrued),
+      avApplied: asNumber(inst?.av_applied ?? inst?.avApplied),
+      paidPrincipal: asNumber(inst?.paid_principal ?? inst?.paidPrincipal),
+      paidInterest: asNumber(inst?.paid_interest ?? inst?.paidInterest),
+      paidLateFee: asNumber(inst?.paid_late_fee ?? inst?.paidLateFee),
+      paidTotal: asNumber(inst?.paid_total ?? inst?.paidTotal),
+      status,
+      paidDate: safeDateString(inst?.paid_date ?? inst?.paidDate),
+      paidAmount: asNumber(inst?.paid_amount ?? inst?.paidAmount),
+      logs: asArray(inst?.logs),
+      renewalCount: asNumber(inst?.renewal_count ?? inst?.renewalCount),
+      number: asNumber(inst?.number ?? inst?.numero ?? inst?.n),
+    } as Installment;
+  });
 
-// --- ADAPTER CONTRATO (BANCO -> FRONTEND) ---
-export const mapLoanFromDB = (l: any, clientsData: any[] = []): Loan => {
-    const rawParcelas = asArray(l.parcelas);
-    const rawTransacoes = asArray(l.transacoes);
-    const rawSinais = asArray(l.sinalizacoes_pagamento);
+  const startDate = safeDateString(l?.start_date ?? l?.startDate, 'startDate');
 
-    // CORREÇÃO CRÍTICA: Ordenação por Data de Vencimento
-    // Garante que o Portal pegue a parcela mais antiga pendente, e não uma futura aleatória (ex: 2026)
-    const installments = rawParcelas.map((p: any) => ({
-        id: asString(p.id),
-        dueDate: safeDateString(p.data_vencimento || p.due_date, 'dueDate'),
-        amount: asNumber(p.valor_parcela || p.amount),
-        scheduledPrincipal: asNumber(p.scheduled_principal),
-        scheduledInterest: asNumber(p.scheduled_interest),
-        principalRemaining: asNumber(p.principal_remaining),
-        interestRemaining: asNumber(p.interest_remaining),
-        lateFeeAccrued: asNumber(p.late_fee_accrued),
-        avApplied: asNumber(p.av_applied),
-        paidPrincipal: asNumber(p.paid_principal),
-        paidInterest: asNumber(p.paid_interest),
-        paidLateFee: asNumber(p.paid_late_fee),
-        paidTotal: asNumber(p.paid_total),
-        status: asString(p.status, 'PENDING') as LoanStatus,
-        paidDate: p.paid_date,
-        number: asNumber(p.numero_parcela || p.number), // Garante número da parcela
-        logs: []
-    })).sort((a: any, b: any) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+  const activeAgreement = rawAgreement
+    ? agreementAdapter(rawAgreement, rawAgreementInstallments)
+    : undefined;
 
-    const ledger = rawTransacoes.map((t: any) => ({
-        id: asString(t.id),
-        date: safeDateString(t.date),
-        type: asString(t.type, 'UNKNOWN') as any,
-        amount: asNumber(t.amount),
-        principalDelta: asNumber(t.principal_delta),
-        interestDelta: asNumber(t.interest_delta),
-        lateFeeDelta: asNumber(t.late_fee_delta),
-        sourceId: t.source_id,
-        installmentId: t.installment_id,
-        agreementId: t.agreement_id,
-        notes: asString(t.notes),
-        category: asString(t.category) as any
-    }));
+  // funding vindo do banco (snake_case) ou de payloads antigos (camelCase)
+  const fundingTotalPayable = asNumber(l?.funding_total_payable ?? l?.fundingTotalPayable);
+  const fundingCost = asNumber(l?.funding_cost ?? l?.fundingCost);
 
-    const signals = rawSinais.map((s: any) => ({
-        id: asString(s.id),
-        date: safeDateString(s.created_at),
-        type: s.tipo_intencao,
-        status: s.status,
-        comprovanteUrl: s.comprovante_url,
-        clientViewedAt: s.client_viewed_at,
-        reviewNote: s.review_note
-    }));
+  const loan: Loan = {
+    id: asString(l?.id),
 
-    let activeAgreement = undefined;
-    const agreementsArr = asArray(l.acordos_inadimplencia);
-    if (agreementsArr.length > 0) {
-        const rawAgreement = agreementsArr.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
-        try {
-            if (rawAgreement) activeAgreement = agreementAdapter(rawAgreement);
-        } catch (e) {
-            console.warn("Falha ao mapear acordo", l.id, e);
-        }
-    }
+    // necessário p/ PIX/Portal (Realtime/RLS e criação de charge)
+    profile_id: asString(l?.profile_id ?? l?.profileId),
 
-    let phone = l.debtor_phone || l.phone || l.telefone || l.celular;
-    let debtorClientNumber = null;
+    clientId: asString(l?.client_id ?? l?.clientId),
+    debtorName: asString(l?.debtor_name ?? l?.debtorName),
+    debtorPhone: asString(l?.debtor_phone ?? l?.debtorPhone),
+    debtorDocument: asString(l?.debtor_document ?? l?.debtorDocument),
+    debtorAddress: asString(l?.debtor_address ?? l?.debtorAddress),
 
-    // Busca dados enriquecidos do cliente (Número/Código) se disponível na lista carregada
-    if (l.client_id && asArray(clientsData).length > 0) {
-        const linkedClient = clientsData.find((c: any) => c.id === l.client_id);
-        if (linkedClient) {
-            // Se não tinha telefone no contrato, pega do cliente
-            if (!phone || String(phone).trim() === '') {
-                phone = linkedClient.phone || linkedClient.telefone || linkedClient.celular;
-            }
-            // Pega o número do cliente (Código) para agrupamento correto
-            debtorClientNumber = linkedClient.client_number || linkedClient.clientNumber;
-        }
-    }
-    
-    return {
-        id: asString(l.id, '', 'id'),
-        clientId: asString(l.client_id),
-        profile_id: asString(l.profile_id), 
-        debtorName: asString(l.debtor_name, 'Cliente Desconhecido'),
-        debtorPhone: maskPhone(asString(phone, '00000000000')),
-        debtorDocument: l.debtor_document,
-        debtorClientNumber, // Propriedade injetada para agrupamento por código
-        debtorAddress: l.debtor_address,
-        clientAvatarUrl: l.cliente_foto_url,
-        sourceId: asString(l.source_id),
-        preferredPaymentMethod: asString(l.preferred_payment_method, 'PIX') as any,
-        pixKey: l.pix_key,
-        principal: asNumber(l.principal),
-        interestRate: asNumber(l.interest_rate),
-        finePercent: asNumber(l.fine_percent),
-        dailyInterestPercent: asNumber(l.daily_interest_percent),
-        
-        // Mapeamento de Funding
-        fundingTotalPayable: asNumber(l.funding_total_payable),
-        fundingCost: asNumber(l.funding_cost),
-        fundingProvider: asString(l.funding_provider),
-        fundingFeePercent: asNumber(l.funding_fee_percent),
+    sourceId: asString(l?.source_id ?? l?.sourceId),
+    preferredPaymentMethod: asString(
+      l?.preferred_payment_method ?? l?.preferredPaymentMethod,
+      'PIX'
+    ) as any,
+    pixKey: asString(l?.pix_key ?? l?.pixKey),
 
-        billingCycle: asString(l.billing_cycle, 'MONTHLY') as any,
-        amortizationType: asString(l.amortization_type, 'JUROS') as any,
-        startDate: safeDateString(l.start_date),
-        createdAt: safeDateString(l.created_at), 
-        totalToReceive: asNumber(l.total_to_receive),
-        notes: asString(l.notes),
-        guaranteeDescription: asString(l.guarantee_description),
-        policiesSnapshot: l.policies_snapshot || null,
-        installments,
-        ledger,
-        paymentSignals: signals,
-        customDocuments: asArray(l.policies_snapshot?.customDocuments),
-        isArchived: !!l.is_archived,
-        attachments: [], 
-        documentPhotos: [],
-        activeAgreement
-    } as Loan;
-};
+    billingCycle: asString(l?.billing_cycle ?? l?.billingCycle) as any,
+    amortizationType: asString(l?.amortization_type ?? l?.amortizationType, 'JUROS') as any,
+
+    principal: asNumber(l?.principal),
+
+    // ✅ SAÍDA EM camelCase (igual types.ts)
+    fundingTotalPayable: fundingTotalPayable || undefined,
+    fundingCost: fundingCost || undefined,
+    fundingProvider: asString(l?.funding_provider ?? l?.fundingProvider),
+    fundingFeePercent: asNumber(l?.funding_fee_percent ?? l?.fundingFeePercent),
+
+    interestRate: asNumber(l?.interest_rate ?? l?.interestRate),
+    finePercent: asNumber(l?.fine_percent ?? l?.finePercent),
+    dailyInterestPercent: asNumber(l?.daily_interest_percent ?? l?.dailyInterestPercent),
+
+    policiesSnapshot: l?.policies_snapshot ?? l?.policiesSnapshot,
+
+    startDate,
+    createdAt: safeDateString(l?.created_at ?? l?.createdAt),
+    updatedAt: safeDateString(l?.updated_at ?? l?.updatedAt),
+
+    installments,
+
+    totalToReceive: asNumber(l?.total_to_receive ?? l?.totalToReceive),
+
+    ledger: asArray(l?.ledger),
+    paymentSignals: asArray(l?.paymentSignals ?? l?.sinalizacoes_pagamento),
+
+    notes: asString(l?.notes),
+
+    guaranteeDescription: asString(l?.guarantee_description ?? l?.guaranteeDescription),
+
+    attachments: asArray(l?.attachments),
+    documentPhotos: asArray(l?.documentPhotos),
+    customDocuments: asArray(l?.customDocuments),
+
+    isArchived: !!(l?.is_archived ?? l?.isArchived),
+    skipWeekends: !!(l?.skip_weekends ?? l?.skipWeekends),
+
+    portalToken: asString(l?.portal_token ?? l?.portalToken),
+
+    activeAgreement,
+  } as Loan;
+
+  return loan;
+}

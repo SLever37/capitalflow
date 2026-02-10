@@ -321,8 +321,7 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
                     <h4 className="text-white font-bold text-sm uppercase">Assinatura Pendente</h4>
                     <p className="text-[10px] text-slate-500 mt-1">Seus contratos estão disponíveis para regularização.</p>
                 </div>
-                {/* Fixed: Remove argument 'CONFISSAO' from handleSignDocument call to match its signature in useClientPortalLogic.ts */}
-                <button onClick={() => handleSignDocument()} disabled={isSigning} className="w-full p-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black uppercase text-xs flex justify-center gap-2 items-center">
+                <button onClick={() => handleSignDocument('CONFISSAO')} disabled={isSigning} className="w-full p-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black uppercase text-xs flex justify-center gap-2 items-center">
                     {isSigning ? <RefreshCw className="animate-spin" size={16}/> : <><FileSignature size={16}/> Assinar Digitalmente</>}
                 </button>
             </div>

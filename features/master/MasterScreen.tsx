@@ -4,7 +4,6 @@ import { UserProfile } from '../../types';
 import { LogOut, Shield, Search, User, Edit, ShieldAlert } from 'lucide-react';
 import { useMasterController } from './hooks/useMasterController';
 import { MasterEditModal } from './components/MasterEditModal';
-import { SystemHealthCheck } from './components/SystemHealthCheck';
 
 interface MasterScreenProps {
     activeUser: UserProfile;
@@ -130,11 +129,6 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
                             <p className="text-slate-500 font-bold uppercase text-xs tracking-widest">Nenhum usuário encontrado.</p>
                         </div>
                     )}
-                </div>
-
-                {/* PAINEL DE AUTODIAGNÓSTICO */}
-                <div className="mt-12">
-                    <SystemHealthCheck />
                 </div>
             </main>
 

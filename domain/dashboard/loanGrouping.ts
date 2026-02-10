@@ -23,24 +23,33 @@ export interface ClientGroup {
 export const groupLoansByClient = (loans: Loan[], sortOption: SortOption = 'DUE_DATE_ASC'): ClientGroup[] => {
   const groups: Record<string, ClientGroup> = {};
   
+  // 1. Mapa de Normalização: Nome -> ClientID
+  const nameToIdMap: Record<string, string> = {};
+
   loans.forEach(loan => {
+      if (loan.clientId && loan.debtorName) {
+          const normalizedName = loan.debtorName.trim().toLowerCase();
+          nameToIdMap[normalizedName] = loan.clientId;
+      }
+  });
+
+  loans.forEach(loan => {
+    let key = loan.clientId;
     const cleanName = (loan.debtorName || 'Cliente Desconhecido').trim();
-    
-    // REGRA DE AGRUPAMENTO: NOME + CÓDIGO DO CLIENTE
-    // Nunca agrupar por CPF.
-    // O código do cliente (debtorClientNumber) é injetado pelo loanAdapter se o cliente existir.
-    // Se não tiver código, usa o ID interno do cliente. Se não tiver ID, usa 'S/C' (Sem Código).
-    
-    const clientCode = (loan as any).debtorClientNumber || loan.clientId || 'SC';
-    
-    // Chave composta única: Nome|Código
-    // Isso garante que "João|100" e "João|101" sejam grupos diferentes.
-    // E "João|100" (Contrato A) e "João|100" (Contrato B) sejam o mesmo grupo.
-    const key = `${cleanName}|${clientCode}`;
+
+    // Se não tem ID, tenta achar pelo nome no mapa ou usa o próprio nome como chave
+    if (!key) {
+        const normalizedName = cleanName.toLowerCase();
+        if (nameToIdMap[normalizedName]) {
+            key = nameToIdMap[normalizedName];
+        } else {
+            key = `NAME_KEY_${normalizedName}`;
+        }
+    }
 
     if (!groups[key]) {
       groups[key] = {
-        clientId: loan.clientId || key, // Mantém ID para chaves do React, fallback para a key composta
+        clientId: loan.clientId || (key.startsWith('NAME_KEY_') ? '' : key),
         clientName: cleanName,
         avatarUrl: loan.clientAvatarUrl,
         loans: [],

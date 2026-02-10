@@ -17,15 +17,12 @@ interface ClientsPageProps {
   selectedClientsToDelete: string[];
   toggleClientSelection: (id: string) => void;
   executeBulkDelete: () => void;
-  // Nova prop para exclusão individual
-  onDeleteClient: (id: string) => void;
 }
 
 export const ClientsPage: React.FC<ClientsPageProps> = ({ 
   filteredClients, clientSearchTerm, setClientSearchTerm, 
   openClientModal, openConfirmation, showToast,
-  isBulkDeleteMode, toggleBulkDeleteMode, selectedClientsToDelete, toggleClientSelection, executeBulkDelete,
-  onDeleteClient
+  isBulkDeleteMode, toggleBulkDeleteMode, selectedClientsToDelete, toggleClientSelection, executeBulkDelete
 }) => {
   return (
     <div className="space-y-6">
@@ -87,14 +84,9 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({
                             <p className="text-[10px] text-slate-500 truncate font-mono">{(client as any).document || 'S/ CPF'}</p>
                         </div>
                         {!isBulkDeleteMode && (
-                            <div className="flex gap-1">
-                                <button onClick={() => openClientModal(client)} className="p-2 text-slate-600 hover:text-white bg-slate-950 rounded-xl hover:bg-slate-800 transition-colors" title="Editar">
-                                    <Edit size={14}/>
-                                </button>
-                                <button onClick={() => onDeleteClient(client.id)} className="p-2 text-slate-600 hover:text-rose-500 bg-slate-950 rounded-xl hover:bg-rose-950/20 transition-colors" title="Excluir">
-                                    <Trash2 size={14}/>
-                                </button>
-                            </div>
+                            <button onClick={() => openClientModal(client)} className="p-2 text-slate-600 hover:text-white bg-slate-950 rounded-xl hover:bg-slate-800 transition-colors">
+                                <Edit size={14}/>
+                            </button>
                         )}
                     </div>
 

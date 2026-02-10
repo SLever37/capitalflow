@@ -124,10 +124,8 @@ export const PersonalFinancesPage: React.FC<Props> = ({ activeUser }) => {
 
             {/* Conteúdo Principal */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Coluna 1: Contas e Cartões + IA */}
+                {/* Coluna 1: Contas e Cartões (Agora no Topo da coluna) */}
                 <div className="space-y-6">
-                    <PersonalFinanceAI transactions={transactions} accounts={accounts} cards={cards} profileId={activeUser.id} onRefresh={loadData} />
-                    
                     <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="text-xs font-black text-white uppercase tracking-widest flex items-center gap-2"><CreditCard size={14}/> Contas & Cartões</h3>
@@ -227,6 +225,15 @@ export const PersonalFinancesPage: React.FC<Props> = ({ activeUser }) => {
                     </div>
                 </div>
             </div>
+
+            {/* IA FINANCEIRA (AGORA NO FINAL DA PÁGINA) */}
+            <PersonalFinanceAI 
+                transactions={transactions} 
+                accounts={accounts} 
+                cards={cards} 
+                profileId={activeUser.id} 
+                onRefresh={loadData} 
+            />
 
             {/* Modal Nova Transação */}
             {isTxModalOpen && (

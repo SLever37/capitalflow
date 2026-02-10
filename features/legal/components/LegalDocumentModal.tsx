@@ -4,7 +4,7 @@ import { Modal } from "../../../components/ui/Modal";
 import { Agreement, Loan, UserProfile, LegalDocumentRecord } from "../../../types";
 import { generateConfissaoDividaHTML } from "../templates/ConfissaoDividaTemplate";
 import { legalService } from "../services/legalService";
-import { Printer, Scale, FileSignature, Loader2, ShieldCheck, Check, FileText, Activity, User, Copy, MessageSquare, Share2 } from "lucide-react";
+import { Printer, Scale, FileSignature, Loader2, ShieldCheck, Check, FileText, Activity, Users, User, Copy, MessageSquare, Link } from "lucide-react";
 import { LegalReportView } from './LegalReportView';
 
 interface LegalDocumentModalProps {
@@ -65,7 +65,6 @@ export const LegalDocumentModal: React.FC<LegalDocumentModalProps> = ({ agreemen
     const getLinkForRole = (role: string, index?: number) => {
         if (!docRecord) return '';
         const baseUrl = window.location.origin;
-        // ✅ CORREÇÃO: Usa apenas o public_access_token (view_token) do documento
         let url = `${baseUrl}/?legal_sign=${docRecord.public_access_token}&role=${role}`;
         if (index !== undefined) url += `&idx=${index}`;
         return url;
@@ -73,7 +72,6 @@ export const LegalDocumentModal: React.FC<LegalDocumentModalProps> = ({ agreemen
 
     const copyLink = (role: string, index?: number) => {
         const url = getLinkForRole(role, index);
-        if (!url) return;
         navigator.clipboard.writeText(url);
         setCopiedKey(`${role}${index ?? ''}`);
         setTimeout(() => setCopiedKey(null), 2000);
@@ -81,7 +79,6 @@ export const LegalDocumentModal: React.FC<LegalDocumentModalProps> = ({ agreemen
 
     const sendZapNotification = (role: string, name: string, index?: number) => {
         const url = getLinkForRole(role, index);
-        if (!url) return;
         const phone = role === 'DEVEDOR' ? loan.debtorPhone.replace(/\D/g, '') : '';
         const text = `Olá *${name}*, solicito sua assinatura digital no Título Executivo ID ${docRecord?.id.substring(0,8)}. Acesse o link seguro para assinar: ${url}`;
         window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(text)}`, '_blank');
@@ -99,7 +96,7 @@ export const LegalDocumentModal: React.FC<LegalDocumentModalProps> = ({ agreemen
                         <FileText size={14}/> Documento
                     </button>
                     <button onClick={() => setViewMode('SIGNATURES')} className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase flex items-center justify-center gap-2 ${viewMode === 'SIGNATURES' ? 'bg-slate-800 text-white' : 'text-slate-500'}`}>
-                        <FileSignature size={14}/> Assinaturas & Links
+                        <FileSignature size={14}/> Assinaturas
                     </button>
                     <button onClick={() => setViewMode('REPORT')} className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase flex items-center justify-center gap-2 ${viewMode === 'REPORT' ? 'bg-slate-800 text-white' : 'text-slate-500'}`}>
                         <Activity size={14}/> Auditoria
@@ -116,12 +113,12 @@ export const LegalDocumentModal: React.FC<LegalDocumentModalProps> = ({ agreemen
                     ) : viewMode === 'SIGNATURES' ? (
                         <div className="bg-slate-900 h-full p-6 space-y-4 overflow-y-auto custom-scrollbar">
                             <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800">
-                                <h4 className="text-[10px] font-black text-indigo-400 uppercase mb-4 tracking-widest flex items-center gap-2"><Scale size={14}/> Links de Assinatura</h4>
+                                <h4 className="text-[10px] font-black text-indigo-400 uppercase mb-4 tracking-widest flex items-center gap-2"><Scale size={14}/> Centro de Assinaturas</h4>
                                 
                                 <div className="space-y-3">
                                     <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 flex items-center justify-between">
                                         <div className="flex items-center gap-3">
-                                            <div className={`p-2 rounded-lg ${getSignatureStatus('CREDOR') ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-slate-50'}`}>
+                                            <div className={`p-2 rounded-lg ${getSignatureStatus('CREDOR') ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-slate-500'}`}>
                                                 {getSignatureStatus('CREDOR') ? <Check size={16}/> : <User size={16}/>}
                                             </div>
                                             <div>
@@ -130,13 +127,13 @@ export const LegalDocumentModal: React.FC<LegalDocumentModalProps> = ({ agreemen
                                             </div>
                                         </div>
                                         {!getSignatureStatus('CREDOR') ? (
-                                            <button onClick={handleSignAsCreditor} disabled={isSigning} className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-[9px] font-black uppercase hover:bg-indigo-500 transition-colors">Assinar</button>
+                                            <button onClick={handleSignAsCreditor} disabled={isSigning} className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-[9px] font-black uppercase hover:bg-indigo-500">Assinar</button>
                                         ) : <span className="text-[9px] font-black text-emerald-500 uppercase">Confirmado</span>}
                                     </div>
 
                                     <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 flex items-center justify-between">
                                         <div className="flex items-center gap-3">
-                                            <div className={`p-2 rounded-lg ${getSignatureStatus('DEVEDOR') ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-slate-50'}`}>
+                                            <div className={`p-2 rounded-lg ${getSignatureStatus('DEVEDOR') ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-slate-500'}`}>
                                                 {getSignatureStatus('DEVEDOR') ? <Check size={16}/> : <User size={16}/>}
                                             </div>
                                             <div>
@@ -145,8 +142,8 @@ export const LegalDocumentModal: React.FC<LegalDocumentModalProps> = ({ agreemen
                                             </div>
                                         </div>
                                         <div className="flex gap-2">
-                                            <button onClick={() => sendZapNotification('DEVEDOR', loan.debtorName)} className="p-2 bg-emerald-600/10 text-emerald-500 rounded-lg hover:bg-emerald-600 hover:text-white transition-all" title="Enviar via WhatsApp"><MessageSquare size={16}/></button>
-                                            <button onClick={() => copyLink('DEVEDOR')} className={`p-2 rounded-lg transition-all ${copiedKey === 'DEVEDOR' ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-blue-400 hover:text-white'}`} title="Copiar Link">
+                                            <button onClick={() => sendZapNotification('DEVEDOR', loan.debtorName)} className="p-2 bg-emerald-600/10 text-emerald-500 rounded-lg hover:bg-emerald-600 hover:text-white transition-all"><MessageSquare size={16}/></button>
+                                            <button onClick={() => copyLink('DEVEDOR')} className={`p-2 rounded-lg transition-all ${copiedKey === 'DEVEDOR' ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-blue-400 hover:text-white'}`}>
                                                 {copiedKey === 'DEVEDOR' ? <Check size={16}/> : <Copy size={16}/>}
                                             </button>
                                         </div>
@@ -158,8 +155,8 @@ export const LegalDocumentModal: React.FC<LegalDocumentModalProps> = ({ agreemen
                                         return (
                                             <div key={idx} className="bg-slate-900 p-4 rounded-xl border border-slate-800 flex items-center justify-between">
                                                 <div className="flex items-center gap-3">
-                                                    <div className={`p-2 rounded-lg ${sig ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-slate-50'}`}>
-                                                        {sig ? <Check size={16}/> : <User size={16}/>}
+                                                    <div className={`p-2 rounded-lg ${sig ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-slate-500'}`}>
+                                                        {sig ? <Check size={16}/> : <Users size={16}/>}
                                                     </div>
                                                     <div>
                                                         <p className="text-xs font-bold text-white uppercase">{w.name}</p>
@@ -167,14 +164,8 @@ export const LegalDocumentModal: React.FC<LegalDocumentModalProps> = ({ agreemen
                                                     </div>
                                                 </div>
                                                 <div className="flex gap-2">
-                                                    <button onClick={() => {
-                                                        const url = getLinkForRole('TESTEMUNHA', idx);
-                                                        window.open(`https://wa.me/?text=${encodeURIComponent(`Olá, segue link para assinatura como Testemunha: ${url}`)}`, '_blank');
-                                                    }} className="p-2 bg-slate-800 text-slate-400 hover:text-white rounded-lg hover:bg-emerald-600 transition-all" title="Compartilhar Link">
-                                                        <Share2 size={16}/>
-                                                    </button>
-                                                    <button onClick={() => copyLink('TESTEMUNHA', idx)} className={`p-2 rounded-lg transition-all ${copiedKey === `TESTEMUNHA${idx}` ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-blue-400 hover:text-white'}`} title="Copiar Link Individual">
-                                                        {copiedKey === `TESTEMUNHA${idx}` ? <Check size={16}/> : <Copy size={16}/>}
+                                                    <button onClick={() => copyLink('TESTEMUNHA', idx)} className={`p-2 rounded-lg transition-all ${copiedKey === `TESTEMUNHA${idx}` ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-blue-400 hover:text-white'}`}>
+                                                        {copiedKey === `TESTEMUNHA${idx}` ? <Check size={16}/> : <Link size={16}/>}
                                                     </button>
                                                 </div>
                                             </div>
@@ -184,7 +175,7 @@ export const LegalDocumentModal: React.FC<LegalDocumentModalProps> = ({ agreemen
                             </div>
                             <div className="p-4 bg-blue-900/10 border border-blue-500/20 rounded-2xl flex items-start gap-3">
                                 <ShieldCheck size={18} className="text-blue-500 shrink-0 mt-0.5"/>
-                                <p className="text-[10px] text-blue-300 leading-relaxed font-medium uppercase tracking-wider">Envie o link correspondente para cada parte. O sistema valida IP e dispositivo no momento da assinatura.</p>
+                                <p className="text-[10px] text-blue-300 leading-relaxed font-medium uppercase tracking-wider">Cada parte deve assinar individualmente através do link exclusivo gerado acima.</p>
                             </div>
                         </div>
                     ) : (

@@ -21,9 +21,6 @@ export const FlexibleDailyScreen = ({
         );
     }
 
-    // Helper de arredondamento para corrigir erro de centavos
-    const round = (num: number) => Math.round((num + Number.EPSILON) * 100) / 100;
-
     // Helper seguro para parsing (Suporta 1.000,00 ou 1000.00)
     const safeParseAmount = (val: string) => {
         if (!val) return 0;
@@ -42,9 +39,8 @@ export const FlexibleDailyScreen = ({
     const cleanAmount = safeParseAmount(amount);
     
     const dailyRate = (Number(loan.interestRate || 0) / 100) / 30;
-    const dailyCost = round(Number(debt.principal || 0) * dailyRate);
-    // +0.01 tolerância float
-    const daysPaid = dailyCost > 0 ? Math.floor((cleanAmount + 0.01) / dailyCost) : 0; 
+    const dailyCost = Number(debt.principal || 0) * dailyRate;
+    const daysPaid = dailyCost > 0 ? Math.floor((cleanAmount + 0.01) / dailyCost) : 0; // +0.01 tolerância float
 
     const baseDateStr =
       loan.billingCycle === 'DAILY_FREE'
@@ -126,7 +122,7 @@ export const FlexibleDailyScreen = ({
                         </div>
                         <div className="text-right">
                             <p className="text-[9px] text-purple-400 font-black uppercase">Saldo Restante</p>
-                            <p className="text-lg font-black text-white">R$ {round(Math.max(0, debt.principal - cleanAmount)).toFixed(2)}</p>
+                            <p className="text-lg font-black text-white">R$ {Math.max(0, debt.principal - cleanAmount).toFixed(2)}</p>
                         </div>
                     </div>
                 </div>

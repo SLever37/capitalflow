@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { Loan, Client, CapitalSource, UserProfile, SortOption, AppTab } from '../types';
@@ -7,7 +6,7 @@ import { mapLoanFromDB } from '../services/adapters/dbAdapters';
 import { asString, asNumber } from '../utils/safe';
 
 const DEFAULT_NAV: AppTab[] = ['DASHBOARD', 'CLIENTS', 'TEAM'];
-const DEFAULT_HUB: AppTab[] = ['SOURCES', 'LEGAL', 'PROFILE', 'MASTER'];
+const DEFAULT_HUB: AppTab[] = ['SOURCES', 'LEGAL', 'PROFILE', 'MASTER', 'PERSONAL_FINANCE'];
 
 // Mock completo para o modo demonstração
 const DEMO_USER: UserProfile = {
@@ -24,39 +23,47 @@ const DEMO_USER: UserProfile = {
     brandColor: '#2563eb'
 };
 
-const mapProfileFromDB = (data: any): UserProfile => ({
-    id: data.id,
-    name: asString(data.nome_operador),
-    fullName: asString(data.nome_completo),
-    email: asString(data.usuario_email || data.email),
-    document: asString(data.document),
-    phone: asString(data.phone),
-    address: asString(data.address),
-    addressNumber: asString(data.address_number),
-    neighborhood: asString(data.neighborhood),
-    city: asString(data.city),
-    state: asString(data.state),
-    zipCode: asString(data.zip_code),
-    businessName: asString(data.nome_empresa),
-    accessLevel: asNumber(data.access_level),
-    interestBalance: asNumber(data.interest_balance),
-    totalAvailableCapital: asNumber(data.total_available_capital),
-    supervisor_id: data.supervisor_id,
-    pixKey: asString(data.pix_key),
-    photo: data.avatar_url,
-    brandColor: '#2563eb', // Força a cor original
-    logoUrl: data.logo_url,
-    password: data.senha_acesso,
-    recoveryPhrase: data.recovery_phrase,
-    defaultInterestRate: asNumber(data.default_interest_rate),
-    defaultFinePercent: asNumber(data.default_fine_percent),
-    defaultDailyInterestPercent: asNumber(data.default_daily_interest_percent),
-    targetCapital: asNumber(data.target_capital),
-    targetProfit: asNumber(data.target_profit),
-    ui_nav_order: data.ui_nav_order || DEFAULT_NAV,
-    ui_hub_order: data.ui_hub_order || DEFAULT_HUB,
-    createdAt: data.created_at
-});
+const mapProfileFromDB = (data: any): UserProfile => {
+    // Migração on-the-fly: Garante que PERSONAL_FINANCE esteja no menu
+    let hubOrder = (data.ui_hub_order || DEFAULT_HUB) as AppTab[];
+    if (Array.isArray(hubOrder) && !hubOrder.includes('PERSONAL_FINANCE')) {
+        hubOrder = [...hubOrder, 'PERSONAL_FINANCE'];
+    }
+
+    return {
+        id: data.id,
+        name: asString(data.nome_operador),
+        fullName: asString(data.nome_completo),
+        email: asString(data.usuario_email || data.email),
+        document: asString(data.document),
+        phone: asString(data.phone),
+        address: asString(data.address),
+        addressNumber: asString(data.address_number),
+        neighborhood: asString(data.neighborhood),
+        city: asString(data.city),
+        state: asString(data.state),
+        zipCode: asString(data.zip_code),
+        businessName: asString(data.nome_empresa),
+        accessLevel: asNumber(data.access_level),
+        interestBalance: asNumber(data.interest_balance),
+        totalAvailableCapital: asNumber(data.total_available_capital),
+        supervisor_id: data.supervisor_id,
+        pixKey: asString(data.pix_key),
+        photo: data.avatar_url,
+        brandColor: '#2563eb', // Força a cor original
+        logoUrl: data.logo_url,
+        password: data.senha_acesso,
+        recoveryPhrase: data.recovery_phrase,
+        defaultInterestRate: asNumber(data.default_interest_rate),
+        defaultFinePercent: asNumber(data.default_fine_percent),
+        defaultDailyInterestPercent: asNumber(data.default_daily_interest_percent),
+        targetCapital: asNumber(data.target_capital),
+        targetProfit: asNumber(data.target_profit),
+        ui_nav_order: data.ui_nav_order || DEFAULT_NAV,
+        ui_hub_order: hubOrder,
+        createdAt: data.created_at
+    };
+};
 
 export const useAppState = (activeProfileId: string | null) => {
   const [activeUser, setActiveUser] = useState<UserProfile | null>(null);
@@ -124,7 +131,7 @@ export const useAppState = (activeProfileId: string | null) => {
           setActiveUser(u);
           setProfileEditForm(u);
           setNavOrder(u.ui_nav_order || DEFAULT_NAV);
-          setHubOrder(u.ui_hub_order || DEFAULT_HUB);
+          setHubOrder(u.ui_hub_order);
 
           const ownerId = u.supervisor_id || u.id;
           const isStaff = !!u.supervisor_id;

@@ -3,13 +3,6 @@ import { LegalDocumentParams } from "../../../types";
 import { formatMoney, numberToWordsBRL } from "../../../utils/formatters";
 import { buildConfissaoDividaVM } from "../viewModels/confissaoVM";
 
-// Helper para garantir data local exata sem shift de UTC
-const formatDateSafe = (isoDate: string) => {
-    if (!isoDate) return '—';
-    const [y, m, d] = isoDate.split('T')[0].split('-');
-    return `${d}/${m}/${y}`;
-};
-
 export const generateConfissaoDividaHTML = (data: LegalDocumentParams, docId?: string, hash?: string, signatures: any[] = []) => {
     const vm = buildConfissaoDividaVM(data);
     const findSig = (role: string) => (signatures || []).find(s => s.role === role);
@@ -38,7 +31,7 @@ export const generateConfissaoDividaHTML = (data: LegalDocumentParams, docId?: s
     const installmentsHtml = (vm.installments || []).map((i: any) => `
         <tr>
             <td>${i.number || '—'}ª</td>
-            <td>${formatDateSafe(i.dueDate)}</td>
+            <td>${new Date(i.dueDate).toLocaleDateString('pt-BR')}</td>
             <td>${formatMoney(i.amount)}</td>
         </tr>
     `).join('');

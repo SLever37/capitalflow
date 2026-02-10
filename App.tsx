@@ -1,5 +1,5 @@
 
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect } from 'react';
 import { AppShell } from './layout/AppShell';
 import { NavHubController } from './layout/NavHubController';
 import { AppGate } from './components/AppGate';
@@ -25,9 +25,9 @@ import { notificationService } from './services/notification.service';
 import { MasterScreen } from './features/master/MasterScreen';
 import { LoadingScreen } from './components/ui/LoadingScreen';
 import { PersonalFinancesPage } from './pages/PersonalFinancesPage';
-import { AppTab } from './types';
 
 export const App: React.FC = () => {
+  // Hooks de Infraestrutura
   const { portalToken, legalSignToken } = usePortalRouting();
   const { toast, showToast } = useToast();
   
@@ -71,39 +71,6 @@ export const App: React.FC = () => {
 
   usePersistedTab(activeTab, setActiveTab);
 
-  // --- LÓGICA DE NAVEGAÇÃO E BOTÃO VOLTAR ---
-  useEffect(() => {
-    if (isPublicView) return;
-
-    const handleBackButton = (event: PopStateEvent) => {
-      // 1. Se houver modal aberto, fecha o modal e cancela a navegação
-      if (ui.activeModal) {
-        event.preventDefault();
-        ui.closeModal();
-        // Re-insere o estado atual para o botão voltar não pular a aba
-        window.history.pushState({ tab: activeTab }, '', `#${activeTab}`);
-        return;
-      }
-
-      // 2. Se estiver no Dashboard, pergunta se quer sair
-      if (activeTab === 'DASHBOARD') {
-        if (window.confirm('Deseja encerrar sua sessão e sair do sistema?')) {
-          handleLogout();
-        } else {
-          // Mantém no Dashboard
-          window.history.pushState({ tab: 'DASHBOARD' }, '', '#DASHBOARD');
-        }
-      } 
-      // 3. Se estiver em outra aba, volta para a anterior (o navegador já faz isso via popstate, só atualizamos o state)
-      else if (event.state?.tab) {
-        setActiveTab(event.state.tab as AppTab);
-      }
-    };
-
-    window.addEventListener('popstate', handleBackButton);
-    return () => window.removeEventListener('popstate', handleBackButton);
-  }, [activeTab, ui.activeModal, handleLogout, isPublicView]);
-
   const controllers = useControllers(
     activeUser, ui, loans, setLoans, clients, setClients,
     sources, setSources, setActiveUser, setIsLoadingData,
@@ -119,18 +86,22 @@ export const App: React.FC = () => {
     disabled: isPublicView,
   });
 
+  // 1. Anti-Saída Acidental (Proteção contra fechamento de aba)
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      // Só ativa se estiver logado e não for uma visão pública
       if (activeUser && !isPublicView) {
         e.preventDefault();
-        e.returnValue = '';
+        e.returnValue = ''; // Padrão para navegadores modernos exibirem o alerta
         return '';
       }
     };
+
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [activeUser, isPublicView]);
 
+  // Init Notifications Permissions (apenas se logado E não for view pública)
   useEffect(() => {
     if (activeUser && !isPublicView) {
         notificationService.requestPermission();
@@ -140,6 +111,9 @@ export const App: React.FC = () => {
   const effectiveSelectedStaffId = activeUser && activeUser.accessLevel === 2 ? activeUser.id : selectedStaffId;
   const isInvitePath = window.location.pathname === '/invite' || window.location.pathname === '/setup-password';
 
+  // 2. Tela de Carregamento Global (Splash Screen)
+  // Exibe se: Temos um ID de perfil (tentando restaurar sessão) MAS ainda não temos o objeto user carregado
+  // OU se estamos carregando dados iniciais críticos.
   const isInitializing = (!!activeProfileId && !activeUser) || (!!activeUser && isLoadingData && loans.length === 0 && !loadError);
 
   if (isInitializing && !isPublicView && !isInvitePath) {
@@ -195,6 +169,10 @@ export const App: React.FC = () => {
               onOpenSupport={() => ui.openModal('SUPPORT_CHAT')}
               navOrder={navOrder}
             >
+              <div className="hidden">
+                 {/* Componentes de layout ocultos mas renderizados para lógica se necessário, ou limpeza futura */}
+              </div>
+
               {activeTab === 'DASHBOARD' && (
                 <DashboardContainer
                   loans={loans} sources={sources} activeUser={activeUser}
@@ -243,7 +221,7 @@ export const App: React.FC = () => {
               )}
 
               {activeTab === 'PERSONAL_FINANCE' && activeUser && (
-                  <PersonalFinancesPage activeUser={activeUser} />
+                <PersonalFinancesPage activeUser={activeUser} />
               )}
 
               <ModalHostContainer

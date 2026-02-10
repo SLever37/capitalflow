@@ -3,27 +3,12 @@ import { LegalDocumentParams } from "../../../types";
 import { formatMoney } from "../../../utils/formatters";
 import { buildConfissaoDividaVM } from "../viewModels/confissaoVM";
 
-const formatDateSafe = (isoDate: string) => {
-    if (!isoDate) return '—';
-    const [y, m, d] = isoDate.split('T')[0].split('-');
-    return `${d}/${m}/${y}`;
-};
-
 export const generateNotaPromissoriaHTML = (data: LegalDocumentParams, docId?: string, hash?: string) => {
     const vm = buildConfissaoDividaVM(data);
     
     // Calcula data de vencimento final (última parcela) ou específica
     const lastInstallment = data.installments[data.installments.length - 1];
-    const dueDate = lastInstallment ? formatDateSafe(lastInstallment.dueDate) : new Date().toLocaleDateString('pt-BR');
-    
-    // Data do contrato segura
-    const contractDateSafe = formatDateSafe(data.contractDate);
-
-    // Mês por extenso para o corpo do texto
-    const dateObj = new Date(data.contractDate);
-    const day = dateObj.getUTCDate(); // Usa UTC para pegar o dia correto da string ISO
-    const month = dateObj.toLocaleDateString('pt-BR', { month: 'long', timeZone: 'UTC' });
-    const year = dateObj.getUTCFullYear();
+    const dueDate = lastInstallment ? new Date(lastInstallment.dueDate).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR');
 
     return `
     <!DOCTYPE html>
@@ -81,7 +66,7 @@ export const generateNotaPromissoriaHTML = (data: LegalDocumentParams, docId?: s
 
             <div class="content">
                 <p>
-                    Aos <b>${day}</b> dias do mês de <b>${month}</b> de <b>${year}</b>, pagarei(emos) por esta única via de <b>NOTA PROMISSÓRIA</b> a <b>${vm.creditorName}</b>, inscrito(a) no CPF/CNPJ sob o nº ${vm.creditorDoc}, ou à sua ordem, a quantia líquida e certa de <b>${vm.totalDebt}</b>, em moeda corrente deste país.
+                    Aos <b>${new Date(data.contractDate).getDate()}</b> dias do mês de <b>${new Date(data.contractDate).toLocaleDateString('pt-BR', {month: 'long'})}</b> de <b>${new Date(data.contractDate).getFullYear()}</b>, pagarei(emos) por esta única via de <b>NOTA PROMISSÓRIA</b> a <b>${vm.creditorName}</b>, inscrito(a) no CPF/CNPJ sob o nº ${vm.creditorDoc}, ou à sua ordem, a quantia líquida e certa de <b>${vm.totalDebt}</b>, em moeda corrente deste país.
                 </p>
                 <p style="font-size: 10pt; margin-top: 20px;">
                     <b>Praça de Pagamento:</b> ${vm.city}.
@@ -97,7 +82,7 @@ export const generateNotaPromissoriaHTML = (data: LegalDocumentParams, docId?: s
                 </div>
                 <div class="detail-item">
                     <strong>Data de Emissão</strong>
-                    ${contractDateSafe}
+                    ${vm.date}
                 </div>
             </div>
 

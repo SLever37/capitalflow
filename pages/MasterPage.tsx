@@ -1,7 +1,6 @@
 
 import React from 'react';
 import { Edit, ShieldAlert, KeyRound, Shield, User, Search } from 'lucide-react';
-import { SystemHealthCheck } from '../features/master/components/SystemHealthCheck';
 
 interface MasterPageProps {
   allUsers: any[];
@@ -111,9 +110,6 @@ export const MasterPage: React.FC<MasterPageProps> = ({
                 )}
             </div>
         </div>
-
-        {/* COMPONENTE DE TESTE AUTOMATIZADO */}
-        <SystemHealthCheck />
     </div>
   );
 };
