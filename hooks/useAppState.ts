@@ -1,3 +1,4 @@
+
 // hooks/useAppState.ts
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
@@ -127,7 +128,7 @@ export const useAppState = (activeProfileId: string | null) => {
 
       if (profileError) throw profileError;
       if (!profileData) {
-        throw { code: 'PROFILE_NOT_FOUND', message: 'Perfil não encontrado (sessão antiga/localStorage).' };
+        throw { code: 'PROFILE_NOT_FOUND', message: 'Perfil não encontrado. Faça login novamente.' };
       }
 
       const u = mapProfileFromDB(profileData);
@@ -138,9 +139,6 @@ export const useAppState = (activeProfileId: string | null) => {
 
       // ✅ ownerId calculado (mas vamos ter fallback)
       const ownerId = u.supervisor_id || u.id;
-
-      // logs mínimos pra você ver no console do navegador
-      console.log('[fetchFullData] profileId=', profileId, 'u.id=', u.id, 'u.supervisor_id=', u.supervisor_id, 'ownerId=', ownerId);
 
       const fetchClientsByProfile = async (pid: string) => {
         const res = await supabase
@@ -178,11 +176,9 @@ export const useAppState = (activeProfileId: string | null) => {
 
       // ✅ Fallback: se clientes vier vazio e ownerId != u.id, tenta buscar também no u.id
       if ((clientsRes.data?.length || 0) === 0 && ownerId !== u.id) {
-        console.warn('[fetchFullData] clientes vazio no ownerId. Tentando fallback no u.id...');
         const fallbackClients = await fetchClientsByProfile(u.id);
         if (fallbackClients.error) throw fallbackClients.error;
 
-        // mescla sem duplicar por id
         const merged = [
           ...(clientsRes.data || []),
           ...(fallbackClients.data || []),
@@ -193,9 +189,8 @@ export const useAppState = (activeProfileId: string | null) => {
         clientsRes = { ...clientsRes, data: merged } as any;
       }
 
-      // ✅ Fallback opcional também para fontes (muito comum ter fonte criada com profile_id do operador)
+      // ✅ Fallback opcional também para fontes
       if ((sourcesRes.data?.length || 0) === 0 && ownerId !== u.id) {
-        console.warn('[fetchFullData] fontes vazio no ownerId. Tentando fallback no u.id...');
         const fallbackSources = await fetchSourcesByProfile(u.id);
         if (fallbackSources.error) throw fallbackSources.error;
 
@@ -250,6 +245,7 @@ export const useAppState = (activeProfileId: string | null) => {
     } catch (error: any) {
       console.error('Erro ao carregar dados:', error);
       setLoadError(error?.message || 'Erro de conexão com o banco de dados.');
+      // CRÍTICO: Limpa o usuário para tirar do estado de loading e forçar o App a mostrar a tela de Login ou Erro
       setActiveUser(null);
       setClients([]);
       setLoans([]);
