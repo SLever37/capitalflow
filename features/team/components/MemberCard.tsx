@@ -1,14 +1,15 @@
 
 import React from 'react';
-import { Trash2, User, ShieldCheck, Mail, Clock, AlertCircle } from 'lucide-react';
+import { Trash2, User, ShieldCheck, Mail, Clock, AlertCircle, Edit } from 'lucide-react';
 import { maskDocument } from '../../../utils/formatters';
 
 interface MemberCardProps {
   member: any;
   onDelete: (id: string) => void;
+  onEdit: (member: any) => void;
 }
 
-export const MemberCard: React.FC<MemberCardProps> = ({ member, onDelete }) => {
+export const MemberCard: React.FC<MemberCardProps> = ({ member, onDelete, onEdit }) => {
   // Erison no CSV não tem profile_id vinculado
   const isPending = !member.profile_id;
   
@@ -68,13 +69,22 @@ export const MemberCard: React.FC<MemberCardProps> = ({ member, onDelete }) => {
           <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
             {roleLabel}
           </span>
-          <button 
-            onClick={() => onDelete(member.id)} 
-            className="p-3 bg-slate-950 text-slate-600 hover:text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all border border-slate-800 hover:border-rose-500/30"
-            title="Excluir Membro"
-          >
-            <Trash2 size={18} />
-          </button>
+          <div className="flex gap-2">
+            <button 
+                onClick={() => onEdit(member)} 
+                className="p-3 bg-slate-950 text-slate-500 hover:text-white hover:bg-slate-800 rounded-xl transition-all border border-slate-800"
+                title="Editar Membro"
+            >
+                <Edit size={16} />
+            </button>
+            <button 
+                onClick={() => onDelete(member.id)} 
+                className="p-3 bg-slate-950 text-slate-600 hover:text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all border border-slate-800 hover:border-rose-500/30"
+                title="Excluir Membro"
+            >
+                <Trash2 size={16} />
+            </button>
+          </div>
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
+import { generateUUID } from '../../../utils/generators';
 
 export const useTeamData = (activeUserId: string | null | undefined) => {
   const [teams, setTeams] = useState<any[]>([]);
@@ -29,10 +30,12 @@ export const useTeamData = (activeUserId: string | null | undefined) => {
       
       // Define a equipe ativa inicial
       let current = activeTeam;
-      if (!current && teamsList.length > 0) {
-          // Tenta encontrar a equipe "CapitalFlow" mencionada no CSV
+      
+      // Se o time ativo não existe mais na lista (ex: foi deletado), pega o primeiro ou null
+      if (!current || !teamsList.find(t => t.id === current.id)) {
+          // Tenta encontrar a equipe "CapitalFlow" mencionada no CSV ou a primeira
           const capitalFlow = teamsList.find(t => t.name === 'CapitalFlow');
-          current = capitalFlow || teamsList[0];
+          current = capitalFlow || teamsList[0] || null;
           setActiveTeam(current);
       }
 
@@ -54,6 +57,8 @@ export const useTeamData = (activeUserId: string | null | undefined) => {
           
         if (mErr) throw mErr;
         setMembers(m || []);
+      } else {
+        setMembers([]);
       }
     } catch (err) {
       console.error("Erro crítico na Gestão de Time:", err);
@@ -66,12 +71,52 @@ export const useTeamData = (activeUserId: string | null | undefined) => {
     loadData();
   }, [loadData]);
 
+  // --- ACTIONS ---
+
+  const createTeam = async (name: string) => {
+      if (!activeUserId) return;
+      const { data, error } = await supabase.from('teams').insert({
+          id: generateUUID(),
+          owner_profile_id: activeUserId,
+          name: name.trim()
+      }).select().single();
+      
+      if (error) throw error;
+      await loadData();
+      return data;
+  };
+
+  const updateTeam = async (teamId: string, name: string) => {
+      const { error } = await supabase.from('teams').update({ name: name.trim() }).eq('id', teamId);
+      if (error) throw error;
+      await loadData();
+  };
+
+  const deleteTeam = async (teamId: string) => {
+      const { error } = await supabase.from('teams').delete().eq('id', teamId);
+      if (error) throw error;
+      setActiveTeam(null); // Força reset da seleção
+      await loadData();
+  };
+
+  const updateMember = async (memberId: string, updates: { role?: string, team_id?: string }) => {
+      const { error } = await supabase.from('team_members').update(updates).eq('id', memberId);
+      if (error) throw error;
+      await loadData();
+  };
+
   return { 
     teams, 
     activeTeam, 
     setActiveTeam, 
     members, 
     loading, 
-    refresh: loadData 
+    refresh: loadData,
+    actions: {
+        createTeam,
+        updateTeam,
+        deleteTeam,
+        updateMember
+    }
   };
 };

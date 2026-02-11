@@ -24,57 +24,53 @@ export const useClientPortalLogic = (initialToken: string) => {
     setPortalError(null);
 
     try {
-      // 1. Validação de Acesso (Usa o token para achar o contrato "porta de entrada")
+      // 1. Validação de Acesso e Busca do Contrato Inicial (via RPC Seguro)
       const entryLoan = await portalService.fetchLoanByToken(initialToken);
-      const clientId = (entryLoan as any)?.client_id;
+      const clientId = entryLoan.clientId;
       
       if (!clientId) throw new Error('Contrato sem cliente associado.');
 
       // 2. Dados do Cliente
-      const clientData = (entryLoan as any)?.clients || await portalService.fetchClientById(clientId);
-      if (!clientData?.id) throw new Error('Dados do cliente não encontrados.');
+      // Tenta buscar dados completos ou usa o que veio no contrato
+      let clientData = await portalService.fetchClientById(clientId);
+      if (!clientData) {
+          // Fallback: Usa dados denormalizados do contrato se o RLS bloquear a tabela de clientes
+          clientData = {
+              id: clientId,
+              name: entryLoan.debtorName,
+              document: entryLoan.debtorDocument,
+              phone: entryLoan.debtorPhone,
+              email: (entryLoan as any).debtorEmail // Se houver
+          };
+      }
 
-      setLoggedClient({
-        id: clientData.id,
-        name: clientData.name,
-        document: clientData.document || '',
-        phone: clientData.phone,
-        email: clientData.email
-      });
+      setLoggedClient(clientData);
 
-      // 3. Buscar TODOS os contratos deste cliente (Lista Resumida)
-      const rawContractsList = await portalService.fetchClientContracts(clientId);
+      // 3. Buscar TODOS os contratos deste cliente (via RPC Seguro)
+      // Passamos o initialToken para validar que temos permissão de ver os dados desse cliente
+      const rawContractsList = await portalService.fetchClientContracts(clientId, initialToken);
       
-      // 4. Hidratação Profunda (Carregar parcelas e detalhes para CADA contrato)
-      // Isso permite que a UI mostre o status real de todos eles simultaneamente.
+      // 4. Hidratação: Se o RPC get_portal_contracts_by_token retornar apenas headers,
+      // precisariamos buscar detalhes. Mas para o portal funcionar bem com RLS restrito,
+      // o ideal seria o RPC já retornar dados suficientes.
+      // Assumindo que rawContractsList contém dados da tabela 'contratos', precisamos das parcelas.
+      
       const hydratedContracts: Loan[] = await Promise.all(
         rawContractsList.map(async (contractHeader: any) => {
-            // Busca dados completos no banco para este contrato específico
-            // Precisamos dos dados 'raw' do contrato + parcelas
-            // Como fetchClientContracts retorna parcial, vamos buscar o full loan details de cada um
-            // Otimização: Poderíamos criar uma RPC, mas aqui faremos via loop controlado
-            
-            // Reutiliza a lógica de fetch loan by ID (simulada aqui recuperando o loan completo)
-            // Precisamos buscar o contrato completo no supabase
-            // A portalService não tem "fetchLoanById", vamos usar a lógica interna ou expandir a service
-            // Para simplificar e manter segurança, usamos o fetchDetails que já pega parcelas
-            
-            // A solução mais robusta é buscar o contrato completo
-            const { data: fullLoanData, error } = await import('../../../lib/supabase').then(m => 
-                m.supabase.from('contratos')
-                .select('*, parcelas(*), sinalizacoes_pagamento(*)')
-                .eq('id', contractHeader.id)
-                .single()
-            );
-            
-            if (error || !fullLoanData) return null;
+            // Se for o contrato atual, já temos os dados completos do passo 1
+            if (contractHeader.id === entryLoan.id) return entryLoan;
 
-            return mapLoanFromDB(
-                fullLoanData, 
-                fullLoanData.parcelas, 
-                undefined, // acordos (se necessário, expandir query)
-                [] 
-            );
+            // Para outros contratos, se o usuário não está logado, 
+            // ele não conseguirá fazer 'select * from parcelas'.
+            // Solução: Usar o token deste outro contrato para buscar via RPC individualmente
+            if (contractHeader.portal_token) {
+                 try {
+                     return await portalService.fetchLoanByToken(contractHeader.portal_token);
+                 } catch {
+                     return null;
+                 }
+            }
+            return null;
         })
       );
 
@@ -82,18 +78,13 @@ export const useClientPortalLogic = (initialToken: string) => {
       const validContracts = hydratedContracts.filter(Boolean) as Loan[];
       
       // Ordenação Inteligente:
-      // 1. Atrasados
-      // 2. A Vencer Próximo
-      // 3. Pagos/Arquivados pro final
       const sortedContracts = validContracts.sort((a, b) => {
           const summaryA = resolveDebtSummary(a, a.installments);
           const summaryB = resolveDebtSummary(b, b.installments);
           
-          // Prioridade para quem tem atraso
           if (summaryA.hasLateInstallments && !summaryB.hasLateInstallments) return -1;
           if (!summaryA.hasLateInstallments && summaryB.hasLateInstallments) return 1;
           
-          // Se ambos iguais, pelo vencimento mais próximo
           const dateA = summaryA.nextDueDate?.getTime() || 9999999999999;
           const dateB = summaryB.nextDueDate?.getTime() || 9999999999999;
           return dateA - dateB;
@@ -103,7 +94,7 @@ export const useClientPortalLogic = (initialToken: string) => {
 
     } catch (err: any) {
       console.error('Portal Load Error:', err);
-      setPortalError(err?.message || 'Não foi possível carregar os dados do portal.');
+      setPortalError(err?.message || 'Link inválido ou expirado.');
     } finally {
       setIsLoading(false);
     }
@@ -126,12 +117,11 @@ export const useClientPortalLogic = (initialToken: string) => {
     isLoading,
     portalError,
     loggedClient,
-    clientContracts, // Array completo de contratos
+    clientContracts,
     loadFullPortalData,
     handleSignDocument,
     handleViewDocument,
     isSigning,
-    // Compatibilidade temporária
     activeToken: initialToken,
     setActiveToken: () => {}, 
   };
