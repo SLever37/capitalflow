@@ -158,6 +158,11 @@ export const useAuth = () => {
         return;
       }
 
+// 🔐 Define profile_id na sessão do Postgres para RLS funcionar
+await supabase.rpc('set_session_profile_id', {
+  p_profile_id: profile.id,
+});
+
       handleLoginSuccess(profile, showToast);
     } catch (err: any) {
       console.error("Erro crítico no login:", err);
