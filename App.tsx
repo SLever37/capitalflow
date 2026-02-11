@@ -86,15 +86,7 @@ export const App: React.FC = () => {
     disabled: isPublicView,
   });
 
-  // 1. Monitoramento de Erros de Carga (Correção Infinite Loading)
-  useEffect(() => {
-    if (loadError) {
-      showToast(loadError, 'error');
-      setIsLoadingData(false); // Força parada do loading em caso de erro
-    }
-  }, [loadError]);
-
-  // 2. Anti-Saída Acidental (Proteção contra fechamento de aba)
+  // 1. Anti-Saída Acidental (Proteção contra fechamento de aba)
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       // Só ativa se estiver logado e não for uma visão pública
@@ -119,12 +111,10 @@ export const App: React.FC = () => {
   const effectiveSelectedStaffId = activeUser && activeUser.accessLevel === 2 ? activeUser.id : selectedStaffId;
   const isInvitePath = window.location.pathname === '/invite' || window.location.pathname === '/setup-password';
 
-  // 3. Tela de Carregamento Global (Splash Screen)
-  // Lógica corrigida: Se houver loadError, NÃO mostra loading (deixa cair pro AuthScreen)
-  const isInitializing = (
-      (!!activeProfileId && !activeUser && !loadError) || 
-      (!!activeUser && isLoadingData && loans.length === 0 && !loadError)
-  );
+  // 2. Tela de Carregamento Global (Splash Screen)
+  // Exibe se: Temos um ID de perfil (tentando restaurar sessão) MAS ainda não temos o objeto user carregado
+  // OU se estamos carregando dados iniciais críticos.
+  const isInitializing = (!!activeProfileId && !activeUser) || (!!activeUser && isLoadingData && loans.length === 0 && !loadError);
 
   if (isInitializing && !isPublicView && !isInvitePath) {
     return <LoadingScreen />;

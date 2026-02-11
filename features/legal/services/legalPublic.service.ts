@@ -1,4 +1,3 @@
-
 // src/features/legal/services/legalPublic.service.ts
 import { supabase } from '../../../lib/supabase';
 import { LegalDocumentParams } from '../../../types';
@@ -7,6 +6,7 @@ import { legalValidityService } from './legalValidity.service';
 export const legalPublicService = {
   /**
    * Gera link público de assinatura (uso administrativo)
+   * ⚠️ NÃO acessa tabela direto — usa RPC
    */
   async generateSigningLink(documentId: string): Promise<string> {
     const { data, error } = await supabase
@@ -68,6 +68,7 @@ export const legalPublicService = {
   /**
    * Assinatura pública (DEVEDOR)
    * ✅ leitura via RPC
+   * ❌ nenhuma query direta em documentos_juridicos
    */
   async signDocumentPublicly(
     token: string,

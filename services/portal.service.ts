@@ -1,40 +1,32 @@
 
 import { supabase } from '../lib/supabase';
-import { mapLoanFromDB } from './adapters/loanAdapter';
 
 export const portalService = {
   /**
    * Busca um contrato específico pelo TOKEN PÚBLICO.
    * Usado na entrada do portal.
-   * Utiliza RPC para bypass seguro do RLS.
    */
   async fetchLoanByToken(token: string) {
-    const { data: loanRaw, error } = await supabase
-      .rpc('get_loan_by_portal_token', { p_token: token });
+    const { data: loan, error } = await supabase
+      .from('contratos')
+      .select('*, clients:client_id(*)')
+      .eq('portal_token', token)
+      .single();
 
-    if (error || !loanRaw || loanRaw.length === 0) {
-      console.error("Portal Fetch Error:", error);
+    if (error || !loan) {
       throw new Error('Contrato não encontrado ou link inválido.');
     }
 
-    // O RPC retorna um array (função table), pegamos o primeiro
-    const loanData = loanRaw[0];
-    
-    // Mapeamento para o formato interno do App
-    // O RPC já traz as parcelas embutidas no campo 'installments' (JSONB)
-    return mapLoanFromDB(loanData, loanData.installments || []);
+    return loan;
   },
 
   /**
-   * Busca dados básicos do cliente pelo ID.
-   * Tenta buscar direto, mas retorna null silenciosamente se falhar por RLS.
-   * O Hook de lógica tem fallback para usar os dados do contrato.
+   * Busca dados básicos do cliente pelo ID (para preencher o header do portal)
    */
   async fetchClientById(clientId: string) {
-    // Tenta buscar (pode falhar por RLS se for anon)
     const { data, error } = await supabase
         .from('clientes')
-        .select('id, name, document, phone, email')
+        .select('id, name, document, phone')
         .eq('id', clientId)
         .single();
     
@@ -44,29 +36,74 @@ export const portalService = {
 
   /**
    * Lista contratos do cliente para dropdown/switcher.
-   * Utiliza RPC que valida se o token pertence ao cliente.
+   * CORREÇÃO: Incluído client_id e code na seleção para validação de segurança no frontend.
    */
-  async fetchClientContracts(clientId: string, currentToken: string) {
-    // Usa RPC para garantir que quem tem o token pode ver os contratos do mesmo cliente
+  async fetchClientContracts(clientId: string) {
     const { data, error } = await supabase
-      .rpc('get_portal_contracts_by_token', { p_token: currentToken });
+      .from('contratos')
+      .select('id, created_at, portal_token, client_id, code, start_date')
+      .eq('client_id', clientId)
+      .neq('is_archived', true) // Opcional: Não mostrar arquivados no portal
+      .order('created_at', { ascending: false });
 
     if (error) throw new Error('Falha ao listar contratos.');
     return data || [];
   },
 
   /**
+   * Carrega dados completos do contrato (parcelas, sinais, etc).
+   */
+  async fetchLoanDetails(loanId: string) {
+    const { data: installments, error: instErr } = await supabase
+      .from('parcelas')
+      .select('*')
+      .eq('loan_id', loanId)
+      .order('numero_parcela', { ascending: true });
+
+    if (instErr) throw new Error('Erro ao carregar parcelas.');
+
+    let signals: any[] = [];
+    try {
+      const { data: sig } = await supabase
+        .from('sinalizacoes_pagamento')
+        .select('*')
+        .eq('loan_id', loanId)
+        .order('created_at', { ascending: false });
+      if (sig) signals = sig;
+    } catch {}
+
+    return { installments: installments || [], signals };
+  },
+
+  /**
    * Registra intenção de pagamento
    */
   async submitPaymentIntent(clientId: string, loanId: string, profileId: string, tipo: string) {
-    const { data, error } = await supabase.rpc('portal_submit_payment_intent', {
-      p_client_id: clientId,
-      p_loan_id: loanId,
-      p_profile_id: profileId,
-      p_tipo: tipo,
-    });
-    
-    if (error) throw error;
-    return data;
+    try {
+      const { data, error } = await supabase.rpc('portal_submit_payment_intent', {
+        p_client_id: clientId,
+        p_loan_id: loanId,
+        p_profile_id: profileId,
+        p_tipo: tipo,
+      });
+      if (error) throw error;
+      return data;
+    } catch {
+      const { data, error } = await supabase
+        .from('sinalizacoes_pagamento')
+        .insert({
+          client_id: clientId,
+          loan_id: loanId,
+          profile_id: profileId,
+          tipo_intencao: tipo,
+          status: 'PENDENTE',
+          created_at: new Date().toISOString(),
+        })
+        .select('id')
+        .single();
+
+      if (error) throw new Error('Falha ao registrar intenção.');
+      return data?.id;
+    }
   },
 };
