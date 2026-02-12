@@ -1,17 +1,36 @@
-
 import { useState, useRef, useCallback } from 'react';
-import { CapitalSource, Loan, Client, Installment, AgreementInstallment } from '../types';
-import { ModalType, ModalState } from '../contexts/ModalContext';
+import type { CapitalSource, Loan, Client, Installment, AgreementInstallment } from '../types';
+import type { ModalType, ModalState } from '../contexts/ModalContext';
 
-// Estado agrupado para pagamento para evitar poluição do root state
+// Estado agrupado para pagamento (suporta parcela normal ou parcela de acordo)
 interface PaymentState {
-    loan: Loan;
-    inst: Installment;
-    calculations: any;
+  loan: Loan;
+  inst: Installment | AgreementInstallment;
+  calculations: any;
 }
+
+const DEFAULT_CLIENT_FORM = {
+  name: '',
+  phone: '',
+  document: '',
+  email: '',
+  address: '',
+  city: '',
+  state: '',
+  notes: '',
+  fotoUrl: '',
+};
+
+const DEFAULT_SOURCE_FORM = {
+  name: '',
+  type: 'BANK',
+  balance: '',
+  operador_permitido_id: '',
+};
 
 export const useUiState = () => {
   const [activeModal, setActiveModal] = useState<ModalState | null>(null);
+
   const [showNavHub, setShowNavHub] = useState(false);
   const [isStealthMode, setIsStealthMode] = useState(false);
   const [mobileDashboardTab, setMobileDashboardTab] = useState<'CONTRACTS' | 'BALANCE'>('CONTRACTS');
@@ -19,13 +38,15 @@ export const useUiState = () => {
   // Controllers de UI para edição
   const [noteText, setNoteText] = useState('');
   const [noteModalLoan, setNoteModalLoan] = useState<Loan | null>(null);
+
   const [editingSource, setEditingSource] = useState<CapitalSource | null>(null);
   const [editingLoan, setEditingLoan] = useState<Loan | null>(null);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
+
   const [selectedLoanId, setSelectedLoanId] = useState<string | null>(null);
-  
+
   // Master / Admin
-  const [masterEditUser, setMasterEditUser] = useState<any>(null); 
+  const [masterEditUser, setMasterEditUser] = useState<any>(null);
   const [sacSearch, setSacSearch] = useState('');
 
   // Estados de Processamento
@@ -33,34 +54,42 @@ export const useUiState = () => {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   // Forms e Inputs
-  const [clientForm, setClientForm] = useState({ name: '', phone: '', document: '', email: '', address: '', city: '', state: '', notes: '', fotoUrl: '' });
+  const [clientForm, setClientForm] = useState({ ...DEFAULT_CLIENT_FORM });
   const [clientDraftAccessCode, setClientDraftAccessCode] = useState<string>('');
   const [clientDraftNumber, setClientDraftNumber] = useState<string>('');
-  const [sourceForm, setSourceForm] = useState({ name: '', type: 'BANK', balance: '', operador_permitido_id: '' }); // Fixed missing property
+
+  const [sourceForm, setSourceForm] = useState({ ...DEFAULT_SOURCE_FORM });
   const [addFundsValue, setAddFundsValue] = useState('');
-  
-  // Payment Logic State (Agrupado seria melhor, mas mantendo compatibilidade por enquanto)
+
+  // Payment Logic State
   const [paymentModal, setPaymentModal] = useState<PaymentState | null>(null);
-  const [paymentType, setPaymentType] = useState<'FULL' | 'RENEW_INTEREST' | 'RENEW_AV' | 'LEND_MORE' | 'CUSTOM'>('FULL'); // Fixed type
+  const [paymentType, setPaymentType] = useState<'FULL' | 'RENEW_INTEREST' | 'RENEW_AV' | 'LEND_MORE' | 'CUSTOM'>('FULL');
   const [avAmount, setAvAmount] = useState('');
-  const [showReceipt, setShowReceipt] = useState<{loan: Loan, inst: Installment | AgreementInstallment, amountPaid: number, type: string} | null>(null);
+  const [showReceipt, setShowReceipt] = useState<{
+    loan: Loan;
+    inst: Installment | AgreementInstallment;
+    amountPaid: number;
+    type: string;
+  } | null>(null);
 
   // Context Modals Data
   const [renegotiationModalLoan, setRenegotiationModalLoan] = useState<Loan | null>(null);
   const [newAporteModalLoan, setNewAporteModalLoan] = useState<Loan | null>(null);
   const [messageModalLoan, setMessageModalLoan] = useState<Loan | null>(null);
+
   const [withdrawValue, setWithdrawValue] = useState('');
   const [withdrawSourceId, setWithdrawSourceId] = useState('');
+
   const [refundChecked, setRefundChecked] = useState(true);
 
   // Confirmations
   const [confirmation, setConfirmation] = useState<{
-    type: 'DELETE' | 'ARCHIVE' | 'RESTORE' | 'DELETE_CLIENT' | 'DELETE_SOURCE' | 'REVERSE_TRANSACTION', 
-    target: any,
-    title?: string,
-    message?: string,
-    showRefundOption?: boolean,
-    extraData?: any
+    type: 'DELETE' | 'ARCHIVE' | 'RESTORE' | 'DELETE_CLIENT' | 'DELETE_SOURCE' | 'REVERSE_TRANSACTION';
+    target: any;
+    title?: string;
+    message?: string;
+    showRefundOption?: boolean;
+    extraData?: any;
   } | null>(null);
 
   // Upload Helpers State
@@ -75,11 +104,11 @@ export const useUiState = () => {
   const [importMapping, setImportMapping] = useState<Record<string, number>>({});
   const [importCandidates, setImportCandidates] = useState<any[]>([]);
   const [selectedImportIndices, setSelectedImportIndices] = useState<number[]>([]);
-  
+
   // Bulk Actions
   const [isBulkDeleteMode, setIsBulkDeleteMode] = useState(false);
   const [selectedClientsToDelete, setSelectedClientsToDelete] = useState<string[]>([]);
-  
+
   // Danger Zone
   const [resetPasswordInput, setResetPasswordInput] = useState('');
   const [deleteAccountAgree, setDeleteAccountAgree] = useState(false);
@@ -92,69 +121,222 @@ export const useUiState = () => {
   const profilePhotoInputRef = useRef<HTMLInputElement>(null);
   const fileInputExcelRef = useRef<HTMLInputElement>(null);
 
+  // =========================
+  // Reset Helpers (reutilizáveis)
+  // =========================
+  const resetClientForm = useCallback(() => {
+    setClientForm({ ...DEFAULT_CLIENT_FORM });
+    setClientDraftAccessCode('');
+    setClientDraftNumber('');
+    setEditingClient(null);
+  }, []);
+
+  const resetSourceForm = useCallback(() => {
+    setSourceForm({ ...DEFAULT_SOURCE_FORM });
+    setAddFundsValue('');
+    setEditingSource(null);
+  }, []);
+
+  const resetPaymentState = useCallback(() => {
+    setPaymentModal(null);
+    setPaymentType('FULL');
+    setAvAmount('');
+    setIsProcessingPayment(false);
+  }, []);
+
+  const resetNotes = useCallback(() => {
+    setNoteText('');
+    setNoteModalLoan(null);
+  }, []);
+
+  const resetImports = useCallback(() => {
+    setImportSheets([]);
+    setImportSheetNames([]);
+    setImportCurrentSheet(null);
+    setImportMapping({});
+    setImportCandidates([]);
+    setSelectedImportIndices([]);
+  }, []);
+
   const openModal = useCallback((type: ModalType, payload?: any) => {
-      setActiveModal({ type, payload });
+    setActiveModal({ type, payload });
   }, []);
 
   const closeModal = useCallback(() => {
-      setActiveModal(null);
-      setEditingLoan(null);
-      setPaymentModal(null);
-      setConfirmation(null);
-      setNoteModalLoan(null);
-      setNewAporteModalLoan(null);
-      setIsBulkDeleteMode(false);
-  }, []);
+    // fecha modal
+    setActiveModal(null);
+
+    // limpa “acessórios” de modal que vazam fácil
+    setConfirmation(null);
+    setRefundChecked(true);
+
+    // notes
+    resetNotes();
+
+    // pagamento
+    resetPaymentState();
+    setShowReceipt(null);
+
+    // bulk delete
+    setIsBulkDeleteMode(false);
+    setSelectedClientsToDelete([]);
+
+    // modais auxiliares
+    setRenegotiationModalLoan(null);
+    setNewAporteModalLoan(null);
+    setMessageModalLoan(null);
+
+    // upload targets
+    setPromissoriaUploadLoanId(null);
+    setExtraDocUploadLoanId(null);
+    setExtraDocKind(null);
+
+    // import
+    resetImports();
+
+    // forms “não destrutivos”:
+    // ⚠️ não zeramos editingLoan aqui por padrão, porque tem modal que fecha e você ainda está no fluxo do contrato.
+    // Controllers (Loan/Client/Source) devem limpar o editing* quando finalizar a ação.
+  }, [resetNotes, resetPaymentState, resetImports]);
 
   return {
-    activeModal, openModal, closeModal,
-    showNavHub, setShowNavHub,
-    isStealthMode, setIsStealthMode,
-    mobileDashboardTab, setMobileDashboardTab,
-    noteText, setNoteText,
-    noteModalLoan, setNoteModalLoan,
-    editingSource, setEditingSource,
-    editingLoan, setEditingLoan,
-    editingClient, setEditingClient,
-    selectedLoanId, setSelectedLoanId,
-    showReceipt, setShowReceipt,
-    masterEditUser, setMasterEditUser,
-    sacSearch, setSacSearch,
-    isSaving, setIsSaving,
-    isProcessingPayment, setIsProcessingPayment,
-    clientForm, setClientForm,
-    clientDraftAccessCode, setClientDraftAccessCode,
-    clientDraftNumber, setClientDraftNumber,
-    sourceForm, setSourceForm,
-    addFundsValue, setAddFundsValue,
-    paymentModal, setPaymentModal,
-    renegotiationModalLoan, setRenegotiationModalLoan,
-    newAporteModalLoan, setNewAporteModalLoan,
-    messageModalLoan, setMessageModalLoan,
-    withdrawValue, setWithdrawValue,
-    withdrawSourceId, setWithdrawSourceId,
-    paymentType, setPaymentType,
-    avAmount, setAvAmount,
-    refundChecked, setRefundChecked,
-    confirmation, setConfirmation,
-    promissoriaUploadLoanId, setPromissoriaUploadLoanId,
-    extraDocUploadLoanId, setExtraDocUploadLoanId,
-    extraDocKind, setExtraDocKind,
-    importSheets, setImportSheets,
-    importSheetNames, setImportSheetNames,
-    importCurrentSheet, setImportCurrentSheet,
-    importMapping, setImportMapping,
-    importCandidates, setImportCandidates,
-    selectedImportIndices, setSelectedImportIndices,
-    isBulkDeleteMode, setIsBulkDeleteMode,
-    selectedClientsToDelete, setSelectedClientsToDelete,
-    resetPasswordInput, setResetPasswordInput,
-    deleteAccountAgree, setDeleteAccountAgree,
-    deleteAccountConfirm, setDeleteAccountConfirm,
+    // modal
+    activeModal,
+    openModal,
+    closeModal,
+
+    // helpers de reset (úteis pros controllers)
+    resetClientForm,
+    resetSourceForm,
+    resetPaymentState,
+    resetNotes,
+    resetImports,
+
+    // ui
+    showNavHub,
+    setShowNavHub,
+    isStealthMode,
+    setIsStealthMode,
+    mobileDashboardTab,
+    setMobileDashboardTab,
+
+    // notes
+    noteText,
+    setNoteText,
+    noteModalLoan,
+    setNoteModalLoan,
+
+    // editing
+    editingSource,
+    setEditingSource,
+    editingLoan,
+    setEditingLoan,
+    editingClient,
+    setEditingClient,
+
+    // selection
+    selectedLoanId,
+    setSelectedLoanId,
+
+    // receipt
+    showReceipt,
+    setShowReceipt,
+
+    // master/admin
+    masterEditUser,
+    setMasterEditUser,
+    sacSearch,
+    setSacSearch,
+
+    // processing
+    isSaving,
+    setIsSaving,
+    isProcessingPayment,
+    setIsProcessingPayment,
+
+    // client form
+    clientForm,
+    setClientForm,
+    clientDraftAccessCode,
+    setClientDraftAccessCode,
+    clientDraftNumber,
+    setClientDraftNumber,
+
+    // source form
+    sourceForm,
+    setSourceForm,
+    addFundsValue,
+    setAddFundsValue,
+
+    // payment
+    paymentModal,
+    setPaymentModal,
+    paymentType,
+    setPaymentType,
+    avAmount,
+    setAvAmount,
+
+    // context modals
+    renegotiationModalLoan,
+    setRenegotiationModalLoan,
+    newAporteModalLoan,
+    setNewAporteModalLoan,
+    messageModalLoan,
+    setMessageModalLoan,
+
+    // withdraw
+    withdrawValue,
+    setWithdrawValue,
+    withdrawSourceId,
+    setWithdrawSourceId,
+
+    // confirmations
+    refundChecked,
+    setRefundChecked,
+    confirmation,
+    setConfirmation,
+
+    // uploads
+    promissoriaUploadLoanId,
+    setPromissoriaUploadLoanId,
+    extraDocUploadLoanId,
+    setExtraDocUploadLoanId,
+    extraDocKind,
+    setExtraDocKind,
+
+    // import
+    importSheets,
+    setImportSheets,
+    importSheetNames,
+    setImportSheetNames,
+    importCurrentSheet,
+    setImportCurrentSheet,
+    importMapping,
+    setImportMapping,
+    importCandidates,
+    setImportCandidates,
+    selectedImportIndices,
+    setSelectedImportIndices,
+
+    // bulk
+    isBulkDeleteMode,
+    setIsBulkDeleteMode,
+    selectedClientsToDelete,
+    setSelectedClientsToDelete,
+
+    // danger zone
+    resetPasswordInput,
+    setResetPasswordInput,
+    deleteAccountAgree,
+    setDeleteAccountAgree,
+    deleteAccountConfirm,
+    setDeleteAccountConfirm,
+
+    // refs
     promissoriaFileInputRef,
     extraDocFileInputRef,
     clientAvatarInputRef,
     profilePhotoInputRef,
-    fileInputExcelRef
+    fileInputExcelRef,
   };
 };

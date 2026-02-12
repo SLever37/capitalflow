@@ -13,6 +13,8 @@ const isUUID = (v: any) =>
 const safeUUID = (v: any) => (isUUID(v) ? v : null);
 const ensureUUID = (v: any) => (isUUID(v) ? v : generateUUID());
 
+const onlyDigits = (v: any) => String(v ?? '').replace(/\D/g, '');
+
 const safeFloat = (v: any): number => {
   if (typeof v === 'number') return v;
   if (!v) return 0;
@@ -35,21 +37,37 @@ export const contractsService = {
     // --- LÓGICA DE CLIENTE (Criação ou Busca Inteligente) ---
     if (!finalClientId && loan.debtorName) {
       const cleanName = loan.debtorName.trim();
-      const cleanDoc = loan.debtorDocument?.replace(/\D/g, '');
+      const cleanDoc = onlyDigits(loan.debtorDocument);
+      const cleanPhone = onlyDigits(loan.debtorPhone);
 
       // 1) Busca por documento (se existir)
       if (cleanDoc && cleanDoc.length >= 11) {
         const { data: existingByDoc, error: e1 } = await supabase
           .from('clientes')
-          .select('id')
+          .select('id, document')
           .eq('owner_id', ownerId)
-          .eq('document', loan.debtorDocument)
+          // ✅ importante: compara no padrão do BD (somente dígitos)
+          .eq('document', cleanDoc)
           .maybeSingle();
+
         if (e1) throw new Error(e1.message);
         if (existingByDoc?.id) finalClientId = existingByDoc.id;
       }
 
-      // 2) Busca por nome (case-insensitive)
+      // 2) Se não achou por doc, tenta por telefone (opcional)
+      if (!finalClientId && cleanPhone && cleanPhone.length >= 10) {
+        const { data: existingByPhone, error: ePhone } = await supabase
+          .from('clientes')
+          .select('id, phone')
+          .eq('owner_id', ownerId)
+          .eq('phone', cleanPhone)
+          .maybeSingle();
+
+        if (ePhone) throw new Error(ePhone.message);
+        if (existingByPhone?.id) finalClientId = existingByPhone.id;
+      }
+
+      // 3) Busca por nome (case-insensitive)
       if (!finalClientId) {
         const { data: existingByName, error: e2 } = await supabase
           .from('clientes')
@@ -57,25 +75,28 @@ export const contractsService = {
           .eq('owner_id', ownerId)
           .ilike('name', cleanName)
           .maybeSingle();
+
         if (e2) throw new Error(e2.message);
         if (existingByName?.id) finalClientId = existingByName.id;
       }
 
-      // 3) Cria cliente se não existir
+      // 4) Cria cliente se não existir
       if (!finalClientId) {
         const newId = generateUUID();
+
         const { error: createError } = await supabase.from('clientes').insert({
           id: newId,
           owner_id: ownerId, // ✅ clientes = owner_id
           name: cleanName,
-          phone: loan.debtorPhone || null,
-          document: loan.debtorDocument || null,
+          phone: cleanPhone || null,
+          document: cleanDoc || null,
           address: loan.debtorAddress || null,
           access_code: String(Math.floor(Math.random() * 10000)).padStart(4, '0'),
           client_number: String(Math.floor(100000 + Math.random() * 900000)),
           notes: 'Gerado automaticamente ao criar contrato',
           created_at: new Date().toISOString(),
         });
+
         if (createError) throw new Error('Erro ao criar ficha do cliente: ' + createError.message);
         finalClientId = newId;
       }
@@ -138,6 +159,7 @@ export const contractsService = {
           data_vencimento: inst.dueDate,
           valor_parcela: safeFloat(inst.amount),
 
+          // colunas extras (se existirem)
           amount: safeFloat(inst.amount),
           scheduled_principal: safeFloat(inst.scheduledPrincipal),
           scheduled_interest: safeFloat(inst.scheduledInterest),
@@ -150,9 +172,10 @@ export const contractsService = {
         if (upsertErr) throw upsertErr;
       }
     } else {
-      const { error } = await supabase
-        .from('contratos')
-        .insert({ ...loanPayload, created_at: new Date().toISOString() });
+      const { error } = await supabase.from('contratos').insert({
+        ...loanPayload,
+        created_at: new Date().toISOString(),
+      });
       if (error) throw new Error(error.message);
 
       if (loan.installments?.length) {
@@ -222,6 +245,8 @@ export const contractsService = {
     const { loanId, amount, sourceId, installmentId, notes, activeUser } = params;
 
     const ownerId = safeUUID((activeUser as any).supervisor_id) || safeUUID(activeUser.id);
+    if (!ownerId) throw new Error('Perfil inválido.');
+
     const safeAmount = safeFloat(amount);
     if (safeAmount <= 0) throw new Error('Valor inválido.');
 

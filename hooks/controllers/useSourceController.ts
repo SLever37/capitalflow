@@ -1,7 +1,13 @@
-
 import { supabase } from '../../lib/supabase';
 import { CapitalSource, UserProfile } from '../../types';
 import { parseCurrency } from '../../utils/formatters';
+
+/* helpers */
+const isUUID = (v: any) =>
+  typeof v === 'string' &&
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
+
+const safeUUID = (v: any) => (isUUID(v) ? v : null);
 
 export const useSourceController = (
   activeUser: UserProfile | null,
@@ -12,14 +18,16 @@ export const useSourceController = (
   fetchFullData: (id: string) => Promise<void>,
   showToast: (msg: string, type?: 'success' | 'error') => void
 ) => {
+  const getOwnerId = (u: UserProfile) => safeUUID((u as any).supervisor_id) || safeUUID(u.id);
 
   const handleSaveSource = async () => {
     if (!activeUser) return;
 
     if (!ui.sourceForm.name.trim()) {
-      showToast("Dê um nome para a nova fonte de capital.", "error");
+      showToast('Dê um nome para a nova fonte de capital.', 'error');
       return;
     }
+
     if (ui.isSaving) return;
 
     const initialBalance = parseCurrency(ui.sourceForm.balance);
@@ -32,42 +40,43 @@ export const useSourceController = (
         balance: initialBalance,
       };
       setSources([...sources, newSource]);
-      showToast("Fonte criada (Demo)", "success");
+      showToast('Fonte criada (Demo)', 'success');
       ui.closeModal();
       return;
     }
 
     ui.setIsSaving(true);
+
     try {
       const id = crypto.randomUUID();
-      const ownerId = (activeUser as any).supervisor_id || activeUser.id;
+      const ownerId = getOwnerId(activeUser);
+      if (!ownerId) throw new Error('OwnerId inválido. Refaça login.');
+
       const isStaff = !!(activeUser as any).supervisor_id;
 
-      // Se for STAFF criando, a fonte pertence ao Dono, mas com acesso exclusivo do STAFF
+      // STAFF criando: fonte pertence ao DONO, mas pode restringir pelo operador_permitido_id
       const operadorPermitido = isStaff ? activeUser.id : (ui.sourceForm.operador_permitido_id || null);
 
-      const { error } = await supabase
-        .from('fontes')
-        .insert([
-          {
-            id,
-            profile_id: ownerId,
-            name: ui.sourceForm.name,
-            type: ui.sourceForm.type,
-            balance: initialBalance,
-            operador_permitido_id: operadorPermitido
-          },
-        ]);
+      const { error } = await supabase.from('fontes').insert([
+        {
+          id,
+          profile_id: ownerId, // ✅ fontes pertencem ao DONO
+          name: ui.sourceForm.name,
+          type: ui.sourceForm.type,
+          balance: initialBalance,
+          operador_permitido_id: operadorPermitido,
+        },
+      ]);
 
       if (error) {
-        showToast("Erro ao criar fonte: " + error.message, "error");
+        showToast('Erro ao criar fonte: ' + error.message, 'error');
       } else {
-        showToast("Fonte criada!", "success");
+        showToast('Fonte criada!', 'success');
         ui.closeModal();
-        await fetchFullData(activeUser.id);
+        await fetchFullData(ownerId); // ✅ recarrega pelo DONO
       }
     } catch (e: any) {
-      showToast("Erro ao criar fonte.", "error");
+      showToast('Erro ao criar fonte: ' + (e?.message || 'erro desconhecido'), 'error');
     } finally {
       ui.setIsSaving(false);
     }
@@ -77,20 +86,23 @@ export const useSourceController = (
     if (!activeUser || !ui.activeModal?.payload || ui.addFundsValue == null) return;
 
     const amount = parseCurrency(ui.addFundsValue);
-    
     if (amount <= 0) {
-      showToast("Informe um valor válido para adicionar.", "error");
+      showToast('Informe um valor válido para adicionar.', 'error');
       return;
     }
 
     if (activeUser.id === 'DEMO') {
       setSources(
-        sources.map((s) =>
-          s.id === ui.activeModal.payload?.id ? { ...s, balance: s.balance + amount } : s
-        )
+        sources.map((s) => (s.id === ui.activeModal.payload?.id ? { ...s, balance: s.balance + amount } : s))
       );
-      showToast("Fundos adicionados (Demo)", "success");
+      showToast('Fundos adicionados (Demo)', 'success');
       ui.closeModal();
+      return;
+    }
+
+    const ownerId = getOwnerId(activeUser);
+    if (!ownerId) {
+      showToast('OwnerId inválido. Refaça login.', 'error');
       return;
     }
 
@@ -100,11 +112,11 @@ export const useSourceController = (
     });
 
     if (error) {
-      showToast("Erro ao adicionar fundos: " + error.message, "error");
+      showToast('Erro ao adicionar fundos: ' + error.message, 'error');
     } else {
-      showToast("Saldo atualizado com segurança!", "success");
+      showToast('Saldo atualizado com segurança!', 'success');
       ui.closeModal();
-      await fetchFullData(activeUser.id);
+      await fetchFullData(ownerId); // ✅ recarrega pelo DONO
     }
   };
 
@@ -114,27 +126,27 @@ export const useSourceController = (
     const newBalance = parseCurrency(ui.editingSource.balance);
 
     if (activeUser.id === 'DEMO') {
-      setSources(
-        sources.map((s) => (s.id === ui.editingSource?.id ? { ...s, balance: newBalance } : s))
-      );
-      showToast("Saldo atualizado (Demo)", "success");
+      setSources(sources.map((s) => (s.id === ui.editingSource?.id ? { ...s, balance: newBalance } : s)));
+      showToast('Saldo atualizado (Demo)', 'success');
       ui.setEditingSource(null);
       return;
     }
 
-    try {
-      const { error } = await supabase
-        .from('fontes')
-        .update({ balance: newBalance })
-        .eq('id', ui.editingSource.id);
+    const ownerId = getOwnerId(activeUser);
+    if (!ownerId) {
+      showToast('OwnerId inválido. Refaça login.', 'error');
+      return;
+    }
 
+    try {
+      const { error } = await supabase.from('fontes').update({ balance: newBalance }).eq('id', ui.editingSource.id);
       if (error) throw error;
 
-      showToast("Inventário da fonte atualizado!", "success");
+      showToast('Inventário da fonte atualizado!', 'success');
       ui.setEditingSource(null);
-      await fetchFullData(activeUser.id);
+      await fetchFullData(ownerId); // ✅ recarrega pelo DONO
     } catch (e: any) {
-      showToast("Erro ao atualizar saldo: " + (e?.message || "erro desconhecido"), "error");
+      showToast('Erro ao atualizar saldo: ' + (e?.message || 'erro desconhecido'), 'error');
     }
   };
 
@@ -144,47 +156,50 @@ export const useSourceController = (
     const amount = parseCurrency(ui.withdrawValue);
 
     if (amount <= 0) {
-      showToast("Informe um valor válido para resgatar.", "error");
+      showToast('Informe um valor válido para resgatar.', 'error');
       return;
     }
 
     if (amount > (Number(activeUser.interestBalance) || 0)) {
-      showToast("Saldo de lucro insuficiente.", "error");
+      showToast('Saldo de lucro insuficiente.', 'error');
       return;
     }
 
-    const targetSourceId =
-      ui.withdrawSourceId === 'EXTERNAL_WITHDRAWAL' ? null : ui.withdrawSourceId;
+    const targetSourceId = ui.withdrawSourceId === 'EXTERNAL_WITHDRAWAL' ? null : ui.withdrawSourceId;
 
     if (targetSourceId && !sources.some((s) => s.id === targetSourceId)) {
-      showToast("Selecione uma fonte válida para receber o resgate.", "error");
+      showToast('Selecione uma fonte válida para receber o resgate.', 'error');
       return;
     }
 
     if (activeUser.id === 'DEMO') {
       setActiveUser({ ...activeUser, interestBalance: (activeUser.interestBalance || 0) - amount });
-
       if (targetSourceId) {
         setSources(sources.map((s) => (s.id === targetSourceId ? { ...s, balance: s.balance + amount } : s)));
       }
-
-      showToast("Resgate realizado (Demo)!", "success");
+      showToast('Resgate realizado (Demo)!', 'success');
       ui.closeModal();
+      return;
+    }
+
+    const ownerId = getOwnerId(activeUser);
+    if (!ownerId) {
+      showToast('OwnerId inválido. Refaça login.', 'error');
       return;
     }
 
     const { error } = await supabase.rpc('profit_withdrawal_atomic', {
       p_amount: amount,
-      p_profile_id: activeUser.id,
+      p_profile_id: ownerId, // ✅ CRÍTICO: lucro pertence ao DONO
       p_target_source_id: targetSourceId,
     });
 
     if (error) {
-      showToast("Falha no resgate: " + error.message, "error");
+      showToast('Falha no resgate: ' + error.message, 'error');
     } else {
-      showToast("Resgate processado com sucesso!", "success");
+      showToast('Resgate processado com sucesso!', 'success');
       ui.closeModal();
-      await fetchFullData(activeUser.id);
+      await fetchFullData(ownerId); // ✅ recarrega pelo DONO
     }
   };
 
