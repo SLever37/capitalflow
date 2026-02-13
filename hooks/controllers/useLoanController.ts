@@ -1,14 +1,20 @@
-// controllers/useLoanController.ts
+// src/hooks/controllers/useLoanController.ts
 import { supabase } from '../../lib/supabase';
 import { contractsService } from '../../services/contracts.service';
 import { demoService } from '../../services/demo.service';
 import { ledgerService } from '../../services/ledger.service';
 import { getOrCreatePortalLink } from '../../utils/portalLink';
-import { Loan, UserProfile, CapitalSource, Client, LedgerEntry } from '../../types';
+import type { Loan, UserProfile, CapitalSource, Client, LedgerEntry } from '../../types';
 
 const isUUID = (v: any) =>
   typeof v === 'string' &&
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
+
+const safeOwnerId = (activeUser: UserProfile | null) => {
+  if (!activeUser?.id) return null;
+  const ownerId = (activeUser as any).supervisor_id || activeUser.id;
+  return isUUID(ownerId) ? ownerId : null;
+};
 
 export const useLoanController = (
   activeUser: UserProfile | null,
@@ -22,11 +28,7 @@ export const useLoanController = (
   fetchFullData: (id: string) => Promise<void>,
   showToast: (msg: string, type?: 'success' | 'error') => void
 ) => {
-  const getOwnerId = () => {
-    if (!activeUser?.id) return null;
-    const ownerId = (activeUser as any).supervisor_id || activeUser.id;
-    return isUUID(ownerId) ? ownerId : null;
-  };
+  const getOwnerId = () => safeOwnerId(activeUser);
 
   const handleSaveLoan = async (loan: Loan) => {
     if (!activeUser) return;
@@ -96,7 +98,7 @@ export const useLoanController = (
       const note =
         window.prompt(nextStatus === 'APROVADO' ? 'Observação (opcional):' : 'Motivo/observação (opcional):') || null;
 
-      // ✅ sinalizacoes_pagamento: filtra por profile_id = DONO (ownerId), não activeUser.id
+      // ✅ sinalizacoes_pagamento: filtra por profile_id = DONO (ownerId)
       const { error } = await supabase
         .from('sinalizacoes_pagamento')
         .update({
@@ -122,7 +124,6 @@ export const useLoanController = (
       const accessCode = (client as any)?.access_code || (client as any)?.accessCode;
 
       let url = await getOrCreatePortalLink(loan.id);
-
       if (accessCode) url += `&code=${accessCode}`;
 
       await navigator.clipboard.writeText(url);
@@ -135,6 +136,8 @@ export const useLoanController = (
 
   const openConfirmation = (config: any) => {
     ui.setRefundChecked(true);
+
+    // Exibe estorno por padrão em DELETE/ARCHIVE
     const shouldShowRefund = config.type === 'DELETE' || config.type === 'ARCHIVE';
 
     ui.setConfirmation({
@@ -172,13 +175,18 @@ export const useLoanController = (
 
     try {
       if (ui.confirmation.type === 'REVERSE_TRANSACTION') {
-        await ledgerService.reverseTransaction(ui.confirmation.target as LedgerEntry, activeUser, ui.confirmation.extraData);
+        await ledgerService.reverseTransaction(
+          ui.confirmation.target as LedgerEntry,
+          activeUser,
+          ui.confirmation.extraData
+        );
         showToast('Transação estornada com sucesso!', 'success');
       } else {
         const target = ui.confirmation.target;
         if (!target) throw new Error('Alvo da ação não definido.');
 
         const targetId = typeof target === 'string' ? target : target.id;
+
         if (!targetId || targetId === 'undefined' || typeof targetId !== 'string') {
           throw new Error('ID inválido para execução. Tente recarregar a página.');
         }
@@ -210,7 +218,9 @@ export const useLoanController = (
       type: 'REVERSE_TRANSACTION',
       target: t,
       title: 'Confirmar Estorno?',
-      message: `Deseja desfazer o lançamento de R$ ${t.amount.toFixed(2)}? Isso reajustará o saldo devedor do contrato e o caixa.`,
+      message: `Deseja desfazer o lançamento de R$ ${t.amount.toFixed(
+        2
+      )}? Isso reajustará o saldo devedor do contrato e o caixa.`,
       extraData: loan,
     });
   };

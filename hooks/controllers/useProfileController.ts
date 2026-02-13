@@ -4,13 +4,6 @@ import { operatorProfileService } from '../../features/profile/services/operator
 import { readBackupFile } from '../../services/dataService';
 import { UserProfile } from '../../types';
 
-// helpers
-const isUUID = (v: any) =>
-  typeof v === 'string' &&
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
-
-const safeUUID = (v: any) => (isUUID(v) ? v : null);
-
 export const useProfileController = (
   activeUser: UserProfile | null,
   ui: any,
@@ -22,8 +15,6 @@ export const useProfileController = (
   handleLogout: () => void,
   showToast: (msg: string, type?: 'success' | 'error' | 'info') => void
 ) => {
-  const getOwnerId = (u: UserProfile) => safeUUID((u as any).supervisor_id) || safeUUID(u.id);
-
   const handleSaveProfile = async () => {
     if (!activeUser || !profileEditForm) return;
 
@@ -111,29 +102,23 @@ export const useProfileController = (
     }
   };
 
-  /**
-   * ✅ LIMPEZA DEFINITIVA
-   * - Dados da conta: ownerId (clientes/contratos)
-   * - Dados operacionais: operatorId (fontes, avatar etc.)
-   */
-  const executeCleanData = async (ownerId: string, operatorId: string) => {
-    // segurança
-    if (!isUUID(ownerId) || !isUUID(operatorId)) throw new Error('IDs inválidos para limpeza.');
+  const executeCleanData = async (profileId: string) => {
+    // ownerId é o DONO (supervisor) ou o próprio
+    const ownerId = (activeUser as any)?.supervisor_id || profileId;
 
-    // 1) Dependentes por profile_id (seu schema mostra isso)
+    // ✅ Por profile_id (tabelas operacionais e acessórias)
+    // Nota: Usamos o ID do dono para garantir que toda a organização seja limpa
     await supabase.from('transacoes').delete().eq('profile_id', ownerId);
+    await supabase.from('documentos_juridicos').delete().eq('profile_id', ownerId);
     await supabase.from('sinalizacoes_pagamento').delete().eq('profile_id', ownerId);
     await supabase.from('parcelas').delete().eq('profile_id', ownerId);
 
-    // 2) Cabeçalhos por owner_id (seu schema mostra isso)
+    // ✅ Contratos e Clientes agora são filtrados por owner_id (Schema v3+)
     await supabase.from('contratos').delete().eq('owner_id', ownerId);
     await supabase.from('clientes').delete().eq('owner_id', ownerId);
 
-    // 3) Itens do operador (carteiras/fontes são do operador no app)
-    await supabase.from('fontes').delete().eq('profile_id', operatorId);
-
-    // 4) Jurídico (mantém por profile_id, igual o restante do app)
-    await supabase.from('documentos_juridicos').delete().eq('profile_id', ownerId);
+    // ✅ Fontes continuam vinculadas ao perfil principal (Dono)
+    await supabase.from('fontes').delete().eq('profile_id', ownerId);
   };
 
   const handleResetData = async () => {
@@ -144,29 +129,19 @@ export const useProfileController = (
       return;
     }
 
-    const ownerId = getOwnerId(activeUser);
-    const operatorId = safeUUID(activeUser.id);
-
-    if (!ownerId || !operatorId) {
-      showToast('Perfil inválido. Refaça login.', 'error');
-      return;
-    }
-
     setIsLoadingData(true);
     try {
-      await executeCleanData(ownerId, operatorId);
+      await executeCleanData(activeUser.id);
 
-      // zera métricas no PERFIL DA CONTA (owner)
       await supabase
         .from('perfis')
         .update({ total_available_capital: 0, interest_balance: 0 })
-        .eq('id', ownerId);
+        .eq('id', activeUser.id);
 
       showToast('Banco de dados resetado com sucesso!', 'success');
       ui.closeModal();
 
-      // recarrega pela conta (owner)
-      await fetchFullData(ownerId);
+      await fetchFullData(activeUser.id);
     } catch (e: any) {
       showToast('Erro ao resetar: ' + e.message, 'error');
     } finally {
@@ -183,21 +158,10 @@ export const useProfileController = (
       return;
     }
 
-    const ownerId = getOwnerId(activeUser);
-    const operatorId = safeUUID(activeUser.id);
-
-    if (!ownerId || !operatorId) {
-      showToast('Perfil inválido. Refaça login.', 'error');
-      return;
-    }
-
     setIsLoadingData(true);
     try {
-      await executeCleanData(ownerId, operatorId);
-
-      // apaga a conta (owner)
-      await supabase.from('perfis').delete().eq('id', ownerId);
-
+      await executeCleanData(activeUser.id);
+      await supabase.from('perfis').delete().eq('id', activeUser.id);
       showToast('Sua conta foi excluída permanentemente.', 'success');
       handleLogout();
     } catch (e: any) {
@@ -213,6 +177,6 @@ export const useProfileController = (
     handlePhotoUpload,
     handleRestoreBackup,
     handleDeleteAccount,
-    handleResetData,
+    handleResetData
   };
 };

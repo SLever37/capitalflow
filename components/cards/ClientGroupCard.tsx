@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { ChevronDown, ChevronUp, User, ShieldAlert, AlertCircle, CheckCircle2, Wallet, Layers } from 'lucide-react';
 import { ClientGroup } from '../../domain/dashboard/loanGrouping';
@@ -15,7 +14,36 @@ interface ClientGroupCardProps {
 export const ClientGroupCard: React.FC<ClientGroupCardProps> = ({ group, passThroughProps, isStealthMode }) => {
     const [isExpanded, setIsExpanded] = useState(false);
 
-    // Definição de Cores do Header baseada no Status do Grupo
+    // REGRA: Se for apenas um contrato, não agrupa visualmente. Renderiza o LoanCard direto.
+    if (group.isStandalone && group.loans.length === 1) {
+        const loan = group.loans[0];
+        return (
+            <LoanCard 
+                loan={loan}
+                {...passThroughProps}
+                onEdit={(e) => { e?.stopPropagation(); passThroughProps.onEdit(loan); }}
+                onMessage={(e) => { e?.stopPropagation(); passThroughProps.onMessage(loan); }}
+                onNote={(e) => { e?.stopPropagation(); passThroughProps.onNote(loan); }}
+                onArchive={(e) => { e?.stopPropagation(); passThroughProps.onArchive(loan); }}
+                onRestore={(e) => { e?.stopPropagation(); passThroughProps.onRestore(loan); }}
+                onDelete={(e) => { e?.stopPropagation(); passThroughProps.onDelete(loan); }}
+                onPortalLink={(e) => { e?.stopPropagation(); passThroughProps.onPortalLink(loan); }}
+                onUploadPromissoria={(e) => { e?.stopPropagation(); passThroughProps.onUploadPromissoria(loan); }}
+                onUploadDoc={(e) => { e?.stopPropagation(); passThroughProps.onUploadDoc(loan); }}
+                onRenegotiate={() => { passThroughProps.onRenegotiate(loan); }}
+                onNewAporte={() => { passThroughProps.onNewAporte(loan); }}
+                onViewPromissoria={(e, url) => { e?.stopPropagation(); passThroughProps.onViewPromissoria(url); }}
+                onViewDoc={(e, url) => { e?.stopPropagation(); passThroughProps.onViewDoc(url); }}
+                isExpanded={passThroughProps.selectedLoanId === loan.id}
+                onToggleExpand={(e) => {
+                    e?.stopPropagation();
+                    passThroughProps.setSelectedLoanId(passThroughProps.selectedLoanId === loan.id ? null : loan.id);
+                }}
+            />
+        );
+    }
+
+    // Definição de Cores do Header baseada no Status do Grupo (Para múltiplos contratos)
     let statusColor = 'border-slate-800 bg-slate-900';
     let icon = <User className="text-slate-400" size={24} />;
     let statusText = 'Regular';
@@ -40,13 +68,10 @@ export const ClientGroupCard: React.FC<ClientGroupCardProps> = ({ group, passThr
 
     return (
         <div className={`rounded-3xl border transition-all duration-300 overflow-hidden mb-4 ${statusColor} ${isExpanded ? 'shadow-2xl' : 'shadow-md'}`}>
-            
-            {/* HEADER DO GRUPO (Clicável para Expandir) */}
             <div 
                 className="p-5 cursor-pointer flex flex-col gap-4 relative"
                 onClick={() => setIsExpanded(!isExpanded)}
             >
-                {/* Linha Superior: Avatar e Info */}
                 <div className="flex justify-between items-start">
                     <div className="flex items-center gap-4">
                         <div className="relative">
@@ -76,7 +101,6 @@ export const ClientGroupCard: React.FC<ClientGroupCardProps> = ({ group, passThr
                     </div>
                 </div>
 
-                {/* Linha Inferior: Resumo Financeiro */}
                 <div className="flex items-center justify-between pt-2 border-t border-slate-800/50 mt-1">
                     <div className="flex items-center gap-2 text-slate-400">
                         <Wallet size={16}/>
@@ -88,7 +112,6 @@ export const ClientGroupCard: React.FC<ClientGroupCardProps> = ({ group, passThr
                 </div>
             </div>
 
-            {/* CORPO DO GRUPO (Lista de Contratos) */}
             {isExpanded && (
                 <div className="bg-slate-950/50 p-3 sm:p-4 space-y-4 border-t border-slate-800 animate-in slide-in-from-top-2 duration-300">
                     <p className="text-[10px] text-slate-500 font-bold uppercase text-center tracking-[0.3em] mb-2">Detalhamento dos Contratos</p>
@@ -97,34 +120,20 @@ export const ClientGroupCard: React.FC<ClientGroupCardProps> = ({ group, passThr
                             key={loan.id}
                             loan={loan}
                             {...passThroughProps}
-                            
-                            // --- WRAPPERS DE EVENTOS (Correção de Bug UUID Undefined) ---
-                            // O LoanCard emite (e: MouseEvent). O Controller espera (loan: Loan).
-                            // Precisamos interceptar e passar o objeto 'loan' do loop.
-                            
                             onEdit={(e) => { e?.stopPropagation(); passThroughProps.onEdit(loan); }}
                             onMessage={(e) => { e?.stopPropagation(); passThroughProps.onMessage(loan); }}
                             onNote={(e) => { e?.stopPropagation(); passThroughProps.onNote(loan); }}
-                            
                             onArchive={(e) => { e?.stopPropagation(); passThroughProps.onArchive(loan); }}
                             onRestore={(e) => { e?.stopPropagation(); passThroughProps.onRestore(loan); }}
                             onDelete={(e) => { e?.stopPropagation(); passThroughProps.onDelete(loan); }}
-                            
                             onPortalLink={(e) => { e?.stopPropagation(); passThroughProps.onPortalLink(loan); }}
                             onUploadPromissoria={(e) => { e?.stopPropagation(); passThroughProps.onUploadPromissoria(loan); }}
                             onUploadDoc={(e) => { e?.stopPropagation(); passThroughProps.onUploadDoc(loan); }}
                             onRenegotiate={() => { passThroughProps.onRenegotiate(loan); }}
                             onNewAporte={() => { passThroughProps.onNewAporte(loan); }}
-                            
-                            // Fix para visualizadores que recebem URL como 2º argumento
                             onViewPromissoria={(e, url) => { e?.stopPropagation(); passThroughProps.onViewPromissoria(url); }}
                             onViewDoc={(e, url) => { e?.stopPropagation(); passThroughProps.onViewDoc(url); }}
-
-                            // -------------------------------------------------------------
-
-                            // Força modo não expandido por padrão dentro do grupo
                             isExpanded={passThroughProps.selectedLoanId === loan.id}
-                            // Toggle expand individual
                             onToggleExpand={(e) => {
                                 e?.stopPropagation();
                                 passThroughProps.setSelectedLoanId(passThroughProps.selectedLoanId === loan.id ? null : loan.id);

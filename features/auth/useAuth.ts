@@ -1,4 +1,3 @@
-// features/auth/useAuth.ts
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { requestBrowserNotificationPermission } from '../../utils/notifications';
@@ -12,10 +11,6 @@ type SavedProfile = {
   email: string;
 };
 
-/**
- * Resolve o nome de EXIBIÇÃO de forma inteligente.
- * Ignora termos genéricos como "Usuário" ou "Operador" se houver dados melhores.
- */
 const resolveSmartName = (p: any): string => {
   if (!p) return 'Gestor';
 
@@ -25,23 +20,18 @@ const resolveSmartName = (p: any): string => {
     return ['usuário', 'usuario', 'user', 'operador', 'admin', 'gestor', 'undefined', 'null', ''].includes(clean);
   };
 
-  // 1. Tenta Nome de Exibição (Prioridade Máxima do BD)
   const display = asString(p.nome_exibicao);
   if (display && !isGeneric(display)) return display;
 
-  // 2. Tenta Nome do Operador
   const operator = asString(p.nome_operador);
   if (operator && !isGeneric(operator)) return operator;
 
-  // 3. Tenta Nome da Empresa
   const business = asString(p.nome_empresa);
   if (business && !isGeneric(business)) return business;
 
-  // 4. Tenta Primeiro Nome Completo
   const full = asString(p.nome_completo);
   if (full && !isGeneric(full)) return full.split(' ')[0];
 
-  // 5. Tenta parte do E-mail (Sempre único e seguro)
   const email = asString(p.usuario_email || p.email);
   if (email && email.includes('@')) {
     const prefix = email.split('@')[0];
@@ -97,13 +87,7 @@ export const useAuth = () => {
     showToast(`Bem-vindo, ${profileName}!`, 'success');
   };
 
-  /**
-   * ✅ CRÍTICO: garante sessão Auth (para auth.uid() != null e RLS funcionar)
-   * - Se o usuário Auth ainda não existir / senha diferente, isso vai falhar.
-   * - Nesse caso, você precisa alinhar a senha do usuário no Supabase Auth com a senha usada aqui.
-   */
   const ensureAuthSession = async (email: string, password: string) => {
-    // já tem sessão?
     const { data: s } = await supabase.auth.getSession();
     if (s?.session?.user?.id) return;
 
@@ -115,13 +99,11 @@ export const useAuth = () => {
     if (error) throw error;
   };
 
-  // Login Padrão (Gestor)
   const submitLogin = async (
     setIsLoading: (v: boolean) => void,
     showToast: (msg: string, type?: 'error' | 'success' | 'warning') => void
   ) => {
     setIsLoading(true);
-
     const userInput = loginUser.trim();
     const pass = loginPassword.trim();
 
@@ -135,20 +117,16 @@ export const useAuth = () => {
 
     try {
       let profile: any = null;
-
-      // 1. Tenta via RPC (E-mail sempre em minúsculas para matching de login)
       try {
         const { data, error: rpcError } = await supabase.rpc('login_user', {
           p_email: userInput.toLowerCase(),
           p_password: pass,
         });
-
         if (!rpcError && data) profile = Array.isArray(data) ? data[0] : data;
       } catch (e) {
         console.warn('RPC Login failed, falling back.', e);
       }
 
-      // 2. Fallback Manual Seguro
       if (!profile) {
         const { data: fallbackData, error: fallbackError } = await supabase
           .from('perfis')
@@ -166,34 +144,18 @@ export const useAuth = () => {
         return;
       }
 
-      // ✅ PASSO CRÍTICO: cria sessão Auth antes de carregar o app (RLS depende disso)
       const email = asString(profile.usuario_email || profile.email || userInput).toLowerCase();
       await ensureAuthSession(email, pass);
-      const { data: debugData } = await supabase.rpc('debug_whoami');
-console.log('[WHOAMI]', debugData);
-
-      // agora sim salva sessão local e entra
       handleLoginSuccess(profile, showToast);
     } catch (err: any) {
       console.error('Erro crítico no login:', err);
-
-      // mensagem direta pra você identificar o motivo
       const msg = err?.message || 'Desconhecido';
-      if (String(msg).toLowerCase().includes('invalid login credentials')) {
-        showToast(
-          'Login Auth falhou (senha do Supabase Auth diferente). Ajuste a senha do usuário no Auth para bater com a senha do perfil.',
-          'error'
-        );
-      } else {
-        showToast('Erro de conexão: ' + msg, 'error');
-      }
+      showToast('Erro de conexão: ' + msg, 'error');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Login de Equipe (Sem Senha, com Validação de Dados)
-  // ⚠️ Mantido como está (se equipe também precisar de RLS, depois alinhamos com Auth também)
   const submitTeamLogin = async (
     params: { document: string; phone: string; code: string },
     setIsLoading: (v: boolean) => void,
@@ -238,11 +200,22 @@ console.log('[WHOAMI]', debugData);
     }
   };
 
+  const handleSelectSavedProfile = (p: SavedProfile, showToast: any) => {
+    setActiveProfileId(p.id);
+    localStorage.setItem('cm_session', JSON.stringify({ profileId: p.id, ts: Date.now() }));
+    showToast(`Bem-vindo de volta, ${p.name}!`, 'success');
+  };
+
+  const handleRemoveSavedProfile = (id: string) => {
+    const updated = savedProfiles.filter((p) => p.id !== id);
+    setSavedProfiles(updated);
+    localStorage.setItem('cm_saved_profiles', JSON.stringify(updated));
+  };
+
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
     } catch {}
-
     setActiveProfileId(null);
     localStorage.removeItem('cm_session');
   };
@@ -258,5 +231,7 @@ console.log('[WHOAMI]', debugData);
     submitLogin,
     submitTeamLogin,
     handleLogout,
+    handleSelectSavedProfile,
+    handleRemoveSavedProfile,
   };
 };

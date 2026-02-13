@@ -1,4 +1,3 @@
-
 import { supabase } from '../../../lib/supabase';
 import { generateUUID } from '../../../utils/generators';
 import { PFTransaction, PFAccount, PFCard, PFCategory } from '../types';
@@ -48,15 +47,29 @@ export const personalFinanceService = {
         const payload = {
             id: generateUUID(),
             profile_id: profileId,
-            ...tx
+            descricao: tx.descricao,
+            valor: Number(tx.valor),
+            tipo: tx.tipo,
+            data: tx.data || new Date().toISOString(),
+            categoria_id: tx.categoria_id || null,
+            conta_id: tx.conta_id || null,
+            cartao_id: tx.cartao_id || null,
+            fixo: !!tx.fixo,
+            status: tx.status || 'CONSOLIDADO',
+            created_at: new Date().toISOString()
         };
+
         const { error } = await supabase.from('pf_transacoes').insert(payload);
         if (error) throw error;
         
-        // Atualiza saldo da conta se não for cartão de crédito e já estiver consolidado
-        if (tx.conta_id && tx.status === 'CONSOLIDADO' && !tx.cartao_id) {
-            const delta = tx.tipo === 'RECEITA' ? Number(tx.valor) : -Number(tx.valor);
-            await supabase.rpc('pf_adjust_account_balance', { p_account_id: tx.conta_id, p_delta: delta });
+        // Rigor Contábil: Atualiza o saldo da conta destino na hora
+        if (payload.conta_id && payload.status === 'CONSOLIDADO' && !payload.cartao_id) {
+            const delta = payload.tipo === 'RECEITA' ? payload.valor : -payload.valor;
+            const { error: rpcErr } = await supabase.rpc('pf_adjust_account_balance', { 
+                p_account_id: payload.conta_id, 
+                p_delta: delta 
+            });
+            if (rpcErr) console.error("Erro ao atualizar saldo da conta:", rpcErr);
         }
     },
 

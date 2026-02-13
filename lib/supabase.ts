@@ -1,50 +1,47 @@
-// src/lib/supabase.ts
 import { createClient } from '@supabase/supabase-js';
 
-// Helper seguro para obter variáveis de ambiente
-const getEnv = (key: string) => {
-  // 1) Vite
+/**
+ * Helper para acesso seguro ao ambiente.
+ * Previne "TypeError: Cannot read properties of undefined" ao acessar import.meta.env
+ */
+const safeEnv = (() => {
   try {
-    const v = (import.meta as any)?.env?.[key];
-    if (v) return v;
-  } catch {}
+    return ((import.meta as any)?.env ?? {}) as Record<string, any>;
+  } catch {
+    return {};
+  }
+})();
 
-  // 2) Node / build tools
-  try {
-    const v = (globalThis as any)?.process?.env?.[key];
-    if (v) return v;
-  } catch {}
-
-  return undefined;
-};
-
+// Configurações baseadas no ambiente ou fallback estático
 const SUPABASE_URL =
-  getEnv('VITE_SUPABASE_URL') || 'https://hzchchbxkhryextaymkn.supabase.co';
+  process.env.VITE_SUPABASE_URL ||
+  safeEnv.VITE_SUPABASE_URL ||
+  'https://hzchchbxkhryextaymkn.supabase.co';
 
 const SUPABASE_ANON_KEY =
-  getEnv('VITE_SUPABASE_ANON_KEY') ||
+  process.env.VITE_SUPABASE_ANON_KEY ||
+  safeEnv.VITE_SUPABASE_ANON_KEY ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh6Y2hjaGJ4a2hyeWV4dGF5bWtuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3NTk2ODcsImV4cCI6MjA4MzMzNTY4N30.kX6FlTuPkl7XfycwVuZN2mI6e3ed8NaDUoyAHy9L3nc';
 
-if (!SUPABASE_URL) throw new Error('SUPABASE_URL não definida');
-if (!SUPABASE_ANON_KEY) throw new Error('SUPABASE_ANON_KEY não definida');
+if (!SUPABASE_URL) {
+  console.warn('[SUPABASE] URL não detectada nas variáveis de ambiente.');
+}
+
+if (!SUPABASE_ANON_KEY || SUPABASE_ANON_KEY === '') {
+  console.warn('[SUPABASE] Anon Key ausente. Operações de banco podem falhar.');
+}
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: false,
+    detectSessionInUrl: true,
+    storageKey: 'cm_supabase_auth',
   },
 });
 
-// DEBUG (remover depois)
-console.log('[SUPABASE] url=', SUPABASE_URL);
-console.log('[SUPABASE] keyPrefix=', SUPABASE_ANON_KEY.slice(0, 12));
-
-// ✅ ESTE LOG É O PRÓXIMO PASSO PARA DESTRAVAR CLIENTES/CONTRATOS
-supabase.auth.getSession().then(({ data }) => {
-  console.log('[AUTH][SESSION] uid=', data.session?.user?.id ?? null);
-});
-
-supabase.auth.onAuthStateChange((event, session) => {
-  console.log('[AUTH][CHANGE] event=', event, 'uid=', session?.user?.id ?? null);
-});
+// Debug em desenvolvimento
+if (process.env.NODE_ENV === 'development') {
+  console.log('[SUPABASE] Inicializado:', SUPABASE_URL);
+  console.log('[SUPABASE] Key Prefix:', (SUPABASE_ANON_KEY || '').slice(0, 12));
+}

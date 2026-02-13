@@ -20,10 +20,13 @@ export async function executeLedgerAction(params: {
 
   // 1) Reembolso de capital na fonte (opcional)
   if (refundChecked && loan && loan.sourceId && (type === 'DELETE' || type === 'ARCHIVE')) {
-    const remainingPrincipal = (loan.installments || []).reduce((sum: number, i: any) => sum + toNumber(i.principalRemaining), 0);
+    const remainingPrincipal = (loan.installments || []).reduce(
+      (sum: number, i: any) => sum + toNumber(i.principalRemaining),
+      0
+    );
 
     if (remainingPrincipal > 0) {
-      const source = sources.find(s => s.id === loan.sourceId);
+      const source = sources.find((s) => s.id === loan.sourceId);
       if (source) {
         const { error: refundError } = await supabase
           .from('fontes')
@@ -60,13 +63,14 @@ export async function executeLedgerAction(params: {
 
   // 2) Ações
   if (type === 'DELETE') {
-    const { error } = await supabase.from('contratos').delete().eq('id', targetId).eq('profile_id', ownerId);
+    // ✅ contratos pertencem ao DONO (coluna: owner_id)
+    const { error } = await supabase.from('contratos').delete().eq('id', targetId).eq('owner_id', ownerId);
     if (error) throw error;
     return 'Contrato Excluído permanentemente.';
   }
 
   if (type === 'ARCHIVE') {
-    const { error } = await supabase.from('contratos').update({ is_archived: true }).eq('id', targetId).eq('profile_id', ownerId);
+    const { error } = await supabase.from('contratos').update({ is_archived: true }).eq('id', targetId).eq('owner_id', ownerId);
     if (error) throw error;
 
     await logArchive(ownerId, targetId, loan?.sourceId);
@@ -74,7 +78,7 @@ export async function executeLedgerAction(params: {
   }
 
   if (type === 'RESTORE') {
-    const { error } = await supabase.from('contratos').update({ is_archived: false }).eq('id', targetId).eq('profile_id', ownerId);
+    const { error } = await supabase.from('contratos').update({ is_archived: false }).eq('id', targetId).eq('owner_id', ownerId);
     if (error) throw error;
 
     await logRestore(ownerId, targetId, loan?.sourceId);
@@ -82,9 +86,60 @@ export async function executeLedgerAction(params: {
   }
 
   if (type === 'DELETE_CLIENT') {
-    const { error } = await supabase.from('clientes').delete().eq('id', targetId).eq('profile_id', ownerId);
-    if (error) throw error;
-    return 'Cliente removido.';
+    // ✅ clientes pertencem ao DONO (coluna: owner_id)
+    // ✅ deleção em cascata (app-side) para evitar FK travando:
+    // 1) pegar loans do cliente
+    const { data: loanIdsData, error: loanIdsErr } = await supabase
+      .from('contratos')
+      .select('id')
+      .eq('owner_id', ownerId)
+      .eq('client_id', targetId);
+
+    if (loanIdsErr) throw loanIdsErr;
+
+    const loanIds = (loanIdsData || []).map((r: any) => r.id).filter(Boolean);
+
+    if (loanIds.length > 0) {
+      // 2) apagar dependências por loan_id (tabelas que você citou no schema)
+      const deletes = [
+        supabase.from('sinalizacoes_pagamento').delete().in('loan_id', loanIds).eq('profile_id', ownerId),
+        supabase.from('transacoes').delete().in('loan_id', loanIds).eq('profile_id', ownerId),
+        supabase.from('parcelas').delete().in('loan_id', loanIds).eq('profile_id', ownerId),
+        // acordos: depende do seu schema, mas normalmente tem loan_id
+        supabase.from('acordo_parcelas').delete().in('loan_id', loanIds).eq('profile_id', ownerId),
+        supabase.from('acordos_inadimplencia').delete().in('loan_id', loanIds).eq('profile_id', ownerId),
+      ];
+
+      const results = await Promise.allSettled(deletes);
+
+      // se alguma tabela não existir/coluna não existir no seu projeto, isso pode falhar:
+      // nesse caso você me manda o erro exato e eu ajusto para o seu schema REAL.
+      for (const r of results) {
+        if (r.status === 'fulfilled' && (r.value as any)?.error) {
+          throw (r.value as any).error;
+        }
+      }
+
+      // 3) apagar contratos
+      const { error: delLoansErr } = await supabase
+        .from('contratos')
+        .delete()
+        .in('id', loanIds)
+        .eq('owner_id', ownerId);
+
+      if (delLoansErr) throw delLoansErr;
+    }
+
+    // 4) apagar cliente
+    const { error: delClientErr } = await supabase
+      .from('clientes')
+      .delete()
+      .eq('id', targetId)
+      .eq('owner_id', ownerId);
+
+    if (delClientErr) throw delClientErr;
+
+    return 'Cliente removido (com contratos e histórico).';
   }
 
   if (type === 'DELETE_SOURCE') {

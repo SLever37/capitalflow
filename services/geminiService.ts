@@ -2,151 +2,75 @@ import { supabase } from '../lib/supabase';
 import { GoogleGenAI } from "@google/genai";
 
 /**
- * Envia o comando e o contexto para a Edge Function 'ai-assistant'.
- * Se falhar (erro de conexão ou função ausente), tenta executar localmente via SDK Client-side (Fallback).
+ * Processa comandos em linguagem natural.
+ * Prioridade: Edge Function 'ai-assistant' no Supabase.
+ * Fallback: SDK Google Gemini local para redundância.
  */
 export const processNaturalLanguageCommand = async (text: string, portfolioContext: any) => {
+  // 1. TENTATIVA: Supabase Edge Function (Recomendado para Produção)
   try {
-    // 1. Tentativa Principal: Edge Function (Server-side)
+    // Verificamos se estamos em ambiente browser e se o supabase está ok
     const { data, error } = await supabase.functions.invoke('ai-assistant', {
-      body: {
-        text,
-        context: portfolioContext
+      body: { text, context: portfolioContext },
+    });
+
+    if (!error && data) {
+      return data;
+    }
+
+    if (error) {
+      // Logamos o erro mas não travamos o fluxo, o catch/fallback cuidará disso
+      console.warn('[AI][EDGE] Função remota retornou erro ou não encontrada:', error);
+    }
+  } catch (e: any) {
+    console.warn('[AI][EDGE] Falha na conexão com a Edge Function:', e?.message);
+  }
+
+  // 2. FALLBACK: Execução Local via SDK Gemini
+  // Verificação de segurança para a API Key conforme diretrizes
+  if (!process.env.API_KEY || process.env.API_KEY === 'PLACEHOLDER_API_KEY') {
+    return {
+      intent: 'ERROR',
+      feedback: 'Assistente offline. Verifique a conexão ou a API Key.',
+      analysis: 'As Edge Functions falharam e o SDK local não possui chave válida.'
+    };
+  }
+
+  try {
+    // Inicialização direta conforme diretrizes
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    
+    // Determinação de Persona baseada no contexto
+    const isPersonal = portfolioContext?.type === 'PERSONAL_FINANCE';
+    const systemInstruction = isPersonal 
+      ? "Consultor Financeiro Pessoal do CapitalFlow. Analise Receitas/Despesas. Retorne JSON puro."
+      : "CRO e Auditor Senior do CapitalFlow. Analise carteira de empréstimos e riscos. Retorne JSON puro.";
+
+    const userPrompt = `CONTEXTO: ${JSON.stringify(portfolioContext)}. MENSAGEM: "${text}"`;
+
+    // Chamada direta ao generateContent conforme diretrizes
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: userPrompt,
+      config: {
+        systemInstruction,
+        responseMimeType: "application/json",
+        temperature: 0.3
       }
     });
 
-    if (error) {
-      console.warn("Edge Function Error (Falling back to client-side):", error);
-      throw error; // Força cair no catch para tentar local
-    }
+    const textOutput = response.text;
+    if (!textOutput) throw new Error("IA retornou resposta vazia.");
 
-    return data;
+    const cleanJson = textOutput.replace(/^```json\s*/, '').replace(/\s*```$/, '').trim();
+    return JSON.parse(cleanJson);
 
-  } catch (edgeError: any) {
-    // 2. Fallback: Execução Local (Client-side)
-    // Só funciona se a chave estiver configurada no .env local e injetada pelo Vite
-    const apiKey = process.env.API_KEY;
-
-    if (apiKey && apiKey !== 'PLACEHOLDER_API_KEY') {
-        console.info("Usando Fallback Local de IA...");
-        try {
-            const ai = new GoogleGenAI({ apiKey });
-            
-            let systemInstruction = '';
-            let userPrompt = '';
-
-            // Lógica de Contexto: Finanças Pessoais vs Carteira de Empréstimos
-            if (portfolioContext?.type === 'PERSONAL_FINANCE') {
-                systemInstruction = `
-                Você é o Consultor Financeiro Pessoal do CapitalFlow.
-                Analise as finanças pessoais do usuário (Receitas, Despesas, Cartões).
-                
-                REGRAS:
-                1. Identifique a intenção:
-                   - 'PF_ADD_ASSET': Adicionar conta ou cartão.
-                   - 'PF_REMOVE_ASSET': Remover conta ou cartão.
-                   - 'PF_ADD_TRANSACTION': Adicionar transação.
-                   - 'PF_ANALYZE': Análise de gastos ou conselhos.
-    
-                RETORNE JSON:
-                {
-                  "intent": "PF_ADD_ASSET" | "PF_REMOVE_ASSET" | "PF_ADD_TRANSACTION" | "PF_ANALYZE" | "UNKNOWN",
-                  "data": { "name": "...", "type": "CARD"|"ACCOUNT", "balance": 0, "limit": 0 },
-                  "feedback": "Resposta curta.",
-                  "analysis": "Análise detalhada (se solicitado)."
-                }
-                `;
-                
-                userPrompt = `
-                DADOS FINANCEIROS:
-                - Saldo Total: R$ ${portfolioContext.balance?.toFixed(2)}
-                - Despesas Mês: R$ ${portfolioContext.totalExpensesMonth?.toFixed(2)}
-                - Contas: ${JSON.stringify(portfolioContext.accounts)}
-                - Cartões: ${JSON.stringify(portfolioContext.cards)}
-    
-                MENSAGEM: "${text}"
-                `;
-
-            } else {
-                // Padrão: Gestão de Empréstimos
-                systemInstruction = `
-                Você é o CRO (Chief Risk Officer) e Auditor Senior do CapitalFlow. 
-                Sua missão é julgar a saúde financeira da carteira de empréstimos do operador.
-                Seja analítico, as vezes cético e sempre focado em preservação de capital.
-
-                REGRAS DE RESPOSTA:
-                1. Identifique a intenção do usuário:
-                   - 'ANALYZE_PORTFOLIO': Perguntas sobre status, lucro, riscos, resumo, "como estou", "analise minha carteira".
-                   - 'REGISTER_CLIENT': Intenção de cadastrar alguém. Extraia nome e telefone se houver.
-                   - 'REGISTER_PAYMENT': Intenção de registrar pagamento. Extraia nome e valor.
-                   - 'ADD_REMINDER': Agendar lembrete.
-                
-                2. Se for análise ('ANALYZE_PORTFOLIO'):
-                   - Use os DADOS FORNECIDOS para apontar riscos.
-                   - Se houver muitos atrasos, aja como um "Juiz" severo pedindo foco em cobrança.
-                   - Mantenha um parágrafo denso de análise estratégica no campo 'analysis'.
-
-                RETORNE SEMPRE JSON NESTE FORMATO (SEM MARKDOWN):
-                {
-                  "intent": "ANALYZE_PORTFOLIO" | "REGISTER_CLIENT" | "REGISTER_PAYMENT" | "ADD_REMINDER" | "UNKNOWN",
-                  "data": { "name": "...", "amount": 0, "phone": "..." }, 
-                  "feedback": "Resposta curta de interação (1 frase).",
-                  "analysis": "Análise profunda, julgamento e recomendações práticas (Apenas para ANALYZE_PORTFOLIO)."
-                }
-                `;
-
-                userPrompt = `
-                DADOS ATUAIS DA CARTEIRA:
-                - Capital Ativo na Rua: R$ ${portfolioContext?.totalLent?.toFixed(2) || '0.00'}
-                - Lucro Líquido p/ Saque: R$ ${portfolioContext?.interestBalance?.toFixed(2) || '0.00'}
-                - Contratos em Atraso: ${portfolioContext?.lateCount || 0}
-                - Top Inadimplentes: ${JSON.stringify(portfolioContext?.topLateLoans || [])}
-                - Fluxo Mensal: ${JSON.stringify(portfolioContext?.monthFlow || {})}
-
-                MENSAGEM DO USUÁRIO:
-                "${text}"
-                `;
-            }
-
-            // Changed to flash-preview to avoid quota exhaustion (429) on preview tier
-            const response = await ai.models.generateContent({
-              model: 'gemini-3-flash-preview', 
-              contents: userPrompt,
-              config: {
-                systemInstruction: systemInstruction,
-                responseMimeType: "application/json",
-                temperature: 0.4
-              }
-            });
-
-            let cleanJson = response.text || '{}';
-            cleanJson = cleanJson.replace(/^```json\s*/, '').replace(/\s*```$/, '').trim();
-            return JSON.parse(cleanJson);
-
-        } catch (localError: any) {
-            console.error("Local AI Error:", localError);
-            
-            // Tratamento aprimorado de erro para exibir mensagem útil na UI
-            let msg = localError.message || (localError.error && localError.error.message) || JSON.stringify(localError);
-            
-            if (msg.includes('429') || msg.includes('quota') || msg.includes('RESOURCE_EXHAUSTED')) {
-                msg = "Cota da IA excedida (429). Aguarde alguns instantes ou verifique seu plano.";
-            }
-
-            return { 
-                intent: "ERROR", 
-                feedback: "Falha na IA: " + msg, 
-                analysis: "Verifique sua API Key ou conexão." 
-            };
-        }
-    }
-
-    // Se falhar tudo (Edge e sem chave local)
-    console.error("AI Service Critical Failure:", edgeError);
-    return { 
-        intent: "ERROR",
-        feedback: "Erro de conexão com o Assistente (Edge Function indisponível e sem chave local).", 
-        analysis: "Não foi possível processar sua solicitação no momento. Verifique sua conexão ou configuração de backend." 
+  } catch (localError: any) {
+    console.error("[AI] Falha crítica no SDK local:", localError);
+    return {
+      intent: 'ERROR',
+      feedback: 'Não foi possível processar o comando por voz no momento.',
+      analysis: localError.message
     };
   }
 };

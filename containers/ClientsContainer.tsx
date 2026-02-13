@@ -1,4 +1,3 @@
-
 import React, { useMemo } from 'react';
 import { ClientsPage } from '../pages/ClientsPage';
 import { Client } from '../types';
@@ -28,6 +27,7 @@ export const ClientsContainer: React.FC<ClientsContainerProps> = ({
         selectedClientsToDelete={ui.selectedClientsToDelete}
         toggleClientSelection={clientCtrl.toggleClientSelection}
         executeBulkDelete={clientCtrl.executeBulkDelete}
+        onDeleteClient={(id) => loanCtrl.openConfirmation({ type: 'DELETE_CLIENT', target: id })}
     />
   );
 };

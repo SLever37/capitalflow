@@ -7,7 +7,7 @@
  * continuará funcionando normalmente.
  *
  * Toda a lógica real está agora em:
- *   services/ledger/ledgerService.ts
+ *   src/services/ledger/ledgerService.ts
  */
-
 export { ledgerService } from './ledger/ledgerService';
+export type { LedgerActionType } from './ledger/ledgerService';

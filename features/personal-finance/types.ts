@@ -1,4 +1,3 @@
-
 export type PFTransactionType = 'RECEITA' | 'DESPESA' | 'TRANSFERENCIA';
 export type PFAccountType = 'CORRENTE' | 'POUPANCA' | 'CARTEIRA' | 'INVESTIMENTO';
 
@@ -22,6 +21,7 @@ export interface PFCategory {
     nome: string;
     tipo: 'RECEITA' | 'DESPESA';
     icone?: string;
+    is_system?: boolean; // Categorias fixas como Salário
 }
 
 export interface PFTransaction {
@@ -35,9 +35,10 @@ export interface PFTransaction {
     cartao_id?: string;
     fixo: boolean;
     status: 'PENDENTE' | 'CONSOLIDADO';
-    category_name?: string; // Join
-    account_name?: string; // Join
-    card_name?: string; // Join
+    category_name?: string; 
+    account_name?: string; 
+    card_name?: string;
+    created_at?: string;
 }
 
 export interface PFDashboardStats {

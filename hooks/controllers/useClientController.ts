@@ -87,7 +87,6 @@ export const useClientController = (
     if (!name.trim()) { showToast('Nome é obrigatório.', 'error'); return; }
     if (!phone.trim()) { showToast('Telefone é obrigatório.', 'error'); return; }
 
-    // valida CPF/CNPJ se informado
     if (document && !isValidCPForCNPJ(document)) {
       showToast('CPF ou CNPJ inválido.', 'error');
       return;
@@ -109,27 +108,7 @@ export const useClientController = (
       const cleanDoc = onlyDigits(document);
       const cleanPhone = onlyDigits(normalizeBrazilianPhone(phone));
 
-      // --- DUPLICIDADE CPF/CNPJ (não permite, exceto legado 00000000000) ---
-      if (cleanDoc && cleanDoc !== '00000000000' && cleanDoc.length >= 11) {
-        let q = supabase
-          .from('clientes')
-          .select('id, name')
-          .eq('owner_id', ownerId)
-          .eq('document', cleanDoc);
-
-        if (ui.editingClient?.id) q = q.neq('id', ui.editingClient.id);
-
-        const { data: existing, error: dupErr } = await q.maybeSingle();
-        if (dupErr) throw dupErr;
-
-        if (existing) {
-          showToast(`Documento já cadastrado para: ${existing.name}.`, 'error');
-          ui.setIsSaving(false);
-          return;
-        }
-      }
-
-      // --- DUPLICIDADE NOME (regra que você pediu) ---
+      // Verificação de duplicidade (apenas se não estiver editando o mesmo)
       const cleanName = String(name || '').trim();
       if (cleanName && !isTestClientName(cleanName)) {
         let qn = supabase
@@ -140,9 +119,7 @@ export const useClientController = (
 
         if (ui.editingClient?.id) qn = qn.neq('id', ui.editingClient.id);
 
-        const { data: existingName, error: nameErr } = await qn.maybeSingle();
-        if (nameErr) throw nameErr;
-
+        const { data: existingName } = await qn.maybeSingle();
         if (existingName) {
           showToast(`Já existe cliente com esse nome: ${existingName.name}.`, 'error');
           ui.setIsSaving(false);
@@ -151,130 +128,79 @@ export const useClientController = (
       }
 
       const id = ui.editingClient ? ui.editingClient.id : crypto.randomUUID();
+      const accessCode = ui.editingClient?.access_code || ui.clientDraftAccessCode;
+      const clientNum = ui.editingClient?.client_number || ui.clientDraftNumber;
 
       const payload: any = {
         id,
-        owner_id: ownerId,           // ✅ clientes usa owner_id
+        owner_id: ownerId, 
         name: cleanName,
-        phone: cleanPhone || null,   // ✅ guarda limpo (só dígitos)
-        document: cleanDoc || null,  // ✅ guarda limpo (só dígitos)
+        phone: cleanPhone || null,
+        document: cleanDoc || null,
         email: email || null,
         address: address || null,
         city: city || null,
         state: state || null,
         notes: notes || null,
+        access_code: accessCode,
+        client_number: clientNum
       };
 
-      if (!ui.editingClient) {
-        payload.access_code = ui.clientDraftAccessCode;
-        payload.client_number = ui.clientDraftNumber;
-        payload.created_at = new Date().toISOString();
-      }
-
       const { error } = await supabase.from('clientes').upsert(payload);
+
       if (error) throw error;
 
-      showToast(ui.editingClient ? 'Cliente atualizado!' : 'Cliente cadastrado!', 'success');
+      showToast(ui.editingClient ? 'Cadastro atualizado!' : 'Cliente cadastrado!', 'success');
       ui.closeModal();
       await fetchFullData(activeUser.id);
-    } catch (e: any) {
-      showToast('Erro ao salvar cliente: ' + (e?.message || 'erro desconhecido'), 'error');
+    } catch (err: any) {
+      showToast('Erro ao salvar: ' + err.message, 'error');
     } finally {
       ui.setIsSaving(false);
     }
   };
 
-  const handlePickContact = async () => {
-    if ('contacts' in navigator && 'ContactsManager' in window) {
-      try {
-        const props = ['name', 'tel', 'email', 'address'];
-        const opts = { multiple: false };
-        const contacts = await (navigator as any).contacts.select(props, opts);
-
-        if (contacts.length) {
-          const contact = contacts[0];
-          const name = contact.name?.[0] || '';
-          const tel = contact.tel?.[0] || '';
-          const email = contact.email?.[0] || '';
-          const addressObj = contact.address?.[0];
-
-          let addressStr = '';
-          let cityStr = '';
-          let stateStr = '';
-          if (addressObj) {
-            addressStr = [addressObj.addressLine, addressObj.street].filter(Boolean).join(', ');
-            cityStr = addressObj.city || '';
-            stateStr = addressObj.region || '';
-          }
-
-          ui.setClientForm((prev: any) => ({
-            ...prev,
-            name: name || prev.name,
-            phone: tel ? maskPhone(tel) : prev.phone,
-            email: email || prev.email,
-            address: addressStr || prev.address,
-            city: cityStr || prev.city,
-            state: stateStr || prev.state,
-          }));
-        }
-      } catch {
-        // ignore cancel
-      }
-    } else {
-      showToast('Importação indisponível neste dispositivo.', 'error');
-    }
-  };
-
-  // Bulk Actions
   const toggleBulkDeleteMode = () => {
     ui.setIsBulkDeleteMode(!ui.isBulkDeleteMode);
     ui.setSelectedClientsToDelete([]);
   };
 
   const toggleClientSelection = (id: string) => {
-    ui.setSelectedClientsToDelete((prev: string[]) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
+    const current = ui.selectedClientsToDelete || [];
+    if (current.includes(id)) {
+      ui.setSelectedClientsToDelete(current.filter((cid: string) => cid !== id));
+    } else {
+      ui.setSelectedClientsToDelete([...current, id]);
+    }
   };
 
   const executeBulkDelete = async () => {
-    const count = ui.selectedClientsToDelete.length;
-    if (count === 0) return;
+    if (!activeUser || !ui.selectedClientsToDelete?.length) return;
+    if (!confirm(`Excluir permanentemente ${ui.selectedClientsToDelete.length} clientes? Contratos vinculados podem ser afetados.`)) return;
 
-    if (!confirm(`Tem certeza que deseja excluir ${count} clientes? Esta ação removerá também o histórico e contratos vinculados.`)) return;
-
-    if (activeUser?.id === 'DEMO') {
-      showToast(`${count} clientes removidos (Demo)`, 'success');
-      ui.setIsBulkDeleteMode(false);
-      ui.setSelectedClientsToDelete([]);
-      return;
-    }
-
+    ui.setIsSaving(true);
     try {
-      const ownerId = (activeUser as any).supervisor_id || activeUser.id;
-
       const { error } = await supabase
         .from('clientes')
         .delete()
-        .in('id', ui.selectedClientsToDelete)
-        .eq('owner_id', ownerId); // ✅ clientes usa owner_id
+        .in('id', ui.selectedClientsToDelete);
 
       if (error) throw error;
 
-      showToast(`${count} clientes removidos com sucesso!`, 'success');
-      await fetchFullData(activeUser!.id);
-      ui.setIsBulkDeleteMode(false);
-      ui.setSelectedClientsToDelete([]);
-    } catch (e: any) {
-      showToast('Erro ao excluir clientes: ' + e.message, 'error');
+      showToast(`${ui.selectedClientsToDelete.length} clientes removidos.`, 'success');
+      toggleBulkDeleteMode();
+      await fetchFullData(activeUser.id);
+    } catch (err: any) {
+      showToast('Erro na exclusão em massa: ' + err.message, 'error');
+    } finally {
+      ui.setIsSaving(false);
     }
   };
 
   return {
     openClientModal,
-    handleSaveClient,
     handleAvatarUpload,
-    handlePickContact,
+    handleSaveClient,
     toggleBulkDeleteMode,
     toggleClientSelection,
     executeBulkDelete,

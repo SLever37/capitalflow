@@ -77,7 +77,6 @@ export const useFileController = (
     let successLoans = 0;
     let errors = 0;
 
-    // ✅ pega códigos existentes (compatível com campos antigos/novos)
     const existingCodes = new Set(
       clients
         .map((c: any) => String(c.access_code || c.accessCode || '').trim())
@@ -92,7 +91,7 @@ export const useFileController = (
     const defaultSourceId = sources.length > 0 ? sources[0].id : null;
 
     try {
-      const ownerId = (activeUser as any).supervisor_id || activeUser.id; // ✅ DONO REAL
+      const ownerId = (activeUser as any).supervisor_id || activeUser.id; 
 
       for (const item of selected) {
         try {
@@ -103,10 +102,9 @@ export const useFileController = (
           existingCodes.add(accessCode);
           existingNums.add(clientNum);
 
-          // ✅ 1) Criar Cliente (clientes = owner_id)
           const { error: clientError } = await supabase.from('clientes').insert({
             id: clientId,
-            owner_id: ownerId, // ✅ CORRETO
+            owner_id: ownerId, 
             name: item.nome,
             document: item.documento || null,
             phone: item.whatsapp || null,
@@ -123,15 +121,12 @@ export const useFileController = (
           if (clientError) throw clientError;
           successClients++;
 
-          // ✅ 2) Se houver valor base, criar contrato automaticamente (contratos = owner_id via contractsService)
           if (item.valor_base && item.valor_base > 0 && defaultSourceId) {
             const today = new Date().toISOString().split('T')[0];
 
             const loanPayload = {
               id: generateUUID(),
-              // (se o seu tipo Loan exigir, deixamos para TS compilar; o service ignora)
               profile_id: ownerId,
-
               clientId: clientId,
               debtorName: item.nome,
               debtorPhone: item.whatsapp,
