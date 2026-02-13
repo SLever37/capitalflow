@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { ClientPortalView } from '../containers/ClientPortal/ClientPortalView';
 import { PublicLegalSignPage } from '../features/legal/components/PublicLegalSignPage';
@@ -15,6 +14,7 @@ interface AppGateProps {
   setLoginUser: (v: string) => void;
   loginPassword: string;
   setLoginPassword: (v: string) => void;
+  loginError?: string | null; // Adicionado
   submitLogin: (setLoading: any, setToast: any) => void;
   savedProfiles: any[];
   handleSelectSavedProfile: (p: any, toast: any) => void;
@@ -31,7 +31,7 @@ export const AppGate: React.FC<AppGateProps> = ({
   activeUser,
   children,
   // Props de Login
-  loginUser, setLoginUser, loginPassword, setLoginPassword, submitLogin,
+  loginUser, setLoginUser, loginPassword, setLoginPassword, loginError, submitLogin,
   savedProfiles, handleSelectSavedProfile, handleRemoveSavedProfile,
   isLoadingData, setIsLoadingData, showToast
 }) => {
@@ -54,6 +54,7 @@ export const AppGate: React.FC<AppGateProps> = ({
         setLoginUser={setLoginUser}
         loginPassword={loginPassword}
         setLoginPassword={setLoginPassword}
+        loginError={loginError || null}
         submitLogin={() => submitLogin(setIsLoadingData, showToast)}
         savedProfiles={savedProfiles}
         handleSelectSavedProfile={(p) => handleSelectSavedProfile(p, showToast)}
