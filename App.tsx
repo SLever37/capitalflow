@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { AppShell } from './layout/AppShell';
 import { NavHubController } from './layout/NavHubController';
@@ -34,7 +35,6 @@ export const App: React.FC = () => {
     activeProfileId,
     loginUser, setLoginUser,
     loginPassword, setLoginPassword,
-    loginError, // Extraído do hook
     savedProfiles,
     submitLogin,
     handleLogout,
@@ -86,18 +86,22 @@ export const App: React.FC = () => {
     disabled: isPublicView,
   });
 
+  // 1. Anti-Saída Acidental (Proteção contra fechamento de aba)
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      // Só ativa se estiver logado e não for uma visão pública
       if (activeUser && !isPublicView) {
         e.preventDefault();
-        e.returnValue = ''; 
+        e.returnValue = ''; // Padrão para navegadores modernos exibirem o alerta
         return '';
       }
     };
+
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [activeUser, isPublicView]);
 
+  // Init Notifications Permissions (apenas se logado E não for view pública)
   useEffect(() => {
     if (activeUser && !isPublicView) {
         notificationService.requestPermission();
@@ -107,6 +111,9 @@ export const App: React.FC = () => {
   const effectiveSelectedStaffId = activeUser && activeUser.accessLevel === 2 ? activeUser.id : selectedStaffId;
   const isInvitePath = window.location.pathname === '/invite' || window.location.pathname === '/setup-password';
 
+  // 2. Tela de Carregamento Global (Splash Screen)
+  // Exibe se: Temos um ID de perfil (tentando restaurar sessão) MAS ainda não temos o objeto user carregado
+  // OU se estamos carregando dados iniciais críticos.
   const isInitializing = (!!activeProfileId && !activeUser) || (!!activeUser && isLoadingData && loans.length === 0 && !loadError);
 
   if (isInitializing && !isPublicView && !isInvitePath) {
@@ -132,7 +139,6 @@ export const App: React.FC = () => {
           setLoginUser={setLoginUser}
           loginPassword={loginPassword}
           setLoginPassword={setLoginPassword}
-          loginError={loginError} // Passando o erro aqui
           submitLogin={submitLogin}
           savedProfiles={savedProfiles}
           handleSelectSavedProfile={handleSelectSavedProfile}
@@ -163,6 +169,10 @@ export const App: React.FC = () => {
               onOpenSupport={() => ui.openModal('SUPPORT_CHAT')}
               navOrder={navOrder}
             >
+              <div className="hidden">
+                 {/* Componentes de layout ocultos mas renderizados para lógica se necessário, ou limpeza futura */}
+              </div>
+
               {activeTab === 'DASHBOARD' && (
                 <DashboardContainer
                   loans={loans} sources={sources} activeUser={activeUser}

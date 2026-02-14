@@ -1,9 +1,9 @@
-
 import React from 'react';
 import { useModal } from '../../../contexts/ModalContext';
 import { LoanForm } from '../../LoanForm';
 import { ClientModals } from '../ModalGroups';
 import { NewAporteModal } from '../NewAporteModal';
+import { RenegotiationModal } from '../../../features/agreements/components/RenegotiationModal';
 
 export const LoanModalsWrapper = () => {
     const { activeModal, closeModal, ui, loanCtrl, clients, sources, activeUser, fetchFullData } = useModal();
@@ -36,6 +36,17 @@ export const LoanModalsWrapper = () => {
                 installments={ui.newAporteModalLoan.installments}
                 onSuccess={() => { closeModal(); fetchFullData(activeUser.id); }}
                 isStealthMode={ui.isStealthMode}
+            />
+        );
+    }
+
+    if (activeModal?.type === 'RENEGOTIATION' && ui.renegotiationModalLoan && activeUser) {
+        return (
+            <RenegotiationModal
+                loan={ui.renegotiationModalLoan}
+                activeUser={activeUser}
+                onClose={closeModal}
+                onSuccess={() => { closeModal(); fetchFullData(activeUser.id); }}
             />
         );
     }
