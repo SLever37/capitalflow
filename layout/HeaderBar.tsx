@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { TrendingUp, Plus, Loader2, LayoutGrid, Eye, EyeOff, Users, LayoutDashboard, Wallet, Briefcase } from 'lucide-react';
+import { TrendingUp, Plus, Loader2, LayoutGrid, Eye, EyeOff, Users, LayoutDashboard, Wallet, Briefcase, PiggyBank } from 'lucide-react';
 import { UserProfile } from '../types';
 import { Tooltip } from '../components/ui/Tooltip';
 
@@ -25,6 +25,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
       case 'CLIENTS': return <Users size={14}/>;
       case 'TEAM': return <Briefcase size={14}/>;
       case 'SOURCES': return <Wallet size={14}/>;
+      case 'PERSONAL_FINANCE': return <PiggyBank size={14}/>;
       default: return null;
     }
   };
@@ -35,6 +36,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
       case 'CLIENTS': return 'Clientes';
       case 'TEAM': return 'Equipe';
       case 'SOURCES': return 'Capital';
+      case 'PERSONAL_FINANCE': return 'Minhas Finanças';
       default: return tab;
     }
   };

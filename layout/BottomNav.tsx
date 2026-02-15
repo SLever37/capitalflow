@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LayoutDashboard, Users, Wallet, LayoutGrid, Plus, Briefcase } from 'lucide-react';
+import { LayoutDashboard, Users, Wallet, LayoutGrid, Plus, Briefcase, PiggyBank } from 'lucide-react';
 import { Tooltip } from '../components/ui/Tooltip';
 
 interface BottomNavProps {
@@ -22,6 +22,7 @@ export const BottomNav: React.FC<BottomNavProps & { isStaff?: boolean }> = ({
       case 'CLIENTS': return <Users size={20}/>;
       case 'TEAM': return <Briefcase size={20}/>;
       case 'SOURCES': return <Wallet size={20}/>;
+      case 'PERSONAL_FINANCE': return <PiggyBank size={20}/>;
       default: return <LayoutGrid size={20}/>;
     }
   };
@@ -32,6 +33,7 @@ export const BottomNav: React.FC<BottomNavProps & { isStaff?: boolean }> = ({
       case 'CLIENTS': return 'Clientes';
       case 'TEAM': return 'Equipe';
       case 'SOURCES': return 'Fundos';
+      case 'PERSONAL_FINANCE': return 'Finanças';
       default: return tab;
     }
   };

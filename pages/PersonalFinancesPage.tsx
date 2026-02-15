@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, Wallet, CreditCard, TrendingUp, TrendingDown, LayoutGrid, ArrowRightLeft, ShoppingBag, Settings2, Calendar, Banknote, Coins } from 'lucide-react';
 import { UserProfile } from '../types';
@@ -179,8 +180,8 @@ export const PersonalFinancesPage: React.FC<Props> = ({ activeUser }) => {
 
                     <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl">
                          <h3 className="text-xs font-black text-white uppercase tracking-widest mb-4 flex items-center gap-2"><ShoppingBag size={14}/> Gastos por Categoria</h3>
-                         <div className="h-48 w-full">
-                            <ResponsiveContainer width="100%" height="100%">
+                         <div style={{ width: '100%', minHeight: 300 }}>
+                            <ResponsiveContainer width="100%" height={300}>
                                 <PieChart>
                                     <Pie data={stats.pieData} innerRadius={40} outerRadius={60} paddingAngle={5} dataKey="value">
                                         {stats.pieData.map((_, index) => (

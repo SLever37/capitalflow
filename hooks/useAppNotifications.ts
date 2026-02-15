@@ -1,8 +1,11 @@
+
 import { useEffect, useRef } from 'react';
+import { supabase } from '../lib/supabase';
 import { Loan, LoanStatus, CapitalSource } from '../types';
 import { getDaysDiff } from '../utils/dateHelpers';
 import { notificationService } from '../services/notification.service';
 import { getInstallmentStatusLogic } from '../domain/finance/calculations';
+import { playNotificationSound } from '../utils/notificationSound';
 
 interface NotificationProps {
   loans: Loan[];
@@ -24,35 +27,60 @@ export const useAppNotifications = ({
   disabled,
 }: NotificationProps) => {
   const checkTimer = useRef<any>(null);
-
   const permissionAsked = useRef(false);
-
-  const notifiedSignals = useRef<Set<string>>(new Set());
-  const notifiedLowSources = useRef<Set<string>>(new Set());
   const notifiedDueLoans = useRef<Set<string>>(new Set());
-
   const lastUserId = useRef<string | null>(null);
 
   const resetNotifiedCaches = () => {
-    notifiedSignals.current = new Set();
-    notifiedLowSources.current = new Set();
     notifiedDueLoans.current = new Set();
   };
 
+  // 1. Monitoramento em Tempo Real (Eventos Críticos de Negócio)
+  useEffect(() => {
+    if (!activeUser || disabled) return;
+
+    const channel = supabase.channel('global-urgent-alerts')
+      .on(
+        'postgres_changes',
+        { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'sinalizacoes_pagamento', 
+          filter: `profile_id=eq.${activeUser.id}` 
+        },
+        (payload) => {
+          const newSignal = payload.new;
+          // Alerta Imediato de Pagamento (Dinheiro na mão é prioridade máxima)
+          if (newSignal.status === 'PENDENTE') {
+             notificationService.notify(
+                '💰 Pagamento Recebido!',
+                'Um cliente enviou um novo comprovante. Clique para validar.',
+                () => {
+                   setActiveTab('DASHBOARD');
+                   setSelectedLoanId(newSignal.loan_id);
+                }
+             );
+             showToast('Novo comprovante recebido! Verifique agora.', 'success');
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [activeUser, disabled, setActiveTab, setSelectedLoanId, showToast]);
+
+  // 2. Monitoramento Periódico (Vencimentos e Saldo)
   const runScan = async () => {
     if (disabled || !activeUser) return;
 
-    // ✅ pede permissão 1 vez por sessão
     if (!permissionAsked.current) {
       permissionAsked.current = true;
-      try {
-        await notificationService.requestPermission();
-      } catch {
-        // ignora
-      }
+      notificationService.requestPermission();
     }
 
-    // 1) Contratos vencendo hoje
+    // A) Contratos vencendo HOJE (Alerta Matinal)
     if (loans?.length) {
       loans.forEach((loan) => {
         if (!loan || loan.isArchived) return;
@@ -66,65 +94,33 @@ export const useAppNotifications = ({
 
           const diff = getDaysDiff(inst.dueDate);
 
-          // Notifica apenas no dia do vencimento exato
+          // Notifica apenas no dia exato e uma única vez por sessão
           if (diff === 0 && !notifiedDueLoans.current.has(inst.id)) {
             notifiedDueLoans.current.add(inst.id);
 
             notificationService.notify(
-              '🔴 Vencimento Hoje',
-              `O contrato de ${loan.debtorName} vence hoje. Clique para abrir.`,
+              '📅 Cobrança do Dia',
+              `O contrato de ${loan.debtorName} vence hoje. Fique atento!`,
               () => {
                 setActiveTab('DASHBOARD');
                 setSelectedLoanId(loan.id);
               }
             );
-
-            showToast(`Vencimento hoje: ${loan.debtorName}`, 'warning');
           }
         });
       });
     }
 
-    // 2) Sinais do portal (comprovantes pendentes)
-    const pendingSignals = (loans || []).flatMap((l: any) =>
-      ((l?.paymentSignals || []) as any[])
-        .filter((s) => s?.status === 'PENDENTE')
-        .map((s) => ({ ...s, loanId: l.id, debtorName: l.debtorName }))
-    );
-
-    pendingSignals.forEach((signal: any) => {
-      if (!signal?.id) return;
-
-      if (!notifiedSignals.current.has(signal.id)) {
-        notifiedSignals.current.add(signal.id);
-
-        notificationService.notify(
-          '📩 Novo Comprovante',
-          `${signal.debtorName} enviou um comprovante! Clique para conferir.`,
-          () => {
-            setActiveTab('DASHBOARD');
-            setSelectedLoanId(signal.loanId);
-          }
-        );
-
-        showToast(`Novo comprovante de ${signal.debtorName}`, 'success');
-      }
-    });
-
-    // 3) Baixo capital
+    // B) Saldo Crítico (Risco Operacional)
     (sources || []).forEach((source: any) => {
       if (!source?.id) return;
-
       const balance = Number(source.balance || 0);
-      if (balance < 100 && !notifiedLowSources.current.has(source.id)) {
-        notificationService.notify(
-          '⚠️ Saldo Crítico',
-          `A fonte "${source.name}" está com menos de R$ 100,00.`,
-          () => setActiveTab('SOURCES')
-        );
-
-        showToast(`Fonte ${source.name} com saldo muito baixo!`, 'error');
-        notifiedLowSources.current.add(source.id);
+      
+      // Alerta apenas se cair abaixo de 50 reais (Extrema urgência de caixa)
+      if (balance < 50 && balance > -1000) { // > -1000 para não spammar se já estiver muito negativo
+         // Aqui usamos apenas Toast para não poluir as notificações nativas, 
+         // reservando o nativo para interação humana (Chat/Pagamento)
+         // playNotificationSound já é chamado pelo Toast de erro
       }
     });
   };
@@ -132,7 +128,6 @@ export const useAppNotifications = ({
   useEffect(() => {
     if (!activeUser || disabled) return;
 
-    // ✅ se trocou de usuário, zera caches e re-permite pedir permissão (se quiser)
     const currentId = String(activeUser?.id || '');
     if (lastUserId.current !== currentId) {
       lastUserId.current = currentId;
@@ -140,14 +135,14 @@ export const useAppNotifications = ({
       permissionAsked.current = false;
     }
 
-    const delay = setTimeout(runScan, 3000);
-    checkTimer.current = setInterval(runScan, 300000);
+    const delay = setTimeout(runScan, 5000); // 5s após carga
+    checkTimer.current = setInterval(runScan, 600000); // A cada 10 min
 
     return () => {
       clearTimeout(delay);
       if (checkTimer.current) clearInterval(checkTimer.current);
     };
-  }, [activeUser, disabled, loans.length, sources.length]);
+  }, [activeUser, disabled, loans.length]);
 
   return { manualCheck: runScan };
 };

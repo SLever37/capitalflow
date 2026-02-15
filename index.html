@@ -69,13 +69,17 @@
 <body>
     <div id="root"></div>
 <script type="module" src="/index.tsx"></script>
-<script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/service-worker.js')
-        .then(reg => console.log('Service Worker registrado com sucesso:', reg.scope))
-        .catch(err => console.warn('Falha ao registrar Service Worker:', err));
-    });
+<script type="module">
+  if (
+    'serviceWorker' in navigator &&
+    window.location.hostname.includes('pages.dev')
+  ) {
+    navigator.serviceWorker
+      .register('/service-worker.js')
+      .then(() => console.log('Service Worker registrado'))
+      .catch(err =>
+        console.warn('Falha ao registrar Service Worker:', err)
+      );
   }
 </script>
 </body>

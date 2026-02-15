@@ -147,98 +147,99 @@ export const App: React.FC = () => {
           setIsLoadingData={setIsLoadingData}
           toast={toast}
         >
-          {activeUser?.accessLevel === 1 ? (
-            <MasterScreen
-              activeUser={activeUser}
-              systemUsers={systemUsers}
-              fetchFullData={fetchFullData}
-              handleLogout={handleLogout}
-              showToast={showToast}
-            />
-          ) : (
-            <AppShell
-              toast={toast}
-              activeTab={activeTab}
-              setActiveTab={setActiveTab}
-              activeUser={activeUser}
-              isLoadingData={isLoadingData}
-              onOpenNav={() => ui.setShowNavHub(true)}
-              onNewLoan={() => { ui.setEditingLoan(null); ui.openModal('LOAN_FORM'); }}
-              isStealthMode={ui.isStealthMode}
-              toggleStealthMode={() => ui.setIsStealthMode(!ui.isStealthMode)}
-              onOpenSupport={() => ui.openModal('SUPPORT_CHAT')}
-              navOrder={navOrder}
-            >
-              <div className="hidden">
-                 {/* Componentes de layout ocultos mas renderizados para lógica se necessário, ou limpeza futura */}
-              </div>
+          <AppShell
+            toast={toast}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            activeUser={activeUser}
+            isLoadingData={isLoadingData}
+            onOpenNav={() => ui.setShowNavHub(true)}
+            onNewLoan={() => { ui.setEditingLoan(null); ui.openModal('LOAN_FORM'); }}
+            isStealthMode={ui.isStealthMode}
+            toggleStealthMode={() => ui.setIsStealthMode(!ui.isStealthMode)}
+            onOpenSupport={() => ui.openModal('SUPPORT_CHAT')}
+            navOrder={navOrder}
+          >
+            <div className="hidden">
+               {/* Componentes de layout ocultos mas renderizados para lógica se necessário, ou limpeza futura */}
+            </div>
 
-              {activeTab === 'DASHBOARD' && (
-                <DashboardContainer
-                  loans={loans} sources={sources} activeUser={activeUser}
-                  staffMembers={staffMembers} selectedStaffId={effectiveSelectedStaffId}
-                  setSelectedStaffId={setSelectedStaffId}
-                  mobileDashboardTab={ui.mobileDashboardTab} setMobileDashboardTab={ui.setMobileDashboardTab}
-                  statusFilter={statusFilter} setStatusFilter={setStatusFilter}
-                  searchTerm={searchTerm} setSearchTerm={setSearchTerm}
-                  ui={ui} loanCtrl={loanCtrl} fileCtrl={fileCtrl}
-                  showToast={showToast} onRefresh={() => fetchFullData(activeUser?.id || '')}
-                />
-              )}
-
-              {activeTab === 'CLIENTS' && (
-                <ClientsContainer
-                  clients={clients} clientSearchTerm={clientSearchTerm}
-                  setClientSearchTerm={setClientSearchTerm}
-                  clientCtrl={clientCtrl} loanCtrl={loanCtrl}
-                  showToast={showToast} ui={ui}
-                />
-              )}
-
-              {activeTab === 'TEAM' && !activeUser?.supervisor_id && (
-                <TeamPage activeUser={activeUser} showToast={showToast} onRefresh={() => fetchFullData(activeUser?.id || '')} />
-              )}
-
-              {activeTab === 'SOURCES' && (
-                <SourcesContainer sources={sources} ui={ui} sourceCtrl={sourceCtrl} loanCtrl={loanCtrl} />
-              )}
-
-              {activeTab === 'PROFILE' && activeUser && (
-                <ProfileContainer
-                  activeUser={activeUser} clients={clients} loans={loans} sources={sources}
-                  ui={ui} profileCtrl={profileCtrl} handleLogout={handleLogout} showToast={showToast}
-                  profileEditForm={profileEditForm} setProfileEditForm={setProfileEditForm}
-                  fileCtrl={fileCtrl} navOrder={navOrder} hubOrder={hubOrder} saveNavConfig={saveNavConfig}
-                />
-              )}
-
-              {activeTab === 'LEGAL' && (
-                <LegalContainer
-                  loans={loans} sources={sources} activeUser={activeUser}
-                  ui={ui} loanCtrl={loanCtrl} fileCtrl={fileCtrl}
-                  showToast={showToast} onRefresh={() => fetchFullData(activeUser?.id || '')}
-                />
-              )}
-
-              {activeTab === 'PERSONAL_FINANCE' && activeUser && (
-                <PersonalFinancesPage activeUser={activeUser} />
-              )}
-
-              <ModalHostContainer
-                ui={ui} activeUser={activeUser} clients={clients} sources={sources} loans={loans}
-                isLoadingData={isLoadingData} loanCtrl={loanCtrl} clientCtrl={clientCtrl}
-                sourceCtrl={sourceCtrl} paymentCtrl={paymentCtrl} profileCtrl={profileCtrl}
-                adminCtrl={adminCtrl} fileCtrl={fileCtrl} aiCtrl={aiCtrl}
-                showToast={showToast} fetchFullData={fetchFullData} handleLogout={handleLogout}
+            {activeTab === 'DASHBOARD' && (
+              <DashboardContainer
+                loans={loans} sources={sources} activeUser={activeUser}
+                staffMembers={staffMembers} selectedStaffId={effectiveSelectedStaffId}
+                setSelectedStaffId={setSelectedStaffId}
+                mobileDashboardTab={ui.mobileDashboardTab} setMobileDashboardTab={ui.setMobileDashboardTab}
+                statusFilter={statusFilter} setStatusFilter={setStatusFilter}
+                searchTerm={searchTerm} setSearchTerm={setSearchTerm}
+                ui={ui} loanCtrl={loanCtrl} fileCtrl={fileCtrl}
+                showToast={showToast} onRefresh={() => fetchFullData(activeUser?.id || '')}
               />
+            )}
 
-              {ui.activeModal?.type === 'SUPPORT_CHAT' && (
-                <OperatorSupportChat activeUser={activeUser} onClose={ui.closeModal} />
-              )}
+            {activeTab === 'CLIENTS' && (
+              <ClientsContainer
+                clients={clients} clientSearchTerm={clientSearchTerm}
+                setClientSearchTerm={setClientSearchTerm}
+                clientCtrl={clientCtrl} loanCtrl={loanCtrl}
+                showToast={showToast} ui={ui}
+              />
+            )}
 
-              <NavHubController ui={ui} setActiveTab={setActiveTab} activeUser={activeUser} hubOrder={hubOrder} />
-            </AppShell>
-          )}
+            {activeTab === 'TEAM' && !activeUser?.supervisor_id && (
+              <TeamPage activeUser={activeUser} showToast={showToast} onRefresh={() => fetchFullData(activeUser?.id || '')} />
+            )}
+
+            {activeTab === 'SOURCES' && (
+              <SourcesContainer sources={sources} ui={ui} sourceCtrl={sourceCtrl} loanCtrl={loanCtrl} />
+            )}
+
+            {activeTab === 'PROFILE' && activeUser && (
+              <ProfileContainer
+                activeUser={activeUser} clients={clients} loans={loans} sources={sources}
+                ui={ui} profileCtrl={profileCtrl} handleLogout={handleLogout} showToast={showToast}
+                profileEditForm={profileEditForm} setProfileEditForm={setProfileEditForm}
+                fileCtrl={fileCtrl} navOrder={navOrder} hubOrder={hubOrder} saveNavConfig={saveNavConfig}
+              />
+            )}
+
+            {activeTab === 'LEGAL' && (
+              <LegalContainer
+                loans={loans} sources={sources} activeUser={activeUser}
+                ui={ui} loanCtrl={loanCtrl} fileCtrl={fileCtrl}
+                showToast={showToast} onRefresh={() => fetchFullData(activeUser?.id || '')}
+              />
+            )}
+
+            {activeTab === 'PERSONAL_FINANCE' && activeUser && (
+              <PersonalFinancesPage activeUser={activeUser} />
+            )}
+
+            {/* Painel Master (SAC) integrado ao AppShell */}
+            {activeTab === 'MASTER' && activeUser?.accessLevel === 1 && (
+              <MasterScreen
+                activeUser={activeUser}
+                systemUsers={systemUsers}
+                fetchFullData={fetchFullData}
+                handleLogout={handleLogout}
+                showToast={showToast}
+              />
+            )}
+
+            <ModalHostContainer
+              ui={ui} activeUser={activeUser} clients={clients} sources={sources} loans={loans}
+              isLoadingData={isLoadingData} loanCtrl={loanCtrl} clientCtrl={clientCtrl}
+              sourceCtrl={sourceCtrl} paymentCtrl={paymentCtrl} profileCtrl={profileCtrl}
+              adminCtrl={adminCtrl} fileCtrl={fileCtrl} aiCtrl={aiCtrl}
+              showToast={showToast} fetchFullData={fetchFullData} handleLogout={handleLogout}
+            />
+
+            {ui.activeModal?.type === 'SUPPORT_CHAT' && (
+              <OperatorSupportChat activeUser={activeUser} onClose={ui.closeModal} />
+            )}
+
+            <NavHubController ui={ui} setActiveTab={setActiveTab} activeUser={activeUser} hubOrder={hubOrder} />
+          </AppShell>
         </AppGate>
       )}
     </>

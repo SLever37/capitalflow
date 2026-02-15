@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { requestBrowserNotificationPermission } from '../../utils/notifications';
@@ -34,6 +35,27 @@ const resolveSmartName = (p: any): string => {
   return 'Gestor';
 };
 
+// --- HELPERS DE ERRO DE LOGIN ---
+const mapLoginError = (err: any) => {
+  const msg = String(err?.message || err || '');
+
+  if (msg.toLowerCase().includes('invalid login')) return 'Usuário ou senha inválidos.';
+  if (msg.toLowerCase().includes('perfil não encontrado')) return 'Perfil não encontrado. Verifique o usuário.';
+  if (msg.toLowerCase().includes('senha incorreta')) return 'Usuário ou senha inválidos.';
+  if (msg.toLowerCase().includes('credenciais inválidas')) return 'Usuário ou senha inválidos.';
+  if (msg.toLowerCase().includes('expired')) return 'Sessão/convite expirado. Gere um novo link.';
+  if (msg.toLowerCase().includes('permission')) return 'Sem permissão para acessar. Verifique RLS/políticas.';
+  if (msg.toLowerCase().includes('network') || msg.toLowerCase().includes('failed to fetch'))
+    return 'Falha de conexão. Verifique a internet.';
+
+  return msg || 'Erro desconhecido no login.';
+};
+
+const devLog = (...args: any[]) => {
+  console.warn('[AUTH]', ...args);
+};
+// -------------------------------
+
 export const useAuth = () => {
   const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
   const [loginUser, setLoginUser] = useState('');
@@ -43,7 +65,6 @@ export const useAuth = () => {
   const trackAccess = async (profileId: string) => {
     if (!profileId || profileId === 'DEMO') return;
     try {
-      // Incrementa acessos e atualiza timestamp de atividade
       await supabase.rpc('increment_profile_access', { p_profile_id: profileId });
     } catch (e) {
       console.warn("Falha ao registrar métrica de acesso", e);
@@ -73,7 +94,7 @@ export const useAuth = () => {
   }, []);
 
   const handleLoginSuccess = (profile: any, showToast: any) => {
-    playNotificationSound();
+    playNotificationSound(); // Som de sucesso
     const profileId = profile.id;
     const profileName = resolveSmartName(profile);
     const profileEmail = asString(profile.usuario_email || profile.email || 'equipe@sistema');
@@ -97,7 +118,8 @@ export const useAuth = () => {
     const { data: s } = await supabase.auth.getSession();
     if (s?.session?.user?.id) return;
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
+    // Não lançamos erro aqui para não bloquear o login via 'perfis' se o Auth estiver desincronizado
+    if (error) console.warn("Supabase Auth Warning:", error.message);
   };
 
   const submitLogin = async (
@@ -105,45 +127,68 @@ export const useAuth = () => {
     showToast: (msg: string, type?: 'error' | 'success' | 'warning') => void
   ) => {
     setIsLoading(true);
-    const userInput = loginUser.trim();
-    const pass = loginPassword.trim();
-    if (!userInput || !pass) {
-      showToast('Informe usuário e senha.', 'warning');
-      setIsLoading(false);
-      return;
-    }
-    await requestBrowserNotificationPermission();
+    
     try {
+      const userInput = (loginUser || '').trim();
+      const pass = (loginPassword || '').trim();
+      
+      if (!userInput) throw new Error('Informe o usuário/e-mail.');
+      if (!pass) throw new Error('Informe a senha.');
+
+      // Solicita permissão cedo para garantir notificações futuras
+      requestBrowserNotificationPermission();
+
       let profile: any = null;
+      
+      // 1. Tenta Login Rápido via RPC
       try {
         const { data, error: rpcError } = await supabase.rpc('login_user', {
           p_email: userInput.toLowerCase(),
           p_password: pass,
         });
         if (!rpcError && data) profile = Array.isArray(data) ? data[0] : data;
-      } catch (e) { console.warn('RPC Login failed, falling back.', e); }
-
-      if (!profile) {
-        const { data: fallbackData, error: fallbackError } = await supabase
-          .from('perfis')
-          .select('*')
-          .or(`usuario_email.ilike."${userInput}",nome_operador.ilike."${userInput}"`)
-          .eq('senha_acesso', pass)
-          .maybeSingle();
-        if (!fallbackError && fallbackData) profile = fallbackData;
+      } catch (e) { 
+        devLog('RPC Login failed, falling back.', e);
       }
 
+      // 2. Se RPC não retornou (Falha ou Credenciais Erradas), faz diagnóstico detalhado
       if (!profile) {
-        showToast('Usuário ou senha inválidos.', 'error');
-        setIsLoading(false);
-        return;
+        // A. Busca usuário pelo identificador para diagnosticar o erro
+        const { data: usersFound, error: userError } = await supabase
+            .from('perfis')
+            .select('*')
+            .or(`usuario_email.ilike."${userInput}",email.ilike."${userInput}",nome_operador.ilike."${userInput}"`);
+
+        if (userError) throw userError;
+
+        if (!usersFound || usersFound.length === 0) {
+            throw new Error('Perfil não encontrado. Verifique o usuário.');
+        }
+
+        // B. Usuário existe, verifica a SENHA
+        const validUser = usersFound.find(u => u.senha_acesso === pass);
+
+        if (!validUser) {
+            throw new Error('Usuário ou senha inválidos.');
+        }
+
+        // C. Se passou (Senha correta no banco, mas RPC falhou), define o perfil e segue
+        profile = validUser;
       }
+
+      if (!profile) throw new Error('Credenciais inválidas.');
+      
       const email = asString(profile.usuario_email || profile.email || userInput).toLowerCase();
+      // Tenta sincronizar sessão Auth (opcional para RLS, mas o app usa 'perfis' como verdade)
       await ensureAuthSession(email, pass);
+      
       handleLoginSuccess(profile, showToast);
+
     } catch (err: any) {
-      const msg = err?.message || 'Desconhecido';
-      showToast('Erro de conexão: ' + msg, 'error');
+      const friendly = mapLoginError(err);
+      devLog('submitLogin error:', err);
+      playNotificationSound();
+      showToast(friendly, 'error');
     } finally {
       setIsLoading(false);
     }
@@ -159,34 +204,42 @@ export const useAuth = () => {
       const cleanDoc = onlyDigits(params.document);
       const cleanPhone = onlyDigits(params.phone);
       const cleanCode = params.code.trim();
+
       if (!cleanDoc || !cleanPhone || !cleanCode) {
-        showToast('Preencha todos os campos para entrar.', 'warning');
-        setIsLoading(false);
-        return;
+        throw new Error('Preencha todos os campos para entrar.');
       }
+
       const { data: profiles, error } = await supabase
         .from('perfis')
         .select('*')
         .eq('document', cleanDoc)
         .eq('access_code', cleanCode);
+
       if (error) throw error;
+
       const validProfile = profiles?.find((p) => {
         const dbPhone = onlyDigits(p.phone || '');
         return dbPhone.includes(cleanPhone) || cleanPhone.includes(dbPhone);
       });
+
       if (!validProfile) {
-        showToast('Dados incorretos. Verifique CPF, Telefone e Código.', 'error');
-        setIsLoading(false);
-        return;
+        throw new Error('Dados incorretos. Verifique CPF, Telefone e Código.');
       }
+
       handleLoginSuccess(validProfile, showToast);
-    } catch (e: any) {
-      showToast('Erro ao entrar: ' + e.message, 'error');
+
+    } catch (err: any) {
+      const friendly = mapLoginError(err);
+      devLog('submitTeamLogin error:', err);
+      playNotificationSound();
+      showToast(friendly, 'error');
+    } finally {
       setIsLoading(false);
     }
   };
 
   const handleSelectSavedProfile = (p: SavedProfile, showToast: any) => {
+    playNotificationSound();
     setActiveProfileId(p.id);
     trackAccess(p.id);
     localStorage.setItem('cm_session', JSON.stringify({ profileId: p.id, ts: Date.now() }));

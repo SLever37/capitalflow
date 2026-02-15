@@ -112,8 +112,16 @@ export const MemberCard = ({ member, onDelete, onEdit, onOpenChat }: any) => {
                             <span className="text-slate-500 text-[9px] uppercase font-black tracking-widest bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
                                 {member.cpf ? maskDocument(member.cpf) : 'S/ CPF'}
                             </span>
-                            {member.role === 'ADMIN' && <ShieldCheck size={12} className="text-blue-500" title="Administrador" />}
-                            {isAccepted && <CheckCircle2 size={12} className="text-emerald-500" title="Acesso Ativo" />}
+                            {member.role === 'ADMIN' && (
+                                <span title="Administrador" className="flex items-center">
+                                    <ShieldCheck size={12} className="text-blue-500" />
+                                </span>
+                            )}
+                            {isAccepted && (
+                                <span title="Acesso Ativo" className="flex items-center">
+                                    <CheckCircle2 size={12} className="text-emerald-500" />
+                                </span>
+                            )}
                         </div>
                     </div>
                 </div>

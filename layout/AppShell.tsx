@@ -1,10 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, AlertTriangle, CheckCircle2, MessageSquare } from 'lucide-react';
 import { HeaderBar } from './HeaderBar';
 import { BottomNav } from './BottomNav';
 import { UserProfile } from '../types';
 import { supabase } from '../lib/supabase';
-import { playNotificationSound } from '../utils/notificationSound';
 import { notificationService } from '../services/notification.service';
 
 interface AppShellProps {
@@ -36,7 +36,7 @@ export const AppShell: React.FC<AppShellProps> = ({
             .select('*', { count: 'exact', head: true })
             .eq('profile_id', activeUser.id)
             .eq('read', false)
-            .neq('sender_user_id', activeUser.id); // Mensagens não enviadas por mim
+            .neq('sender_user_id', activeUser.id);
         setUnreadSupport(count || 0);
     };
 
@@ -51,10 +51,10 @@ export const AppShell: React.FC<AppShellProps> = ({
         }, (payload) => {
             // Se a mensagem não foi enviada por mim (evitar eco)
             if (payload.new.sender_user_id !== activeUser.id) {
-                // Notificação Nativa (Push)
+                // Notificação Nativa de Extrema Importância (Chat)
                 notificationService.notify(
-                    "Nova Mensagem",
-                    payload.new.content || payload.new.text || "Mídia recebida no atendimento.",
+                    "Nova Mensagem de Suporte",
+                    payload.new.content || payload.new.text || "Cliente enviou uma mídia.",
                     () => {
                         window.focus();
                         onOpenSupport?.();

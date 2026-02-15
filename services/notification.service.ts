@@ -18,35 +18,39 @@ export const notificationService = {
   },
 
   /**
-   * Dispara um alerta nativo compatível com Mobile e Desktop.
+   * Dispara um alerta nativo de Extrema Importância.
    */
   async notify(title: string, body: string, onClick?: () => void) {
-    // Tenta tocar som primeiro
+    // 1. Som de Alerta (Sempre toca, independente da permissão visual)
     playNotificationSound();
 
+    // 2. Notificação Visual Nativa
     if ("Notification" in window && Notification.permission === "granted") {
       try {
+        // Tenta focar a janela se estiver oculta
+        if (document.hidden) {
+            window.focus(); 
+        }
+
         const options: any = {
           body,
-          icon: window.location.origin + '/favicon.ico',
-          badge: window.location.origin + '/favicon.ico',
-          tag: 'capitalflow-alert',
-          renotify: true,
-          vibrate: [200, 100, 200],
+          icon: '/favicon.ico', // Caminho absoluto para garantir carregamento
+          badge: '/favicon.ico',
+          tag: 'capitalflow-critical', // Tag fixa para agrupar alertas críticos
+          renotify: true, // Garante que vibre/toque novamente mesmo se houver outra notificação
+          requireInteraction: true, // Mantém na tela até o usuário interagir
           silent: false,
-          requireInteraction: false
+          vibrate: [200, 100, 200, 100, 200] // Padrão de vibração urgente
         };
 
         const n = new Notification(title, options);
 
         n.onclick = (e) => {
             e.preventDefault();
-            // Garante que a janela ganhe foco
             window.focus();
             if (onClick) {
                 onClick();
             }
-            // Cessa a mensagem imediatamente ao clicar
             n.close();
         };
       } catch (e) {
