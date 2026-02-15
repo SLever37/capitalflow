@@ -16,15 +16,18 @@ export const useTeamData = (activeUserId: string | null | undefined) => {
 
     setLoading(true);
     try {
+      // 1) Busca todas as equipes disponíveis
       const { data: allTeams, error: tErr } = await supabase
         .from('teams')
         .select('*')
         .order('name', { ascending: true });
 
       if (tErr) throw tErr;
+
       const teamsList = allTeams || [];
       setTeams(teamsList);
 
+      // Define equipe ativa baseada na seleção anterior ou padrão
       let current = activeTeam;
       if (!current || !teamsList.find((t) => t.id === current.id)) {
         const capitalFlow = teamsList.find((t) => t.name === 'CapitalFlow');
@@ -32,21 +35,11 @@ export const useTeamData = (activeUserId: string | null | undefined) => {
         setActiveTeam(current);
       }
 
+      // 2) Busca Membros (SEM JOIN para garantir visibilidade total)
       if (current) {
-        // Realiza join com perfis para pegar dados de acesso (v3 schema)
         const { data: m, error: mErr } = await supabase
           .from('team_members')
-          .select(`
-            *,
-            linked_profile:linked_profile_id (
-              id,
-              last_active_at,
-              access_count,
-              avatar_url,
-              usuario_email,
-              supervisor_id
-            )
-          `)
+          .select('*')
           .eq('team_id', current.id)
           .order('full_name', { ascending: true });
 
@@ -67,6 +60,8 @@ export const useTeamData = (activeUserId: string | null | undefined) => {
     loadData();
   }, [loadData]);
 
+  // --- ACTIONS ---
+
   const createTeam = async (name: string) => {
     if (!activeUserId) return;
     const { data, error } = await supabase
@@ -78,26 +73,36 @@ export const useTeamData = (activeUserId: string | null | undefined) => {
       })
       .select()
       .single();
+
     if (error) throw error;
     await loadData();
     return data;
   };
 
   const updateTeam = async (teamId: string, name: string) => {
-    const { error } = await supabase.from('teams').update({ name: name.trim() }).eq('id', teamId);
+    const { error } = await supabase
+      .from('teams')
+      .update({ name: name.trim() })
+      .eq('id', teamId);
     if (error) throw error;
     await loadData();
   };
 
   const deleteTeam = async (teamId: string) => {
-    const { error } = await supabase.from('teams').delete().eq('id', teamId);
+    const { error } = await supabase
+      .from('teams')
+      .delete()
+      .eq('id', teamId);
     if (error) throw error;
     setActiveTeam(null);
     await loadData();
   };
 
-  const updateMember = async (memberId: string, updates: any) => {
-    const { error } = await supabase.from('team_members').update(updates).eq('id', memberId);
+  const updateMember = async (memberId: string, updates: { role?: string; team_id?: string; profile_id?: string | null }) => {
+    const { error } = await supabase
+      .from('team_members')
+      .update(updates)
+      .eq('id', memberId);
     if (error) throw error;
     await loadData();
   };
