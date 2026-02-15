@@ -1,3 +1,4 @@
+
 import { supabase } from '../lib/supabase';
 
 export type SupportMessageType = 'text' | 'image' | 'audio' | 'file' | 'location';
@@ -200,32 +201,46 @@ export const supportChatService = {
   },
 
   async getActiveChats(operatorId: string) {
-    // Busca mensagens recentes para montar a lista de conversas ativas
-    // Usa !inner join com contratos para filtrar e pegar nome do devedor
-    const { data, error } = await supabase
+    console.warn('[BUILD-MARK] supportChatService.getActiveChats v4 (SEM JOIN contratos)');
+    // 1. Busca mensagens recentes para montar a lista de conversas ativas
+    // NÃO usa join com contratos para evitar erro PGRST200 (relação inexistente)
+    const { data: messages, error } = await supabase
       .from('mensagens_suporte')
-      .select(`
-        id, loan_id, content, text, created_at, read, sender_type,
-        contratos!inner (
-          debtor_name
-        )
-      `)
+      .select('id, loan_id, content, text, created_at, read, sender_type')
       .order('created_at', { ascending: false })
-      .limit(500); // Limite de segurança para performance
+      .limit(200);
 
     if (error) {
       console.error('Erro ao buscar chats ativos:', error);
       return [];
     }
 
+    // 2. Busca nomes dos devedores (contratos) manualmente
+    const loanIds = Array.from(new Set((messages || []).map((m: any) => m.loan_id).filter(Boolean)));
+    const contractsMap = new Map<string, string>();
+
+    if (loanIds.length > 0) {
+        const { data: loans, error: loansError } = await supabase
+            .from('contratos')
+            .select('id, debtor_name')
+            .in('id', loanIds);
+        
+        if (!loansError && loans) {
+            loans.forEach((l: any) => contractsMap.set(l.id, l.debtor_name || 'Cliente'));
+        }
+    }
+
     const chatsMap = new Map();
 
-    for (const m of (data || [])) {
+    for (const m of (messages || [])) {
         const anyMsg = m as any;
         const loanId = anyMsg.loan_id;
         
+        // Simula o INNER JOIN: Se não achou contrato, ignora mensagem (pois seria contrato deletado ou sem acesso)
+        const clientName = contractsMap.get(loanId);
+        if (!clientName) continue;
+
         if (!chatsMap.has(loanId)) {
-            const clientName = anyMsg.contratos?.debtor_name || 'Cliente';
             chatsMap.set(loanId, {
                 loanId: loanId,
                 clientName: clientName,
