@@ -1,4 +1,6 @@
+
 import { createClient } from '@supabase/supabase-js';
+import { isDev } from '../utils/isDev';
 
 /**
  * Helper para acesso seguro ao ambiente.
@@ -41,7 +43,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 });
 
 // Debug em desenvolvimento
-if (process.env.NODE_ENV === 'development') {
+if (isDev) {
   console.log('[SUPABASE] Inicializado:', SUPABASE_URL);
   console.log('[SUPABASE] Key Prefix:', (SUPABASE_ANON_KEY || '').slice(0, 12));
 }

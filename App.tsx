@@ -26,6 +26,18 @@ import { MasterScreen } from './features/master/MasterScreen';
 import { LoadingScreen } from './components/ui/LoadingScreen';
 import { PersonalFinancesPage } from './pages/PersonalFinancesPage';
 
+// ===== DEBUG BOOT START =====
+console.time('[BOOT] app_start');
+
+setTimeout(() => {
+  console.log('[BOOT] 3s passou - ainda carregando?');
+}, 3000);
+
+window.addEventListener('load', () => {
+  console.timeEnd('[BOOT] app_start');
+});
+// ===== DEBUG BOOT END =====
+
 export const App: React.FC = () => {
   // Hooks de Infraestrutura
   const { portalToken, legalSignToken } = usePortalRouting();

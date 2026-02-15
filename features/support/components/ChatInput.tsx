@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { Send, Paperclip, Mic, X, Loader2, MapPin } from 'lucide-react';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
@@ -85,7 +86,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, isUploading, place
   };
 
   return (
-    <div className="p-4 bg-[#0f172a] border-t border-slate-800/50 relative select-none z-30">
+    <div className="px-4 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] bg-[#0f172a] border-t border-slate-800/50 relative select-none z-30 shrink-0">
       {showAttachMenu && <AttachMenu onSelect={handleAttachSelect} fileInputRef={fileInputRef} />}
 
       <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileChange} />

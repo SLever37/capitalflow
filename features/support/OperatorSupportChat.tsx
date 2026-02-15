@@ -7,6 +7,7 @@ import { ChatSidebar } from './components/ChatSidebar';
 import { useSupportRealtime } from './hooks/useSupportRealtime';
 
 function diffLabel(ts: string | number | Date) {
+  if (!ts) return '';
   const t = typeof ts === 'string' || typeof ts === 'number' ? new Date(ts) : ts;
   const ms = Date.now() - t.getTime();
   const sec = Math.max(0, Math.floor(ms / 1000));
@@ -24,7 +25,7 @@ const ActiveChatWrapper = ({ loanId, activeUser, clientName }: any) => {
     const { updateTicketStatus, ticketStatus } = useSupportRealtime(loanId, activeUser.id, 'OPERATOR');
 
     return (
-        <div className="flex-1 flex flex-col relative h-full">
+        <div className="flex-1 flex flex-col relative min-h-0">
              {/* Header de Ação Rápida */}
              <div className="absolute top-14 right-4 z-20">
                 <button 
@@ -48,32 +49,67 @@ const ActiveChatWrapper = ({ loanId, activeUser, clientName }: any) => {
 };
 
 export const OperatorSupportChat = ({ activeUser, onClose }: { activeUser: any; onClose: () => void; }) => {
-  const [chats, setChats] = useState<any[]>([]);
+  const [activeChats, setActiveChats] = useState<any[]>([]);
+  const [contracts, setContracts] = useState<any[]>([]);
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  
   const [selectedChat, setSelectedChat] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const loadChats = async () => {
+  // Identificação do dono para buscar dados corretos
+  const ownerId = activeUser.supervisor_id || activeUser.id;
+
+  const loadAllData = async () => {
     if (!activeUser) return;
-    const data = await supportChatService.getActiveChats(activeUser.id);
-    setChats(data);
+    
+    // 1. Chats Ativos
+    const actives = await supportChatService.getActiveChats(activeUser.id);
+    setActiveChats(actives);
+
+    // 2. Contratos (Clientes)
+    const clients = await supportChatService.getAvailableContracts(ownerId);
+    setContracts(clients);
+
+    // 3. Equipe
+    const team = await supportChatService.getTeamMembers(ownerId);
+    setTeamMembers(team);
   };
 
   useEffect(() => {
-    loadChats();
-    const interval = setInterval(loadChats, 10000);
+    loadAllData();
+    const interval = setInterval(loadAllData, 15000); // Polling mais lento para dados gerais
     return () => clearInterval(interval);
-  }, []);
+  }, [activeUser.id]);
 
-  const filteredChats = useMemo(() => {
-    const term = searchTerm.toLowerCase();
-    return chats.filter(c => 
-      c.clientName.toLowerCase().includes(term) || 
-      c.loanId.toLowerCase().includes(term)
-    );
-  }, [chats, searchTerm]);
+  // Filtros de busca para cada lista
+  const filteredActive = useMemo(() => activeChats.filter(c => c.clientName.toLowerCase().includes(searchTerm.toLowerCase())), [activeChats, searchTerm]);
+  const filteredClients = useMemo(() => contracts.filter(c => c.clientName.toLowerCase().includes(searchTerm.toLowerCase())), [contracts, searchTerm]);
+  const filteredTeam = useMemo(() => teamMembers.filter(t => t.clientName.toLowerCase().includes(searchTerm.toLowerCase())), [teamMembers, searchTerm]);
+
+  const handleSelectContact = (contact: any) => {
+      // Se for cliente (contrato) ou ativo, usa loanId
+      // Se for equipe, ainda não implementado full (placeholder)
+      if (contact.type === 'TEAM') {
+          alert("Chat interno de equipe em breve.");
+          return;
+      }
+      
+      // Se selecionou um cliente da lista que JÁ tem chat ativo, muda para o chat ativo
+      const existingChat = activeChats.find(c => c.loanId === contact.loanId);
+      if (existingChat) {
+          setSelectedChat(existingChat);
+      } else {
+          // Cria objeto de chat temporário para iniciar conversa
+          setSelectedChat({
+              loanId: contact.loanId,
+              clientName: contact.clientName,
+              type: 'ACTIVE'
+          });
+      }
+  };
 
   return (
-    <div className="fixed inset-0 z-[200] bg-slate-950 flex flex-col animate-in fade-in duration-300 font-sans">
+    <div className="fixed inset-0 z-[200] bg-slate-950 flex flex-col animate-in fade-in duration-300 font-sans h-[100dvh]">
       
       {/* HEADER */}
       <div className="h-16 border-b border-slate-800 bg-slate-950 flex items-center justify-between px-4 sm:px-6 shrink-0">
@@ -83,7 +119,7 @@ export const OperatorSupportChat = ({ activeUser, onClose }: { activeUser: any; 
           </div>
           <div>
             <h1 className="text-sm font-black text-white uppercase tracking-wider leading-none">Central de Atendimento</h1>
-            <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-widest">Painel do Operador • {chats.length} Chamados</p>
+            <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-widest">Painel do Operador</p>
           </div>
         </div>
         <button onClick={onClose} className="p-2.5 bg-slate-900 text-slate-400 hover:text-white hover:bg-rose-950/30 hover:border-rose-900 border border-slate-800 rounded-xl transition-all group">
@@ -93,13 +129,15 @@ export const OperatorSupportChat = ({ activeUser, onClose }: { activeUser: any; 
 
       <div className="flex-1 flex overflow-hidden">
         
-        {/* SIDEBAR */}
+        {/* SIDEBAR COM ABAS */}
         <ChatSidebar 
-            chats={filteredChats}
+            chats={filteredActive}
+            clients={filteredClients}
+            team={filteredTeam}
             selectedChat={selectedChat}
             searchTerm={searchTerm}
             setSearchTerm={setSearchTerm}
-            onSelectChat={setSelectedChat}
+            onSelectChat={handleSelectContact}
             diffLabel={diffLabel}
         />
 
@@ -137,7 +175,7 @@ export const OperatorSupportChat = ({ activeUser, onClose }: { activeUser: any; 
                  <MessageCircle size={40} className="opacity-50"/>
               </div>
               <h3 className="text-sm font-black uppercase text-white tracking-widest mb-2">Pronto para Atender</h3>
-              <p className="text-xs text-slate-500 max-w-xs text-center">Selecione uma conversa na lista lateral para iniciar o atendimento.</p>
+              <p className="text-xs text-slate-500 max-w-xs text-center">Selecione um cliente ou conversa na lista lateral para iniciar.</p>
             </div>
           )}
         </div>

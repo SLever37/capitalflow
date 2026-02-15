@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { SupportMessage } from '../../../services/supportChat.service';
 import { AudioPlayer } from './AudioPlayer';
@@ -156,7 +157,7 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
   };
 
   return (
-    <div className="flex-1 p-4 sm:p-6 overflow-y-auto custom-scrollbar space-y-2 pt-16" ref={scrollRef}>
+    <div className="flex-1 p-4 sm:p-6 overflow-y-auto custom-scrollbar space-y-2 pt-16 min-h-0" ref={scrollRef}>
       {messages.map((m, index) => {
         const isMe = m.sender_type === senderType;
         const prevM = messages[index - 1];

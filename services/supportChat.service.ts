@@ -1,5 +1,6 @@
 
 import { supabase } from '../lib/supabase';
+import { isDev } from '../utils/isDev';
 
 export type SupportMessageType = 'text' | 'image' | 'audio' | 'file' | 'location';
 
@@ -201,9 +202,11 @@ export const supportChatService = {
   },
 
   async getActiveChats(operatorId: string) {
-    console.warn('[BUILD-MARK] supportChatService.getActiveChats v4 (SEM JOIN contratos)');
-    // 1. Busca mensagens recentes para montar a lista de conversas ativas
-    // NÃO usa join com contratos para evitar erro PGRST200 (relação inexistente)
+    if (isDev) {
+       console.log('[BUILD-MARK] supportChatService.getActiveChats v5 (SEM JOIN contratos)');
+    }
+    
+    // 1. Busca mensagens recentes
     const { data: messages, error } = await supabase
       .from('mensagens_suporte')
       .select('id, loan_id, content, text, created_at, read, sender_type')
@@ -236,9 +239,8 @@ export const supportChatService = {
         const anyMsg = m as any;
         const loanId = anyMsg.loan_id;
         
-        // Simula o INNER JOIN: Se não achou contrato, ignora mensagem (pois seria contrato deletado ou sem acesso)
         const clientName = contractsMap.get(loanId);
-        if (!clientName) continue;
+        if (!clientName) continue; // Ignora se contrato não existe ou sem acesso
 
         if (!chatsMap.has(loanId)) {
             chatsMap.set(loanId, {
@@ -246,16 +248,62 @@ export const supportChatService = {
                 clientName: clientName,
                 timestamp: anyMsg.created_at,
                 lastMessage: anyMsg.content || anyMsg.text || 'Mídia enviada',
-                unreadCount: 0
+                unreadCount: 0,
+                type: 'ACTIVE'
             });
         }
 
-        // Se for mensagem de cliente e não lida, incrementa contador
         if (anyMsg.sender_type === 'CLIENT' && !anyMsg.read) {
             chatsMap.get(loanId).unreadCount += 1;
         }
     }
 
     return Array.from(chatsMap.values());
+  },
+
+  /**
+   * Busca todos os contratos ativos para listar como "Contatos"
+   */
+  async getAvailableContracts(ownerId: string) {
+    const { data, error } = await supabase
+      .from('contratos')
+      .select('id, debtor_name, debtor_document, debtor_phone')
+      .eq('owner_id', ownerId)
+      .neq('is_archived', true)
+      .order('debtor_name', { ascending: true })
+      .limit(300); // Limite de segurança
+
+    if (error) return [];
+
+    return (data || []).map((c: any) => ({
+      loanId: c.id,
+      clientName: c.debtor_name || 'Sem Nome',
+      debtorDocument: c.debtor_document,
+      type: 'CLIENT',
+      unreadCount: 0,
+      lastMessage: 'Iniciar conversa'
+    }));
+  },
+
+  /**
+   * Busca membros da equipe para chat interno
+   */
+  async getTeamMembers(ownerId: string) {
+     const { data, error } = await supabase
+       .from('perfis')
+       .select('id, nome_operador, nome_completo, email, access_level')
+       .or(`id.eq.${ownerId},supervisor_id.eq.${ownerId}`)
+       .order('nome_operador', { ascending: true });
+
+     if (error) return [];
+
+     return (data || []).map((u: any) => ({
+       profileId: u.id,
+       clientName: u.nome_operador || u.nome_completo || 'Membro',
+       role: u.access_level === 1 ? 'Admin' : 'Operador',
+       type: 'TEAM',
+       unreadCount: 0,
+       lastMessage: 'Chat de equipe'
+     }));
   }
 };

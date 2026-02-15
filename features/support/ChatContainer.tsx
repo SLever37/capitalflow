@@ -81,7 +81,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-950/20 relative overflow-hidden overflow-x-hidden">
+    <div className="flex flex-col flex-1 min-h-0 bg-slate-950/20 relative overflow-hidden">
       {/* Header Status */}
       <div className="absolute top-0 right-0 left-0 p-2 flex justify-between items-center pointer-events-none z-10 px-4 pt-3 bg-gradient-to-b from-slate-900/80 to-transparent">
         <div className="pointer-events-auto">
@@ -196,7 +196,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
       />
 
       {ticketStatus === 'CLOSED' && (
-        <div className="px-4 pb-2 text-center">
+        <div className="px-4 pb-2 text-center shrink-0">
           <div className="bg-slate-900/80 border border-slate-700 p-3 rounded-xl inline-flex items-center gap-2">
             <Lock size={14} className="text-slate-500" />
             <span className="text-xs text-slate-400 font-bold uppercase">Atendimento Finalizado</span>

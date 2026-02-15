@@ -3,6 +3,7 @@ import { Loan, Installment } from '../../../types';
 import { calculateTotalDue } from '../../../domain/finance/calculations';
 import { normalizeLoanForCalc, normalizeInstallmentForCalc } from './portalAdapters';
 import { getDaysDiff } from '../../../utils/dateHelpers';
+import { isDev } from '../../../utils/isDev';
 
 // Tipos de Retorno
 export interface PortalDebtSummary {
@@ -185,7 +186,7 @@ export const resolvePaymentOptions = (loan: Loan, inst: Installment): PaymentOpt
 
 // DEV ONLY
 export const debugDebtCheck = (loan: Loan, inst: Installment) => {
-    if (process.env.NODE_ENV === 'development') {
+    if (isDev) {
         const res = resolvePaymentOptions(loan, inst);
         console.group('💰 Debt Check');
         console.log('Loan:', loan.debtorName);

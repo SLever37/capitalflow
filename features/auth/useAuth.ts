@@ -5,6 +5,7 @@ import { requestBrowserNotificationPermission } from '../../utils/notifications'
 import { asString } from '../../utils/safe';
 import { playNotificationSound } from '../../utils/notificationSound';
 import { onlyDigits } from '../../utils/formatters';
+import { isDev } from '../../utils/isDev';
 
 type SavedProfile = {
   id: string;
@@ -52,11 +53,15 @@ const mapLoginError = (err: any) => {
 };
 
 const devLog = (...args: any[]) => {
-  console.warn('[AUTH]', ...args);
+  // LOG APENAS EM AMBIENTE DE DESENVOLVIMENTO
+  if (isDev) {
+    console.warn('[AUTH]', ...args);
+  }
 };
 // -------------------------------
 
 export const useAuth = () => {
+  console.log('[BOOT] useAuth init');
   const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
   const [loginUser, setLoginUser] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -67,7 +72,7 @@ export const useAuth = () => {
     try {
       await supabase.rpc('increment_profile_access', { p_profile_id: profileId });
     } catch (e) {
-      console.warn("Falha ao registrar métrica de acesso", e);
+      devLog("Falha ao registrar métrica de acesso", e);
     }
   };
 
@@ -118,8 +123,7 @@ export const useAuth = () => {
     const { data: s } = await supabase.auth.getSession();
     if (s?.session?.user?.id) return;
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    // Não lançamos erro aqui para não bloquear o login via 'perfis' se o Auth estiver desincronizado
-    if (error) console.warn("Supabase Auth Warning:", error.message);
+    if (error) devLog("Supabase Auth Warning:", error.message);
   };
 
   const submitLogin = async (
@@ -132,7 +136,7 @@ export const useAuth = () => {
       const userInput = (loginUser || '').trim();
       const pass = (loginPassword || '').trim();
       
-      if (!userInput) throw new Error('Informe o usuário/e-mail.');
+      if (!userInput) throw new Error('Informe seu usuário ou e-mail.');
       if (!pass) throw new Error('Informe a senha.');
 
       // Solicita permissão cedo para garantir notificações futuras
@@ -187,7 +191,11 @@ export const useAuth = () => {
     } catch (err: any) {
       const friendly = mapLoginError(err);
       devLog('submitLogin error:', err);
-      playNotificationSound();
+      // UX: Som de erro e Toast visível
+      if (typeof window !== 'undefined') {
+        const audio = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU");
+        audio.play().catch(() => {});
+      }
       showToast(friendly, 'error');
     } finally {
       setIsLoading(false);
@@ -231,7 +239,6 @@ export const useAuth = () => {
     } catch (err: any) {
       const friendly = mapLoginError(err);
       devLog('submitTeamLogin error:', err);
-      playNotificationSound();
       showToast(friendly, 'error');
     } finally {
       setIsLoading(false);

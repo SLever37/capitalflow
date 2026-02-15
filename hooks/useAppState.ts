@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { Loan, Client, CapitalSource, UserProfile, SortOption, AppTab } from '../types';
@@ -7,6 +8,49 @@ import { asString, asNumber } from '../utils/safe';
 
 const DEFAULT_NAV: AppTab[] = ['DASHBOARD', 'CLIENTS', 'TEAM'];
 const DEFAULT_HUB: AppTab[] = ['SOURCES', 'LEGAL', 'PROFILE', 'MASTER', 'PERSONAL_FINANCE'];
+
+// --- CACHE SYSTEM START ---
+const CACHE_KEY = (profileId: string) => `cm_cache_${profileId}`;
+
+type AppCacheSnapshot = {
+  ts: number;
+  activeUser: UserProfile;
+  loans: Loan[];
+  clients: Client[];
+  sources: CapitalSource[];
+  staffMembers: UserProfile[];
+  navOrder: AppTab[];
+  hubOrder: AppTab[];
+};
+
+const readCache = (profileId: string): AppCacheSnapshot | null => {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY(profileId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+
+    // Cache expira em 24h (para forçar refresh completo eventualmente)
+    // Mas o app sempre faz fetch em background, então isso é só segurança contra dados muito velhos
+    if (!parsed?.ts || Date.now() - parsed.ts > 24 * 60 * 60 * 1000) {
+        localStorage.removeItem(CACHE_KEY(profileId));
+        return null;
+    }
+
+    return parsed as AppCacheSnapshot;
+  } catch {
+    return null;
+  }
+};
+
+const writeCache = (profileId: string, snap: Omit<AppCacheSnapshot, 'ts'>) => {
+  try {
+    const payload: AppCacheSnapshot = { ...snap, ts: Date.now() };
+    localStorage.setItem(CACHE_KEY(profileId), JSON.stringify(payload));
+  } catch (e) {
+    console.warn('Falha ao salvar cache local', e);
+  }
+};
+// --- CACHE SYSTEM END ---
 
 const DEMO_USER: UserProfile = {
   id: 'DEMO',
@@ -84,6 +128,7 @@ export const useAppState = (activeProfileId: string | null) => {
   const [clientSearchTerm, setClientSearchTerm] = useState('');
   const [profileEditForm, setProfileEditForm] = useState<UserProfile | null>(null);
 
+  // --- BOOT COM CACHE ---
   useEffect(() => {
     if (!activeProfileId || activeProfileId === 'null') {
       setActiveUser(null);
@@ -92,12 +137,37 @@ export const useAppState = (activeProfileId: string | null) => {
       setLoans([]);
       setClients([]);
       setSources([]);
+      setStaffMembers([]);
+    } else {
+        // 1. Tenta carregar cache instantaneamente
+        const cached = readCache(activeProfileId);
+        
+        if (cached?.activeUser) {
+             console.log('[BOOT] Cache encontrado. Renderizando instantaneamente.');
+             setActiveUser(cached.activeUser);
+             setProfileEditForm(cached.activeUser);
+             setNavOrder(cached.navOrder || DEFAULT_NAV);
+             setHubOrder(cached.hubOrder || DEFAULT_HUB);
+             
+             setClients(cached.clients || []);
+             setSources(cached.sources || []);
+             setLoans(cached.loans || []);
+             setStaffMembers(cached.staffMembers || []);
+             
+             setIsLoadingData(false);
+             setLoadError(null);
+        }
+
+        // 2. Dispara sincronização em background (Silent Fetch)
+        fetchFullData(activeProfileId);
     }
-  }, [activeProfileId]);
+  }, [activeProfileId]); // Removido fetchFullData das deps para evitar loop, pois é estavel pelo useCallback
 
   const fetchFullData = useCallback(async (profileId: string) => {
+    console.time('[BOOT] fetchFullData');
     if (!profileId || profileId === 'null' || profileId === 'undefined') {
       setIsLoadingData(false);
+      console.timeEnd('[BOOT] fetchFullData');
       return;
     }
 
@@ -108,10 +178,17 @@ export const useAppState = (activeProfileId: string | null) => {
       setHubOrder(DEFAULT_HUB);
       setIsLoadingData(false);
       setLoadError(null);
+      console.timeEnd('[BOOT] fetchFullData');
       return;
     }
 
-    setIsLoadingData(true);
+    // Se já temos dados (cache ou anterior), não mostra loading spinner
+    // Apenas se não tiver nada (primeiro login limpo)
+    setActiveUser(prev => {
+        if (!prev) setIsLoadingData(true);
+        return prev;
+    });
+
     setLoadError(null);
 
     try {
@@ -125,21 +202,13 @@ export const useAppState = (activeProfileId: string | null) => {
       if (!profileData) throw new Error('Perfil não encontrado');
 
       const u = mapProfileFromDB(profileData);
-      setActiveUser(u);
-      setProfileEditForm(u);
-      setNavOrder(u.ui_nav_order || DEFAULT_NAV);
-      setHubOrder(u.ui_hub_order);
-
+      
       const ownerId = u.supervisor_id || u.id;
       const isStaff = !!u.supervisor_id;
 
       const [clientsRes, sourcesRes, loansRes] = await Promise.all([
-        // ✅ CORREÇÃO DEFINITIVA
         supabase.from('clientes').select('*').eq('owner_id', ownerId).limit(isStaff ? 0 : 1000),
-
         supabase.from('fontes').select('*').eq('profile_id', ownerId),
-
-        // ✅ CORREÇÃO DEFINITIVA
         supabase
           .from('contratos')
           .select(
@@ -148,24 +217,21 @@ export const useAppState = (activeProfileId: string | null) => {
           .eq('owner_id', ownerId)
       ]);
 
-      if (clientsRes.data) {
-        setClients(
-          clientsRes.data.map((c: any) => ({
+      // Mapeamento dos Dados
+      const mappedClients = (clientsRes.data || []).map((c: any) => ({
             ...c,
             phone: maskPhone(c.phone),
             document: maskDocument(c.document)
-          }))
-        );
-      }
+      }));
 
-      if (sourcesRes.data) {
-        setSources(sourcesRes.data.map((s: any) => ({ ...s, balance: asNumber(s.balance) })));
-      }
+      const mappedSources = (sourcesRes.data || []).map((s: any) => ({ 
+            ...s, 
+            balance: asNumber(s.balance) 
+      }));
 
-      if (loansRes.data) {
-        setLoans(loansRes.data.map((l: any) => mapLoanFromDB(l, clientsRes.data || [])));
-      }
+      const mappedLoans = (loansRes.data || []).map((l: any) => mapLoanFromDB(l, clientsRes.data || []));
 
+      let mappedStaff: UserProfile[] = [];
       if (u.accessLevel === 1) {
         const { data: staffData } = await supabase
           .from('perfis')
@@ -174,15 +240,42 @@ export const useAppState = (activeProfileId: string | null) => {
           .order('nome_operador', { ascending: true });
 
         if (staffData) {
-          setStaffMembers(staffData.map(s => mapProfileFromDB(s)));
+          mappedStaff = staffData.map(s => mapProfileFromDB(s));
         }
       }
+
+      // Atualiza Estados (Renderização)
+      setActiveUser(u);
+      setProfileEditForm(u);
+      setNavOrder(u.ui_nav_order || DEFAULT_NAV);
+      setHubOrder(u.ui_hub_order || DEFAULT_HUB);
+      setClients(mappedClients);
+      setSources(mappedSources);
+      setLoans(mappedLoans);
+      setStaffMembers(mappedStaff);
+
+      // --- PERSISTE NO CACHE (ATUALIZAÇÃO) ---
+      writeCache(profileId, {
+          activeUser: u,
+          clients: mappedClients,
+          sources: mappedSources,
+          loans: mappedLoans,
+          staffMembers: mappedStaff,
+          navOrder: u.ui_nav_order || DEFAULT_NAV,
+          hubOrder: u.ui_hub_order || DEFAULT_HUB
+      });
+
     } catch (error: any) {
       console.error('Erro ao carregar dados:', error);
-      setLoadError(error.message || 'Erro de conexão com o banco de dados.');
-      setActiveUser(null);
+      // Se tiver cache, o usuário continua vendo dados antigos e recebe um toast (via UI), 
+      // aqui setamos erro apenas se não tiver usuário.
+      setActiveUser(prev => {
+          if (!prev) setLoadError(error.message || 'Erro de conexão.');
+          return prev;
+      });
     } finally {
       setIsLoadingData(false);
+      console.timeEnd('[BOOT] fetchFullData');
     }
   }, []);
 
@@ -194,6 +287,12 @@ export const useAppState = (activeProfileId: string | null) => {
 
     const updatedUser = { ...activeUser, ui_nav_order: newNav, ui_hub_order: newHub };
     setActiveUser(updatedUser);
+
+    // Atualiza cache local imediatamente para consistência no próximo F5
+    const cached = readCache(activeUser.id);
+    if (cached) {
+        writeCache(activeUser.id, { ...cached, activeUser: updatedUser, navOrder: newNav, hubOrder: newHub });
+    }
 
     if (profileEditForm?.id === activeUser.id) {
       setProfileEditForm(updatedUser);
@@ -210,12 +309,6 @@ export const useAppState = (activeProfileId: string | null) => {
       }
     }
   };
-
-  useEffect(() => {
-    if (activeProfileId && activeProfileId !== 'null') {
-      fetchFullData(activeProfileId);
-    }
-  }, [activeProfileId, fetchFullData]);
 
   return {
     loans,

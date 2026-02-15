@@ -1,6 +1,7 @@
 
 import React, { createContext, useContext, ReactNode } from 'react';
 import { UserProfile, Client, Loan, CapitalSource } from '../types';
+import { isDev } from '../utils/isDev';
 
 export type ModalType = 
     | 'LOAN_FORM'
@@ -61,7 +62,6 @@ const ModalContext = createContext<ModalContextType | undefined>(undefined);
 
 export const ModalProvider: React.FC<ModalContextType & { children: ReactNode }> = (props) => {
     const { children, ...values } = props;
-    const isDev = (import.meta as any).env?.DEV;
     if (isDev && values.activeModal) {
         if (!values.activeModal.type) {
             console.warn("ModalContext: Tentativa de abrir modal sem tipo definido.", values.activeModal);
