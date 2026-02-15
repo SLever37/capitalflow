@@ -11,6 +11,7 @@ const DEFAULT_HUB: AppTab[] = ['SOURCES', 'LEGAL', 'PROFILE', 'MASTER', 'PERSONA
 
 // --- CACHE SYSTEM START ---
 const CACHE_KEY = (profileId: string) => `cm_cache_${profileId}`;
+const CACHE_MAX_AGE = 2 * 60 * 1000; // 2 minutos de validade fresca
 
 type AppCacheSnapshot = {
   ts: number;
@@ -29,12 +30,13 @@ const readCache = (profileId: string): AppCacheSnapshot | null => {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
 
-    // Cache expira em 24h (para forçar refresh completo eventualmente)
-    // Mas o app sempre faz fetch em background, então isso é só segurança contra dados muito velhos
-    if (!parsed?.ts || Date.now() - parsed.ts > 24 * 60 * 60 * 1000) {
-        localStorage.removeItem(CACHE_KEY(profileId));
-        return null;
-    }
+    if (!parsed?.ts) return null;
+
+    // Validação de Idade do Cache (Stale-While-Revalidate)
+    const age = Date.now() - parsed.ts;
+    
+    // Se o cache for muito antigo (> 2 min), forçamos o fetch limpo
+    if (age > CACHE_MAX_AGE) return null;
 
     return parsed as AppCacheSnapshot;
   } catch {
@@ -128,46 +130,10 @@ export const useAppState = (activeProfileId: string | null) => {
   const [clientSearchTerm, setClientSearchTerm] = useState('');
   const [profileEditForm, setProfileEditForm] = useState<UserProfile | null>(null);
 
-  // --- BOOT COM CACHE ---
-  useEffect(() => {
-    if (!activeProfileId || activeProfileId === 'null') {
-      setActiveUser(null);
-      setLoadError(null);
-      setIsLoadingData(false);
-      setLoans([]);
-      setClients([]);
-      setSources([]);
-      setStaffMembers([]);
-    } else {
-        // 1. Tenta carregar cache instantaneamente
-        const cached = readCache(activeProfileId);
-        
-        if (cached?.activeUser) {
-             console.log('[BOOT] Cache encontrado. Renderizando instantaneamente.');
-             setActiveUser(cached.activeUser);
-             setProfileEditForm(cached.activeUser);
-             setNavOrder(cached.navOrder || DEFAULT_NAV);
-             setHubOrder(cached.hubOrder || DEFAULT_HUB);
-             
-             setClients(cached.clients || []);
-             setSources(cached.sources || []);
-             setLoans(cached.loans || []);
-             setStaffMembers(cached.staffMembers || []);
-             
-             setIsLoadingData(false);
-             setLoadError(null);
-        }
-
-        // 2. Dispara sincronização em background (Silent Fetch)
-        fetchFullData(activeProfileId);
-    }
-  }, [activeProfileId]); // Removido fetchFullData das deps para evitar loop, pois é estavel pelo useCallback
-
   const fetchFullData = useCallback(async (profileId: string) => {
-    console.time('[BOOT] fetchFullData');
+    // console.time('[BOOT] fetchFullData'); 
     if (!profileId || profileId === 'null' || profileId === 'undefined') {
       setIsLoadingData(false);
-      console.timeEnd('[BOOT] fetchFullData');
       return;
     }
 
@@ -178,7 +144,6 @@ export const useAppState = (activeProfileId: string | null) => {
       setHubOrder(DEFAULT_HUB);
       setIsLoadingData(false);
       setLoadError(null);
-      console.timeEnd('[BOOT] fetchFullData');
       return;
     }
 
@@ -267,17 +232,59 @@ export const useAppState = (activeProfileId: string | null) => {
 
     } catch (error: any) {
       console.error('Erro ao carregar dados:', error);
-      // Se tiver cache, o usuário continua vendo dados antigos e recebe um toast (via UI), 
-      // aqui setamos erro apenas se não tiver usuário.
       setActiveUser(prev => {
           if (!prev) setLoadError(error.message || 'Erro de conexão.');
           return prev;
       });
     } finally {
       setIsLoadingData(false);
-      console.timeEnd('[BOOT] fetchFullData');
+      // console.timeEnd('[BOOT] fetchFullData');
     }
   }, []);
+
+  // --- BOOT COM CACHE INTELIGENTE ---
+  useEffect(() => {
+    if (!activeProfileId || activeProfileId === 'null') {
+      setActiveUser(null);
+      setLoadError(null);
+      setIsLoadingData(false);
+      setLoans([]);
+      setClients([]);
+      setSources([]);
+      setStaffMembers([]);
+      return;
+    } 
+        
+    const cached = readCache(activeProfileId);
+    
+    if (cached?.activeUser) {
+          // 1. Cache VÁLIDO (< 2min): Renderiza instantaneamente
+          // console.log('[BOOT] Cache válido (< 2min). Renderizando instantaneamente.');
+          setActiveUser(cached.activeUser);
+          setProfileEditForm(cached.activeUser);
+          setNavOrder(cached.navOrder || DEFAULT_NAV);
+          setHubOrder(cached.hubOrder || DEFAULT_HUB);
+          
+          setClients(cached.clients || []);
+          setSources(cached.sources || []);
+          setLoans(cached.loans || []);
+          setStaffMembers(cached.staffMembers || []);
+          
+          setIsLoadingData(false);
+          setLoadError(null);
+
+          // 2. Revalidação silenciosa em background (sem bloquear UI)
+          setTimeout(() => {
+              fetchFullData(activeProfileId);
+          }, 1000);
+
+    } else {
+          // 3. Cache EXPIRADO ou INEXISTENTE: Fetch imediato
+          // console.log('[BOOT] Cache expirado. Fetch imediato.');
+          fetchFullData(activeProfileId);
+    }
+    
+  }, [activeProfileId]); 
 
   const saveNavConfig = async (newNav: AppTab[], newHub: AppTab[]) => {
     if (!activeUser) return;

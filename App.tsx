@@ -11,6 +11,7 @@ import { usePortalRouting } from './hooks/usePortalRouting';
 import { usePersistedTab } from './hooks/usePersistedTab';
 import { useControllers } from './hooks/useControllers';
 import { useAppNotifications } from './hooks/useAppNotifications';
+import { useExitGuard } from './hooks/useExitGuard';
 import { DashboardContainer } from './containers/DashboardContainer';
 import { ClientsContainer } from './containers/ClientsContainer';
 import { SourcesContainer } from './containers/SourcesContainer';
@@ -98,14 +99,16 @@ export const App: React.FC = () => {
     disabled: isPublicView,
   });
 
-  // 1. Anti-Saída Acidental (Proteção contra fechamento de aba)
+  // 1. Controle de Saída (Android e Web)
+  useExitGuard(activeUser, activeTab, isPublicView, showToast);
+
+  // 2. Anti-Saída Web (Proteção contra fechamento de aba/refresh)
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      // Só ativa se estiver logado e não for uma visão pública
       if (activeUser && !isPublicView) {
         e.preventDefault();
-        e.returnValue = ''; // Padrão para navegadores modernos exibirem o alerta
-        return '';
+        e.returnValue = 'Deseja realmente sair?';
+        return 'Deseja realmente sair?';
       }
     };
 
@@ -123,7 +126,7 @@ export const App: React.FC = () => {
   const effectiveSelectedStaffId = activeUser && activeUser.accessLevel === 2 ? activeUser.id : selectedStaffId;
   const isInvitePath = window.location.pathname === '/invite' || window.location.pathname === '/setup-password';
 
-  // 2. Tela de Carregamento Global (Splash Screen)
+  // 3. Tela de Carregamento Global (Splash Screen)
   // Exibe se: Temos um ID de perfil (tentando restaurar sessão) MAS ainda não temos o objeto user carregado
   // OU se estamos carregando dados iniciais críticos.
   const isInitializing = (!!activeProfileId && !activeUser) || (!!activeUser && isLoadingData && loans.length === 0 && !loadError);
