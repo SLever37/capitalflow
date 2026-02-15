@@ -1,91 +1,247 @@
-
-import React from 'react';
-import { Trash2, User, ShieldCheck, Mail, Clock, AlertCircle, Edit } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { 
+    Trash2, User, ShieldCheck, Mail, Clock, Timer, XCircle, 
+    CheckCircle2, Copy, ChevronDown, ChevronUp, Wallet, 
+    Users, Briefcase, Activity, MessageSquare, ExternalLink,
+    TrendingUp, MousePointer2
+} from 'lucide-react';
 import { maskDocument } from '../../../utils/formatters';
+import { supabase } from '../../../lib/supabase';
+import { formatMoney } from '../../../utils/formatters';
+import { getDaysDiff } from '../../../utils/dateHelpers';
 
-interface MemberCardProps {
-  member: any;
-  onDelete: (id: string) => void;
-  onEdit: (member: any) => void;
+interface MemberStats {
+    totalLent: number;
+    activeLoans: number;
+    clientCount: number;
+    totalRecovered: number;
+    lastTransactions: any[];
 }
 
-export const MemberCard: React.FC<MemberCardProps> = ({ member, onDelete, onEdit }) => {
-  // Erison no CSV não tem profile_id vinculado
-  const isPending = !member.profile_id;
-  
-  // No seu CSV o Erison tem CPF/Email no campo username_or_email
-  const emailDisplay = member.linked_profile?.usuario_email || member.username_or_email || "Não ativado";
-  const avatarUrl = member.linked_profile?.avatar_url;
+export const MemberCard = ({ member, onDelete, onEdit, onOpenChat }: any) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+    const [stats, setStats] = useState<MemberStats | null>(null);
+    const [loadingStats, setLoadingStats] = useState(false);
+    const [copied, setCopied] = useState(false);
 
-  // Normaliza papéis: MEMBRO (do seu CSV) ou MEMBER/ADMIN
-  const roleRaw = String(member.role || '').toUpperCase();
-  const isAdmin = roleRaw === 'ADMIN';
-  const roleLabel = isAdmin ? 'Administrador' : 'Operador';
+    const isPending = !member.profile_id && member.invite_status === 'PENDING';
+    const isExpired = member.invite_status === 'EXPIRED' || (!member.profile_id && new Date(member.expires_at) < new Date());
+    const isAccepted = member.invite_status === 'ACCEPTED' || !!member.profile_id;
+    
+    const emailDisplay = member.linked_profile?.usuario_email || member.username_or_email || "Aguardando ativação";
+    const avatarUrl = member.linked_profile?.avatar_url;
+    const inviteLink = `${window.location.origin}/setup-password?invite_token=${member.invite_token}`;
 
-  return (
-    <div className={`bg-slate-900 border p-6 rounded-[2.5rem] flex flex-col group transition-all shadow-sm hover:shadow-xl relative overflow-hidden ${isPending ? 'border-blue-500/20' : 'border-slate-800 hover:border-blue-500/50'}`}>
-      
-      {isPending && (
-          <div className="absolute top-0 right-0 px-4 py-1.5 bg-blue-500/10 border-b border-l border-blue-500/20 text-blue-400 text-[8px] font-black uppercase tracking-widest rounded-bl-2xl flex items-center gap-1.5">
-              <AlertCircle size={10}/> Convite Aguardando Login
-          </div>
-      )}
+    // Auditoria de Acesso
+    const accessCount = member.linked_profile?.access_count || 0;
+    const lastActive = member.linked_profile?.last_active_at;
+    const daysOff = lastActive ? getDaysDiff(lastActive) : null;
 
-      <div className="flex items-center gap-4 mb-6">
-        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-slate-500 border overflow-hidden shadow-inner ${isPending ? 'bg-slate-800 border-slate-700' : 'bg-slate-800 border-slate-700'}`}>
-           {avatarUrl ? (
-               <img src={avatarUrl} alt={member.full_name} className="w-full h-full object-cover" />
-           ) : (
-               <User size={28} className={isPending ? 'text-blue-500/50' : ''} />
-           )}
+    const loadMemberActivity = async () => {
+        if (!member.profile_id || !isExpanded) return;
+        
+        setLoadingStats(true);
+        try {
+            const [loansRes, clientsRes, transRes] = await Promise.all([
+                supabase.from('contratos').select('principal, id').eq('operador_responsavel_id', member.profile_id),
+                supabase.from('clientes').select('id', { count: 'exact' }).eq('owner_id', member.linked_profile?.supervisor_id || member.profile_id),
+                supabase.from('transacoes').select('*').eq('profile_id', member.profile_id).order('date', { ascending: false }).limit(5)
+            ]);
+
+            const loans = loansRes.data || [];
+            setStats({
+                totalLent: loans.reduce((acc, l) => acc + (l.principal || 0), 0),
+                activeLoans: loans.length,
+                clientCount: clientsRes.count || 0,
+                totalRecovered: 0,
+                lastTransactions: transRes.data || []
+            });
+        } catch (e) {
+            console.error("Erro ao carregar performance do membro", e);
+        } finally {
+            setLoadingStats(false);
+        }
+    };
+
+    useEffect(() => {
+        if (isExpanded && isAccepted) loadMemberActivity();
+    }, [isExpanded]);
+
+    const handleCopyLink = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        navigator.clipboard.writeText(inviteLink);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    const getRemainingTime = () => {
+        if (!member.expires_at) return null;
+        const diff = new Date(member.expires_at).getTime() - new Date().getTime();
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        if (hours < 0) return "Expirado";
+        if (hours > 24) return `${Math.floor(hours/24)}d restantes`;
+        return `${hours}h restantes`;
+    };
+
+    return (
+        <div className={`bg-slate-900 border rounded-[2.5rem] flex flex-col group transition-all duration-300 relative overflow-hidden ${
+            isExpanded ? 'ring-2 ring-blue-500/50 shadow-2xl' : 'shadow-lg'
+        } ${
+            isExpired ? 'opacity-60 border-rose-900/50' : 
+            isPending ? 'border-blue-500/30' : 
+            'border-slate-800 hover:border-slate-700'
+        }`}>
+            
+            {isPending && !isExpired && (
+                <div className="absolute top-0 right-0 px-4 py-1.5 bg-blue-600 text-white text-[8px] font-black uppercase tracking-widest rounded-bl-2xl flex items-center gap-1.5 shadow-lg z-10">
+                    <Timer size={10} className="animate-spin" /> {getRemainingTime()}
+                </div>
+            )}
+
+            <div className="p-6 cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
+                <div className="flex items-center gap-4 mb-6">
+                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-slate-500 border overflow-hidden shrink-0 ${isPending ? 'bg-slate-800 border-blue-500/20' : 'bg-slate-800 border-slate-700'}`}>
+                       {avatarUrl ? <img src={avatarUrl} alt={member.full_name} className="w-full h-full object-cover" /> : <User size={28} className={isPending ? 'text-blue-500' : ''} />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-white font-black text-base uppercase truncate">{member.full_name}</h3>
+                            {isExpanded ? <ChevronUp size={18} className="text-slate-600"/> : <ChevronDown size={18} className="text-slate-600"/>}
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                            <span className="text-slate-500 text-[9px] uppercase font-black tracking-widest bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                                {member.cpf ? maskDocument(member.cpf) : 'S/ CPF'}
+                            </span>
+                            {member.role === 'ADMIN' && <ShieldCheck size={12} className="text-blue-500" title="Administrador" />}
+                            {isAccepted && <CheckCircle2 size={12} className="text-emerald-500" title="Acesso Ativo" />}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                    <div className="bg-slate-950/50 p-2 rounded-xl border border-slate-800/50">
+                        <p className="text-[8px] text-slate-500 font-black uppercase mb-1">Status</p>
+                        <div className="flex items-center gap-1.5">
+                            <div className={`w-1.5 h-1.5 rounded-full ${daysOff === 0 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-700'}`}></div>
+                            <span className={`text-[10px] font-black uppercase ${daysOff === 0 ? 'text-emerald-400' : 'text-slate-500'}`}>
+                                {daysOff === 0 ? 'Online' : daysOff ? `Off há ${daysOff}d` : 'Inativo'}
+                            </span>
+                        </div>
+                    </div>
+                    <div className="bg-slate-950/50 p-2 rounded-xl border border-slate-800/50">
+                        <p className="text-[8px] text-slate-500 font-black uppercase mb-1">Logins</p>
+                        <div className="flex items-center gap-1.5">
+                            <MousePointer2 size={10} className="text-blue-500" />
+                            <span className="text-[10px] font-black text-white">{accessCount} Acessos</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {isExpanded && isPending && !isExpired && (
+                <div className="px-6 pb-6 animate-in slide-in-from-top-2 duration-300">
+                    <div className="bg-slate-950 p-4 rounded-2xl border border-blue-500/20 space-y-3">
+                        <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest flex items-center gap-2">
+                            <ExternalLink size={12}/> Link de Ativação Único
+                        </p>
+                        <div className="flex items-center gap-2">
+                            <div className="flex-1 bg-slate-900 border border-slate-800 rounded-xl p-2.5 overflow-hidden">
+                                <p className="text-[10px] font-mono text-slate-400 truncate">{inviteLink}</p>
+                            </div>
+                            <button 
+                                onClick={handleCopyLink}
+                                className={`p-2.5 rounded-xl transition-all shadow-lg ${copied ? 'bg-emerald-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-500'}`}
+                            >
+                                {copied ? <CheckCircle2 size={18}/> : <Copy size={18}/>}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {isExpanded && isAccepted && (
+                <div className="px-6 pb-6 space-y-6 animate-in slide-in-from-top-2 duration-300">
+                    <div className="flex gap-2">
+                        <button 
+                            onClick={() => onOpenChat?.(member)}
+                            className="flex-1 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl text-[10px] font-black uppercase flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20 transition-all"
+                        >
+                            <MessageSquare size={14}/> Chat de Equipe
+                        </button>
+                        <button 
+                            onClick={() => onEdit(member)}
+                            className="px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-2xl text-[10px] font-black uppercase transition-all"
+                        >
+                            Editar Permissões
+                        </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
+                            <div className="flex items-center gap-2 text-slate-500 mb-1">
+                                <Briefcase size={12}/>
+                                <span className="text-[9px] font-black uppercase">Capital Operado</span>
+                            </div>
+                            <p className="text-sm font-black text-white">
+                                {loadingStats ? "..." : formatMoney(stats?.totalLent || 0)}
+                            </p>
+                        </div>
+                        <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
+                            <div className="flex items-center gap-2 text-slate-500 mb-1">
+                                <Users size={12}/>
+                                <span className="text-[9px] font-black uppercase">Clientes</span>
+                            </div>
+                            <p className="text-sm font-black text-white">
+                                {loadingStats ? "..." : stats?.clientCount} Cadastrados
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden">
+                        <div className="bg-slate-900/50 px-4 py-2 border-b border-slate-800 flex items-center gap-2">
+                            <Activity size={12} className="text-emerald-500"/>
+                            <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Atividade Recente</span>
+                        </div>
+                        <div className="p-2 space-y-1">
+                            {loadingStats ? (
+                                <div className="py-8 flex justify-center"><Clock className="animate-spin text-slate-700" size={16}/></div>
+                            ) : stats?.lastTransactions.length === 0 ? (
+                                <p className="text-[10px] text-slate-600 text-center py-4 italic">Nenhuma transação registrada.</p>
+                            ) : stats?.lastTransactions.map((t: any) => (
+                                <div key={t.id} className="flex justify-between items-center p-2 hover:bg-slate-900 rounded-lg transition-colors">
+                                    <div className="min-w-0">
+                                        <p className="text-[10px] font-bold text-slate-300 truncate uppercase">{t.notes || t.type}</p>
+                                        <p className="text-[8px] text-slate-600">{new Date(t.date).toLocaleDateString()}</p>
+                                    </div>
+                                    <span className={`text-[10px] font-black ${t.type === 'LEND_MORE' ? 'text-rose-500' : 'text-emerald-500'}`}>
+                                        {t.type === 'LEND_MORE' ? '-' : '+'} {formatMoney(t.amount)}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <div className="mt-auto p-4 bg-slate-950/50 border-t border-slate-800 flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                    <div className={`p-1.5 rounded-lg ${member.role === 'ADMIN' ? 'bg-blue-500/10 text-blue-500' : 'bg-slate-800 text-slate-500'}`}>
+                        {member.role === 'ADMIN' ? <ShieldCheck size={14}/> : <User size={14}/>}
+                    </div>
+                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider">
+                        {member.role === 'ADMIN' ? 'Administrador' : isPending ? 'Convidado' : 'Operador'}
+                    </span>
+                </div>
+                <div className="flex gap-2">
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); onDelete(member.id); }} 
+                        className="p-2.5 bg-slate-900 text-slate-600 hover:text-rose-500 rounded-xl transition-all border border-slate-800 hover:border-rose-500/30"
+                        title="Excluir Membro"
+                    >
+                        <Trash2 size={16} />
+                    </button>
+                </div>
+            </div>
         </div>
-        <div className="flex-1 min-w-0">
-          <h3 className="text-white font-black text-sm sm:text-base uppercase truncate leading-tight">
-            {member.full_name || 'Membro sem nome'}
-          </h3>
-          <div className="flex items-center gap-2 mt-1">
-             <span className="text-slate-500 text-[9px] uppercase font-black tracking-widest bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
-                {member.cpf ? maskDocument(member.cpf) : 'S/ CPF'}
-             </span>
-             {isAdmin && <ShieldCheck size={12} className="text-blue-500"/>}
-          </div>
-        </div>
-      </div>
-
-      <div className="space-y-2 mb-6">
-          <div className="flex items-center gap-2 text-slate-400">
-              <Mail size={12} className="text-blue-500/50"/>
-              <span className="text-[10px] font-medium truncate">{emailDisplay}</span>
-          </div>
-          {member.linked_profile?.last_active_at && (
-              <div className="flex items-center gap-2 text-slate-500">
-                  <Clock size={12}/>
-                  <span className="text-[9px] uppercase font-bold">Visto em: {new Date(member.linked_profile.last_active_at).toLocaleDateString()}</span>
-              </div>
-          )}
-      </div>
-      
-      <div className="mt-auto pt-4 border-t border-slate-800 flex justify-between items-center">
-          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-            {roleLabel}
-          </span>
-          <div className="flex gap-2">
-            <button 
-                onClick={() => onEdit(member)} 
-                className="p-3 bg-slate-950 text-slate-500 hover:text-white hover:bg-slate-800 rounded-xl transition-all border border-slate-800"
-                title="Editar Membro"
-            >
-                <Edit size={16} />
-            </button>
-            <button 
-                onClick={() => onDelete(member.id)} 
-                className="p-3 bg-slate-950 text-slate-600 hover:text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all border border-slate-800 hover:border-rose-500/30"
-                title="Excluir Membro"
-            >
-                <Trash2 size={16} />
-            </button>
-          </div>
-      </div>
-    </div>
-  );
+    );
 };

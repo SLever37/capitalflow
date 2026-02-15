@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { ClientPortalView } from '../containers/ClientPortal/ClientPortalView';
 import { PublicLegalSignPage } from '../features/legal/components/PublicLegalSignPage';
@@ -33,7 +32,7 @@ export const AppGate: React.FC<AppGateProps> = ({
   // Props de Login
   loginUser, setLoginUser, loginPassword, setLoginPassword, submitLogin,
   savedProfiles, handleSelectSavedProfile, handleRemoveSavedProfile,
-  isLoadingData, setIsLoadingData, showToast
+  isLoadingData, setIsLoadingData, showToast, toast
 }) => {
   
   // 1. Rota Pública: Portal Financeiro (Acesso via Token)
@@ -60,6 +59,7 @@ export const AppGate: React.FC<AppGateProps> = ({
         handleRemoveSavedProfile={handleRemoveSavedProfile}
         isLoading={isLoadingData}
         showToast={showToast}
+        toast={toast}
       />
     );
   }

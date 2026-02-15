@@ -13,31 +13,24 @@ type SavedProfile = {
 
 const resolveSmartName = (p: any): string => {
   if (!p) return 'Gestor';
-
   const isGeneric = (s: string) => {
     if (!s) return true;
     const clean = s.toLowerCase().trim();
     return ['usuário', 'usuario', 'user', 'operador', 'admin', 'gestor', 'undefined', 'null', ''].includes(clean);
   };
-
   const display = asString(p.nome_exibicao);
   if (display && !isGeneric(display)) return display;
-
   const operator = asString(p.nome_operador);
   if (operator && !isGeneric(operator)) return operator;
-
   const business = asString(p.nome_empresa);
   if (business && !isGeneric(business)) return business;
-
   const full = asString(p.nome_completo);
   if (full && !isGeneric(full)) return full.split(' ')[0];
-
   const email = asString(p.usuario_email || p.email);
   if (email && email.includes('@')) {
     const prefix = email.split('@')[0];
     return prefix.charAt(0).toUpperCase() + prefix.slice(1);
   }
-
   return 'Gestor';
 };
 
@@ -46,6 +39,16 @@ export const useAuth = () => {
   const [loginUser, setLoginUser] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [savedProfiles, setSavedProfiles] = useState<SavedProfile[]>([]);
+
+  const trackAccess = async (profileId: string) => {
+    if (!profileId || profileId === 'DEMO') return;
+    try {
+      // Incrementa acessos e atualiza timestamp de atividade
+      await supabase.rpc('increment_profile_access', { p_profile_id: profileId });
+    } catch (e) {
+      console.warn("Falha ao registrar métrica de acesso", e);
+    }
+  };
 
   useEffect(() => {
     const saved = localStorage.getItem('cm_saved_profiles');
@@ -59,7 +62,10 @@ export const useAuth = () => {
     if (session) {
       try {
         const parsed = JSON.parse(session);
-        if (parsed?.profileId) setActiveProfileId(parsed.profileId);
+        if (parsed?.profileId) {
+            setActiveProfileId(parsed.profileId);
+            trackAccess(parsed.profileId);
+        }
       } catch {
         localStorage.removeItem('cm_session');
       }
@@ -68,12 +74,12 @@ export const useAuth = () => {
 
   const handleLoginSuccess = (profile: any, showToast: any) => {
     playNotificationSound();
-
     const profileId = profile.id;
     const profileName = resolveSmartName(profile);
     const profileEmail = asString(profile.usuario_email || profile.email || 'equipe@sistema');
 
     setActiveProfileId(profileId);
+    trackAccess(profileId);
 
     const updatedSaved = [
       ...savedProfiles.filter((p) => p.id !== profileId),
@@ -90,12 +96,7 @@ export const useAuth = () => {
   const ensureAuthSession = async (email: string, password: string) => {
     const { data: s } = await supabase.auth.getSession();
     if (s?.session?.user?.id) return;
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
   };
 
@@ -106,15 +107,12 @@ export const useAuth = () => {
     setIsLoading(true);
     const userInput = loginUser.trim();
     const pass = loginPassword.trim();
-
     if (!userInput || !pass) {
       showToast('Informe usuário e senha.', 'warning');
       setIsLoading(false);
       return;
     }
-
     await requestBrowserNotificationPermission();
-
     try {
       let profile: any = null;
       try {
@@ -123,9 +121,7 @@ export const useAuth = () => {
           p_password: pass,
         });
         if (!rpcError && data) profile = Array.isArray(data) ? data[0] : data;
-      } catch (e) {
-        console.warn('RPC Login failed, falling back.', e);
-      }
+      } catch (e) { console.warn('RPC Login failed, falling back.', e); }
 
       if (!profile) {
         const { data: fallbackData, error: fallbackError } = await supabase
@@ -134,7 +130,6 @@ export const useAuth = () => {
           .or(`usuario_email.ilike."${userInput}",nome_operador.ilike."${userInput}"`)
           .eq('senha_acesso', pass)
           .maybeSingle();
-
         if (!fallbackError && fallbackData) profile = fallbackData;
       }
 
@@ -143,12 +138,10 @@ export const useAuth = () => {
         setIsLoading(false);
         return;
       }
-
       const email = asString(profile.usuario_email || profile.email || userInput).toLowerCase();
       await ensureAuthSession(email, pass);
       handleLoginSuccess(profile, showToast);
     } catch (err: any) {
-      console.error('Erro crítico no login:', err);
       const msg = err?.message || 'Desconhecido';
       showToast('Erro de conexão: ' + msg, 'error');
     } finally {
@@ -166,42 +159,36 @@ export const useAuth = () => {
       const cleanDoc = onlyDigits(params.document);
       const cleanPhone = onlyDigits(params.phone);
       const cleanCode = params.code.trim();
-
       if (!cleanDoc || !cleanPhone || !cleanCode) {
         showToast('Preencha todos os campos para entrar.', 'warning');
         setIsLoading(false);
         return;
       }
-
       const { data: profiles, error } = await supabase
         .from('perfis')
         .select('*')
         .eq('document', cleanDoc)
         .eq('access_code', cleanCode);
-
       if (error) throw error;
-
       const validProfile = profiles?.find((p) => {
         const dbPhone = onlyDigits(p.phone || '');
         return dbPhone.includes(cleanPhone) || cleanPhone.includes(dbPhone);
       });
-
       if (!validProfile) {
         showToast('Dados incorretos. Verifique CPF, Telefone e Código.', 'error');
+        setIsLoading(false);
         return;
       }
-
       handleLoginSuccess(validProfile, showToast);
     } catch (e: any) {
-      console.error(e);
       showToast('Erro ao entrar: ' + e.message, 'error');
-    } finally {
       setIsLoading(false);
     }
   };
 
   const handleSelectSavedProfile = (p: SavedProfile, showToast: any) => {
     setActiveProfileId(p.id);
+    trackAccess(p.id);
     localStorage.setItem('cm_session', JSON.stringify({ profileId: p.id, ts: Date.now() }));
     showToast(`Bem-vindo de volta, ${p.name}!`, 'success');
   };
@@ -213,9 +200,7 @@ export const useAuth = () => {
   };
 
   const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-    } catch {}
+    try { await supabase.auth.signOut(); } catch {}
     setActiveProfileId(null);
     localStorage.removeItem('cm_session');
   };

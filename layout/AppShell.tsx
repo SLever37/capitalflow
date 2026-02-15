@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { AlertCircle, AlertTriangle, CheckCircle2, MessageSquare } from 'lucide-react';
 import { HeaderBar } from './HeaderBar';
@@ -6,6 +5,7 @@ import { BottomNav } from './BottomNav';
 import { UserProfile } from '../types';
 import { supabase } from '../lib/supabase';
 import { playNotificationSound } from '../utils/notificationSound';
+import { notificationService } from '../services/notification.service';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -19,7 +19,7 @@ interface AppShellProps {
   isStealthMode: boolean;
   toggleStealthMode: () => void;
   onOpenSupport?: () => void;
-  navOrder: string[]; // Adicionado navOrder aqui
+  navOrder: string[]; 
 }
 
 export const AppShell: React.FC<AppShellProps> = ({ 
@@ -35,22 +35,31 @@ export const AppShell: React.FC<AppShellProps> = ({
             .from('mensagens_suporte')
             .select('*', { count: 'exact', head: true })
             .eq('profile_id', activeUser.id)
-            .eq('sender', 'CLIENT')
-            .eq('read', false);
+            .eq('read', false)
+            .neq('sender_user_id', activeUser.id); // Mensagens não enviadas por mim
         setUnreadSupport(count || 0);
     };
 
     fetchUnread();
 
-    const channel = supabase.channel('support-notifications')
+    const channel = supabase.channel('support-notifications-main')
         .on('postgres_changes', { 
             event: 'INSERT', 
             schema: 'public', 
             table: 'mensagens_suporte', 
             filter: `profile_id=eq.${activeUser.id}` 
         }, (payload) => {
-            if (payload.new.sender === 'CLIENT') {
-                playNotificationSound();
+            // Se a mensagem não foi enviada por mim (evitar eco)
+            if (payload.new.sender_user_id !== activeUser.id) {
+                // Notificação Nativa (Push)
+                notificationService.notify(
+                    "Nova Mensagem",
+                    payload.new.content || payload.new.text || "Mídia recebida no atendimento.",
+                    () => {
+                        window.focus();
+                        onOpenSupport?.();
+                    }
+                );
                 fetchUnread();
             }
         })
@@ -90,7 +99,6 @@ export const AppShell: React.FC<AppShellProps> = ({
         {children}
       </main>
 
-      {/* FAB SUPORTE OPERADOR */}
       {activeUser && (
           <button 
             onClick={onOpenSupport}
@@ -113,6 +121,7 @@ export const AppShell: React.FC<AppShellProps> = ({
         onNewLoan={onNewLoan}
         navOrder={navOrder}
         primaryColor={activeUser?.brandColor}
+        isStaff={!!activeUser?.supervisor_id}
       />
     </div>
   );

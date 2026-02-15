@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   ShieldCheck,
@@ -20,13 +19,15 @@ import {
 
 import { useClientPortalLogic } from '../../features/portal/hooks/useClientPortalLogic';
 import { usePortalClientNotifications } from '../../features/portal/hooks/usePortalClientNotifications';
+import { usePortalPushNotifications } from '../../features/portal/hooks/usePortalPushNotifications';
+import { notificationService } from '../../services/notification.service';
 import { PortalPaymentModal } from '../../features/portal/components/PortalPaymentModal';
 import { PortalChatDrawer } from '../../features/portal/components/PortalChatDrawer';
 import { resolveDebtSummary, resolveInstallmentDebt, getPortalDueLabel } from '../../features/portal/mappers/portalDebtRules';
 import { PortalInstallmentItem } from './components/PortalInstallmentItem';
+import { PortalEducationalAI } from '../../features/portal/components/PortalEducationalAI';
 import { formatMoney } from '../../utils/formatters';
 
-// Define the missing props interface
 interface ClientPortalViewProps {
   initialPortalToken: string;
 }
@@ -37,15 +38,11 @@ interface ContractBlockProps {
     onChat: () => void;
 }
 
-// Componente Interno: Bloco de Contrato Individual
 const ContractBlock: React.FC<ContractBlockProps> = ({ loan, onPay, onChat }) => {
     const summary = useMemo(() => resolveDebtSummary(loan, loan.installments), [loan]);
     const { hasLateInstallments, totalDue, pendingCount, nextDueDate } = summary;
-
-    // Pega o status da próxima parcela ou da mais atrasada
     const nextInst = loan.installments.find((i: any) => i.status !== 'PAID');
     const statusInfo = nextInst ? getPortalDueLabel(resolveInstallmentDebt(loan, nextInst).daysLate, nextInst.dueDate) : { label: 'Quitado', variant: 'OK' };
-
     const isPaidOff = pendingCount === 0;
 
     return (
@@ -68,7 +65,6 @@ const ContractBlock: React.FC<ContractBlockProps> = ({ loan, onPay, onChat }) =>
                 </div>
             </div>
 
-            {/* Conteúdo Principal do Card */}
             {!isPaidOff && (
                 <div className="flex justify-between items-end mb-4">
                     <div>
@@ -86,7 +82,6 @@ const ContractBlock: React.FC<ContractBlockProps> = ({ loan, onPay, onChat }) =>
                 </div>
             )}
 
-            {/* Lista de Parcelas (Apenas as próximas 2 para economizar espaço) */}
             {!isPaidOff && (
                 <div className="space-y-2 mb-4 bg-slate-950/50 p-2 rounded-xl border border-slate-800/50">
                     {loan.installments.filter((i:any) => i.status !== 'PAID').slice(0, 2).map((inst: any) => (
@@ -98,7 +93,6 @@ const ContractBlock: React.FC<ContractBlockProps> = ({ loan, onPay, onChat }) =>
                 </div>
             )}
 
-            {/* Ações */}
             <div className="grid grid-cols-2 gap-2 mt-2">
                 <button 
                     onClick={onPay}
@@ -137,12 +131,18 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({ initialPorta
   const [activeLoanForChat, setActiveLoanForChat] = useState<any>(null);
   const [isLegalOpen, setIsLegalOpen] = useState(false);
 
-  // --- RESUMO GLOBAL DO CLIENTE ---
+  useEffect(() => {
+    if (!isLoading && loggedClient) {
+        notificationService.requestPermission();
+    }
+  }, [isLoading, loggedClient]);
+
+  usePortalPushNotifications(clientContracts, loggedClient?.id || null);
+
   const globalSummary = useMemo(() => {
       let total = 0;
       let lateCount = 0;
       let maxLate = 0;
-
       clientContracts.forEach(c => {
           const sum = resolveDebtSummary(c, c.installments);
           total += sum.totalDue;
@@ -151,17 +151,14 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({ initialPorta
               if (sum.maxDaysLate > maxLate) maxLate = sum.maxDaysLate;
           }
       });
-
       return { total, lateCount, maxLate };
   }, [clientContracts]);
 
   const alertTheme = globalSummary.lateCount > 0;
-
-  // Notificações Baseadas no Global
   const clientNotification = usePortalClientNotifications(initialPortalToken, { 
     overdueCount: globalSummary.lateCount, 
     maxDaysLate: globalSummary.maxLate, 
-    nextDueDate: null // Global não tem nextDueDate único relevante
+    nextDueDate: null 
   });
 
   if (isLoading) {
@@ -188,7 +185,6 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({ initialPorta
   return (
     <div className="min-h-screen bg-slate-950 flex justify-center p-0 sm:p-4 overflow-hidden">
       
-      {/* NOTIFICAÇÃO TOAST */}
       {clientNotification && clientNotification.show && (
           <div className="fixed top-6 left-4 right-4 z-[200] animate-in slide-in-from-top-6 duration-500 pointer-events-none">
              <div className="bg-slate-900 text-white p-4 rounded-2xl shadow-2xl border-l-4 border-rose-500 flex items-start gap-3 max-w-sm mx-auto pointer-events-auto ring-1 ring-white/10">
@@ -205,7 +201,6 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({ initialPorta
 
       <div className="w-full max-w-lg bg-slate-900 sm:rounded-[2.5rem] flex flex-col h-full sm:h-[90vh] sm:border border-slate-800 shadow-2xl overflow-hidden relative">
         
-        {/* HEADER CLIENTE */}
         <div className="bg-slate-950 border-b border-slate-800 p-5 flex items-center justify-between shrink-0 relative z-10">
             <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white font-black text-sm shadow-lg border-2 border-slate-900">
@@ -221,13 +216,10 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({ initialPorta
             </button>
         </div>
 
-        {/* CONTEÚDO SCROLLÁVEL */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-6 relative">
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-6 relative pb-20">
             
-            {/* Efeito Background Alerta */}
             {alertTheme && <div className="absolute top-0 right-0 w-full h-64 bg-rose-900/10 blur-[80px] pointer-events-none"></div>}
 
-            {/* RESUMO GLOBAL */}
             <div className={`p-6 rounded-[2rem] border relative overflow-hidden transition-all ${alertTheme ? 'bg-gradient-to-br from-rose-950 to-slate-900 border-rose-500/30' : 'bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700'}`}>
                  <div className="relative z-10">
                      <p className={`text-[10px] font-black uppercase mb-1 flex items-center gap-1 ${alertTheme ? 'text-rose-300' : 'text-slate-400'}`}>
@@ -252,7 +244,6 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({ initialPorta
                  </div>
             </div>
 
-            {/* AÇÕES GERAIS */}
             <button onClick={() => setIsLegalOpen(true)} className="w-full bg-slate-800 border border-slate-700 p-4 rounded-2xl flex items-center justify-between group hover:bg-slate-700 transition-all">
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-indigo-500/10 text-indigo-400 rounded-xl group-hover:bg-indigo-500 group-hover:text-white transition-all"><FileSignature size={18}/></div>
@@ -264,7 +255,6 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({ initialPorta
                 <ChevronRight size={16} className="text-slate-500"/>
             </button>
 
-            {/* LISTA DE CONTRATOS */}
             <div className="space-y-4">
                 <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest pl-1">Seus Contratos</h3>
                 {clientContracts.length === 0 ? (
@@ -283,7 +273,9 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({ initialPorta
                 )}
             </div>
             
-            {/* CREDOR INFO (Geral, pega do primeiro contrato ativo) */}
+            {/* IA EDUCACIONAL NO FINAL */}
+            <PortalEducationalAI contracts={clientContracts} clientName={loggedClient.name} />
+
             {clientContracts.length > 0 && (
                 <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800/50 flex items-center gap-3 opacity-60">
                     <div className="p-2 bg-slate-800 rounded-xl text-slate-400"><Building size={16}/></div>
@@ -296,7 +288,6 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({ initialPorta
         </div>
       </div>
 
-      {/* MODAL PAGAMENTO (Contextualizado) */}
       {activeLoanForPayment && (
           <PortalPaymentModal 
               loan={activeLoanForPayment} 
@@ -306,14 +297,14 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({ initialPorta
           />
       )}
 
-      {/* DRAWER CHAT (Contextualizado) */}
-      <PortalChatDrawer 
-          loan={activeLoanForChat} 
-          isOpen={!!activeLoanForChat} 
-          onClose={() => setActiveLoanForChat(null)} 
-      />
+      {activeLoanForChat && (
+          <PortalChatDrawer 
+              loan={activeLoanForChat} 
+              isOpen={!!activeLoanForChat} 
+              onClose={() => setActiveLoanForChat(null)} 
+          />
+      )}
 
-      {/* MODAL JURÍDICO */}
       {isLegalOpen && (
         <div className="fixed inset-0 bg-slate-950/95 flex items-center justify-center z-[150] p-4 backdrop-blur-sm">
           <div className="bg-slate-900 p-6 rounded-[2.5rem] border border-indigo-500/30 max-w-lg w-full shadow-2xl animate-in zoom-in-95 relative">

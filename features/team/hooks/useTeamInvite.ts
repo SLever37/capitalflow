@@ -1,7 +1,5 @@
-
 import { useState } from 'react';
 import { supabase } from '../../../lib/supabase';
-import { generateUUID } from '../../../utils/generators';
 import { InviteResult } from '../types';
 
 interface UseTeamInviteProps {
@@ -10,13 +8,36 @@ interface UseTeamInviteProps {
   showToast: (msg: string, type?: 'success' | 'error') => void;
 }
 
+type TeamMemberInsert = {
+  team_id: string;
+  full_name: string;
+  cpf: string;
+  username_or_email: string;
+  role: 'MEMBER' | 'ADMIN';
+  // profile_id fica null até aceitar
+  profile_id?: string | null;
+  linked_profile_id?: string | null;
+};
+
 export const useTeamInvite = ({ teamId, onSuccess, showToast }: UseTeamInviteProps) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [inviteResult, setInviteResult] = useState<InviteResult | null>(null);
 
   const createInvite = async (name: string, cleanCPF: string) => {
     if (!teamId) {
-      showToast("Erro: Time não identificado.", "error");
+      showToast('Erro: Time não identificado.', 'error');
+      return;
+    }
+
+    const fullName = (name || '').trim();
+    const cpf = (cleanCPF || '').trim();
+
+    if (!fullName) {
+      showToast('Informe o nome do membro.', 'error');
+      return;
+    }
+    if (!cpf) {
+      showToast('Informe o CPF do membro.', 'error');
       return;
     }
 
@@ -24,40 +45,35 @@ export const useTeamInvite = ({ teamId, onSuccess, showToast }: UseTeamInvitePro
     setInviteResult(null);
 
     try {
-      const profileId = generateUUID();
-      const inviteToken = generateUUID();
-
-      // 1. Criar perfil "placeholder" (sem senha, apenas para vincular dados)
-      // O email fictício garante unicidade temporária até o usuário reclamar a conta
-      const { error: pErr } = await supabase.from('profiles').insert({
-        id: profileId,
-        full_name: name,
-        email: `${cleanCPF}@convite.temp`, // Email temporário
-      });
-
-      if (pErr) throw new Error("Erro ao criar perfil base: " + pErr.message);
-
-      // 2. Criar o vínculo no time com o token
-      const { error: mErr } = await supabase.from('team_members').insert({
+      // 1) Cria o "slot" no time sem profile_id (Resolve Erro de FK)
+      const payload: TeamMemberInsert = {
         team_id: teamId,
-        profile_id: profileId,
-        full_name: name,
-        cpf: cleanCPF,
-        username_or_email: cleanCPF,
+        full_name: fullName,
+        cpf,
+        username_or_email: cpf, // Usando CPF como identificador inicial
         role: 'MEMBER',
-        invite_token: inviteToken
-      });
+        profile_id: null,
+        linked_profile_id: null,
+      };
 
-      if (mErr) throw new Error("Erro ao adicionar membro: " + mErr.message);
+      // Inserimos e capturamos o token gerado automaticamente pelo banco
+      const { data, error } = await supabase
+        .from('team_members')
+        .insert(payload)
+        .select('invite_token, expires_at')
+        .single();
 
-      // Gera link para Login (assumindo que a rota /login aceita ?token=...)
-      const inviteLink = `${window.location.origin}/login?invite_token=${inviteToken}`;
-      
-      setInviteResult({ link: inviteLink, name });
-      showToast("Convite gerado com sucesso!", "success");
-      onSuccess(); // Recarrega a lista
+      if (error) throw new Error('Erro ao gerar convite no banco: ' + error.message);
+      if (!data?.invite_token) throw new Error('O banco não gerou um token de convite. Verifique o Default da coluna invite_token.');
+
+      // 2) Gera o Link Mágico de Ativação
+      const inviteLink = `${window.location.origin}/setup-password?invite_token=${data.invite_token}`;
+
+      setInviteResult({ link: inviteLink, name: fullName });
+      showToast('Convite gerado com sucesso! Válido por 2 dias.', 'success');
+      onSuccess();
     } catch (e: any) {
-      showToast(e.message, "error");
+      showToast(e?.message || 'Falha ao gerar convite.', 'error');
     } finally {
       setIsProcessing(false);
     }
@@ -69,23 +85,21 @@ export const useTeamInvite = ({ teamId, onSuccess, showToast }: UseTeamInvitePro
     try {
       const { error } = await supabase.from('team_members').delete().eq('id', memberId);
       if (error) throw error;
-      
-      showToast("Membro removido.", "success");
+
+      showToast('Membro removido.', 'success');
       onSuccess();
     } catch (e: any) {
-      showToast("Erro ao remover: " + e.message, "error");
+      showToast('Erro ao remover: ' + (e?.message || 'desconhecido'), 'error');
     }
   };
 
-  const resetInviteState = () => {
-    setInviteResult(null);
-  };
+  const resetInviteState = () => setInviteResult(null);
 
   return {
     isProcessing,
     inviteResult,
     createInvite,
     deleteMember,
-    resetInviteState
+    resetInviteState,
   };
 };
