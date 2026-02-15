@@ -1,8 +1,13 @@
-
 import React from 'react';
-import { TrendingUp, Loader2, ShieldCheck } from 'lucide-react';
+import { TrendingUp, Loader2, ShieldCheck, LogOut } from 'lucide-react';
 
 export const LoadingScreen: React.FC = () => {
+  const handleCancelLoading = () => {
+    // Limpa a sessão persistente e recarrega o app para forçar o login
+    localStorage.removeItem('cm_session');
+    window.location.reload();
+  };
+
   return (
     <div className="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center z-[9999]">
       <div className="relative mb-8">
@@ -21,9 +26,19 @@ export const LoadingScreen: React.FC = () => {
       </h1>
 
       {/* Indicador de Carregamento */}
-      <div className="flex items-center gap-3 mt-8 bg-slate-900/50 px-6 py-3 rounded-full border border-slate-800/50 backdrop-blur-md animate-in fade-in duration-1000 delay-200">
-         <Loader2 size={16} className="text-blue-500 animate-spin" />
-         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sincronizando Sistema...</span>
+      <div className="flex flex-col items-center gap-4 mt-8 animate-in fade-in duration-1000 delay-200">
+         <div className="flex items-center gap-3 bg-slate-900/50 px-6 py-3 rounded-full border border-slate-800/50 backdrop-blur-md">
+            <Loader2 size={16} className="text-blue-500 animate-spin" />
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sincronizando Sistema...</span>
+         </div>
+
+         {/* Botão de Escape para evitar carregamento infinito */}
+         <button 
+            onClick={handleCancelLoading}
+            className="flex items-center gap-2 text-[10px] font-bold text-slate-600 hover:text-rose-500 transition-colors uppercase tracking-widest px-4 py-2 rounded-xl"
+         >
+            <LogOut size={12}/> Voltar ao Login
+         </button>
       </div>
 
       {/* Footer de Segurança */}
