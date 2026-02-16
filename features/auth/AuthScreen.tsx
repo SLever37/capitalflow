@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { HelpCircle, TrendingUp, User, KeyRound, Loader2, X, ChevronRight, Beaker, Eye, EyeOff, UserPlus, Phone, ShieldCheck, Mail, Lock } from 'lucide-react';
 import { Modal } from '../../components/ui/Modal';
@@ -5,7 +6,6 @@ import { supabase } from '../../lib/supabase';
 import { generateUUID } from '../../utils/generators';
 import { maskPhone, maskDocument, onlyDigits } from '../../utils/formatters';
 import { isValidCPForCNPJ } from '../../utils/validators';
-import { useAuth } from './useAuth';
 
 /**
  * LEAME: Refatoração de AuthScreen
@@ -350,6 +350,11 @@ interface AuthScreenProps {
   loginPassword: string;
   setLoginPassword: (v: string) => void;
   submitLogin: () => void;
+  submitTeamLogin: (
+    params: { document: string; phone: string; code: string },
+    setIsLoading: (v: boolean) => void,
+    showToast: (msg: string, type?: any) => void
+  ) => Promise<void>;
   isLoading: boolean;
   savedProfiles: any[];
   handleSelectSavedProfile: (p: any) => void;
@@ -359,10 +364,9 @@ interface AuthScreenProps {
 }
 
 export const AuthScreen: React.FC<AuthScreenProps> = ({
-    loginUser, setLoginUser, loginPassword, setLoginPassword, submitLogin, isLoading,
+    loginUser, setLoginUser, loginPassword, setLoginPassword, submitLogin, submitTeamLogin, isLoading,
     savedProfiles, handleSelectSavedProfile, handleRemoveSavedProfile, showToast
 }) => {
-    const { submitTeamLogin } = useAuth();
     
     // Flags de UI
     const [isCreatingProfile, setIsCreatingProfile] = useState(false);

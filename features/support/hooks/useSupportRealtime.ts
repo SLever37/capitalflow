@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { playNotificationSound } from '../../../utils/notificationSound';
+import { supportChatService } from '../../../services/supportChat.service';
 
 type Role = 'CLIENT' | 'OPERATOR';
 type TicketStatus = 'OPEN' | 'CLOSED';
@@ -109,6 +110,16 @@ export const useSupportRealtime = (loanId: string, profileId: string, role: Role
 
           const isMine = senderUserId ? senderUserId === profileId : false;
           if (!isMine) playNotificationSound();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'mensagens_suporte', filter: `loan_id=eq.${loanId}` },
+        (payload) => {
+          // Remove a mensagem apagada da lista
+          if (payload.old && payload.old.id) {
+            setMessages((prev) => prev.filter((m) => m.id !== payload.old.id));
+          }
         }
       )
       .on(
@@ -257,6 +268,12 @@ export const useSupportRealtime = (loanId: string, profileId: string, role: Role
     if (error) throw new Error(error.message || 'Falha ao reabrir ticket.');
   };
 
+  // Nova função para deletar mensagem
+  const deleteMessage = async (msgId: string) => {
+    await supportChatService.deleteMessage(msgId);
+    // Realtime atualizará o estado
+  };
+
   return {
     messages,
     ticketStatus,
@@ -265,5 +282,6 @@ export const useSupportRealtime = (loanId: string, profileId: string, role: Role
     sendMessage,
     sendLocation,
     updateTicketStatus,
+    deleteMessage
   };
 };

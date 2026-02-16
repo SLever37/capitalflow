@@ -22,7 +22,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
   senderType,
   placeholder,
 }) => {
-  const { messages, ticketStatus, isOnline, isLoading, sendMessage, updateTicketStatus } =
+  const { messages, ticketStatus, isOnline, isLoading, sendMessage, updateTicketStatus, deleteMessage } =
     useSupportRealtime(loanId, profileId, senderType);
 
   // ✅ CHAMADAS (voz/vídeo)
@@ -193,6 +193,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         senderType={senderType}
         operatorId={operatorId}
         scrollRef={scrollRef}
+        onDeleteMessage={deleteMessage}
       />
 
       {ticketStatus === 'CLOSED' && (

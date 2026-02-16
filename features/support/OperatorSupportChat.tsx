@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { ShieldCheck, X, ChevronLeft, MessageCircle, Lock, Unlock } from 'lucide-react';
+import { ShieldCheck, X, ChevronLeft, MessageCircle, Lock, Unlock, Trash2 } from 'lucide-react';
 import { supportChatService } from '../../services/supportChat.service';
 import { ChatContainer } from './ChatContainer';
 import { ChatSidebar } from './components/ChatSidebar';
@@ -21,18 +21,35 @@ function diffLabel(ts: string | number | Date) {
 }
 
 // Wrapper interno para ter acesso ao hook realtime dentro do chat selecionado
-const ActiveChatWrapper = ({ loanId, activeUser, clientName }: any) => {
+const ActiveChatWrapper = ({ loanId, activeUser, clientName, onChatDeleted }: any) => {
     const { updateTicketStatus, ticketStatus } = useSupportRealtime(loanId, activeUser.id, 'OPERATOR');
+
+    const handleDeleteHistory = async () => {
+        if (!confirm(`Tem certeza que deseja apagar TODO o histórico de conversa com ${clientName}? Essa ação é irreversível.`)) return;
+        try {
+            await supportChatService.deleteChatHistory(loanId);
+            onChatDeleted();
+        } catch (e: any) {
+            alert('Erro ao apagar histórico: ' + e.message);
+        }
+    };
 
     return (
         <div className="flex-1 flex flex-col relative min-h-0">
              {/* Header de Ação Rápida */}
-             <div className="absolute top-14 right-4 z-20">
+             <div className="absolute top-14 right-4 z-20 flex gap-2">
+                <button 
+                    onClick={handleDeleteHistory}
+                    className="px-3 py-1.5 rounded-lg text-[10px] font-black uppercase backdrop-blur-md shadow-lg border border-rose-500/20 bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white transition-all flex items-center gap-1"
+                    title="Apagar Histórico"
+                >
+                    <Trash2 size={12}/>
+                </button>
                 <button 
                     onClick={() => updateTicketStatus(ticketStatus === 'OPEN' ? 'CLOSED' : 'OPEN')}
-                    className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase backdrop-blur-md shadow-lg border transition-all flex items-center gap-1 ${ticketStatus === 'OPEN' ? 'bg-rose-500/10 text-rose-500 border-rose-500/20 hover:bg-rose-500 hover:text-white' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500 hover:text-white'}`}
+                    className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase backdrop-blur-md shadow-lg border transition-all flex items-center gap-1 ${ticketStatus === 'OPEN' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20 hover:bg-amber-500 hover:text-black' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500 hover:text-white'}`}
                 >
-                    {ticketStatus === 'OPEN' ? <><Lock size={12}/> Encerrar Chamado</> : <><Unlock size={12}/> Reabrir Chamado</>}
+                    {ticketStatus === 'OPEN' ? <><Lock size={12}/> Encerrar</> : <><Unlock size={12}/> Reabrir</>}
                 </button>
              </div>
 
@@ -108,6 +125,20 @@ export const OperatorSupportChat = ({ activeUser, onClose }: { activeUser: any; 
       }
   };
 
+  const handleBulkDelete = async (selectedIds: string[]) => {
+      if (confirm(`Deseja apagar o histórico de ${selectedIds.length} conversas selecionadas?`)) {
+          try {
+              await supportChatService.deleteMultipleChats(selectedIds);
+              await loadAllData();
+              if (selectedChat && selectedIds.includes(selectedChat.loanId)) {
+                  setSelectedChat(null);
+              }
+          } catch (e: any) {
+              alert("Erro ao apagar chats: " + e.message);
+          }
+      }
+  };
+
   return (
     <div className="fixed inset-0 z-[200] bg-slate-950 flex flex-col animate-in fade-in duration-300 font-sans h-[100dvh]">
       
@@ -139,6 +170,7 @@ export const OperatorSupportChat = ({ activeUser, onClose }: { activeUser: any; 
             setSearchTerm={setSearchTerm}
             onSelectChat={handleSelectContact}
             diffLabel={diffLabel}
+            onBulkDelete={handleBulkDelete}
         />
 
         {/* ÁREA DE CHAT */}
@@ -166,6 +198,7 @@ export const OperatorSupportChat = ({ activeUser, onClose }: { activeUser: any; 
                   loanId={selectedChat.loanId} 
                   activeUser={activeUser}
                   clientName={selectedChat.clientName}
+                  onChatDeleted={() => { setSelectedChat(null); loadAllData(); }}
               />
             </>
           ) : (

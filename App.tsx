@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { AppShell } from './layout/AppShell';
 import { NavHubController } from './layout/NavHubController';
@@ -50,6 +49,7 @@ export const App: React.FC = () => {
     loginPassword, setLoginPassword,
     savedProfiles,
     submitLogin,
+    submitTeamLogin,
     handleLogout,
     handleSelectSavedProfile,
     handleRemoveSavedProfile,
@@ -100,7 +100,8 @@ export const App: React.FC = () => {
   });
 
   // 1. Controle de Saída (Android e Web)
-  useExitGuard(activeUser, activeTab, isPublicView, showToast);
+  // Agora passando setActiveTab para controlar a navegação interna
+  useExitGuard(activeUser, activeTab, setActiveTab, isPublicView, showToast);
 
   // 2. Anti-Saída Web (Proteção contra fechamento de aba/refresh)
   useEffect(() => {
@@ -155,6 +156,7 @@ export const App: React.FC = () => {
           loginPassword={loginPassword}
           setLoginPassword={setLoginPassword}
           submitLogin={submitLogin}
+          submitTeamLogin={submitTeamLogin}
           savedProfiles={savedProfiles}
           handleSelectSavedProfile={handleSelectSavedProfile}
           handleRemoveSavedProfile={handleRemoveSavedProfile}

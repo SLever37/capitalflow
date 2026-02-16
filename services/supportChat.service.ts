@@ -201,6 +201,26 @@ export const supportChatService = {
     return true;
   },
 
+  async deleteMessage(messageId: string) {
+    const { error } = await supabase.from('mensagens_suporte').delete().eq('id', messageId);
+    if (error) throw error;
+  },
+
+  async deleteChatHistory(loanId: string) {
+    const { error } = await supabase.from('mensagens_suporte').delete().eq('loan_id', loanId);
+    if (error) throw error;
+    // Opcional: Apagar ticket também se quiser resetar status
+    await supabase.from('support_tickets').delete().eq('loan_id', loanId);
+  },
+
+  async deleteMultipleChats(loanIds: string[]) {
+    if (loanIds.length === 0) return;
+    const { error } = await supabase.from('mensagens_suporte').delete().in('loan_id', loanIds);
+    if (error) throw error;
+    // Opcional: Apagar tickets
+    await supabase.from('support_tickets').delete().in('loan_id', loanIds);
+  },
+
   async getActiveChats(operatorId: string) {
     if (isDev) {
        console.log('[BUILD-MARK] supportChatService.getActiveChats v5 (SEM JOIN contratos)');

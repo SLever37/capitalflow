@@ -15,6 +15,7 @@ interface AppGateProps {
   loginPassword: string;
   setLoginPassword: (v: string) => void;
   submitLogin: (setLoading: any, setToast: any) => void;
+  submitTeamLogin: (params: any, setIsLoading: any, showToast: any) => Promise<void>;
   savedProfiles: any[];
   handleSelectSavedProfile: (p: any, toast: any) => void;
   handleRemoveSavedProfile: (id: string) => void;
@@ -30,7 +31,7 @@ export const AppGate: React.FC<AppGateProps> = ({
   activeUser,
   children,
   // Props de Login
-  loginUser, setLoginUser, loginPassword, setLoginPassword, submitLogin,
+  loginUser, setLoginUser, loginPassword, setLoginPassword, submitLogin, submitTeamLogin,
   savedProfiles, handleSelectSavedProfile, handleRemoveSavedProfile,
   isLoadingData, setIsLoadingData, showToast, toast
 }) => {
@@ -54,6 +55,7 @@ export const AppGate: React.FC<AppGateProps> = ({
         loginPassword={loginPassword}
         setLoginPassword={setLoginPassword}
         submitLogin={() => submitLogin(setIsLoadingData, showToast)}
+        submitTeamLogin={submitTeamLogin}
         savedProfiles={savedProfiles}
         handleSelectSavedProfile={(p) => handleSelectSavedProfile(p, showToast)}
         handleRemoveSavedProfile={handleRemoveSavedProfile}

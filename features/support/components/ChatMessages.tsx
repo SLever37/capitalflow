@@ -2,7 +2,7 @@
 import React from 'react';
 import { SupportMessage } from '../../../services/supportChat.service';
 import { AudioPlayer } from './AudioPlayer';
-import { Check, CheckCheck, FileText, Image as ImageIcon, MapPin, User, ExternalLink } from 'lucide-react';
+import { Check, CheckCheck, FileText, Image as ImageIcon, MapPin, User, ExternalLink, Trash2 } from 'lucide-react';
 
 interface ChatMessagesProps {
   messages: SupportMessage[];
@@ -10,6 +10,7 @@ interface ChatMessagesProps {
   senderType: 'CLIENT' | 'OPERATOR';
   operatorId?: string;
   scrollRef: React.RefObject<HTMLDivElement>;
+  onDeleteMessage?: (id: string) => void;
 }
 
 function buildMapsUrlFromMessage(m: SupportMessage): { url: string | null; lat?: number; lng?: number } {
@@ -45,8 +46,15 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
   currentUserId,
   senderType,
   operatorId,
-  scrollRef
+  scrollRef,
+  onDeleteMessage
 }) => {
+  const handleDelete = (id: string) => {
+    if (confirm('Apagar esta mensagem permanentemente?')) {
+        onDeleteMessage?.(id);
+    }
+  };
+
   const renderContent = (m: SupportMessage) => {
     switch (m.type) {
       case 'image':
@@ -164,7 +172,7 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
         const isSequence = prevM && prevM.sender_type === m.sender_type;
 
         return (
-          <div key={m.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'} ${isSequence ? 'mt-1' : 'mt-4'}`}>
+          <div key={m.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'} ${isSequence ? 'mt-1' : 'mt-4'} group`}>
             <div
               className={`max-w-[85%] px-4 py-3 relative ${
                 isMe
@@ -179,6 +187,17 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
                   isMe ? 'opacity-70 text-blue-100' : 'opacity-50 text-slate-400'
                 }`}
               >
+                {/* Botão de Deletar para Operador */}
+                {senderType === 'OPERATOR' && isMe && onDeleteMessage && (
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); handleDelete(m.id); }} 
+                        className="mr-2 opacity-0 group-hover:opacity-100 transition-opacity hover:text-rose-300"
+                        title="Apagar Mensagem"
+                    >
+                        <Trash2 size={10} />
+                    </button>
+                )}
+
                 {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
 
                 {m.sender_type === 'OPERATOR' && m.operator_id && !isMe && (

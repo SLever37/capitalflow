@@ -61,7 +61,6 @@ const devLog = (...args: any[]) => {
 // -------------------------------
 
 export const useAuth = () => {
-  console.log('[BOOT] useAuth init');
   const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
   const [loginUser, setLoginUser] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
