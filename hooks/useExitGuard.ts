@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { supabase } from '../lib/supabase';
 
 export const useExitGuard = (
   activeUser: any,
@@ -10,72 +11,66 @@ export const useExitGuard = (
 ) => {
   const lastBackPress = useRef<number>(0);
 
-  // 1. Anti-Saída Web (Confirmação ao fechar aba ou atualizar página)
+  // 1. Proteção Web (Confirmação ao fechar aba/recarregar)
   useEffect(() => {
     if (!activeUser || isPublicView) return;
 
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      // Evita o prompt se estivermos saindo deliberadamente (logout)
       if (!activeUser) return;
-      
       e.preventDefault();
-      // A mensagem personalizada é ignorada pela maioria dos browsers modernos (mostram padrão)
-      e.returnValue = 'Deseja realmente sair? Alterações não salvas podem ser perdidas.';
-      return 'Deseja realmente sair?';
+      e.returnValue = 'As alterações não salvas serão perdidas. Deseja realmente sair?';
+      return e.returnValue;
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [activeUser, isPublicView]);
 
-  // 2. Proteção de Botão Voltar (Android PWA/WebView)
+  // 2. Proteção de Botão Voltar (Android PWA / Mobile Browser)
   useEffect(() => {
     if (!activeUser || isPublicView) return;
 
     const isAndroid = /Android/i.test(navigator.userAgent);
+    
+    // Injeta um estado falso no histórico para capturar o primeiro clique no voltar
+    window.history.pushState({ anchor: true }, '', window.location.href);
 
-    if (isAndroid) {
-      // Cria uma entrada no histórico para "capturar" o primeiro clique no voltar
-      window.history.pushState(null, '', window.location.href);
+    const handlePopState = (e: PopStateEvent) => {
+      // Prioridade 1: Fechar Modais Abertos
+      if (ui?.activeModal) {
+        ui.closeModal();
+        window.history.pushState({ anchor: true }, '', window.location.href);
+        return;
+      }
 
-      const handlePopState = (e: PopStateEvent) => {
-        // 1. Prioridade Máxima: Fechar Modais Abertos
-        if (ui?.activeModal) {
-          e.preventDefault();
-          ui.closeModal();
-          // Repõe o estado para capturar o próximo clique
-          window.history.pushState(null, '', window.location.href);
-          return;
+      // Prioridade 2: Se não estiver no Dashboard, volta para ele
+      if (activeTab !== 'DASHBOARD') {
+        setActiveTab('DASHBOARD');
+        window.history.pushState({ anchor: true }, '', window.location.href);
+        return;
+      }
+
+      // Prioridade 3: Lógica de Saída (Duplo Clique)
+      const now = Date.now();
+      const diff = now - lastBackPress.current;
+
+      if (diff < 2000 && lastBackPress.current !== 0) {
+        // Segundo clique em menos de 2s: permite sair
+        // Como navegadores não permitem fechar janelas que não foram abertas por script,
+        // redirecionamos ou simplesmente deixamos o histórico seguir (que sairá do app).
+        if (isAndroid && window.matchMedia('(display-mode: standalone)').matches) {
+            // Em PWA instalado, tentamos fechar
+            window.close();
         }
+      } else {
+        // Primeiro clique: Avisa o usuário e "segura" no app
+        lastBackPress.current = now;
+        showToast('Pressione novamente para sair do CapitalFlow', 'warning');
+        window.history.pushState({ anchor: true }, '', window.location.href);
+      }
+    };
 
-        // 2. Se estiver fora do Dashboard, volta para ele antes de sair
-        if (activeTab !== 'DASHBOARD') {
-          e.preventDefault();
-          setActiveTab('DASHBOARD');
-          window.history.pushState(null, '', window.location.href);
-          return;
-        }
-
-        // 3. Lógica de Saída do App (Toque Duplo com Mensagem)
-        const now = Date.now();
-        const diff = now - lastBackPress.current;
-
-        if (diff < 2000 && diff > 0) {
-          // Segundo toque em menos de 2s: permite a saída (fecha a janela)
-          // Em PWAs instalados, window.close() pode fechar o app
-          window.close();
-        } else {
-          // Primeiro toque: mostra mensagem e bloqueia a saída
-          lastBackPress.current = now;
-          showToast('Pressione novamente para sair do CapitalFlow', 'warning');
-          
-          // Repõe o estado para "segurar" o usuário
-          window.history.pushState(null, '', window.location.href);
-        }
-      };
-
-      window.addEventListener('popstate', handlePopState);
-      return () => window.removeEventListener('popstate', handlePopState);
-    }
-  }, [activeUser, activeTab, isPublicView, showToast, setActiveTab, ui?.activeModal]);
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [activeUser, activeTab, isPublicView, showToast, setActiveTab, ui]);
 };

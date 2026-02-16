@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AppShell } from './layout/AppShell';
 import { NavHubController } from './layout/NavHubController';
 import { AppGate } from './components/AppGate';
@@ -25,6 +25,7 @@ import { notificationService } from './services/notification.service';
 import { MasterScreen } from './features/master/MasterScreen';
 import { LoadingScreen } from './components/ui/LoadingScreen';
 import { PersonalFinancesPage } from './pages/PersonalFinancesPage';
+import { isDev } from './utils/isDev';
 
 export const App: React.FC = () => {
   const { portalToken, legalSignToken } = usePortalRouting();
@@ -58,7 +59,7 @@ export const App: React.FC = () => {
     searchTerm, setSearchTerm,
     clientSearchTerm, setClientSearchTerm,
     profileEditForm, setProfileEditForm,
-    loadError,
+    loadError, setLoadError,
     navOrder, hubOrder,
     saveNavConfig,
   } = useAppState(activeProfileId);
@@ -96,10 +97,22 @@ export const App: React.FC = () => {
     }
   }, [activeUser, isPublicView]);
 
+  // Timeout de Segurança para o Loading (8 segundos)
+  useEffect(() => {
+    if (activeProfileId && !activeUser && !loadError) {
+      const timer = setTimeout(() => {
+        if (!activeUser && !loadError) {
+          setLoadError("Tempo limite de sincronização excedido. Verifique sua conexão.");
+          if (isDev) console.error("[BOOT] Timeout de 8s atingido sem carregar activeUser.");
+        }
+      }, 8000);
+      return () => clearTimeout(timer);
+    }
+  }, [activeProfileId, activeUser, loadError, setLoadError]);
+
   const effectiveSelectedStaffId = activeUser && activeUser.accessLevel === 2 ? activeUser.id : selectedStaffId;
 
-  // Condição de Inicialização Robusta: 
-  // Bloqueia a Splash Screen até que o bootFinished do useAuth seja resolvido.
+  // Condição de Inicialização Robusta
   const isInitializing = !bootFinished || (!!activeProfileId && !activeUser && !loadError);
 
   if (isInitializing && !isPublicView && !isInvitePath) {

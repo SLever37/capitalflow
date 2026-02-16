@@ -24,9 +24,14 @@ export class AppErrorBoundary extends React.Component<Props, State> {
     message: ''
   };
 
+  // Explicitly declare props to resolve "Property 'props' does not exist on type 'AppErrorBoundary'" errors
+  // This satisfies environments where TypeScript fails to pick up inherited properties from React.Component
+  public props: Props;
+
   constructor(props: Props) {
     super(props);
-    // Initialize state in constructor as well for base class consistency
+    // Initialize props and state in constructor as well for base class consistency
+    this.props = props;
     this.state = { hasError: false, message: '' };
   }
 

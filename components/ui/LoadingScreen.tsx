@@ -1,11 +1,21 @@
 import React from 'react';
 import { TrendingUp, Loader2, ShieldCheck, LogOut } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 
 export const LoadingScreen: React.FC = () => {
-  const handleCancelLoading = () => {
-    // Limpa a sessão persistente e recarrega o app para forçar o login
-    localStorage.removeItem('cm_session');
-    window.location.reload();
+  const handleCancelLoading = async () => {
+    try {
+      // Limpeza profunda
+      localStorage.removeItem('cm_session');
+      localStorage.removeItem('cm_last_tab');
+      localStorage.removeItem('cm_cache_null'); // Previne cache fantasma
+      
+      // Tenta deslogar do Supabase se houver algo pendente
+      await supabase.auth.signOut().catch(() => {});
+    } finally {
+      // Força recarregamento limpo na raiz
+      window.location.href = '/';
+    }
   };
 
   return (
@@ -35,7 +45,7 @@ export const LoadingScreen: React.FC = () => {
          {/* Botão de Escape para evitar carregamento infinito */}
          <button 
             onClick={handleCancelLoading}
-            className="flex items-center gap-2 text-[10px] font-bold text-slate-600 hover:text-rose-500 transition-colors uppercase tracking-widest px-4 py-2 rounded-xl"
+            className="flex items-center gap-2 text-[10px] font-bold text-slate-500 hover:text-rose-500 transition-colors uppercase tracking-widest px-4 py-2 rounded-xl bg-slate-900/30 border border-slate-800/50 mt-4"
          >
             <LogOut size={12}/> Voltar ao Login
          </button>
