@@ -38,11 +38,7 @@ const resolveSmartName = (p: any): string => {
 const mapLoginError = (err: any) => {
   const msg = String(err?.message || err || '');
   if (msg.toLowerCase().includes('invalid login')) return 'Usuário ou senha inválidos.';
-  if (msg.toLowerCase().includes('perfil não encontrado')) return 'Perfil não encontrado. Verifique o usuário.';
-  if (msg.toLowerCase().includes('senha incorreta')) return 'Usuário ou senha inválidos.';
-  if (msg.toLowerCase().includes('credenciais inválidas')) return 'Usuário ou senha inválidos.';
-  if (msg.toLowerCase().includes('expired')) return 'Sessão/convite expirado. Gere um novo link.';
-  if (msg.toLowerCase().includes('permission')) return 'Sem permissão para acessar. Verifique RLS/políticas.';
+  if (msg.toLowerCase().includes('email not confirmed')) return 'E-mail não confirmado. Verifique sua caixa de entrada.';
   if (msg.toLowerCase().includes('network') || msg.toLowerCase().includes('failed to fetch'))
     return 'Falha de conexão. Verifique a internet.';
   return msg || 'Erro desconhecido no login.';
@@ -60,38 +56,67 @@ export const useAuth = () => {
     try {
       await supabase.rpc('increment_profile_access', { p_profile_id: profileId });
     } catch (e) {
-      if (isDev) console.warn('[AUTH] Falha ao registrar métrica de acesso', e);
+      if (isDev) console.warn('[AUTH] Falha ao registrar acesso', e);
+    }
+  };
+
+  /**
+   * Garante que exista uma sessão válida no Supabase Auth.
+   * Isso é fundamental para que as políticas de RLS permitam o acesso aos dados.
+   */
+  const ensureAuthSession = async (email: string, pass: string) => {
+    try {
+      const { data: s } = await supabase.auth.getSession();
+      
+      // Se já houver sessão para o mesmo e-mail, não faz nada
+      if (s?.session?.user?.email?.toLowerCase() === email.toLowerCase()) {
+        if (isDev) console.log('[AUTH_SYNC] Sessão já ativa para:', email);
+        return;
+      }
+
+      // Se houver sessão mas de outro usuário, desloga antes
+      if (s?.session) {
+        await supabase.auth.signOut();
+      }
+
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.toLowerCase().trim(),
+        password: pass
+      });
+
+      if (error) {
+        if (isDev) console.error('[AUTH_SYNC] Falha ao sincronizar sessão Auth:', error);
+        if (error.message.includes('Invalid login credentials')) {
+          throw new Error("Seu usuário existe no sistema, mas ainda não foi provisionado no Auth. Contate o gestor.");
+        }
+        throw error;
+      }
+      
+      if (isDev) console.log('[AUTH_SYNC] Sessão Auth criada com sucesso.');
+    } catch (e: any) {
+      if (isDev) console.error('[AUTH_SYNC_ERROR]', e);
+      throw e;
     }
   };
 
   useEffect(() => {
     let mounted = true;
-
     const boot = async () => {
       try {
-        // Carrega perfis salvos
         const saved = localStorage.getItem('cm_saved_profiles');
         if (saved && mounted) {
           try { setSavedProfiles(JSON.parse(saved)); } catch {}
         }
-
-        // Se estiver na rota de convite, não bloqueia o boot e não tenta carregar sessão
-        if (window.location.pathname.includes('setup-password')) {
-          if (mounted) setBootFinished(true);
-          return;
-        }
-
-        // Verifica Sessão Auth do Supabase
-        const { data } = await supabase.auth.getSession();
         
-        if (!mounted) return;
-
-        // Verifica Sessão CapitalFlow (LocalStorage)
+        const { data: s } = await supabase.auth.getSession();
         const session = localStorage.getItem('cm_session');
-        if (session) {
+        
+        if (session && mounted) {
           try {
             const parsed = JSON.parse(session);
-            if (parsed?.profileId && mounted) {
+            if (parsed?.profileId) {
+                // Sincronização passiva: se o profileId é demo, ignora. 
+                // Se for real e não houver Auth session, em prod o ideal seria re-login.
                 setActiveProfileId(parsed.profileId);
                 trackAccess(parsed.profileId);
             }
@@ -100,21 +125,16 @@ export const useAuth = () => {
           }
         }
       } catch (err) {
-        if (isDev) console.error('[BOOT] Erro na inicialização:', err);
+        if (isDev) console.error('[BOOT] Erro:', err);
       } finally {
         if (mounted) setBootFinished(true);
       }
     };
-
     boot();
-
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, []);
 
   const handleLoginSuccess = (profile: any, showToast: any) => {
-    playNotificationSound();
     const profileId = profile.id;
     const profileName = resolveSmartName(profile);
     const profileEmail = asString(profile.usuario_email || profile.email || 'equipe@sistema');
@@ -132,13 +152,7 @@ export const useAuth = () => {
     localStorage.setItem('cm_session', JSON.stringify({ profileId, ts: Date.now() }));
 
     showToast(`Bem-vindo, ${profileName}!`, 'success');
-  };
-
-  const ensureAuthSession = async (email: string, password: string) => {
-    const { data: s } = await supabase.auth.getSession();
-    if (s?.session?.user?.id) return;
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error && isDev) console.warn("Supabase Auth Warning:", error.message);
+    playNotificationSound();
   };
 
   const submitLogin = async (
@@ -153,29 +167,32 @@ export const useAuth = () => {
 
       requestBrowserNotificationPermission();
 
-      let profile: any = null;
-      try {
-        const { data, error: rpcError } = await supabase.rpc('login_user', {
-          p_email: userInput.toLowerCase(),
-          p_password: pass,
-        });
-        if (!rpcError && data) profile = Array.isArray(data) ? data[0] : data;
-      } catch (e) { 
-        if (isDev) console.error('RPC Login failed'); 
+      // 1. Busca e-mail vinculado se o input for nome de operador
+      let emailForAuth = userInput;
+      if (!userInput.includes('@')) {
+          const { data: p } = await supabase.from('perfis').select('usuario_email').ilike('nome_operador', userInput).maybeSingle();
+          if (p?.usuario_email) emailForAuth = p.usuario_email;
       }
 
-      if (!profile) {
-        const { data: usersFound } = await supabase
-            .from('perfis')
-            .select('*')
-            .or(`usuario_email.ilike."${userInput}",email.ilike."${userInput}",nome_operador.ilike."${userInput}"`);
+      // 2. Garante Sessão Auth (Sincronização Crítica para RLS)
+      await ensureAuthSession(emailForAuth, pass);
 
-        const validUser = usersFound?.find(u => u.senha_acesso === pass);
-        if (!validUser) throw new Error('Usuário ou senha inválidos.');
-        profile = validUser;
+      // 3. Com a sessão ativa, busca o perfil pelo vínculo correto (perfis.user_id = auth.uid())
+      const { data: u } = await supabase.auth.getUser();
+      const uid = u.user?.id;
+
+      if (!uid) throw new Error("Sessão inválida. Faça login novamente.");
+
+      const { data: profile, error: profError } = await supabase
+        .from('perfis')
+        .select('*')
+        .eq('user_id', uid)
+        .maybeSingle();
+
+      if (profError || !profile) {
+        throw new Error("Perfil de acesso não localizado no banco de dados (user_id não vinculado).");
       }
 
-      await ensureAuthSession(asString(profile.usuario_email || profile.email || userInput).toLowerCase(), pass);
       handleLoginSuccess(profile, showToast);
     } catch (err: any) {
       showToast(mapLoginError(err), 'error');
@@ -192,22 +209,31 @@ export const useAuth = () => {
     setIsLoading(true);
     try {
       const cleanDoc = onlyDigits(params.document);
-      const cleanPhone = onlyDigits(params.phone);
       const cleanCode = params.code.trim();
 
-      if (!cleanDoc || !cleanPhone || !cleanCode) throw new Error('Preencha todos os campos.');
+      if (!cleanDoc || !cleanCode) throw new Error('Preencha todos os campos.');
 
-      const { data: profiles, error } = await supabase
+      // 1. Busca perfil pelo documento e código de acesso
+      const { data: profile, error } = await supabase
         .from('perfis')
         .select('*')
         .eq('document', cleanDoc)
-        .eq('access_code', cleanCode);
+        .eq('access_code', cleanCode)
+        .maybeSingle();
 
-      if (error) throw error;
-      const validProfile = profiles?.find((p) => onlyDigits(p.phone || '').includes(cleanPhone));
-      if (!validProfile) throw new Error('Dados incorretos.');
+      if (error || !profile) throw new Error('Dados de acesso à equipe incorretos.');
 
-      handleLoginSuccess(validProfile, showToast);
+      // 2. Determinar credenciais para o Supabase Auth
+      const authEmail = profile.usuario_email || profile.email;
+      const authPass = profile.access_code || profile.senha_acesso;
+      
+      if (!authEmail) throw new Error('Este perfil não possui e-mail vinculado para autenticação segura.');
+      if (!authPass) throw new Error('Este perfil não possui credenciais de senha definidas.');
+
+      // 3. Garante Sessão Auth (Fundamental para ultrapassar o bloqueio RLS)
+      await ensureAuthSession(authEmail, authPass);
+
+      handleLoginSuccess(profile, showToast);
     } catch (err: any) {
       showToast(mapLoginError(err), 'error');
     } finally {
@@ -215,12 +241,18 @@ export const useAuth = () => {
     }
   };
 
-  const handleSelectSavedProfile = (p: SavedProfile, showToast: any) => {
-    playNotificationSound();
-    setActiveProfileId(p.id);
-    trackAccess(p.id);
-    localStorage.setItem('cm_session', JSON.stringify({ profileId: p.id, ts: Date.now() }));
-    showToast(`Bem-vindo de volta, ${p.name}!`, 'success');
+  const handleSelectSavedProfile = async (p: SavedProfile, showToast: any) => {
+    const { data: s } = await supabase.auth.getSession();
+    if (s.session && s.session.user.email?.toLowerCase() === p.email.toLowerCase()) {
+        setActiveProfileId(p.id);
+        trackAccess(p.id);
+        localStorage.setItem('cm_session', JSON.stringify({ profileId: p.id, ts: Date.now() }));
+        showToast(`Bem-vindo de volta, ${p.name}!`, 'success');
+        playNotificationSound();
+    } else {
+        showToast("Sessão de segurança expirada. Digite sua senha.", "warning");
+        setLoginUser(p.email);
+    }
   };
 
   const handleRemoveSavedProfile = (id: string) => {
@@ -230,7 +262,7 @@ export const useAuth = () => {
   };
 
   const handleLogout = async () => {
-    try { await supabase.auth.signOut(); } catch {}
+    await supabase.auth.signOut();
     setActiveProfileId(null);
     localStorage.removeItem('cm_session');
   };

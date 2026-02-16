@@ -8,6 +8,7 @@ export const useTeamData = (activeUserId: string | null | undefined) => {
   const [activeTeam, setActiveTeam] = useState<any>(null);
   const [members, setMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     if (!activeUserId || activeUserId === 'DEMO') {
@@ -16,87 +17,88 @@ export const useTeamData = (activeUserId: string | null | undefined) => {
     }
 
     setLoading(true);
+    setFetchError(null);
+
     try {
-      // 1) Busca todas as equipes disponíveis (baseado em RLS ou owner)
+      if (isDev) console.log('[TEAM_LOAD] Iniciando carga para user:', activeUserId);
+
+      // 1. Busca Equipes (Base para tudo)
       const { data: allTeams, error: tErr } = await supabase
         .from('teams')
         .select('*')
         .order('name', { ascending: true });
 
-      if (tErr) throw tErr;
+      if (tErr) {
+        console.error('[TEAM_LOAD] Erro ao buscar equipes:', tErr);
+        throw new Error(`Erro RLS/Banco (Equipes): ${tErr.message}`);
+      }
 
       const teamsList = allTeams || [];
       setTeams(teamsList);
 
-      // Define equipe ativa baseada na seleção anterior ou padrão
+      // Define equipe ativa
       let current = activeTeam;
       if (!current || !teamsList.find((t) => t.id === current.id)) {
-        // Tenta achar a equipe padrão "CapitalFlow" ou pega a primeira disponível
         const capitalFlow = teamsList.find((t) => t.name === 'CapitalFlow');
         current = capitalFlow || teamsList[0] || null;
         setActiveTeam(current);
       }
 
-      if (isDev && current) {
-        console.log('[TEAM] ownerId', activeUserId, 'teamId', current.id);
-      }
-
-      // 2) Busca Membros COM JOIN em perfis para trazer dados reais (Ex: Cassia)
       if (current) {
-        const { data: m, error: mErr } = await supabase
+        if (isDev) console.log('[TEAM_LOAD] Buscando membros para equipe:', current.name);
+
+        // 2. Busca Membros via consulta direta (sem join no select)
+        // Isso evita que o RLS do 'perfis' bloqueie a linha inteira do 'team_members'
+        const { data: membersRaw, error: mErr } = await supabase
           .from('team_members')
-          .select(`
-            *,
-            linked_profile:profile_id (
-              id,
-              nome_completo,
-              nome_operador,
-              usuario_email,
-              avatar_url,
-              phone,
-              access_level,
-              last_active_at,
-              access_count,
-              supervisor_id
-            )
-          `)
+          .select('*')
           .eq('team_id', current.id)
           .order('full_name', { ascending: true });
 
         if (mErr) {
-          console.error('[TEAM] Erro ao buscar membros:', mErr);
-          throw mErr;
+          console.error('[TEAM_LOAD] Erro ao buscar membros:', mErr);
+          throw new Error(`Erro RLS/Banco (Membros): ${mErr.message}`);
         }
 
-        if (isDev) {
-          console.log('[TEAM] members_raw', m);
+        const membersList = membersRaw || [];
+
+        // 3. Busca Perfis Vinculados em lote (Query separada para integridade)
+        const profileIds = membersList.map(m => m.profile_id).filter(Boolean);
+        
+        let profilesMap: Record<string, any> = {};
+        if (profileIds.length > 0) {
+          const { data: pData, error: pErr } = await supabase
+            .from('perfis')
+            .select('id, nome_completo, nome_operador, usuario_email, avatar_url, phone, access_level, last_active_at, access_count, supervisor_id')
+            .in('id', profileIds);
+          
+          if (!pErr && pData) {
+            pData.forEach(p => { profilesMap[p.id] = p; });
+          } else if (pErr && isDev) {
+            console.warn('[TEAM_LOAD] Alguns perfis não puderam ser carregados:', pErr);
+          }
         }
 
-        // 3) Tratamento de fallback e normalização
-        const normalizedMembers = (m || []).map(member => {
-            // Se o membro já aceitou (tem linked_profile), garantimos que os dados
-            // do perfil do banco sobreponham os dados estáticos do convite
-            if (member.linked_profile) {
-                return {
-                    ...member,
-                    full_name: member.linked_profile.nome_completo || member.full_name,
-                    username_or_email: member.linked_profile.usuario_email || member.username_or_email
-                };
-            }
-            return member;
+        // 4. Merge de Dados no Frontend
+        const hydratedMembers = membersList.map(member => {
+          const profile = member.profile_id ? profilesMap[member.profile_id] : null;
+          return {
+            ...member,
+            linked_profile: profile,
+            // Prioriza dados do perfil real mas mantém fallback do convite
+            full_name: profile?.nome_completo || member.full_name,
+            username_or_email: profile?.usuario_email || member.username_or_email
+          };
         });
 
-        if (isDev) {
-            console.log('[TEAM] members_final', normalizedMembers);
-        }
-
-        setMembers(normalizedMembers);
+        if (isDev) console.log(`[TEAM_LOAD] ${hydratedMembers.length} membros processados.`);
+        setMembers(hydratedMembers);
       } else {
         setMembers([]);
       }
-    } catch (err) {
-      console.error('Erro crítico na Gestão de Time:', err);
-      setMembers([]);
+    } catch (err: any) {
+      console.error('[TEAM_LOAD] Erro Crítico:', err);
+      setFetchError(err.message || 'Erro desconhecido ao carregar time.');
     } finally {
       setLoading(false);
     }
@@ -106,8 +108,7 @@ export const useTeamData = (activeUserId: string | null | undefined) => {
     loadData();
   }, [loadData]);
 
-  // --- ACTIONS ---
-
+  // Actions
   const createTeam = async (name: string) => {
     if (!activeUserId) return;
     const { data, error } = await supabase
@@ -159,6 +160,7 @@ export const useTeamData = (activeUserId: string | null | undefined) => {
     setActiveTeam,
     members,
     loading,
+    fetchError,
     refresh: loadData,
     actions: {
       createTeam,

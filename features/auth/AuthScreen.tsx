@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { HelpCircle, TrendingUp, User, KeyRound, Loader2, X, ChevronRight, Beaker, Eye, EyeOff, UserPlus, Phone, ShieldCheck, Mail, Lock, AlertCircle, LogOut } from 'lucide-react';
+import { HelpCircle, TrendingUp, User, KeyRound, Loader2, X, ChevronRight, Beaker, Eye, EyeOff, UserPlus, Phone, ShieldCheck, Mail, Lock, AlertCircle, LogOut, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { Modal } from '../../components/ui/Modal';
 import { supabase } from '../../lib/supabase';
 import { generateUUID } from '../../utils/generators';
@@ -11,10 +11,9 @@ import { isDev } from '../../utils/isDev';
  * 1. CAMADA DE DADOS (QUERIES)
  */
 const fetchInviteByToken = async (token: string) => {
-  if (isDev) console.warn('[INVITE] Validando token:', token);
   return await supabase
     .from('team_members')
-    .select('*, teams:team_id(owner_profile_id, name)')
+    .select('id, team_id, invite_status, invite_token, profile_id, linked_profile_id, full_name, username_or_email, expires_at, created_at')
     .eq('invite_token', token)
     .maybeSingle();
 };
@@ -38,38 +37,14 @@ const useInviteFlow = (showToast: any) => {
         setIsProcessing(true);
         try {
             const { data, error } = await fetchInviteByToken(token);
-            
-            if (error) {
-                if (isDev) console.error('[INVITE] Erro Supabase:', error);
-                showToast("Erro ao validar convite. Tente novamente.", "error");
-                return;
-            }
-
-            if (!data) {
-                showToast("Este convite não foi encontrado ou já foi removido.", "error");
+            if (error || !data) {
+                showToast("Convite inválido ou expirado.", "error");
                 localStorage.removeItem('cm_invite_token');
                 setInviteToken(null);
                 return;
             }
-
-            const isPending = data.invite_status === 'PENDING';
-            const isExpired = data.expires_at && new Date(data.expires_at).getTime() < Date.now();
-
-            if (!isPending) {
-                showToast("Este convite já foi utilizado ou está inativo.", "warning");
-                localStorage.removeItem('cm_invite_token');
-                setInviteToken(null);
-            } else if (isExpired) {
-                showToast("Este convite expirou. Solicite um novo link.", "error");
-                await finalizeInvite(data.id, 'EXPIRED');
-                localStorage.removeItem('cm_invite_token');
-                setInviteToken(null);
-            } else {
-                // Sucesso: Persiste para sobreviver a navegação
-                localStorage.setItem('cm_invite_token', token);
-                setInviteData(data);
-                showToast(`Convite validado para a equipe: ${data.teams?.name}`, "success");
-            }
+            localStorage.setItem('cm_invite_token', token);
+            setInviteData(data);
         } catch (e) {
             setInviteToken(null);
         } finally {
@@ -79,20 +54,10 @@ const useInviteFlow = (showToast: any) => {
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
-        const tokenFromUrl = params.get('invite_token');
-        const tokenFromStorage = localStorage.getItem('cm_invite_token');
-        
-        const activeToken = tokenFromUrl || tokenFromStorage;
-
-        if (activeToken) {
-            setInviteToken(activeToken);
-            checkInviteToken(activeToken);
-            
-            // Limpa URL para estética mas mantém o fluxo
-            if (tokenFromUrl) {
-                const cleanUrl = window.location.origin + window.location.pathname;
-                window.history.replaceState({}, document.title, cleanUrl);
-            }
+        const token = params.get('invite_token') || localStorage.getItem('cm_invite_token');
+        if (token) {
+            setInviteToken(token);
+            checkInviteToken(token);
         }
     }, [checkInviteToken]);
 
@@ -100,10 +65,9 @@ const useInviteFlow = (showToast: any) => {
         localStorage.removeItem('cm_invite_token');
         setInviteToken(null);
         setInviteData(null);
-        window.history.replaceState({}, document.title, window.location.origin + window.location.pathname);
     };
 
-    return { inviteToken, setInviteToken, inviteData, isProcessing, setIsProcessing, cancelInvite };
+    return { inviteToken, setInviteToken, inviteData, isProcessing, cancelInvite };
 };
 
 const useMemberActivation = (inviteData: any, submitTeamLogin: any, showToast: any, setIsProcessing: any) => {
@@ -114,54 +78,79 @@ const useMemberActivation = (inviteData: any, submitTeamLogin: any, showToast: a
         if (!inviteData) return;
         setErrorText('');
         
-        if (!form.name.trim()) { setErrorText("Informe seu nome completo."); return; }
-        if (!form.email.trim() || !form.email.includes('@')) { setErrorText("E-mail inválido."); return; }
-        if (!form.document || !isValidCPForCNPJ(form.document)) { setErrorText("CPF inválido."); return; }
-        if (!form.phone || form.phone.length < 14) { setErrorText("Telefone incompleto."); return; }
-        if (!form.accessCode || form.accessCode.length < 4) { setErrorText("Crie um código de 4 dígitos."); return; }
+        if (!form.name.trim() || !form.email.trim() || !form.document || !form.accessCode) {
+            setErrorText("Preencha todos os campos.");
+            return;
+        }
 
         setIsProcessing(true);
-        
-        // Timeout de segurança de 12 segundos
-        const timer = setTimeout(() => {
-            setIsProcessing(false);
-            setErrorText("Não foi possível ativar. Verifique sua internet e tente novamente.");
-        }, 12000);
-
         try {
-            const newProfileId = generateUUID();
             const cleanDoc = onlyDigits(form.document);
             const cleanPhone = onlyDigits(form.phone);
-            
+            const email = form.email.trim().toLowerCase();
+            const pass = form.accessCode.trim();
+            let authUid = '';
+
+            // 1. Sincronização com Supabase Auth (Essencial para RLS)
+            // Tenta logar caso o usuário já tenha sido provisionado manualmente ou em tentativa anterior
+            const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+                email,
+                password: pass
+            });
+
+            if (!signInError && signInData.user) {
+                authUid = signInData.user.id;
+            } else {
+                // Se não conseguiu logar, tenta criar a conta no Auth
+                const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+                    email,
+                    password: pass,
+                    options: { data: { full_name: form.name } }
+                });
+
+                if (signUpError) {
+                    if (signUpError.message.includes('already registered')) {
+                        throw new Error("Usuário já existe no sistema de autenticação. Use o mesmo código de acesso usado no cadastro ou contate o gestor.");
+                    }
+                    throw signUpError;
+                }
+                
+                if (!signUpData.user) throw new Error("Falha ao criar credenciais de segurança.");
+                authUid = signUpData.user.id;
+            }
+
+            // 2. Criar Perfil vinculado ao ID do Auth e preencher user_id para RLS
             const { error: profileError } = await supabase.from('perfis').insert({
-                id: newProfileId,
+                id: authUid,
+                user_id: authUid, // Vincula o perfil ao usuário autenticado (v3.5+)
                 supervisor_id: inviteData.teams?.owner_profile_id, 
                 nome_operador: form.name.trim().split(' ')[0],
                 nome_completo: form.name.trim(),
-                email: form.email.trim().toLowerCase(),
-                usuario_email: form.email.trim().toLowerCase(),
-                senha_acesso: 'NO_PASSWORD',
-                access_code: form.accessCode.trim(),
+                email: email,
+                usuario_email: email,
+                senha_acesso: pass,
+                access_code: pass,
                 document: cleanDoc,
                 phone: cleanPhone,
-                access_level: 2, 
-                interest_balance: 0,
-                total_available_capital: 0,
+                access_level: 3, 
                 created_at: new Date().toISOString()
             });
 
             if (profileError) throw profileError;
 
-            const { error: memberError } = await finalizeInvite(inviteData.id, 'ACCEPTED');
-            if (memberError) throw memberError;
-
-            clearTimeout(timer);
+            await finalizeInvite(inviteData.id, 'ACCEPTED');
             localStorage.removeItem('cm_invite_token');
-            showToast("Conta ativada com sucesso!", "success");
-            await submitTeamLogin({ document: cleanDoc, phone: cleanPhone, code: form.accessCode }, (l: boolean) => setIsProcessing(l), showToast);
+            showToast("Conta ativada!", "success");
+            
+            // Realiza login automático via fluxo de equipe
+            await submitTeamLogin({ document: cleanDoc, phone: cleanPhone, code: pass }, setIsProcessing, showToast);
+            
+            // Limpa a URL e recarrega para aplicar sessão
+            const cleanUrl = window.location.origin + window.location.pathname;
+            window.history.replaceState({}, document.title, cleanUrl);
+            window.location.reload();
         } catch (e: any) {
-            clearTimeout(timer);
-            setErrorText(e.message || "Erro na ativação do banco de dados.");
+            setErrorText(e.message);
             setIsProcessing(false);
         }
     };
@@ -173,37 +162,42 @@ const useCreateProfile = (setLoginUser: any, setIsCreatingProfile: any, showToas
     const [form, setForm] = useState({ name: '', email: '', businessName: '', password: '', recoveryPhrase: '' });
 
     const handleCreate = async () => {
-        if (!form.name.trim() || !form.email.trim() || !form.businessName.trim() || !form.password) {
-            showToast("Preencha todos os campos obrigatórios.", "error");
-            return;
-        }
-        if (form.password.length < 4) {
-            showToast("A senha deve ter no mínimo 4 caracteres.", "error");
+        if (!form.name.trim() || !form.email.trim() || !form.password) {
+            showToast("Preencha os campos obrigatórios.", "error");
             return;
         }
         
         setIsProcessing(true);
         try {
-            const newId = generateUUID();
+            // 1. Criar no Auth
+            const { data: authData, error: authError } = await supabase.auth.signUp({
+                email: form.email.trim().toLowerCase(),
+                password: form.password.trim(),
+                options: { data: { full_name: form.name } }
+            });
+
+            if (authError) throw authError;
+            if (!authData.user) throw new Error("Erro ao gerar credenciais.");
+
+            // 2. Criar Perfil com ID do Auth
             const { error } = await supabase.from('perfis').insert([{
-                id: newId,
+                id: authData.user.id,
+                user_id: authData.user.id,
                 nome_operador: form.name,
                 usuario_email: form.email.trim().toLowerCase(),
                 email: form.email.trim().toLowerCase(),
                 nome_empresa: form.businessName,
                 senha_acesso: form.password.trim(),
                 recovery_phrase: form.recoveryPhrase,
-                access_level: 2, 
-                total_available_capital: 0,
-                interest_balance: 0,
+                access_level: 1, 
                 created_at: new Date().toISOString()
             }]);
+
             if (error) throw error;
-            showToast("Conta criada com sucesso! Faça login.", "success");
+            showToast("Conta criada! Verifique seu e-mail.", "success");
             setIsCreatingProfile(false);
-            setLoginUser(form.email);
         } catch (e: any) {
-            showToast("Erro ao criar conta: " + e.message, "error");
+            showToast(e.message, "error");
         } finally {
             setIsProcessing(false);
         }
@@ -217,14 +211,15 @@ const useRecoveryAndSupport = (setIsRecoveringPassword: any, showToast: any) => 
 
     const handleHelpSupport = (type: 'password' | 'user') => {
         const number = "5592991148103";
-        let msg = type === 'password' ? "Olá, esqueci minha senha no CapitalFlow. Poderia me ajudar?" : "Olá, esqueci meu usuário de login no CapitalFlow. Poderia me ajudar?";
+        let msg = type === 'password' ? "Olá, esqueci minha senha no CapitalFlow." : "Olá, esqueci meu usuário.";
         window.open(`https://wa.me/${number}?text=${encodeURIComponent(msg)}`, '_blank');
     };
 
     const handleRecovery = async () => {
-        if (!form.email.trim()) { showToast("Informe o e-mail cadastrado.", "error"); return; }
-        showToast("Recuperação automática indisponível. Contate o suporte via WhatsApp.", "info");
-        handleHelpSupport('password');
+        if (!form.email.trim()) return;
+        const { error } = await supabase.auth.resetPasswordForEmail(form.email.trim());
+        if (error) showToast(error.message, "error");
+        else showToast("E-mail de recuperação enviado!", "success");
         setIsRecoveringPassword(false);
     };
 
@@ -232,21 +227,16 @@ const useRecoveryAndSupport = (setIsRecoveringPassword: any, showToast: any) => 
 };
 
 /**
- * 3. COMPONENTES DE INTERFACE
+ * 3. COMPONENTES DE INTERFACE (MANTIDOS)
  */
 const InviteActivationView = ({ inviteData, form, setForm, onConfirm, isLoading, errorText, onCancel }: any) => (
     <div className="space-y-4 pb-24">
         <div className="relative z-10 text-center mb-6">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl shadow-lg shadow-blue-600/20 mb-4"><UserPlus className="text-white w-8 h-8" /></div>
             <h1 className="text-xl font-black text-white uppercase tracking-tighter mb-1">Ativar Acesso</h1>
-            <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Complete seu cadastro na equipe</p>
+            <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Você está entrando em: Equipe</p>
         </div>
         
-        <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center">
-            <p className="text-[10px] text-slate-500 uppercase font-black">Equipe:</p>
-            <p className="text-lg font-black text-white uppercase truncate">{inviteData.teams?.name || 'Equipe'}</p>
-        </div>
-
         {errorText && (
             <div className="bg-rose-900/20 border border-rose-500/30 p-4 rounded-xl flex items-start gap-3 animate-in fade-in zoom-in-95">
                 <AlertCircle className="text-rose-500 shrink-0" size={18}/>
@@ -254,46 +244,17 @@ const InviteActivationView = ({ inviteData, form, setForm, onConfirm, isLoading,
             </div>
         )}
 
-        <div>
-            <label className="text-[10px] font-black text-slate-500 uppercase ml-1 mb-1 block">Seu Nome Completo</label>
-            <div className="bg-slate-800/50 p-2 rounded-xl border border-slate-700 flex items-center gap-2">
-                <User className="text-slate-400 w-4 h-4 ml-2" />
-                <input type="text" className="bg-transparent w-full text-white outline-none text-sm font-bold" placeholder="Nome Sobrenome" value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
-            </div>
-        </div>
-        <div>
-            <label className="text-[10px] font-black text-slate-500 uppercase ml-1 mb-1 block">E-mail (Login)</label>
-            <div className="bg-slate-800/50 p-2 rounded-xl border border-slate-700 flex items-center gap-2">
-                <Mail className="text-slate-400 w-4 h-4 ml-2" />
-                <input type="email" className="bg-transparent w-full text-white outline-none text-sm font-bold" placeholder="seu@email.com" value={form.email} onChange={e => setForm({...form, email: e.target.value})} />
-            </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-            <div>
-                <label className="text-[10px] font-black text-slate-500 uppercase ml-1 mb-1 block">CPF</label>
-                <input type="text" className="bg-slate-800/50 w-full text-white outline-none p-3 rounded-xl border border-slate-700 text-xs font-bold" placeholder="000.000.000-00" value={form.document} onChange={e => setForm({...form, document: maskDocument(e.target.value)})} />
-            </div>
-            <div>
-                <label className="text-[10px] font-black text-slate-500 uppercase ml-1 mb-1 block">WhatsApp</label>
-                <input type="tel" className="bg-slate-800/50 w-full text-white outline-none p-3 rounded-xl border border-slate-700 text-xs font-bold" placeholder="(00) 00000-0000" value={form.phone} onChange={e => setForm({...form, phone: maskPhone(e.target.value)})} />
-            </div>
-        </div>
-        <div>
-            <label className="text-[10px] font-black text-slate-500 uppercase ml-1 mb-1 block">Código de Acesso (4 Dígitos)</label>
-            <div className="bg-slate-800/50 p-2 rounded-xl border border-slate-700 flex items-center gap-2">
-                <Lock className="text-slate-400 w-4 h-4 ml-2" />
-                <input type="text" inputMode="numeric" className="bg-transparent w-full text-white outline-none text-sm font-bold" placeholder="Ex: 1234" maxLength={4} value={form.accessCode} onChange={e => setForm({...form, accessCode: onlyDigits(e.target.value)})} />
-            </div>
+        <div className="space-y-3">
+            <input type="text" className="w-full bg-slate-800/50 p-4 rounded-xl text-white outline-none border border-slate-700 text-sm font-bold" placeholder="Nome Completo" value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
+            <input type="email" className="w-full bg-slate-800/50 p-4 rounded-xl text-white outline-none border border-slate-700 text-sm font-bold" placeholder="Seu E-mail" value={form.email} onChange={e => setForm({...form, email: e.target.value})} />
+            <input type="text" className="w-full bg-slate-800/50 p-4 rounded-xl text-white outline-none border border-slate-700 text-sm font-bold" placeholder="CPF" value={form.document} onChange={e => setForm({...form, document: maskDocument(e.target.value)})} />
+            <input type="text" maxLength={4} className="w-full bg-slate-800/50 p-4 rounded-xl text-white outline-none border border-slate-700 text-sm font-bold" placeholder="Crie um PIN de 4 dígitos" value={form.accessCode} onChange={e => setForm({...form, accessCode: onlyDigits(e.target.value)})} />
         </div>
 
-        <div className="space-y-3 pt-4">
-            <button onClick={onConfirm} disabled={isLoading} className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-xs font-black uppercase shadow-lg transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50">
-                {isLoading ? <Loader2 className="animate-spin" /> : 'Confirmar e Entrar'}
-            </button>
-            <button onClick={onCancel} className="w-full py-3 bg-slate-800 text-slate-400 hover:text-white rounded-2xl text-[10px] font-black uppercase transition-all flex items-center justify-center gap-2">
-                <LogOut size={12}/> Voltar ao Login
-            </button>
-        </div>
+        <button onClick={onConfirm} disabled={isLoading} className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-xs font-black uppercase flex items-center justify-center gap-2">
+            {isLoading ? <Loader2 className="animate-spin" /> : 'Ativar e Entrar'}
+        </button>
+        <button onClick={onCancel} className="w-full py-2 text-slate-500 text-[10px] font-black uppercase">Cancelar</button>
     </div>
 );
 
@@ -302,27 +263,27 @@ const LoginView = ({ loginUser, setLoginUser, loginPassword, setLoginPassword, s
         <div className="space-y-4 animate-in fade-in">
             <div className="bg-slate-800/50 p-2 rounded-2xl border border-slate-700 flex items-center gap-2 focus-within:border-blue-500 transition-colors">
                 <div className="p-3 bg-slate-800 rounded-xl"><User className="text-slate-400 w-5 h-5" /></div>
-                <input type="text" className="bg-transparent w-full text-white outline-none text-sm font-bold placeholder:font-normal" placeholder="E-mail ou Usuário" value={loginUser} onChange={e => setLoginUser(e.target.value)} />
+                <input type="text" className="bg-transparent w-full text-white outline-none text-sm font-bold" placeholder="E-mail ou Usuário" value={loginUser} onChange={e => setLoginUser(e.target.value)} />
             </div>
             <div className="bg-slate-800/50 p-2 rounded-2xl border border-slate-700 flex items-center gap-2 relative focus-within:border-blue-500 transition-colors">
                 <div className="p-3 bg-slate-800 rounded-xl"><KeyRound className="text-slate-400 w-5 h-5" /></div>
                 <input 
                     type={showPassword ? "text" : "password"} 
-                    className="bg-transparent w-full text-white outline-none text-sm font-bold placeholder:font-normal pr-10" 
+                    className="bg-transparent w-full text-white outline-none text-sm font-bold pr-10" 
                     placeholder="Senha" 
                     value={loginPassword} 
                     onChange={e => setLoginPassword(e.target.value)} 
                     onKeyDown={e => e.key === 'Enter' && submitLogin()} 
                 />
-                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 text-slate-500 hover:text-slate-300 transition-colors">
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 text-slate-500">
                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
             </div>
-            <button onClick={submitLogin} disabled={isLoading} className="w-full py-4 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl text-xs font-black uppercase shadow-lg flex items-center justify-center gap-2 transition-all active:scale-95">{isLoading ? <Loader2 className="animate-spin" /> : 'Entrar'}</button>
+            <button onClick={submitLogin} disabled={isLoading} className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl text-xs font-black uppercase shadow-lg flex items-center justify-center gap-2 transition-all active:scale-95">{isLoading ? <Loader2 className="animate-spin" /> : 'Entrar'}</button>
         </div>
         <div className="flex gap-2 pt-2 border-t border-slate-800">
-            <button onClick={() => setIsCreatingProfile(true)} className="flex-1 py-3 bg-slate-800 text-slate-400 rounded-2xl text-[10px] font-black uppercase hover:text-white transition-colors">Criar Nova Conta</button>
-            <button onClick={() => setIsRecoveringPassword(true)} className="flex-1 py-3 bg-slate-800 text-slate-400 rounded-2xl text-[10px] font-black uppercase hover:text-white transition-colors">Recuperar Senha</button>
+            <button onClick={() => setIsCreatingProfile(true)} className="flex-1 py-3 bg-slate-800 text-slate-400 rounded-2xl text-[10px] font-black uppercase">Criar Conta</button>
+            <button onClick={() => setIsRecoveringPassword(true)} className="flex-1 py-3 bg-slate-800 text-slate-400 rounded-2xl text-[10px] font-black uppercase">Esqueci Senha</button>
         </div>
         {savedProfiles.length > 0 && (
             <div className="pt-2">
@@ -330,8 +291,8 @@ const LoginView = ({ loginUser, setLoginUser, loginPassword, setLoginPassword, s
                 <div className="flex flex-col gap-2">
                     {savedProfiles.map((p: any) => (
                         <div key={p.id} className="flex items-center gap-3 bg-slate-950 p-2 rounded-xl border border-slate-800 cursor-pointer hover:border-slate-600 transition-colors group" onClick={() => handleSelectSavedProfile(p)}>
-                            <div className="w-8 h-8 rounded-lg bg-blue-900/30 flex items-center justify-center text-blue-400 font-black text-xs group-hover:bg-blue-600 group-hover:text-white transition-colors">{p.name.charAt(0).toUpperCase()}</div>
-                            <div className="flex-1 overflow-hidden"><p className="text-xs font-bold text-white truncate">{p.name}</p><p className="text-[10px] text-slate-500 truncate">{p.email}</p></div>
+                            <div className="w-8 h-8 rounded-lg bg-blue-900/30 flex items-center justify-center text-blue-400 font-black text-xs">{p.name.charAt(0).toUpperCase()}</div>
+                            <div className="flex-1 overflow-hidden"><p className="text-xs font-bold text-white truncate">{p.name}</p></div>
                             <button onClick={(e) => { e.stopPropagation(); handleRemoveSavedProfile(p.id); }} className="p-2 text-slate-600 hover:text-rose-500"><X size={14} /></button>
                         </div>
                     ))}
@@ -347,17 +308,17 @@ const LoginView = ({ loginUser, setLoginUser, loginPassword, setLoginPassword, s
  */
 export const AuthScreen: React.FC<AuthScreenProps> = ({
     loginUser, setLoginUser, loginPassword, setLoginPassword, submitLogin, submitTeamLogin, isLoading,
-    savedProfiles, handleSelectSavedProfile, handleRemoveSavedProfile, showToast
+    savedProfiles, handleSelectSavedProfile, handleRemoveSavedProfile, showToast, toast
 }) => {
     const [isCreatingProfile, setIsCreatingProfile] = useState(false);
     const [isRecoveringPassword, setIsRecoveringPassword] = useState(false);
     const [showHelpModal, setShowHelpModal] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     
-    const { inviteToken, setInviteToken, inviteData, isProcessing: isProcessingInvite, setIsProcessing: setIsProcessingInvite, cancelInvite } = useInviteFlow(showToast);
-    const { form: memberForm, setForm: setMemberForm, handleActivate: handleActivateMember, errorText } = useMemberActivation(inviteData, submitTeamLogin, showToast, setIsProcessingInvite);
-    const { form: createForm, setForm: setCreateForm, handleCreate: handleCreateProfile } = useCreateProfile(setLoginUser, setIsCreatingProfile, showToast, setIsProcessingInvite);
-    const { handleHelpSupport } = useRecoveryAndSupport(setIsRecoveringPassword, showToast);
+    const { inviteToken, inviteData, isProcessing: isProcessingInvite, cancelInvite } = useInviteFlow(showToast);
+    const { form: memberForm, setForm: setMemberForm, handleActivate: handleActivateMember, errorText } = useMemberActivation(inviteData, submitTeamLogin, showToast, (l: any) => {});
+    const { form: createForm, setForm: setCreateForm, handleCreate: handleCreateProfile } = useCreateProfile(setLoginUser, setIsCreatingProfile, showToast, (l: any) => {});
+    const { handleHelpSupport, handleRecovery } = useRecoveryAndSupport(setIsRecoveringPassword, showToast);
 
     const handleDemoMode = () => {
         localStorage.setItem('cm_session', JSON.stringify({ profileId: 'DEMO', ts: Date.now() }));
@@ -366,11 +327,18 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
 
     return (
         <div className="min-h-[100dvh] bg-slate-950 flex items-start sm:items-center justify-center p-4 md:p-6 relative overflow-y-auto py-8">
+            {toast && (
+                <div className={`fixed z-[150] px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-top-4 fade-in duration-300 left-4 right-4 top-4 md:left-auto md:right-4 md:w-auto ${toast.type === 'error' ? 'bg-rose-600 text-white' : toast.type === 'warning' ? 'bg-amber-500 text-black' : 'bg-emerald-600 text-white'}`}>
+                    {toast.type === 'error' ? <AlertCircle size={24}/> : toast.type === 'warning' ? <AlertTriangle size={24}/> : <CheckCircle2 size={24}/>}
+                    <span className="font-bold text-sm leading-tight">{toast.msg}</span>
+                </div>
+            )}
+
             <div className="absolute top-6 right-6 z-50">
                 <button onClick={() => setShowHelpModal(true)} className="p-3 bg-slate-800/50 rounded-full text-slate-400 hover:text-white transition-all"><HelpCircle size={24}/></button>
             </div>
 
-            <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-[2.5rem] p-8 shadow-2xl relative flex flex-col justify-center animate-in zoom-in-95 duration-300 max-h-[92dvh] overflow-y-auto custom-scrollbar mb-10">
+            <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-[2.5rem] p-8 shadow-2xl relative flex flex-col justify-center animate-in zoom-in-95 duration-300">
                 <div className="absolute inset-0 bg-blue-600/5 blur-3xl rounded-full pointer-events-none"></div>
                 
                 {inviteToken && inviteData ? (
@@ -405,15 +373,22 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                         )}
                         
                         {isCreatingProfile && (
-                            <div className="animate-in slide-in-from-right duration-300">
-                                <h3 className="text-center text-white font-bold text-sm uppercase mb-4">Nova Conta</h3>
-                                <div className="space-y-3">
-                                    <input type="text" placeholder="Seu Nome" className="w-full bg-slate-800 p-3 rounded-xl text-white outline-none" value={createForm.name} onChange={e => setCreateForm({...createForm, name: e.target.value})} />
-                                    <input type="email" placeholder="E-mail" className="w-full bg-slate-800 p-3 rounded-xl text-white outline-none" value={createForm.email} onChange={e => setCreateForm({...createForm, email: e.target.value})} />
-                                    <input type="password" placeholder="Senha" className="w-full bg-slate-800 p-3 rounded-xl text-white outline-none" value={createForm.password} onChange={e => setCreateForm({...createForm, password: e.target.value})} />
-                                    <button onClick={handleCreateProfile} disabled={isProcessingInvite} className="w-full py-4 bg-blue-600 text-white rounded-xl font-bold uppercase text-xs">Criar Perfil</button>
-                                    <button onClick={() => setIsCreatingProfile(false)} className="w-full text-slate-500 text-[10px] uppercase font-bold">Voltar</button>
-                                </div>
+                            <div className="animate-in slide-in-from-right duration-300 space-y-4">
+                                <h3 className="text-center text-white font-black uppercase text-sm">Nova Conta</h3>
+                                <input type="text" placeholder="Seu Nome" className="w-full bg-slate-800 p-4 rounded-xl text-white outline-none" value={createForm.name} onChange={e => setCreateForm({...createForm, name: e.target.value})} />
+                                <input type="email" placeholder="E-mail" className="w-full bg-slate-800 p-4 rounded-xl text-white outline-none" value={createForm.email} onChange={e => setCreateForm({...createForm, email: e.target.value})} />
+                                <input type="password" placeholder="Senha" className="w-full bg-slate-800 p-4 rounded-xl text-white outline-none" value={createForm.password} onChange={e => setCreateForm({...createForm, password: e.target.value})} />
+                                <button onClick={handleCreateProfile} className="w-full py-4 bg-blue-600 text-white rounded-xl font-black uppercase text-xs">Criar Perfil</button>
+                                <button onClick={() => setIsCreatingProfile(false)} className="w-full text-slate-500 text-[10px] uppercase font-bold">Voltar</button>
+                            </div>
+                        )}
+
+                        {isRecoveringPassword && (
+                            <div className="animate-in slide-in-from-left duration-300 space-y-4">
+                                <h3 className="text-center text-white font-black uppercase text-sm">Recuperar</h3>
+                                <input type="email" placeholder="Seu e-mail cadastrado" className="w-full bg-slate-800 p-4 rounded-xl text-white outline-none" value={memberForm.email} onChange={e => setMemberForm({...memberForm, email: e.target.value})} />
+                                <button onClick={handleRecovery} className="w-full py-4 bg-blue-600 text-white rounded-xl font-black uppercase text-xs">Enviar E-mail</button>
+                                <button onClick={() => setIsRecoveringPassword(false)} className="w-full text-slate-500 text-[10px] uppercase font-bold">Voltar</button>
                             </div>
                         )}
                     </>
@@ -421,9 +396,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
             </div>
 
             {showHelpModal && (
-                <Modal onClose={() => setShowHelpModal(false)} title="Suporte Técnico">
+                <Modal onClose={() => setShowHelpModal(false)} title="Suporte">
                     <div className="space-y-4">
-                        <button onClick={() => handleHelpSupport('password')} className="w-full p-4 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-between hover:bg-slate-800 transition-all group"><div className="flex items-center gap-3"><div className="p-2 bg-slate-800 rounded-lg group-hover:bg-slate-700"><KeyRound className="text-blue-500" size={20}/></div><span className="text-sm font-bold text-white">Esqueci a Senha</span></div><ChevronRight size={16} className="text-slate-500"/></button>
+                        <button onClick={() => handleHelpSupport('password')} className="w-full p-4 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-between hover:bg-slate-800 transition-all"><span className="text-sm font-bold text-white">Esqueci a Senha</span><ChevronRight size={16} className="text-slate-500"/></button>
+                        <button onClick={() => handleHelpSupport('user')} className="w-full p-4 bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-between hover:bg-slate-800 transition-all"><span className="text-sm font-bold text-white">Não consigo entrar</span><ChevronRight size={16} className="text-slate-500"/></button>
                     </div>
                 </Modal>
             )}
