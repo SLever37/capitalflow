@@ -35,6 +35,8 @@ export const processNaturalLanguageCommand = async (text: string, context: any):
   try {
     const ai = new GoogleGenAI({ apiKey });
     const isDemo = context?.isDemo || false;
+    
+    // Define a Persona baseada no contexto enviado
     const persona: AIPersona = context?.type === 'PORTAL_CLIENT' ? 'CLIENT_MENTOR' : 
                             context?.type === 'TEAM_PAGE' ? 'TEAM_LEADER' :
                             context?.type === 'PERSONAL_FINANCE' ? 'PERSONAL_CFO' : 'OPERATOR_CRO';
@@ -43,16 +45,16 @@ export const processNaturalLanguageCommand = async (text: string, context: any):
 
     switch (persona) {
       case 'OPERATOR_CRO':
-        systemInstruction = `Você é o Chief Risk Officer (CRO) da CapitalFlow. Analise a carteira de empréstimos com foco em liquidez, inadimplência e preservação de capital. Seja técnico e direto. ${isDemo ? "Nota: Este é um ambiente de DEMONSTRAÇÃO." : ""}`;
+        systemInstruction = `Você é o Chief Risk Officer (CRO) da CapitalFlow. Analise a carteira de empréstimos com foco em liquidez, inadimplência e preservação de capital. Seja técnico e direto. ${isDemo ? "Nota: Este é um ambiente de DEMONSTRAÇÃO com dados simulados." : ""}`;
         break;
       case 'TEAM_LEADER':
-        systemInstruction = `Você é um Gestor de Performance de Equipe. Sua missão é analisar a atividade dos operadores, identificar quem precisa de apoio e sugerir metas de produtividade baseadas nos acessos e capital operado.`;
+        systemInstruction = `Você é um Gestor de Performance de Equipe. Sua missão é analisar a atividade dos operadores, identificar gargalos de produtividade e sugerir metas. Foco em engajamento e volume operado.`;
         break;
       case 'CLIENT_MENTOR':
-        systemInstruction = `Você é um Mentor de Prosperidade Financeira. Ajude o cliente a entender sua dívida, sugerindo economia doméstica e planos para sair do vermelho com empatia e motivação.`;
+        systemInstruction = `Você é um Mentor de Prosperidade Financeira. Ajude o cliente a entender sua dívida não como um peso, mas como um degrau. Sugira planos de economia doméstica com empatia e motivação.`;
         break;
       case 'PERSONAL_CFO':
-        systemInstruction = `Você é um CFO Pessoal. Analise gastos, categorias de consumo e saldos bancários para sugerir investimentos ou cortes de gastos desnecessários.`;
+        systemInstruction = `Você é um CFO Pessoal de elite. Analise gastos, categorias de consumo e saldos para sugerir investimentos ou cortes estratégicos. Seja transformador.`;
         break;
     }
 
@@ -65,9 +67,9 @@ export const processNaturalLanguageCommand = async (text: string, context: any):
       {
         "intent": "string",
         "feedback": "string",
-        "analysis": "string (denso e estratégico)",
+        "analysis": "string (análise densa e estratégica)",
         "suggestions": ["sugestão 1", "sugestão 2"],
-        "riskScore": number (se aplicável),
+        "riskScore": number (0 a 100, se aplicável),
         "data": {}
       }
     `;
@@ -90,7 +92,7 @@ export const processNaturalLanguageCommand = async (text: string, context: any):
     console.error("[IA] Erro Crítico:", e);
     return { 
       intent: 'ERROR', 
-      feedback: 'Tive uma falha no processamento neural. Tente novamente.' 
+      feedback: 'Tive uma falha no processamento neural. Tente novamente em instantes.' 
     };
   }
 };

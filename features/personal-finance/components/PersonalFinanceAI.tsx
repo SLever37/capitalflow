@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-/* Added missing Loader2 import from lucide-react */
 import { BrainCircuit, Sparkles, RefreshCw, Lightbulb, Loader2 } from 'lucide-react';
 import { processNaturalLanguageCommand, AIResponse } from '../../../services/geminiService';
 import { PFTransaction, PFAccount, PFCard } from '../types';
@@ -16,26 +15,20 @@ export const PersonalFinanceAI: React.FC<Props> = ({ transactions, accounts, car
     const [result, setResult] = useState<AIResponse | null>(null);
     const [loading, setLoading] = useState(false);
 
-    useEffect(() => {
-        if (transactions.length > 0 || accounts.length > 0) {
-            generateInsight();
-        }
-    }, [transactions.length, accounts.length]);
-
     const generateInsight = async () => {
         setLoading(true);
         try {
             const context = {
                 type: 'PERSONAL_FINANCE',
                 isDemo: profileId === 'DEMO',
-                balance: accounts.reduce((acc, a) => acc + a.saldo, 0),
+                balance: accounts.reduce((acc, a) => acc + (Number(a.saldo) || 0), 0),
                 totalExpensesMonth: transactions.filter(t => t.tipo === 'DESPESA').reduce((acc, t) => acc + t.valor, 0),
                 accounts: accounts.map(a => ({ name: a.nome, type: a.tipo, balance: a.saldo })),
                 cards: cards.map(c => ({ name: c.nome, limit: c.limite })),
                 recentActivity: transactions.slice(0, 5).map(t => ({ desc: t.descricao, val: t.valor, type: t.tipo }))
             };
 
-            const res = await processNaturalLanguageCommand("Aja como um Consultor Financeiro Pessoal. Analise meus dados e dê um resumo estratégico.", context);
+            const res = await processNaturalLanguageCommand("Realize uma consultoria CFO Pessoal sobre minha saúde financeira atual.", context);
             setResult(res);
         } catch (e) {
             setResult({ intent: 'ERROR', feedback: "Não foi possível gerar a consultoria agora." });
@@ -43,6 +36,12 @@ export const PersonalFinanceAI: React.FC<Props> = ({ transactions, accounts, car
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        if (transactions.length > 0 || accounts.length > 0) {
+            generateInsight();
+        }
+    }, [transactions.length, accounts.length]);
 
     return (
         <div className="w-full bg-gradient-to-r from-slate-900 to-slate-900 border border-pink-500/30 rounded-[2.5rem] p-6 sm:p-8 relative overflow-hidden shadow-2xl mt-8">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrainCircuit, Loader2, Sparkles, TrendingUp, Users } from 'lucide-react';
+import { BrainCircuit, Loader2, Sparkles, TrendingUp, Users, Target } from 'lucide-react';
 import { processNaturalLanguageCommand } from '../../../services/geminiService';
 
 export const TeamAIInsight: React.FC<{ members: any[], teamName?: string }> = ({ members, teamName }) => {
@@ -18,13 +18,14 @@ export const TeamAIInsight: React.FC<{ members: any[], teamName?: string }> = ({
                     name: m.full_name,
                     role: m.role,
                     logins: m.linked_profile?.access_count || 0,
+                    lastActive: m.linked_profile?.last_active_at,
                     status: m.invite_status
                 }))
             };
-            const res = await processNaturalLanguageCommand("Analise o engajamento e a estrutura desta equipe.", context);
+            const res = await processNaturalLanguageCommand("Analise o engajamento operacional e a saúde estrutural desta equipe.", context);
             setInsight(res);
         } catch (e) {
-            setInsight({ feedback: "Erro ao analisar equipe." });
+            setInsight({ feedback: "Erro ao analisar equipe. Verifique a conexão com o banco." });
         } finally {
             setIsAnalyzing(false);
         }
@@ -41,9 +42,9 @@ export const TeamAIInsight: React.FC<{ members: any[], teamName?: string }> = ({
                     <BrainCircuit size={20}/>
                 </div>
                 <div>
-                    <h3 className="text-white font-black uppercase text-xs tracking-tighter">Visão do Gestor IA</h3>
+                    <h3 className="text-white font-black uppercase text-xs tracking-tighter">Visão do Líder IA</h3>
                     <p className="text-[9px] text-blue-400 font-bold uppercase tracking-widest flex items-center gap-1">
-                        <Sparkles size={10}/> Team Performance
+                        <Sparkles size={10}/> Team Performance Analytics
                     </p>
                 </div>
             </div>
@@ -52,17 +53,21 @@ export const TeamAIInsight: React.FC<{ members: any[], teamName?: string }> = ({
                 {isAnalyzing ? (
                     <div className="py-8 flex flex-col items-center justify-center gap-2">
                         <Loader2 className="animate-spin text-blue-500" size={20}/>
-                        <span className="text-[10px] font-bold text-slate-500 uppercase">Avaliando Operadores...</span>
+                        <span className="text-[10px] font-bold text-slate-500 uppercase">Auditando Operadores...</span>
                     </div>
                 ) : (
                     <div className="space-y-4">
+                        <div className="flex items-center gap-2 text-indigo-400 mb-1">
+                            <Target size={14}/>
+                            <span className="text-[10px] font-black uppercase">Diagnóstico Gerencial</span>
+                        </div>
                         <p className="text-xs text-slate-300 leading-relaxed font-medium">
-                            {insight?.analysis || insight?.feedback || "Selecione uma equipe para começar a análise estratégica de performance."}
+                            {insight?.analysis || insight?.feedback || "Selecione uma equipe para análise de produtividade."}
                         </p>
                         
                         {insight?.suggestions && (
                             <div className="pt-4 border-t border-slate-800">
-                                <p className="text-[10px] font-black text-blue-500 uppercase mb-2">Recomendações:</p>
+                                <p className="text-[10px] font-black text-blue-500 uppercase mb-2">Recomendações de Gestão:</p>
                                 <ul className="space-y-2">
                                     {insight.suggestions.map((s: string, i: number) => (
                                         <li key={i} className="text-[10px] text-slate-400 flex items-start gap-2">
@@ -78,8 +83,8 @@ export const TeamAIInsight: React.FC<{ members: any[], teamName?: string }> = ({
             </div>
 
             <div className="mt-6 flex items-center justify-between text-[8px] font-black text-slate-600 uppercase tracking-widest">
-                <span>Relatório Gerencial</span>
-                <span>v3.0 Strategic</span>
+                <span>Relatório Auditado por IA</span>
+                <span>v3.5 Strategic</span>
             </div>
         </div>
     );
