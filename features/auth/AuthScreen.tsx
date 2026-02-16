@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { HelpCircle, TrendingUp, User, KeyRound, Loader2, X, ChevronRight, Beaker, Eye, EyeOff, UserPlus, Phone, ShieldCheck, Mail, Lock } from 'lucide-react';
+import { HelpCircle, TrendingUp, User, KeyRound, Loader2, X, ChevronRight, Beaker, Eye, EyeOff, UserPlus, Phone, ShieldCheck, Mail, Lock, AlertCircle, LogOut } from 'lucide-react';
 import { Modal } from '../../components/ui/Modal';
 import { supabase } from '../../lib/supabase';
 import { generateUUID } from '../../utils/generators';
@@ -96,21 +96,38 @@ const useInviteFlow = (showToast: any) => {
         }
     }, [checkInviteToken]);
 
-    return { inviteToken, setInviteToken, inviteData, isProcessing, setIsProcessing };
+    const cancelInvite = () => {
+        localStorage.removeItem('cm_invite_token');
+        setInviteToken(null);
+        setInviteData(null);
+        window.history.replaceState({}, document.title, window.location.origin + window.location.pathname);
+    };
+
+    return { inviteToken, setInviteToken, inviteData, isProcessing, setIsProcessing, cancelInvite };
 };
 
 const useMemberActivation = (inviteData: any, submitTeamLogin: any, showToast: any, setIsProcessing: any) => {
     const [form, setForm] = useState({ name: '', document: '', phone: '', email: '', accessCode: '' });
+    const [errorText, setErrorText] = useState('');
 
     const handleActivate = async () => {
         if (!inviteData) return;
-        if (!form.name.trim()) { showToast("Informe seu nome completo.", "error"); return; }
-        if (!form.email.trim() || !form.email.includes('@')) { showToast("E-mail inválido.", "error"); return; }
-        if (!form.document || !isValidCPForCNPJ(form.document)) { showToast("CPF inválido.", "error"); return; }
-        if (!form.phone || form.phone.length < 14) { showToast("Telefone inválido.", "error"); return; }
-        if (!form.accessCode || form.accessCode.length < 4) { showToast("Crie um código de acesso com 4 dígitos.", "error"); return; }
+        setErrorText('');
+        
+        if (!form.name.trim()) { setErrorText("Informe seu nome completo."); return; }
+        if (!form.email.trim() || !form.email.includes('@')) { setErrorText("E-mail inválido."); return; }
+        if (!form.document || !isValidCPForCNPJ(form.document)) { setErrorText("CPF inválido."); return; }
+        if (!form.phone || form.phone.length < 14) { setErrorText("Telefone incompleto."); return; }
+        if (!form.accessCode || form.accessCode.length < 4) { setErrorText("Crie um código de 4 dígitos."); return; }
 
         setIsProcessing(true);
+        
+        // Timeout de segurança de 12 segundos
+        const timer = setTimeout(() => {
+            setIsProcessing(false);
+            setErrorText("Não foi possível ativar. Verifique sua internet e tente novamente.");
+        }, 12000);
+
         try {
             const newProfileId = generateUUID();
             const cleanDoc = onlyDigits(form.document);
@@ -138,17 +155,18 @@ const useMemberActivation = (inviteData: any, submitTeamLogin: any, showToast: a
             const { error: memberError } = await finalizeInvite(inviteData.id, 'ACCEPTED');
             if (memberError) throw memberError;
 
+            clearTimeout(timer);
             localStorage.removeItem('cm_invite_token');
             showToast("Conta ativada com sucesso!", "success");
             await submitTeamLogin({ document: cleanDoc, phone: cleanPhone, code: form.accessCode }, (l: boolean) => setIsProcessing(l), showToast);
         } catch (e: any) {
-            showToast(e.message || "Erro na ativação", "error");
-        } finally {
+            clearTimeout(timer);
+            setErrorText(e.message || "Erro na ativação do banco de dados.");
             setIsProcessing(false);
         }
     };
 
-    return { form, setForm, handleActivate };
+    return { form, setForm, handleActivate, errorText };
 };
 
 const useCreateProfile = (setLoginUser: any, setIsCreatingProfile: any, showToast: any, setIsProcessing: any) => {
@@ -216,17 +234,26 @@ const useRecoveryAndSupport = (setIsRecoveringPassword: any, showToast: any) => 
 /**
  * 3. COMPONENTES DE INTERFACE
  */
-const InviteActivationView = ({ inviteData, form, setForm, onConfirm, isLoading }: any) => (
-    <div className="space-y-4">
+const InviteActivationView = ({ inviteData, form, setForm, onConfirm, isLoading, errorText, onCancel }: any) => (
+    <div className="space-y-4 pb-24">
         <div className="relative z-10 text-center mb-6">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl shadow-lg shadow-blue-600/20 mb-4"><UserPlus className="text-white w-8 h-8" /></div>
             <h1 className="text-xl font-black text-white uppercase tracking-tighter mb-1">Ativar Acesso</h1>
             <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Complete seu cadastro na equipe</p>
         </div>
+        
         <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center">
             <p className="text-[10px] text-slate-500 uppercase font-black">Equipe:</p>
-            <p className="text-lg font-black text-white uppercase">{inviteData.teams?.name || 'Equipe'}</p>
+            <p className="text-lg font-black text-white uppercase truncate">{inviteData.teams?.name || 'Equipe'}</p>
         </div>
+
+        {errorText && (
+            <div className="bg-rose-900/20 border border-rose-500/30 p-4 rounded-xl flex items-start gap-3 animate-in fade-in zoom-in-95">
+                <AlertCircle className="text-rose-500 shrink-0" size={18}/>
+                <p className="text-xs text-rose-200 font-bold leading-tight">{errorText}</p>
+            </div>
+        )}
+
         <div>
             <label className="text-[10px] font-black text-slate-500 uppercase ml-1 mb-1 block">Seu Nome Completo</label>
             <div className="bg-slate-800/50 p-2 rounded-xl border border-slate-700 flex items-center gap-2">
@@ -255,12 +282,18 @@ const InviteActivationView = ({ inviteData, form, setForm, onConfirm, isLoading 
             <label className="text-[10px] font-black text-slate-500 uppercase ml-1 mb-1 block">Código de Acesso (4 Dígitos)</label>
             <div className="bg-slate-800/50 p-2 rounded-xl border border-slate-700 flex items-center gap-2">
                 <Lock className="text-slate-400 w-4 h-4 ml-2" />
-                <input type="text" className="bg-transparent w-full text-white outline-none text-sm font-bold" placeholder="Ex: 1234" maxLength={4} value={form.accessCode} onChange={e => setForm({...form, accessCode: onlyDigits(e.target.value)})} />
+                <input type="text" inputMode="numeric" className="bg-transparent w-full text-white outline-none text-sm font-bold" placeholder="Ex: 1234" maxLength={4} value={form.accessCode} onChange={e => setForm({...form, accessCode: onlyDigits(e.target.value)})} />
             </div>
         </div>
-        <button onClick={onConfirm} disabled={isLoading} className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-xs font-black uppercase shadow-lg transition-all mt-4 flex items-center justify-center gap-2">
-            {isLoading ? <Loader2 className="animate-spin" /> : 'Confirmar e Entrar'}
-        </button>
+
+        <div className="space-y-3 pt-4">
+            <button onClick={onConfirm} disabled={isLoading} className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-xs font-black uppercase shadow-lg transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50">
+                {isLoading ? <Loader2 className="animate-spin" /> : 'Confirmar e Entrar'}
+            </button>
+            <button onClick={onCancel} className="w-full py-3 bg-slate-800 text-slate-400 hover:text-white rounded-2xl text-[10px] font-black uppercase transition-all flex items-center justify-center gap-2">
+                <LogOut size={12}/> Voltar ao Login
+            </button>
+        </div>
     </div>
 );
 
@@ -321,8 +354,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     const [showHelpModal, setShowHelpModal] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     
-    const { inviteToken, inviteData, isProcessing: isProcessingInvite, setIsProcessing: setIsProcessingInvite } = useInviteFlow(showToast);
-    const { form: memberForm, setForm: setMemberForm, handleActivate: handleActivateMember } = useMemberActivation(inviteData, submitTeamLogin, showToast, setIsProcessingInvite);
+    const { inviteToken, setInviteToken, inviteData, isProcessing: isProcessingInvite, setIsProcessing: setIsProcessingInvite, cancelInvite } = useInviteFlow(showToast);
+    const { form: memberForm, setForm: setMemberForm, handleActivate: handleActivateMember, errorText } = useMemberActivation(inviteData, submitTeamLogin, showToast, setIsProcessingInvite);
     const { form: createForm, setForm: setCreateForm, handleCreate: handleCreateProfile } = useCreateProfile(setLoginUser, setIsCreatingProfile, showToast, setIsProcessingInvite);
     const { handleHelpSupport } = useRecoveryAndSupport(setIsRecoveringPassword, showToast);
 
@@ -332,12 +365,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     };
 
     return (
-        <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 md:p-6 relative">
+        <div className="min-h-[100dvh] bg-slate-950 flex items-start sm:items-center justify-center p-4 md:p-6 relative overflow-y-auto py-8">
             <div className="absolute top-6 right-6 z-50">
                 <button onClick={() => setShowHelpModal(true)} className="p-3 bg-slate-800/50 rounded-full text-slate-400 hover:text-white transition-all"><HelpCircle size={24}/></button>
             </div>
 
-            <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden flex flex-col justify-center animate-in zoom-in-95 duration-300">
+            <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-[2.5rem] p-8 shadow-2xl relative flex flex-col justify-center animate-in zoom-in-95 duration-300 max-h-[92dvh] overflow-y-auto custom-scrollbar mb-10">
                 <div className="absolute inset-0 bg-blue-600/5 blur-3xl rounded-full pointer-events-none"></div>
                 
                 {inviteToken && inviteData ? (
@@ -346,7 +379,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                         form={memberForm} 
                         setForm={setMemberForm} 
                         onConfirm={handleActivateMember} 
-                        isLoading={isProcessingInvite} 
+                        isLoading={isProcessingInvite}
+                        errorText={errorText}
+                        onCancel={cancelInvite}
                     />
                 ) : (
                     <>
