@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { AppShell } from './layout/AppShell';
 import { NavHubController } from './layout/NavHubController';
@@ -100,8 +101,7 @@ export const App: React.FC = () => {
   });
 
   // 1. Controle de Saída (Android e Web)
-  // Agora passando setActiveTab para controlar a navegação interna
-  useExitGuard(activeUser, activeTab, setActiveTab, isPublicView, showToast);
+  useExitGuard(activeUser, activeTab, setActiveTab, isPublicView, showToast, ui);
 
   // 2. Anti-Saída Web (Proteção contra fechamento de aba/refresh)
   useEffect(() => {
@@ -127,9 +127,6 @@ export const App: React.FC = () => {
   const effectiveSelectedStaffId = activeUser && activeUser.accessLevel === 2 ? activeUser.id : selectedStaffId;
   const isInvitePath = window.location.pathname === '/invite' || window.location.pathname === '/setup-password';
 
-  // 3. Tela de Carregamento Global (Splash Screen)
-  // Exibe se: Temos um ID de perfil (tentando restaurar sessão) MAS ainda não temos o objeto user carregado
-  // OU se estamos carregando dados iniciais críticos.
   const isInitializing = (!!activeProfileId && !activeUser) || (!!activeUser && isLoadingData && loans.length === 0 && !loadError);
 
   if (isInitializing && !isPublicView && !isInvitePath) {
@@ -177,10 +174,6 @@ export const App: React.FC = () => {
             onOpenSupport={() => ui.openModal('SUPPORT_CHAT')}
             navOrder={navOrder}
           >
-            <div className="hidden">
-               {/* Componentes de layout ocultos mas renderizados para lógica se necessário, ou limpeza futura */}
-            </div>
-
             {activeTab === 'DASHBOARD' && (
               <DashboardContainer
                 loans={loans} sources={sources} activeUser={activeUser}
@@ -204,7 +197,7 @@ export const App: React.FC = () => {
             )}
 
             {activeTab === 'TEAM' && !activeUser?.supervisor_id && (
-              <TeamPage activeUser={activeUser} showToast={showToast} onRefresh={() => fetchFullData(activeUser?.id || '')} />
+              <TeamPage activeUser={activeUser} showToast={showToast} onRefresh={() => fetchFullData(activeUser?.id || '')} ui={ui} />
             )}
 
             {activeTab === 'SOURCES' && (
@@ -232,7 +225,6 @@ export const App: React.FC = () => {
               <PersonalFinancesPage activeUser={activeUser} />
             )}
 
-            {/* Painel Master (SAC) integrado ao AppShell */}
             {activeTab === 'MASTER' && activeUser?.accessLevel === 1 && (
               <MasterScreen
                 activeUser={activeUser}

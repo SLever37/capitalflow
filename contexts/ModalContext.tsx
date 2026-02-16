@@ -28,7 +28,10 @@ export type ModalType =
     | 'RENEGOTIATION'
     | 'NEW_APORTE'
     | 'AI_ASSISTANT'
-    | 'SUPPORT_CHAT';
+    | 'SUPPORT_CHAT'
+    | 'INVITE'
+    | 'TEAM_EDITOR'
+    | 'MEMBER_EDITOR';
 
 export interface ModalState {
     type: ModalType;

@@ -8,14 +8,10 @@ import { InviteModal } from '../features/team/components/InviteModal';
 import { TeamEditorModal } from '../features/team/components/TeamEditorModal';
 import { MemberEditorModal } from '../features/team/components/MemberEditorModal';
 
-export const TeamPage = ({ activeUser, showToast }: any) => {
-  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
-  const [isTeamEditorOpen, setIsTeamEditorOpen] = useState(false);
-  const [isMemberEditorOpen, setIsMemberEditorOpen] = useState(false);
-  const [editingMember, setEditingMember] = useState<any>(null);
-  
+export const TeamPage = ({ activeUser, showToast, ui }: any) => {
   // Flag para saber se estamos editando um time existente ou criando novo
   const [editingTeam, setEditingTeam] = useState<any>(null);
+  const [editingMember, setEditingMember] = useState<any>(null);
 
   // Hook de Dados
   const { teams, activeTeam, setActiveTeam, members, loading, refresh, actions } = useTeamData(activeUser?.id);
@@ -28,7 +24,7 @@ export const TeamPage = ({ activeUser, showToast }: any) => {
 
   const handleOpenTeamEditor = (isNew: boolean) => {
       setEditingTeam(isNew ? null : activeTeam);
-      setIsTeamEditorOpen(true);
+      ui.openModal('TEAM_EDITOR');
   };
 
   const handleSaveTeam = async (name: string) => {
@@ -41,6 +37,7 @@ export const TeamPage = ({ activeUser, showToast }: any) => {
               if (newTeam) setActiveTeam(newTeam);
               showToast("Equipe criada com sucesso!", "success");
           }
+          ui.closeModal();
       } catch (e: any) {
           showToast(e.message, "error");
       }
@@ -51,6 +48,7 @@ export const TeamPage = ({ activeUser, showToast }: any) => {
       try {
           await actions.deleteTeam(editingTeam.id);
           showToast("Equipe excluída.", "success");
+          ui.closeModal();
       } catch (e: any) {
           showToast("Erro ao excluir: " + e.message, "error");
       }
@@ -58,13 +56,14 @@ export const TeamPage = ({ activeUser, showToast }: any) => {
 
   const handleOpenMemberEditor = (member: any) => {
       setEditingMember(member);
-      setIsMemberEditorOpen(true);
+      ui.openModal('MEMBER_EDITOR');
   };
 
   const handleSaveMember = async (memberId: string, updates: any) => {
       try {
           await actions.updateMember(memberId, updates);
           showToast("Membro atualizado!", "success");
+          ui.closeModal();
       } catch (e: any) {
           showToast("Erro ao atualizar membro: " + e.message, "error");
       }
@@ -81,65 +80,63 @@ export const TeamPage = ({ activeUser, showToast }: any) => {
 
   return (
     <div className="p-4 sm:p-6 space-y-8 pb-20 max-w-7xl mx-auto">
-      {/* Header & Seletor de Equipe */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 bg-slate-900 border border-slate-800 p-6 rounded-[2.5rem] shadow-xl">
-        <div className="flex items-center gap-4">
-            <div className="p-4 bg-blue-600 rounded-2xl text-white shadow-lg shadow-blue-900/20">
-                <Shield size={28} />
+      {/* Header & Seletor de Equipe - Melhoria de Responsividade */}
+      <div className="flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-6 bg-slate-900 border border-slate-800 p-5 sm:p-6 rounded-[2rem] sm:rounded-[2.5rem] shadow-xl">
+        <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+            <div className="p-3 sm:p-4 bg-blue-600 rounded-xl sm:rounded-2xl text-white shadow-lg shadow-blue-900/20 shrink-0">
+                <Shield size={24} className="sm:w-7 sm:h-7" />
             </div>
-            <div className="flex-1">
-                <h2 className="text-xl sm:text-2xl font-black uppercase text-white tracking-tighter leading-none">Gestão de Time</h2>
+            <div className="flex-1 min-w-0">
+                <h2 className="text-lg sm:text-2xl font-black uppercase text-white tracking-tighter leading-none truncate">Gestão de Time</h2>
                 
                 <div className="flex items-center gap-2 mt-2">
-                    <div className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 group focus-within:border-blue-500/50 transition-colors">
-                        <Layers size={10} className="text-blue-500"/>
+                    <div className="flex items-center gap-2 bg-slate-950 px-2 py-1 sm:px-3 sm:py-1.5 rounded-lg border border-slate-800 min-w-0 flex-1 sm:flex-none">
+                        <Layers size={10} className="text-blue-500 shrink-0"/>
                         <select 
                             value={activeTeam?.id || ''} 
                             onChange={(e) => setActiveTeam(teams.find(t => t.id === e.target.value))}
-                            className="bg-transparent text-white text-[10px] font-black uppercase tracking-widest outline-none border-none cursor-pointer hover:text-blue-400 transition-colors"
+                            className="bg-transparent text-white text-[9px] sm:text-[10px] font-black uppercase tracking-widest outline-none border-none cursor-pointer hover:text-blue-400 transition-colors w-full truncate"
                         >
                             {teams.length === 0 ? (
-                                <option>Nenhuma Equipe Listada</option>
+                                <option>Nenhuma Equipe</option>
                             ) : (
                                 teams.map(t => (
-                                    <option key={t.id} value={t.id} className="bg-slate-900 text-white font-bold">{t.name}</option>
+                                    <option key={t.id} value={t.id} className="bg-slate-900 text-white">{t.name}</option>
                                 ))
                             )}
                         </select>
                     </div>
 
-                    <button 
-                        onClick={() => handleOpenTeamEditor(false)} 
-                        disabled={!activeTeam}
-                        className="p-1.5 text-slate-500 hover:text-white hover:bg-slate-800 rounded-lg transition-all"
-                        title="Configurar Equipe Atual"
-                    >
-                        <Settings size={14} />
-                    </button>
-                    
-                    <button 
-                        onClick={() => handleOpenTeamEditor(true)} 
-                        className="p-1.5 text-slate-500 hover:text-emerald-500 hover:bg-slate-800 rounded-lg transition-all"
-                        title="Criar Nova Equipe"
-                    >
-                        <Plus size={14} />
-                    </button>
+                    <div className="flex gap-1 shrink-0">
+                        <button 
+                            onClick={() => handleOpenTeamEditor(false)} 
+                            disabled={!activeTeam}
+                            className="p-1.5 text-slate-500 hover:text-white hover:bg-slate-800 rounded-lg transition-all"
+                        >
+                            <Settings size={14} />
+                        </button>
+                        <button 
+                            onClick={() => handleOpenTeamEditor(true)} 
+                            className="p-1.5 text-slate-500 hover:text-emerald-500 hover:bg-slate-800 rounded-lg transition-all"
+                        >
+                            <Plus size={14} />
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
         
-        <div className="flex gap-2 w-full sm:w-auto">
+        <div className="flex gap-2 w-full lg:w-auto">
             <button 
                 onClick={refresh}
                 disabled={loading}
-                className={`p-4 bg-slate-800 text-slate-400 rounded-2xl border border-slate-700 hover:text-white transition-all active:scale-95 ${loading ? 'animate-spin' : ''}`}
-                title="Sincronizar Manualmente"
+                className={`p-3 sm:p-4 bg-slate-800 text-slate-400 rounded-xl sm:rounded-2xl border border-slate-700 hover:text-white transition-all active:scale-95 ${loading ? 'animate-spin' : ''}`}
             >
                 <RefreshCw size={18} />
             </button>
             <button 
-                onClick={() => { resetInviteState(); setIsInviteModalOpen(true); }} 
-                className="flex-1 sm:flex-none px-6 py-4 bg-blue-600 text-white rounded-2xl font-black text-xs uppercase shadow-lg shadow-blue-600/20 hover:bg-blue-500 transition-all flex items-center justify-center gap-2 active:scale-95"
+                onClick={() => ui.openModal('INVITE')} 
+                className="flex-1 lg:flex-none px-4 sm:px-6 py-3 sm:py-4 bg-blue-600 text-white rounded-xl sm:rounded-2xl font-black text-xs uppercase shadow-lg shadow-blue-600/20 hover:bg-blue-500 transition-all flex items-center justify-center gap-2 active:scale-95"
             >
                 <UserPlus size={18} /> Novo Membro
             </button>
@@ -176,31 +173,37 @@ export const TeamPage = ({ activeUser, showToast }: any) => {
         )}
       </div>
 
-      <InviteModal 
-        isOpen={isInviteModalOpen}
-        onClose={() => setIsInviteModalOpen(false)}
-        onGenerate={createInvite}
-        isLoading={isProcessing}
-        result={inviteResult}
-        resetResult={resetInviteState}
-      />
+      {ui.activeModal?.type === 'INVITE' && (
+        <InviteModal 
+            isOpen={true}
+            onClose={ui.closeModal}
+            onGenerate={createInvite}
+            isLoading={isProcessing}
+            result={inviteResult}
+            resetResult={resetInviteState}
+        />
+      )}
 
-      <TeamEditorModal
-        isOpen={isTeamEditorOpen}
-        onClose={() => setIsTeamEditorOpen(false)}
-        onSave={handleSaveTeam}
-        onDelete={editingTeam ? handleDeleteTeam : undefined}
-        initialName={editingTeam?.name}
-        isEditing={!!editingTeam}
-      />
+      {ui.activeModal?.type === 'TEAM_EDITOR' && (
+          <TeamEditorModal
+            isOpen={true}
+            onClose={ui.closeModal}
+            onSave={handleSaveTeam}
+            onDelete={editingTeam ? handleDeleteTeam : undefined}
+            initialName={editingTeam?.name}
+            isEditing={!!editingTeam}
+          />
+      )}
 
-      <MemberEditorModal
-        isOpen={isMemberEditorOpen}
-        onClose={() => setIsMemberEditorOpen(false)}
-        member={editingMember}
-        teams={teams}
-        onSave={handleSaveMember}
-      />
+      {ui.activeModal?.type === 'MEMBER_EDITOR' && (
+          <MemberEditorModal
+            isOpen={true}
+            onClose={ui.closeModal}
+            member={editingMember}
+            teams={teams}
+            onSave={handleSaveMember}
+          />
+      )}
     </div>
   );
 };
