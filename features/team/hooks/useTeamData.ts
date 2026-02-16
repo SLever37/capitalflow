@@ -136,11 +136,25 @@ export const useTeamData = (activeUserId: string | null | undefined) => {
   };
 
   const deleteTeam = async (teamId: string) => {
+    // 1. Remove membros primeiro (Manual Cascade) para evitar erro de FK se o banco não tiver ON DELETE CASCADE
+    const { error: membersErr } = await supabase
+      .from('team_members')
+      .delete()
+      .eq('team_id', teamId);
+      
+    if (membersErr) {
+       console.error("Erro ao remover membros antes da equipe:", membersErr);
+       // Não interrompe, tenta deletar a equipe mesmo assim (pode ser que não tenha membros ou tenha cascade)
+    }
+
+    // 2. Remove a equipe
     const { error } = await supabase
       .from('teams')
       .delete()
       .eq('id', teamId);
+      
     if (error) throw error;
+    
     setActiveTeam(null);
     await loadData();
   };

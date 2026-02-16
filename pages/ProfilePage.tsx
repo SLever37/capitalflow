@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { User, Save, Upload, Download, RefreshCw, Trash2, Shield, Settings, DollarSign, FileSpreadsheet, Lock, Camera, Palette, MapPin, Phone, LayoutGrid, ArrowUp, ArrowDown, CreditCard, Mail, FileText } from 'lucide-react';
+import { User, Save, Upload, Download, RefreshCw, Trash2, Shield, Settings, DollarSign, FileSpreadsheet, Lock, Camera, Palette, MapPin, Phone, LayoutGrid, ArrowUp, ArrowDown, CreditCard, Mail, FileText, AlertTriangle, LogOut } from 'lucide-react';
 import { UserProfile, Loan, AppTab } from '../types';
 import { maskPhone, formatMoney, maskDocument } from '../utils/formatters';
 import { useProfilePageLogic } from '../features/profile/hooks/useProfilePageLogic';
@@ -41,7 +41,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
 }) => {
   
   const { backupRestoreRef, auditLogs } = useProfilePageLogic(loans);
-  const [activeSection, setActiveSection] = useState<'GENERAL' | 'FINANCE' | 'DATA' | 'INTERFACE' | 'SECURITY'>('GENERAL');
+  const [activeSection, setActiveSection] = useState<'GENERAL' | 'FINANCE' | 'DATA' | 'INTERFACE' | 'SECURITY' | 'DANGER'>('GENERAL');
 
   const getTabLabel = (tab: AppTab) => {
     switch (tab) {
@@ -116,12 +116,17 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                     <button onClick={() => setActiveSection('DATA')} className={`w-full p-4 rounded-xl flex items-center gap-3 transition-all ${activeSection === 'DATA' ? 'bg-amber-600 text-white shadow-lg' : 'bg-slate-950 text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
                         <FileSpreadsheet size={18}/> <span className="font-bold text-xs uppercase">Dados & Backup</span>
                     </button>
-                    <button onClick={() => setActiveSection('SECURITY')} className={`w-full p-4 rounded-xl flex items-center gap-3 transition-all ${activeSection === 'SECURITY' ? 'bg-rose-600 text-white shadow-lg' : 'bg-slate-950 text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
+                    <button onClick={() => setActiveSection('SECURITY')} className={`w-full p-4 rounded-xl flex items-center gap-3 transition-all ${activeSection === 'SECURITY' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-950 text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
                         <Shield size={18}/> <span className="font-bold text-xs uppercase">Segurança</span>
+                    </button>
+                    <button onClick={() => setActiveSection('DANGER')} className={`w-full p-4 rounded-xl flex items-center gap-3 transition-all ${activeSection === 'DANGER' ? 'bg-rose-600 text-white shadow-lg' : 'bg-slate-950 text-rose-500 hover:bg-rose-900/20'}`}>
+                        <AlertTriangle size={18}/> <span className="font-bold text-xs uppercase">Zona de Perigo</span>
                     </button>
                 </nav>
 
-                <button onClick={handleLogout} className="w-full mt-6 py-4 border border-slate-800 text-slate-500 rounded-2xl font-bold uppercase text-xs hover:bg-slate-800 hover:text-white transition-all">Sair do Sistema</button>
+                <button onClick={handleLogout} className="w-full mt-6 py-4 border border-rose-900/30 bg-rose-950/10 text-rose-500 rounded-2xl font-bold uppercase text-xs hover:bg-rose-900/30 hover:text-rose-400 transition-all flex items-center justify-center gap-2">
+                    <LogOut size={16}/> Sair do Sistema
+                </button>
             </div>
         </div>
 
@@ -321,12 +326,18 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                 {/* --- SEÇÃO SEGURANÇA E LOGS --- */}
                 {activeSection === 'SECURITY' && (
                     <div className="space-y-8 animate-in fade-in slide-in-from-right">
-                        <div className="flex items-center gap-3 text-rose-500 mb-4">
+                        <div className="flex items-center gap-3 text-indigo-500 mb-4">
                             <Shield size={24}/>
                             <h3 className="text-lg font-black uppercase">Segurança e Auditoria</h3>
                         </div>
 
                         <ProfileAuditLog logs={auditLogs} />
+                    </div>
+                )}
+                
+                {/* --- SEÇÃO ZONA DE PERIGO (DEVOLVIDA) --- */}
+                {activeSection === 'DANGER' && (
+                    <div className="space-y-8 animate-in fade-in slide-in-from-right">
                         <ProfileDangerZone onResetData={() => setResetDataModal(true)} onDeleteAccount={handleDeleteAccount} />
                     </div>
                 )}

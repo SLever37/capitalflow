@@ -168,10 +168,14 @@ export const useAuth = () => {
       requestBrowserNotificationPermission();
 
       // 1. Busca e-mail vinculado se o input for nome de operador
+      // ATUALIZADO: Usa RPC para evitar erro de RLS ao buscar usuário anonimamente
       let emailForAuth = userInput;
       if (!userInput.includes('@')) {
-          const { data: p } = await supabase.from('perfis').select('usuario_email').ilike('nome_operador', userInput).maybeSingle();
-          if (p?.usuario_email) emailForAuth = p.usuario_email;
+          const { data: resolvedEmail, error: resolveErr } = await supabase
+            .rpc('resolve_login_email_by_operator', { p_operator: userInput });
+
+          if (resolveErr) throw resolveErr;
+          if (resolvedEmail) emailForAuth = String(resolvedEmail);
       }
 
       // 2. Garante Sessão Auth (Sincronização Crítica para RLS)
@@ -213,22 +217,41 @@ export const useAuth = () => {
 
       if (!cleanDoc || !cleanCode) throw new Error('Preencha todos os campos.');
 
-      // 1. Busca perfil pelo documento e código de acesso
-      const { data: profile, error } = await supabase
-        .from('perfis')
-        .select('*')
-        .eq('document', cleanDoc)
-        .eq('access_code', cleanCode)
-        .maybeSingle();
+      // 1. Busca perfil via RPC (Bypass RLS para Login)
+      const { data: loginData, error: loginError } = await supabase
+        .rpc('resolve_team_login', {
+          p_document: cleanDoc,
+          p_pin: cleanCode
+        });
 
-      if (error || !profile) throw new Error('Dados de acesso à equipe incorretos.');
+      if (loginError) throw loginError;
+      if (!loginData) throw new Error('Dados de acesso à equipe incorretos.');
 
-      // 2. Determinar credenciais para o Supabase Auth
-      const authEmail = profile.usuario_email || profile.email;
-      const authPass = profile.access_code || profile.senha_acesso;
-      
+      const profile = loginData;
+      const authEmail = loginData.auth_email;
+
       if (!authEmail) throw new Error('Este perfil não possui e-mail vinculado para autenticação segura.');
-      if (!authPass) throw new Error('Este perfil não possui credenciais de senha definidas.');
+
+      // 2. Garante/Atualiza usuário no Auth via Edge Function
+      // O Supabase Auth exige senha mín 6 chars. Se o PIN for menor (ex: 4), completamos com zeros à direita.
+      const authPass = cleanCode.length < 6 ? cleanCode.padEnd(6, '0') : cleanCode;
+
+      const { data: fnData, error: fnError } = await supabase.functions.invoke('ensure_auth_user', {
+        body: {
+          profile_id: profile.id,
+          email: authEmail,
+          password: authPass
+        }
+      });
+
+      if (fnError) {
+        console.error('Edge Function Error:', fnError);
+        throw new Error('Serviço de autenticação indisponível no momento.');
+      }
+
+      if (!fnData?.ok) {
+        throw new Error(fnData?.error || 'Falha ao sincronizar credenciais de acesso.');
+      }
 
       // 3. Garante Sessão Auth (Fundamental para ultrapassar o bloqueio RLS)
       await ensureAuthSession(authEmail, authPass);

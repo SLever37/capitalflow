@@ -34,7 +34,11 @@ export const TeamEditorModal: React.FC<TeamEditorModalProps> = ({
     };
 
     const handleDelete = async () => {
-        if (!onDelete || !confirm("Tem certeza que deseja excluir esta equipe? Todos os membros serão desvinculados.")) return;
+        if (!onDelete) return;
+        
+        const confirmed = window.confirm("ATENÇÃO: Tem certeza que deseja excluir esta equipe? \n\nEsta ação não pode ser desfeita e todos os membros serão desvinculados.");
+        if (!confirmed) return;
+
         setIsLoading(true);
         try {
             await onDelete();
@@ -71,6 +75,7 @@ export const TeamEditorModal: React.FC<TeamEditorModalProps> = ({
                 <div className="flex gap-3 pt-2">
                     {isEditing && onDelete && (
                         <button 
+                            type="button"
                             onClick={handleDelete} 
                             disabled={isLoading}
                             className="p-4 bg-rose-950/30 text-rose-500 border border-rose-500/20 rounded-xl hover:bg-rose-950/50 transition-all"
