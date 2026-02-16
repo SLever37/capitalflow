@@ -98,7 +98,8 @@ export const App: React.FC = () => {
 
   const effectiveSelectedStaffId = activeUser && activeUser.accessLevel === 2 ? activeUser.id : selectedStaffId;
 
-  // Condição de Inicialização Robusta
+  // Condição de Inicialização Robusta: 
+  // Bloqueia a Splash Screen até que o bootFinished do useAuth seja resolvido.
   const isInitializing = !bootFinished || (!!activeProfileId && !activeUser && !loadError);
 
   if (isInitializing && !isPublicView && !isInvitePath) {

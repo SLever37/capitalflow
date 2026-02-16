@@ -1,9 +1,9 @@
 
-import React, { Component, ReactNode } from 'react';
+import React, { ReactNode } from 'react';
 
-// Added explicit interfaces for better type inference in class components
+// Using optional children in Props to fix "Property 'children' is missing" errors in main.tsx
 interface Props {
-  children: ReactNode;
+  children?: ReactNode;
 }
 
 interface State {
@@ -12,15 +12,25 @@ interface State {
   stack?: string;
 }
 
-// Updated class declaration to extend Component directly for more reliable type inference of 'props'
-export class AppErrorBoundary extends Component<Props, State> {
-  // Added comment: Explicitly initialize state via constructor to help TypeScript track the base class members correctly
+/**
+ * AppErrorBoundary handles runtime errors and prevents total system failure.
+ * Updated to use React.Component and explicit property declaration to resolve 
+ * "Property 'state' does not exist on type 'AppErrorBoundary'" errors.
+ */
+export class AppErrorBoundary extends React.Component<Props, State> {
+  // Explicitly define state property for the class to ensure it's tracked by TypeScript
+  public state: State = {
+    hasError: false,
+    message: ''
+  };
+
   constructor(props: Props) {
     super(props);
+    // Initialize state in constructor as well for base class consistency
     this.state = { hasError: false, message: '' };
   }
 
-  static getDerivedStateFromError(err: any) {
+  static getDerivedStateFromError(err: any): State {
     return {
       hasError: true,
       message: String(err?.message || err || 'Erro desconhecido'),
@@ -85,7 +95,7 @@ export class AppErrorBoundary extends Component<Props, State> {
       );
     }
 
-    // Added comment: Correctly access children from the component's props now that inheritance is properly handled
-    return this.props.children;
+    // Correctly return children from props, ensuring null fallback if undefined
+    return this.props.children || null;
   }
 }

@@ -48,12 +48,6 @@ const mapLoginError = (err: any) => {
   return msg || 'Erro desconhecido no login.';
 };
 
-const devLog = (...args: any[]) => {
-  if (isDev) {
-    console.warn('[AUTH]', ...args);
-  }
-};
-
 export const useAuth = () => {
   const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
   const [loginUser, setLoginUser] = useState('');
@@ -66,7 +60,7 @@ export const useAuth = () => {
     try {
       await supabase.rpc('increment_profile_access', { p_profile_id: profileId });
     } catch (e) {
-      devLog("Falha ao registrar métrica de acesso", e);
+      if (isDev) console.warn('[AUTH] Falha ao registrar métrica de acesso', e);
     }
   };
 
@@ -81,16 +75,16 @@ export const useAuth = () => {
           try { setSavedProfiles(JSON.parse(saved)); } catch {}
         }
 
-        // Verifica Sessão Auth do Supabase (Obrigatório para RLS)
+        // Se estiver na rota de convite, não bloqueia o boot e não tenta carregar sessão
+        if (window.location.pathname.includes('setup-password')) {
+          if (mounted) setBootFinished(true);
+          return;
+        }
+
+        // Verifica Sessão Auth do Supabase
         const { data } = await supabase.auth.getSession();
         
         if (!mounted) return;
-
-        // Se estiver na rota de convite, não bloqueia o boot para permitir a página carregar
-        if (window.location.pathname.includes('setup-password')) {
-          setBootFinished(true);
-          return;
-        }
 
         // Verifica Sessão CapitalFlow (LocalStorage)
         const session = localStorage.getItem('cm_session');
@@ -106,7 +100,7 @@ export const useAuth = () => {
           }
         }
       } catch (err) {
-        devLog('Boot error', err);
+        if (isDev) console.error('[BOOT] Erro na inicialização:', err);
       } finally {
         if (mounted) setBootFinished(true);
       }
@@ -144,7 +138,7 @@ export const useAuth = () => {
     const { data: s } = await supabase.auth.getSession();
     if (s?.session?.user?.id) return;
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) devLog("Supabase Auth Warning:", error.message);
+    if (error && isDev) console.warn("Supabase Auth Warning:", error.message);
   };
 
   const submitLogin = async (
@@ -166,7 +160,9 @@ export const useAuth = () => {
           p_password: pass,
         });
         if (!rpcError && data) profile = Array.isArray(data) ? data[0] : data;
-      } catch (e) { devLog('RPC Login failed'); }
+      } catch (e) { 
+        if (isDev) console.error('RPC Login failed'); 
+      }
 
       if (!profile) {
         const { data: usersFound } = await supabase
