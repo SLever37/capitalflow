@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { AppShell } from './layout/AppShell';
 import { NavHubController } from './layout/NavHubController';
@@ -26,18 +25,6 @@ import { notificationService } from './services/notification.service';
 import { MasterScreen } from './features/master/MasterScreen';
 import { LoadingScreen } from './components/ui/LoadingScreen';
 import { PersonalFinancesPage } from './pages/PersonalFinancesPage';
-
-// ===== DEBUG BOOT START =====
-console.time('[BOOT] app_start');
-
-setTimeout(() => {
-  console.log('[BOOT] 3s passou - ainda carregando?');
-}, 3000);
-
-window.addEventListener('load', () => {
-  console.timeEnd('[BOOT] app_start');
-});
-// ===== DEBUG BOOT END =====
 
 export const App: React.FC = () => {
   // Hooks de Infraestrutura
@@ -125,6 +112,8 @@ export const App: React.FC = () => {
   }, [activeUser, isPublicView]);
 
   const effectiveSelectedStaffId = activeUser && activeUser.accessLevel === 2 ? activeUser.id : selectedStaffId;
+  
+  // CORREÇÃO: SetupPasswordPage agora redireciona para a raiz para usar o AuthScreen centralizado
   const isInvitePath = window.location.pathname === '/invite' || window.location.pathname === '/setup-password';
 
   const isInitializing = (!!activeProfileId && !activeUser) || (!!activeUser && isLoadingData && loans.length === 0 && !loadError);
