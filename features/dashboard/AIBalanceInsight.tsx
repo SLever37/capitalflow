@@ -1,26 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { BrainCircuit, Loader2, ShieldAlert, Sparkles, RefreshCw, BarChart3, TrendingDown, Target } from 'lucide-react';
+import { BrainCircuit, Loader2, ShieldAlert, Sparkles, RefreshCw, Target, Gauge } from 'lucide-react';
 import { Loan, CapitalSource, UserProfile } from '../../types';
-import { processNaturalLanguageCommand } from '../../services/geminiService';
+import { processNaturalLanguageCommand, AIResponse } from '../../services/geminiService';
 
 export const AIBalanceInsight: React.FC<{ loans: Loan[], sources: CapitalSource[], activeUser: UserProfile | null }> = ({ loans, sources, activeUser }) => {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
-    const [analysis, setAnalysis] = useState<string>('');
+    const [result, setResult] = useState<AIResponse | null>(null);
 
     const runAudit = async () => {
         setIsAnalyzing(true);
         try {
             const context = {
-                type: 'DASHBOARD_AUDIT',
+                type: 'OPERATOR_AUDIT',
+                isDemo: activeUser?.id === 'DEMO',
                 totalLent: loans.reduce((acc, l) => acc + (l.isArchived ? 0 : l.principal), 0),
                 interestBalance: activeUser?.interestBalance || 0,
                 lateCount: loans.filter(l => !l.isArchived && l.installments.some(i => i.status === 'LATE')).length,
-                sourceLiquidity: sources.reduce((acc, s) => acc + s.balance, 0)
+                sourceLiquidity: sources.reduce((acc, s) => acc + s.balance, 0),
+                portfolioHealth: loans.map(l => ({ name: l.debtorName, status: l.isArchived ? 'ARCHIVED' : 'ACTIVE' }))
             };
-            const res = await processNaturalLanguageCommand("Gere um Veredito de Auditoria Técnica sobre a saúde desta carteira.", context);
-            setAnalysis(res.analysis || res.feedback);
+            const res = await processNaturalLanguageCommand("Realize um Veredito de Auditoria Técnica sobre esta carteira.", context);
+            setResult(res);
         } catch (e) {
-            setAnalysis("Erro na análise técnica.");
+            setResult({ intent: 'ERROR', feedback: "Erro na análise técnica." });
         } finally {
             setIsAnalyzing(false);
         }
@@ -44,7 +46,7 @@ export const AIBalanceInsight: React.FC<{ loans: Loan[], sources: CapitalSource[
             </div>
 
             <div className="p-6 bg-slate-950/30">
-                {isAnalyzing && !analysis ? (
+                {isAnalyzing && !result ? (
                     <div className="py-12 flex flex-col items-center justify-center gap-3">
                         <Loader2 className="animate-spin text-blue-500" size={32}/>
                         <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Processando Variáveis Macro...</p>
@@ -53,30 +55,37 @@ export const AIBalanceInsight: React.FC<{ loans: Loan[], sources: CapitalSource[
                     <div className="animate-in fade-in duration-1000">
                         <div className="grid grid-cols-2 gap-3 mb-6">
                             <div className="bg-slate-900 p-3 rounded-2xl border border-slate-800">
-                                <p className="text-[8px] font-black text-slate-500 uppercase mb-1">Índice de Risco</p>
+                                <p className="text-[8px] font-black text-slate-500 uppercase mb-1">Score de Saúde</p>
                                 <div className="flex items-center gap-2">
-                                    <ShieldAlert size={14} className="text-rose-500"/>
-                                    <span className="text-xs font-bold text-white">Calculando...</span>
+                                    <Gauge size={14} className={result?.riskScore && result.riskScore > 70 ? "text-emerald-500" : "text-rose-500"}/>
+                                    <span className="text-xs font-bold text-white">{result?.riskScore || '---'}/100</span>
                                 </div>
                             </div>
                             <div className="bg-slate-900 p-3 rounded-2xl border border-slate-800">
-                                <p className="text-[8px] font-black text-slate-500 uppercase mb-1">Target de Recuperação</p>
+                                <p className="text-[8px] font-black text-slate-500 uppercase mb-1">Status de Risco</p>
                                 <div className="flex items-center gap-2">
-                                    <Target size={14} className="text-emerald-500"/>
-                                    <span className="text-xs font-bold text-white">Otimizado</span>
+                                    <ShieldAlert size={14} className="text-amber-500"/>
+                                    <span className="text-xs font-bold text-white uppercase truncate">{result?.intent || 'Monitorando'}</span>
                                 </div>
                             </div>
                         </div>
                         <div className="prose prose-invert max-w-none">
                             <p className="text-sm text-slate-300 leading-relaxed font-medium whitespace-pre-wrap">
-                                {analysis}
+                                {result?.analysis || result?.feedback || "Aguardando próxima auditoria..."}
                             </p>
                         </div>
+                        {result?.suggestions && result.suggestions.length > 0 && (
+                            <div className="mt-4 flex flex-wrap gap-2">
+                                {result.suggestions.map((s, i) => (
+                                    <span key={i} className="text-[9px] bg-blue-500/10 text-blue-400 px-2 py-1 rounded-full border border-blue-500/20 font-bold uppercase">{s}</span>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
             <div className="p-4 bg-slate-900/50 border-t border-slate-800 flex justify-center">
-                <p className="text-[9px] font-black text-slate-600 uppercase tracking-[0.2em]">Análise de Integridade Estrita • v4.0</p>
+                <p className="text-[9px] font-black text-slate-600 uppercase tracking-[0.2em]">Soberania Analítica • v5.0</p>
             </div>
         </div>
     );

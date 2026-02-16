@@ -1,43 +1,96 @@
 import { supabase } from '../lib/supabase';
 import { GoogleGenAI } from "@google/genai";
 
-export const processNaturalLanguageCommand = async (text: string, portfolioContext: any) => {
+export type AIPersona = 'OPERATOR_CRO' | 'TEAM_LEADER' | 'CLIENT_MENTOR' | 'PERSONAL_CFO';
+
+export interface AIResponse {
+  intent: string;
+  feedback: string;
+  analysis?: string;
+  data?: any;
+  suggestions?: string[];
+  riskScore?: number; // 0-100
+}
+
+export const processNaturalLanguageCommand = async (text: string, context: any): Promise<AIResponse> => {
+  // 1. Tenta via Edge Function (Segurança)
   try {
     const { data, error } = await supabase.functions.invoke('ai-assistant', {
-      body: { text, context: portfolioContext },
+      body: { text, context },
     });
     if (!error && data) return data;
-  } catch (e) {}
+  } catch (e) {
+    console.warn("[IA] Falha na Edge Function, usando fallback local...");
+  }
 
-  if (!process.env.API_KEY || process.env.API_KEY === 'PLACEHOLDER_API_KEY') {
-    return { intent: 'ERROR', feedback: 'IA Indisponível.' };
+  // 2. Fallback via SDK Local (Se configurado)
+  const apiKey = process.env.API_KEY;
+  if (!apiKey || apiKey === 'PLACEHOLDER_API_KEY') {
+    return { 
+      intent: 'ERROR', 
+      feedback: 'Assistente offline. Configure sua chave de API.' 
+    };
   }
 
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    
-    // Determinação de Persona Superior
+    const ai = new GoogleGenAI({ apiKey });
+    const isDemo = context?.isDemo || false;
+    const persona: AIPersona = context?.type === 'PORTAL_CLIENT' ? 'CLIENT_MENTOR' : 
+                            context?.type === 'TEAM_PAGE' ? 'TEAM_LEADER' :
+                            context?.type === 'PERSONAL_FINANCE' ? 'PERSONAL_CFO' : 'OPERATOR_CRO';
+
     let systemInstruction = "";
-    if (portfolioContext?.type === 'PORTAL_CLIENT') {
-      systemInstruction = "Você é um Mentor de Prosperidade e Educação Financeira. Sua missão é ensinar o cliente a organizar sua vida financeira, sair das dívidas e prosperar. Seja empático, use analogias inteligentes e dê conselhos práticos sobre economia doméstica. Retorne JSON.";
-    } else {
-      systemInstruction = "Você é um Chief Risk Officer (CRO) e Auditor de Alta Performance. Sua linguagem é técnica, intelectual e focada em métricas de risco, liquidez e saúde de ativos. Não faça chat, gere relatórios analíticos profundos. Retorne JSON.";
+
+    switch (persona) {
+      case 'OPERATOR_CRO':
+        systemInstruction = `Você é o Chief Risk Officer (CRO) da CapitalFlow. Analise a carteira de empréstimos com foco em liquidez, inadimplência e preservação de capital. Seja técnico e direto. ${isDemo ? "Nota: Este é um ambiente de DEMONSTRAÇÃO." : ""}`;
+        break;
+      case 'TEAM_LEADER':
+        systemInstruction = `Você é um Gestor de Performance de Equipe. Sua missão é analisar a atividade dos operadores, identificar quem precisa de apoio e sugerir metas de produtividade baseadas nos acessos e capital operado.`;
+        break;
+      case 'CLIENT_MENTOR':
+        systemInstruction = `Você é um Mentor de Prosperidade Financeira. Ajude o cliente a entender sua dívida, sugerindo economia doméstica e planos para sair do vermelho com empatia e motivação.`;
+        break;
+      case 'PERSONAL_CFO':
+        systemInstruction = `Você é um CFO Pessoal. Analise gastos, categorias de consumo e saldos bancários para sugerir investimentos ou cortes de gastos desnecessários.`;
+        break;
     }
 
+    const model = 'gemini-3-flash-preview';
+    const prompt = `
+      CONTEXTO DO SISTEMA: ${JSON.stringify(context)}
+      COMANDO OU DADOS DO USUÁRIO: "${text}"
+      
+      RETORNE APENAS JSON NO FORMATO:
+      {
+        "intent": "string",
+        "feedback": "string",
+        "analysis": "string (denso e estratégico)",
+        "suggestions": ["sugestão 1", "sugestão 2"],
+        "riskScore": number (se aplicável),
+        "data": {}
+      }
+    `;
+
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `CONTEXTO: ${JSON.stringify(portfolioContext)}. COMANDO: "${text}"`,
+      model,
+      contents: prompt,
       config: {
         systemInstruction,
         responseMimeType: "application/json",
-        temperature: 0.7
+        temperature: 0.5
       }
     });
 
     const textOutput = response.text;
-    if (!textOutput) throw new Error("Vazio");
+    if (!textOutput) throw new Error("Resposta vazia da IA.");
+    
     return JSON.parse(textOutput.replace(/```json|```/g, '').trim());
   } catch (e) {
-    return { intent: 'ERROR', feedback: 'Falha na rede neural.' };
+    console.error("[IA] Erro Crítico:", e);
+    return { 
+      intent: 'ERROR', 
+      feedback: 'Tive uma falha no processamento neural. Tente novamente.' 
+    };
   }
 };

@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Sparkles, Lightbulb, Loader2, BookOpen, HeartPulse, RefreshCw } from 'lucide-react';
-import { processNaturalLanguageCommand } from '../../../services/geminiService';
+import { processNaturalLanguageCommand, AIResponse } from '../../../services/geminiService';
 import { Loan } from '../../../types';
 
 export const PortalEducationalAI: React.FC<{ contracts: Loan[], clientName: string }> = ({ contracts, clientName }) => {
-    const [analysis, setAnalysis] = useState('');
+    const [result, setResult] = useState<AIResponse | null>(null);
     const [loading, setLoading] = useState(false);
 
     const generateMentorAdvice = async () => {
+        if (contracts.length === 0) return;
         setLoading(true);
         try {
             const context = {
@@ -15,18 +16,19 @@ export const PortalEducationalAI: React.FC<{ contracts: Loan[], clientName: stri
                 clientName,
                 debtCount: contracts.length,
                 totalDebt: contracts.reduce((acc, c) => acc + c.totalToReceive, 0),
-                isLate: contracts.some(c => c.installments.some(i => i.status === 'LATE'))
+                isLate: contracts.some(c => c.installments.some(i => i.status === 'LATE')),
+                history: contracts.map(c => ({ start: c.startDate, principal: c.principal }))
             };
-            const res = await processNaturalLanguageCommand("Gere um guia rápido de saúde financeira para este cliente baseado em sua situação atual.", context);
-            setAnalysis(res.analysis || res.feedback);
+            const res = await processNaturalLanguageCommand("Gere um guia de prosperidade para este cliente.", context);
+            setResult(res);
         } catch (e) {
-            setAnalysis("Olá! Gostaria de te ajudar a organizar sua vida financeira, mas tive um probleminha técnico. Tente novamente em instantes.");
+            setResult({ intent: 'ERROR', feedback: "Olá! Gostaria de te ajudar a organizar sua vida financeira, mas tive um probleminha técnico. Tente novamente em instantes." });
         } finally {
             setLoading(false);
         }
     };
 
-    useEffect(() => { if (contracts.length > 0) generateMentorAdvice(); }, []);
+    useEffect(() => { generateMentorAdvice(); }, [contracts.length]);
 
     return (
         <div className="mt-8 pt-8 border-t border-slate-800 space-y-6">
@@ -52,26 +54,33 @@ export const PortalEducationalAI: React.FC<{ contracts: Loan[], clientName: stri
                     <BookOpen size={64} className="text-white"/>
                 </div>
                 
-                {loading && !analysis ? (
+                {loading && !result ? (
                     <div className="py-8 flex flex-col items-center justify-center gap-3">
                         <Loader2 className="animate-spin text-pink-500" size={24}/>
-                        <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Elaborando seu guia...</p>
+                        <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Consultando o Mentor...</p>
                     </div>
                 ) : (
                     <div className="space-y-4 relative z-10">
                         <div className="flex items-center gap-2 text-yellow-500 font-black text-[10px] uppercase tracking-widest">
-                            <Lightbulb size={14}/> Insight do Dia
+                            <Lightbulb size={14}/> Insight do Mentor
                         </div>
                         <p className="text-sm text-slate-300 leading-relaxed font-medium italic">
-                            "{analysis}"
+                            "{result?.analysis || result?.feedback || "Organize suas finanças e construa seu futuro hoje."}"
                         </p>
+                        {result?.suggestions && (
+                             <div className="flex flex-wrap gap-2">
+                                {result.suggestions.slice(0, 3).map((s, i) => (
+                                    <span key={i} className="text-[8px] bg-slate-900 text-slate-400 px-2 py-1 rounded-full border border-slate-800 font-bold">{s}</span>
+                                ))}
+                             </div>
+                        )}
                     </div>
                 )}
             </div>
 
             <div className="bg-blue-600/5 p-4 rounded-2xl border border-blue-500/10 text-center">
                 <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">
-                    Nosso objetivo é seu sucesso. Use essas dicas para construir um futuro sólido.
+                    Educação Financeira • v1.2 Prosperity AI
                 </p>
             </div>
         </div>
