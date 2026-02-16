@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { requestBrowserNotificationPermission } from '../../utils/notifications';
@@ -36,10 +35,8 @@ const resolveSmartName = (p: any): string => {
   return 'Gestor';
 };
 
-// --- HELPERS DE ERRO DE LOGIN ---
 const mapLoginError = (err: any) => {
   const msg = String(err?.message || err || '');
-
   if (msg.toLowerCase().includes('invalid login')) return 'Usuário ou senha inválidos.';
   if (msg.toLowerCase().includes('perfil não encontrado')) return 'Perfil não encontrado. Verifique o usuário.';
   if (msg.toLowerCase().includes('senha incorreta')) return 'Usuário ou senha inválidos.';
@@ -48,23 +45,21 @@ const mapLoginError = (err: any) => {
   if (msg.toLowerCase().includes('permission')) return 'Sem permissão para acessar. Verifique RLS/políticas.';
   if (msg.toLowerCase().includes('network') || msg.toLowerCase().includes('failed to fetch'))
     return 'Falha de conexão. Verifique a internet.';
-
   return msg || 'Erro desconhecido no login.';
 };
 
 const devLog = (...args: any[]) => {
-  // LOG APENAS EM AMBIENTE DE DESENVOLVIMENTO
   if (isDev) {
     console.warn('[AUTH]', ...args);
   }
 };
-// -------------------------------
 
 export const useAuth = () => {
   const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
   const [loginUser, setLoginUser] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [savedProfiles, setSavedProfiles] = useState<SavedProfile[]>([]);
+  const [bootFinished, setBootFinished] = useState(false);
 
   const trackAccess = async (profileId: string) => {
     if (!profileId || profileId === 'DEMO') return;
@@ -76,29 +71,56 @@ export const useAuth = () => {
   };
 
   useEffect(() => {
-    const saved = localStorage.getItem('cm_saved_profiles');
-    if (saved) {
-      try {
-        setSavedProfiles(JSON.parse(saved));
-      } catch {}
-    }
+    let mounted = true;
 
-    const session = localStorage.getItem('cm_session');
-    if (session) {
+    const boot = async () => {
       try {
-        const parsed = JSON.parse(session);
-        if (parsed?.profileId) {
-            setActiveProfileId(parsed.profileId);
-            trackAccess(parsed.profileId);
+        // Carrega perfis salvos
+        const saved = localStorage.getItem('cm_saved_profiles');
+        if (saved && mounted) {
+          try { setSavedProfiles(JSON.parse(saved)); } catch {}
         }
-      } catch {
-        localStorage.removeItem('cm_session');
+
+        // Verifica Sessão Auth do Supabase (Obrigatório para RLS)
+        const { data } = await supabase.auth.getSession();
+        
+        if (!mounted) return;
+
+        // Se estiver na rota de convite, não bloqueia o boot para permitir a página carregar
+        if (window.location.pathname.includes('setup-password')) {
+          setBootFinished(true);
+          return;
+        }
+
+        // Verifica Sessão CapitalFlow (LocalStorage)
+        const session = localStorage.getItem('cm_session');
+        if (session) {
+          try {
+            const parsed = JSON.parse(session);
+            if (parsed?.profileId && mounted) {
+                setActiveProfileId(parsed.profileId);
+                trackAccess(parsed.profileId);
+            }
+          } catch {
+            localStorage.removeItem('cm_session');
+          }
+        }
+      } catch (err) {
+        devLog('Boot error', err);
+      } finally {
+        if (mounted) setBootFinished(true);
       }
-    }
+    };
+
+    boot();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const handleLoginSuccess = (profile: any, showToast: any) => {
-    playNotificationSound(); // Som de sucesso
+    playNotificationSound();
     const profileId = profile.id;
     const profileName = resolveSmartName(profile);
     const profileEmail = asString(profile.usuario_email || profile.email || 'equipe@sistema');
@@ -130,72 +152,37 @@ export const useAuth = () => {
     showToast: (msg: string, type?: 'error' | 'success' | 'warning') => void
   ) => {
     setIsLoading(true);
-    
     try {
       const userInput = (loginUser || '').trim();
       const pass = (loginPassword || '').trim();
-      
-      if (!userInput) throw new Error('Informe seu usuário ou e-mail.');
-      if (!pass) throw new Error('Informe a senha.');
+      if (!userInput || !pass) throw new Error('Preencha usuário e senha.');
 
-      // Solicita permissão cedo para garantir notificações futuras
       requestBrowserNotificationPermission();
 
       let profile: any = null;
-      
-      // 1. Tenta Login Rápido via RPC
       try {
         const { data, error: rpcError } = await supabase.rpc('login_user', {
           p_email: userInput.toLowerCase(),
           p_password: pass,
         });
         if (!rpcError && data) profile = Array.isArray(data) ? data[0] : data;
-      } catch (e) { 
-        devLog('RPC Login failed, falling back.', e);
-      }
+      } catch (e) { devLog('RPC Login failed'); }
 
-      // 2. Se RPC não retornou (Falha ou Credenciais Erradas), faz diagnóstico detalhado
       if (!profile) {
-        // A. Busca usuário pelo identificador para diagnosticar o erro
-        const { data: usersFound, error: userError } = await supabase
+        const { data: usersFound } = await supabase
             .from('perfis')
             .select('*')
             .or(`usuario_email.ilike."${userInput}",email.ilike."${userInput}",nome_operador.ilike."${userInput}"`);
 
-        if (userError) throw userError;
-
-        if (!usersFound || usersFound.length === 0) {
-            throw new Error('Perfil não encontrado. Verifique o usuário.');
-        }
-
-        // B. Usuário existe, verifica a SENHA
-        const validUser = usersFound.find(u => u.senha_acesso === pass);
-
-        if (!validUser) {
-            throw new Error('Usuário ou senha inválidos.');
-        }
-
-        // C. Se passou (Senha correta no banco, mas RPC falhou), define o perfil e segue
+        const validUser = usersFound?.find(u => u.senha_acesso === pass);
+        if (!validUser) throw new Error('Usuário ou senha inválidos.');
         profile = validUser;
       }
 
-      if (!profile) throw new Error('Credenciais inválidas.');
-      
-      const email = asString(profile.usuario_email || profile.email || userInput).toLowerCase();
-      // Tenta sincronizar sessão Auth (opcional para RLS, mas o app usa 'perfis' como verdade)
-      await ensureAuthSession(email, pass);
-      
+      await ensureAuthSession(asString(profile.usuario_email || profile.email || userInput).toLowerCase(), pass);
       handleLoginSuccess(profile, showToast);
-
     } catch (err: any) {
-      const friendly = mapLoginError(err);
-      devLog('submitLogin error:', err);
-      // UX: Som de erro e Toast visível
-      if (typeof window !== 'undefined') {
-        const audio = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU");
-        audio.play().catch(() => {});
-      }
-      showToast(friendly, 'error');
+      showToast(mapLoginError(err), 'error');
     } finally {
       setIsLoading(false);
     }
@@ -204,7 +191,7 @@ export const useAuth = () => {
   const submitTeamLogin = async (
     params: { document: string; phone: string; code: string },
     setIsLoading: (v: boolean) => void,
-    showToast: (msg: string, type?: any) => void
+    showToast: (msg: string, type?: 'error' | 'success' | 'warning') => void
   ) => {
     setIsLoading(true);
     try {
@@ -212,9 +199,7 @@ export const useAuth = () => {
       const cleanPhone = onlyDigits(params.phone);
       const cleanCode = params.code.trim();
 
-      if (!cleanDoc || !cleanPhone || !cleanCode) {
-        throw new Error('Preencha todos os campos para entrar.');
-      }
+      if (!cleanDoc || !cleanPhone || !cleanCode) throw new Error('Preencha todos os campos.');
 
       const { data: profiles, error } = await supabase
         .from('perfis')
@@ -223,22 +208,12 @@ export const useAuth = () => {
         .eq('access_code', cleanCode);
 
       if (error) throw error;
-
-      const validProfile = profiles?.find((p) => {
-        const dbPhone = onlyDigits(p.phone || '');
-        return dbPhone.includes(cleanPhone) || cleanPhone.includes(dbPhone);
-      });
-
-      if (!validProfile) {
-        throw new Error('Dados incorretos. Verifique CPF, Telefone e Código.');
-      }
+      const validProfile = profiles?.find((p) => onlyDigits(p.phone || '').includes(cleanPhone));
+      if (!validProfile) throw new Error('Dados incorretos.');
 
       handleLoginSuccess(validProfile, showToast);
-
     } catch (err: any) {
-      const friendly = mapLoginError(err);
-      devLog('submitTeamLogin error:', err);
-      showToast(friendly, 'error');
+      showToast(mapLoginError(err), 'error');
     } finally {
       setIsLoading(false);
     }
@@ -277,5 +252,6 @@ export const useAuth = () => {
     handleLogout,
     handleSelectSavedProfile,
     handleRemoveSavedProfile,
+    bootFinished,
   };
 };

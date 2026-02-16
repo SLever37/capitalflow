@@ -27,7 +27,6 @@ import { LoadingScreen } from './components/ui/LoadingScreen';
 import { PersonalFinancesPage } from './pages/PersonalFinancesPage';
 
 export const App: React.FC = () => {
-  // Hooks de Infraestrutura
   const { portalToken, legalSignToken } = usePortalRouting();
   const { toast, showToast } = useToast();
   
@@ -41,6 +40,7 @@ export const App: React.FC = () => {
     handleLogout,
     handleSelectSavedProfile,
     handleRemoveSavedProfile,
+    bootFinished
   } = useAuth();
 
   const {
@@ -69,6 +69,7 @@ export const App: React.FC = () => {
   ui.staffMembers = staffMembers;
 
   const isPublicView = !!portalToken || !!legalSignToken;
+  const isInvitePath = window.location.pathname === '/invite' || window.location.pathname === '/setup-password';
 
   usePersistedTab(activeTab, setActiveTab);
 
@@ -87,24 +88,8 @@ export const App: React.FC = () => {
     disabled: isPublicView,
   });
 
-  // 1. Controle de Saída (Android e Web)
   useExitGuard(activeUser, activeTab, setActiveTab, isPublicView, showToast, ui);
 
-  // 2. Anti-Saída Web (Proteção contra fechamento de aba/refresh)
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (activeUser && !isPublicView) {
-        e.preventDefault();
-        e.returnValue = 'Deseja realmente sair?';
-        return 'Deseja realmente sair?';
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [activeUser, isPublicView]);
-
-  // Init Notifications Permissions (apenas se logado E não for view pública)
   useEffect(() => {
     if (activeUser && !isPublicView) {
         notificationService.requestPermission();
@@ -112,11 +97,9 @@ export const App: React.FC = () => {
   }, [activeUser, isPublicView]);
 
   const effectiveSelectedStaffId = activeUser && activeUser.accessLevel === 2 ? activeUser.id : selectedStaffId;
-  
-  // CORREÇÃO: SetupPasswordPage agora redireciona para a raiz para usar o AuthScreen centralizado
-  const isInvitePath = window.location.pathname === '/invite' || window.location.pathname === '/setup-password';
 
-  const isInitializing = (!!activeProfileId && !activeUser) || (!!activeUser && isLoadingData && loans.length === 0 && !loadError);
+  // Condição de Inicialização Robusta
+  const isInitializing = !bootFinished || (!!activeProfileId && !activeUser && !loadError);
 
   if (isInitializing && !isPublicView && !isInvitePath) {
     return <LoadingScreen />;

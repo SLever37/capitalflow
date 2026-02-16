@@ -1,5 +1,5 @@
 
-import React, { ReactNode } from 'react';
+import React, { Component, ReactNode } from 'react';
 
 // Added explicit interfaces for better type inference in class components
 interface Props {
@@ -12,10 +12,13 @@ interface State {
   stack?: string;
 }
 
-// Updated class declaration to extend React.Component directly to ensure props and state are correctly typed
-export class AppErrorBoundary extends React.Component<Props, State> {
-  // Added comment: Initialize state explicitly
-  state: State = { hasError: false, message: '' };
+// Updated class declaration to extend Component directly for more reliable type inference of 'props'
+export class AppErrorBoundary extends Component<Props, State> {
+  // Added comment: Explicitly initialize state via constructor to help TypeScript track the base class members correctly
+  constructor(props: Props) {
+    super(props);
+    this.state = { hasError: false, message: '' };
+  }
 
   static getDerivedStateFromError(err: any) {
     return {
@@ -82,7 +85,7 @@ export class AppErrorBoundary extends React.Component<Props, State> {
       );
     }
 
-    // Added comment: Correctly access children from the component's props
+    // Added comment: Correctly access children from the component's props now that inheritance is properly handled
     return this.props.children;
   }
 }
