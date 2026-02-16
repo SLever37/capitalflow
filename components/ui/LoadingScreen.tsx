@@ -5,16 +5,16 @@ import { supabase } from '../../lib/supabase';
 export const LoadingScreen: React.FC = () => {
   const handleCancelLoading = async () => {
     try {
-      // Limpeza profunda
+      // Limpeza profunda de sessões presas no cliente
       localStorage.removeItem('cm_session');
       localStorage.removeItem('cm_last_tab');
-      localStorage.removeItem('cm_cache_null'); // Previne cache fantasma
+      localStorage.removeItem('cm_invite_token');
       
-      // Tenta deslogar do Supabase se houver algo pendente
+      // Tenta deslogar do Supabase para limpar cookies de auth
       await supabase.auth.signOut().catch(() => {});
     } finally {
       // Força recarregamento limpo na raiz
-      window.location.href = '/';
+      window.location.replace('/');
     }
   };
 
@@ -45,7 +45,7 @@ export const LoadingScreen: React.FC = () => {
          {/* Botão de Escape para evitar carregamento infinito */}
          <button 
             onClick={handleCancelLoading}
-            className="flex items-center gap-2 text-[10px] font-bold text-slate-500 hover:text-rose-500 transition-colors uppercase tracking-widest px-4 py-2 rounded-xl bg-slate-900/30 border border-slate-800/50 mt-4"
+            className="flex items-center gap-2 text-[10px] font-bold text-slate-500 hover:text-rose-500 transition-colors uppercase tracking-widest px-4 py-2 rounded-xl bg-slate-900/30 border border-slate-800/50 mt-4 active:scale-95 transition-all"
          >
             <LogOut size={12}/> Voltar ao Login
          </button>

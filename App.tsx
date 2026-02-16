@@ -98,12 +98,12 @@ export const App: React.FC = () => {
   }, [activeUser, isPublicView]);
 
   // Timeout de Segurança para o Loading (10 segundos)
-  // Se após 10s o app ainda estiver "inicializando" com um profileId ativo, força erro.
   useEffect(() => {
     if (activeProfileId && !activeUser && bootFinished && !loadError) {
       const timer = setTimeout(() => {
         if (!activeUser && !loadError) {
           setLoadError("Tempo limite de sincronização excedido. Verifique sua conexão ou tente reconectar.");
+          if (isDev) console.error("[BOOT] Timeout atingido tentando carregar perfil:", activeProfileId);
         }
       }, 10000);
       return () => clearTimeout(timer);
@@ -112,7 +112,7 @@ export const App: React.FC = () => {
 
   const effectiveSelectedStaffId = activeUser && activeUser.accessLevel === 2 ? activeUser.id : selectedStaffId;
 
-  // Condição de Inicialização Robusta
+  // Condição de Inicialização: ou está no boot inicial, ou tem perfil mas o user ainda não carregou nem deu erro
   const isInitializing = !bootFinished || (!!activeProfileId && !activeUser && !loadError);
 
   if (isInitializing && !isPublicView && !isInvitePath) {

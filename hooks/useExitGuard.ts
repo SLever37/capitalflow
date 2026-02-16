@@ -16,11 +16,8 @@ export const useExitGuard = (
     if (!activeUser || isPublicView) return;
 
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      // Evita o prompt se estivermos saindo deliberadamente (logout ou limpeza)
       if (!activeUser) return;
-      
       e.preventDefault();
-      // Browsers modernos mostram mensagem padrão, mas e.returnValue é necessário
       e.returnValue = 'As alterações não salvas serão perdidas. Deseja realmente sair?';
       return e.returnValue;
     };
@@ -35,8 +32,7 @@ export const useExitGuard = (
 
     const isAndroid = /Android/i.test(navigator.userAgent);
     
-    // Injeta um estado falso no histórico para capturar o primeiro clique no voltar
-    // Sempre mantemos um estado à frente para interceptar o popstate
+    // Mantém um estado à frente para interceptar o popstate
     if (window.history.state?.anchor !== true) {
       window.history.pushState({ anchor: true }, '', window.location.href);
     }
@@ -45,7 +41,6 @@ export const useExitGuard = (
       // 1. Prioridade: Fechar Modais Abertos
       if (ui?.activeModal) {
         ui.closeModal();
-        // Repõe o estado para capturar o próximo clique
         window.history.pushState({ anchor: true }, '', window.location.href);
         return;
       }
@@ -62,14 +57,13 @@ export const useExitGuard = (
       const diff = now - lastBackPress.current;
 
       if (diff < 2000 && lastBackPress.current !== 0) {
-        // Segundo toque em menos de 2s: permite sair.
-        // Em PWAs instalados, window.close() pode fechar o app.
-        // Em browsers, o histórico seguirá para a página anterior ao app.
+        // Segundo toque em menos de 2s: permite a ação padrão do histórico
+        // Em PWA instalado, tentamos fechar
         if (isAndroid && window.matchMedia('(display-mode: standalone)').matches) {
           window.close();
         }
       } else {
-        // Primeiro toque: Avisa o usuário e mantém no app
+        // Primeiro toque: Avisa e empurra o histórico de volta para segurar
         lastBackPress.current = now;
         showToast('Pressione novamente para sair do CapitalFlow', 'warning');
         window.history.pushState({ anchor: true }, '', window.location.href);
