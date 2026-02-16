@@ -102,6 +102,14 @@ export const useAuth = () => {
   useEffect(() => {
     let mounted = true;
     const boot = async () => {
+      // DIAGNÓSTICO TEMPORÁRIO DE CONEXÃO
+      const { data, error } = await supabase.from('perfis').select('id').limit(1);
+      if (error) {
+        alert('Erro conexão Supabase: ' + error.message);
+      } else {
+        alert('Supabase OK');
+      }
+
       try {
         const saved = localStorage.getItem('cm_saved_profiles');
         if (saved && mounted) {
@@ -114,9 +122,19 @@ export const useAuth = () => {
         if (session && mounted) {
           try {
             const parsed = JSON.parse(session);
+            const hasAuth = !!s?.session?.user?.id;
+
+            // ✅ se não existe Auth session, NÃO pode “restaurar” profileId (senão trava no Launch)
+            if (!hasAuth) {
+              // Exceção para o modo DEMO que roda sem Auth
+              if (parsed?.profileId !== 'DEMO') {
+                localStorage.removeItem('cm_session');
+                setActiveProfileId(null);
+                return;
+              }
+            }
+
             if (parsed?.profileId) {
-                // Sincronização passiva: se o profileId é demo, ignora. 
-                // Se for real e não houver Auth session, em prod o ideal seria re-login.
                 setActiveProfileId(parsed.profileId);
                 trackAccess(parsed.profileId);
             }
