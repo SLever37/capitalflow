@@ -16,8 +16,11 @@ export const useExitGuard = (
     if (!activeUser || isPublicView) return;
 
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      // Evita o prompt se estivermos saindo deliberadamente (logout ou limpeza)
       if (!activeUser) return;
+      
       e.preventDefault();
+      // Browsers modernos mostram mensagem padrão, mas e.returnValue é necessário
       e.returnValue = 'As alterações não salvas serão perdidas. Deseja realmente sair?';
       return e.returnValue;
     };
@@ -33,37 +36,40 @@ export const useExitGuard = (
     const isAndroid = /Android/i.test(navigator.userAgent);
     
     // Injeta um estado falso no histórico para capturar o primeiro clique no voltar
-    window.history.pushState({ anchor: true }, '', window.location.href);
+    // Sempre mantemos um estado à frente para interceptar o popstate
+    if (window.history.state?.anchor !== true) {
+      window.history.pushState({ anchor: true }, '', window.location.href);
+    }
 
     const handlePopState = (e: PopStateEvent) => {
-      // Prioridade 1: Fechar Modais Abertos
+      // 1. Prioridade: Fechar Modais Abertos
       if (ui?.activeModal) {
         ui.closeModal();
+        // Repõe o estado para capturar o próximo clique
         window.history.pushState({ anchor: true }, '', window.location.href);
         return;
       }
 
-      // Prioridade 2: Se não estiver no Dashboard, volta para ele
+      // 2. Se não estiver no Dashboard, volta para ele primeiro
       if (activeTab !== 'DASHBOARD') {
         setActiveTab('DASHBOARD');
         window.history.pushState({ anchor: true }, '', window.location.href);
         return;
       }
 
-      // Prioridade 3: Lógica de Saída (Duplo Clique)
+      // 3. Lógica de Saída (Duplo Toque)
       const now = Date.now();
       const diff = now - lastBackPress.current;
 
       if (diff < 2000 && lastBackPress.current !== 0) {
-        // Segundo clique em menos de 2s: permite sair
-        // Como navegadores não permitem fechar janelas que não foram abertas por script,
-        // redirecionamos ou simplesmente deixamos o histórico seguir (que sairá do app).
+        // Segundo toque em menos de 2s: permite sair.
+        // Em PWAs instalados, window.close() pode fechar o app.
+        // Em browsers, o histórico seguirá para a página anterior ao app.
         if (isAndroid && window.matchMedia('(display-mode: standalone)').matches) {
-            // Em PWA instalado, tentamos fechar
-            window.close();
+          window.close();
         }
       } else {
-        // Primeiro clique: Avisa o usuário e "segura" no app
+        // Primeiro toque: Avisa o usuário e mantém no app
         lastBackPress.current = now;
         showToast('Pressione novamente para sair do CapitalFlow', 'warning');
         window.history.pushState({ anchor: true }, '', window.location.href);
@@ -72,5 +78,5 @@ export const useExitGuard = (
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [activeUser, activeTab, isPublicView, showToast, setActiveTab, ui]);
+  }, [activeUser, activeTab, isPublicView, showToast, setActiveTab, ui?.activeModal]);
 };
