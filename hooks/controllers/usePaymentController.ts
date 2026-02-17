@@ -23,10 +23,15 @@ export const usePaymentController = (
   const inFlightRef = useRef(false);
   const lastSigRef = useRef<{ sig: string; ts: number } | null>(null);
 
-  const handlePayment = async (forgivePenalty?: boolean, manualDate?: Date | null, customAmount?: number) => {
+  const handlePayment = async (
+      forgivenessMode?: 'NONE' | 'FINE_ONLY' | 'INTEREST_ONLY' | 'BOTH', 
+      manualDate?: Date | null, 
+      customAmount?: number,
+      realDate?: Date | null,
+      interestHandling?: 'CAPITALIZE' | 'KEEP_PENDING'
+  ) => {
     if (!activeUser || !ui.paymentModal) return;
 
-    // ✅ ownerId definitivo (dono da conta)
     const ownerId =
       safeUUID((activeUser as any).supervisor_id) ||
       safeUUID(activeUser.id);
@@ -44,7 +49,8 @@ export const usePaymentController = (
     const amountRaw =
       type === 'CUSTOM' ? String(customAmount ?? '') : String(ui.avAmount ?? '');
 
-    const sig = `${ownerId}|${loanId}|${instId}|${type}|${amountRaw}|${String(!!forgivePenalty)}|${
+    // Assinatura para evitar duplo clique
+    const sig = `${ownerId}|${loanId}|${instId}|${type}|${amountRaw}|${String(forgivenessMode)}|${
       manualDate ? manualDate.toISOString() : ''
     }`;
 
@@ -56,7 +62,6 @@ export const usePaymentController = (
     inFlightRef.current = true;
     ui.setIsProcessingPayment(true);
 
-    // DEMO
     if (activeUser.id === 'DEMO') {
       demoService.handlePayment({
         loan: ui.paymentModal.loan,
@@ -68,7 +73,7 @@ export const usePaymentController = (
         setLoans,
         setActiveUser,
         showToast,
-        forgivePenalty,
+        forgivePenalty: forgivenessMode === 'BOTH',
       });
       ui.closeModal();
       ui.setAvAmount('');
@@ -84,18 +89,19 @@ export const usePaymentController = (
     }
 
     try {
-      // ✅ PASSO CRÍTICO: paymentsService precisa usar ownerId internamente pra gravar (não activeUser.id)
       const { amountToPay, paymentType: typeReturned } = await paymentsService.processPayment({
         loan: ui.paymentModal.loan,
         inst: ui.paymentModal.inst,
         calculations: ui.paymentModal.calculations,
         paymentType: ui.paymentType,
         avAmount: ui.avAmount,
-        activeUser: { ...activeUser, id: ownerId }, // ✅ força o “id” a ser o dono
+        activeUser: { ...activeUser, id: ownerId },
         sources,
-        forgivePenalty,
-        manualDate,
+        forgivenessMode,
+        manualDate,    // Data do próximo vencimento
         customAmount,
+        realDate,      // Data real do pagamento (EXTRATO)
+        interestHandling // Regra de sobra de juros
       });
 
       let msg = '';
