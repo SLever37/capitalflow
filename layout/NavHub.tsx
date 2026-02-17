@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LayoutGrid, X, User, Calendar, Calculator, ArrowRightLeft, Shield, Scale, Wallet, Briefcase, Users, LayoutDashboard, PiggyBank } from 'lucide-react';
+import { LayoutGrid, X, User, Calendar, Calculator, ArrowRightLeft, Shield, Scale, Wallet, Briefcase, Users, LayoutDashboard, PiggyBank, Settings } from 'lucide-react';
 import { AppTab } from '../types';
 
 interface NavHubProps {
@@ -21,6 +21,7 @@ export const NavHub: React.FC<NavHubProps> = ({ onClose, onNavigate, userLevel, 
             case 'CLIENTS': return { icon: <Users size={32}/>, label: 'Clientes', color: 'text-amber-500', hover: 'hover:border-amber-600' };
             case 'DASHBOARD': return { icon: <LayoutDashboard size={32}/>, label: 'Painel Geral', color: 'text-cyan-500', hover: 'hover:border-cyan-600' };
             case 'PERSONAL_FINANCE': return { icon: <PiggyBank size={32}/>, label: 'Minhas Finanças', color: 'text-pink-500', hover: 'hover:border-pink-600' };
+            case 'SETTINGS': return { icon: <Settings size={32}/>, label: 'Ajustes', color: 'text-slate-400', hover: 'hover:border-slate-500' };
             default: return { icon: <LayoutGrid size={32}/>, label: tab, color: 'text-slate-500', hover: 'hover:border-slate-600' };
         }
     };

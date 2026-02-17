@@ -10,7 +10,7 @@ export type PaymentMethod = 'PIX' | 'CASH' | 'BANK_TRANSFER' | 'OTHER';
 export type SortOption = 'DUE_DATE_ASC' | 'NAME_ASC' | 'CREATED_DESC' | 'UPDATED_DESC';
 export type LoanBillingModality = 'MONTHLY' | 'DAILY_FREE' | 'DAILY_FIXED_TERM' | 'DAILY' | 'DAILY_30_INTEREST' | 'DAILY_30_CAPITAL' | 'DAILY_FIXED';
 
-export type AppTab = 'DASHBOARD' | 'CLIENTS' | 'TEAM' | 'SOURCES' | 'PROFILE' | 'MASTER' | 'LEGAL' | 'PERSONAL_FINANCE';
+export type AppTab = 'DASHBOARD' | 'CLIENTS' | 'TEAM' | 'SOURCES' | 'PROFILE' | 'MASTER' | 'LEGAL' | 'PERSONAL_FINANCE' | 'SETTINGS';
 
 // Added missing Client interface to fix "no exported member" errors
 export interface Client {
@@ -156,6 +156,7 @@ export interface UserProfile {
   password?: string;
   recoveryPhrase?: string;
   supervisor_id?: string;
+  owner_profile_id?: string | null;
   defaultInterestRate?: number;
   defaultFinePercent?: number;
   defaultDailyInterestPercent?: number;

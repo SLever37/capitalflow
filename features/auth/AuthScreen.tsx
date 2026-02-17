@@ -143,7 +143,7 @@ const useMemberActivation = (inviteData: any, submitTeamLogin: any, showToast: a
             showToast("Conta ativada!", "success");
             
             // Realiza login automático via fluxo de equipe
-            await submitTeamLogin({ document: cleanDoc, phone: cleanPhone, code: pass }, setIsProcessing, showToast);
+            await submitTeamLogin({ document: cleanDoc, phone: cleanPhone, code: pass }, showToast);
             
             // Limpa a URL e recarrega para aplicar sessão
             const cleanUrl = window.location.origin + window.location.pathname;
@@ -415,7 +415,6 @@ interface AuthScreenProps {
   submitLogin: () => void;
   submitTeamLogin: (
     params: { document: string; phone: string; code: string },
-    setIsLoading: (v: boolean) => void,
     showToast: (msg: string, type?: any) => void
   ) => Promise<void>;
   isLoading: boolean;

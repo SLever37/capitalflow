@@ -25,6 +25,7 @@ import { notificationService } from './services/notification.service';
 import { MasterScreen } from './features/master/MasterScreen';
 import { LoadingScreen } from './components/ui/LoadingScreen';
 import { PersonalFinancesPage } from './pages/PersonalFinancesPage';
+import { SettingsPage } from './pages/SettingsPage';
 import { isDev } from './utils/isDev';
 
 export const App: React.FC = () => {
@@ -41,7 +42,8 @@ export const App: React.FC = () => {
     handleLogout,
     handleSelectSavedProfile,
     handleRemoveSavedProfile,
-    bootFinished
+    bootFinished,
+    isLoading: authLoading,
   } = useAuth();
 
   const {
@@ -132,14 +134,14 @@ export const App: React.FC = () => {
           legalSignToken={legalSignToken}
           activeProfileId={activeProfileId}
           activeUser={activeUser}
-          isLoadingData={isLoadingData}
+          isLoadingData={isLoadingData || authLoading}
           loadError={loadError}
           loginUser={loginUser}
           setLoginUser={setLoginUser}
           loginPassword={loginPassword}
           setLoginPassword={setLoginPassword}
-          submitLogin={submitLogin}
-          submitTeamLogin={submitTeamLogin}
+          submitLogin={() => submitLogin(showToast)}
+          submitTeamLogin={(params, toast) => submitTeamLogin(params, toast)}
           savedProfiles={savedProfiles}
           handleSelectSavedProfile={handleSelectSavedProfile}
           handleRemoveSavedProfile={handleRemoveSavedProfile}
@@ -209,6 +211,10 @@ export const App: React.FC = () => {
 
             {activeTab === 'PERSONAL_FINANCE' && activeUser && (
               <PersonalFinancesPage activeUser={activeUser} />
+            )}
+
+            {activeTab === 'SETTINGS' && (
+              <SettingsPage />
             )}
 
             {activeTab === 'MASTER' && activeUser?.accessLevel === 1 && (

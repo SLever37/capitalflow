@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { Loan, Client, CapitalSource, UserProfile, SortOption, AppTab } from '../types';
@@ -9,9 +8,8 @@ import { asString, asNumber } from '../utils/safe';
 const DEFAULT_NAV: AppTab[] = ['DASHBOARD', 'CLIENTS', 'TEAM'];
 const DEFAULT_HUB: AppTab[] = ['SOURCES', 'LEGAL', 'PROFILE', 'MASTER', 'PERSONAL_FINANCE'];
 
-// --- CACHE SYSTEM START ---
 const CACHE_KEY = (profileId: string) => `cm_cache_${profileId}`;
-const CACHE_MAX_AGE = 2 * 60 * 1000; // 2 minutos de validade fresca
+const CACHE_MAX_AGE = 2 * 60 * 1000;
 
 type AppCacheSnapshot = {
   ts: number;
@@ -29,15 +27,8 @@ const readCache = (profileId: string): AppCacheSnapshot | null => {
     const raw = localStorage.getItem(CACHE_KEY(profileId));
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-
     if (!parsed?.ts) return null;
-
-    // Validação de Idade do Cache (Stale-While-Revalidate)
-    const age = Date.now() - parsed.ts;
-    
-    // Se o cache for muito antigo (> 2 min), forçamos o fetch limpo
-    if (age > CACHE_MAX_AGE) return null;
-
+    if (Date.now() - parsed.ts > CACHE_MAX_AGE) return null;
     return parsed as AppCacheSnapshot;
   } catch {
     return null;
@@ -52,7 +43,6 @@ const writeCache = (profileId: string, snap: Omit<AppCacheSnapshot, 'ts'>) => {
     console.warn('Falha ao salvar cache local', e);
   }
 };
-// --- CACHE SYSTEM END ---
 
 const DEMO_USER: UserProfile = {
   id: 'DEMO',
@@ -61,8 +51,8 @@ const DEMO_USER: UserProfile = {
   email: 'demo@capitalflow.app',
   businessName: 'Capital Demo',
   accessLevel: 1,
-  interestBalance: 1500.0,
-  totalAvailableCapital: 50000.0,
+  interestBalance: 1500,
+  totalAvailableCapital: 50000,
   ui_nav_order: DEFAULT_NAV,
   ui_hub_order: DEFAULT_HUB,
   brandColor: '#2563eb'
@@ -70,6 +60,7 @@ const DEMO_USER: UserProfile = {
 
 const mapProfileFromDB = (data: any): UserProfile => {
   let hubOrder = (data.ui_hub_order || DEFAULT_HUB) as AppTab[];
+
   if (Array.isArray(hubOrder) && !hubOrder.includes('PERSONAL_FINANCE')) {
     hubOrder = [...hubOrder, 'PERSONAL_FINANCE'];
   }
@@ -115,93 +106,79 @@ export const useAppState = (activeProfileId: string | null) => {
   const [clients, setClients] = useState<Client[]>([]);
   const [sources, setSources] = useState<CapitalSource[]>([]);
   const [staffMembers, setStaffMembers] = useState<UserProfile[]>([]);
-  const [selectedStaffId, setSelectedStaffId] = useState<string>('ALL');
-
   const [navOrder, setNavOrder] = useState<AppTab[]>(DEFAULT_NAV);
   const [hubOrder, setHubOrder] = useState<AppTab[]>(DEFAULT_HUB);
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Restore missing states
+  const [selectedStaffId, setSelectedStaffId] = useState<string>('ALL');
   const [activeTab, setActiveTab] = useState<AppTab>('DASHBOARD');
-  const [statusFilter, setStatusFilter] = useState<
-    'TODOS' | 'ATRASADOS' | 'EM_DIA' | 'PAGOS' | 'ARQUIVADOS' | 'ATRASO_CRITICO'
-  >('TODOS');
+  const [statusFilter, setStatusFilter] = useState<'TODOS' | 'ATRASADOS' | 'EM_DIA' | 'PAGOS' | 'ARQUIVADOS' | 'ATRASO_CRITICO'>('TODOS');
   const [sortOption, setSortOption] = useState<SortOption>('DUE_DATE_ASC');
   const [searchTerm, setSearchTerm] = useState('');
   const [clientSearchTerm, setClientSearchTerm] = useState('');
   const [profileEditForm, setProfileEditForm] = useState<UserProfile | null>(null);
 
   const fetchFullData = useCallback(async (profileId: string) => {
-    // console.time('[BOOT] fetchFullData'); 
-    if (!profileId || profileId === 'null' || profileId === 'undefined') {
-      setIsLoadingData(false);
-      return;
-    }
+    if (!profileId || profileId === 'null') return;
 
     if (profileId === 'DEMO') {
       setActiveUser(DEMO_USER);
       setProfileEditForm(DEMO_USER);
       setNavOrder(DEFAULT_NAV);
       setHubOrder(DEFAULT_HUB);
-      setIsLoadingData(false);
-      setLoadError(null);
       return;
     }
 
-    // Se já temos dados (cache ou anterior), não mostra loading spinner
-    // Apenas se não tiver nada (primeiro login limpo)
-    setActiveUser(prev => {
-        if (!prev) setIsLoadingData(true);
-        return prev;
-    });
-
+    setIsLoadingData(true);
     setLoadError(null);
 
     try {
-      const { data: profileData, error: profileError } = await supabase
+      const { data: profileData, error } = await supabase
         .from('perfis')
         .select('*')
         .eq('id', profileId)
         .single();
 
-      if (profileError) throw profileError;
+      if (error) throw error;
       if (!profileData) throw new Error('Perfil não encontrado');
 
       const u = mapProfileFromDB(profileData);
-      
-      const ownerId = u.supervisor_id || u.id;
-      const isStaff = !!u.supervisor_id;
+
+      const isStaff = u.accessLevel === 3;
+      const ownerId = isStaff ? (u.supervisor_id || u.id) : u.id;
 
       const [clientsRes, sourcesRes, loansRes] = await Promise.all([
-        supabase.from('clientes').select('*').eq('owner_id', ownerId).limit(isStaff ? 0 : 1000),
+        supabase.from('clientes').select('*').eq('owner_id', ownerId),
         supabase.from('fontes').select('*').eq('profile_id', ownerId),
         supabase
           .from('contratos')
-          .select(
-            '*, parcelas(*), transacoes(*), acordos_inadimplencia(*, acordo_parcelas(*)), sinalizacoes_pagamento(*)'
-          )
+          .select('*, parcelas(*), transacoes(*), acordos_inadimplencia(*, acordo_parcelas(*)), sinalizacoes_pagamento(*)')
           .eq('owner_id', ownerId)
       ]);
 
-      // Mapeamento dos Dados
       const mappedClients = (clientsRes.data || []).map((c: any) => ({
-            ...c,
-            phone: maskPhone(c.phone),
-            document: maskDocument(c.document)
+        ...c,
+        phone: maskPhone(c.phone),
+        document: maskDocument(c.document)
       }));
 
-      const mappedSources = (sourcesRes.data || []).map((s: any) => ({ 
-            ...s, 
-            balance: asNumber(s.balance) 
+      const mappedSources = (sourcesRes.data || []).map((s: any) => ({
+        ...s,
+        balance: asNumber(s.balance)
       }));
 
-      const mappedLoans = (loansRes.data || []).map((l: any) => mapLoanFromDB(l, clientsRes.data || []));
+      const mappedLoans = (loansRes.data || []).map((l: any) =>
+        mapLoanFromDB(l, clientsRes.data || [])
+      );
 
       let mappedStaff: UserProfile[] = [];
+
       if (u.accessLevel === 1) {
         const { data: staffData } = await supabase
           .from('perfis')
           .select('*')
-          .neq('id', u.id)
           .order('nome_operador', { ascending: true });
 
         if (staffData) {
@@ -209,7 +186,6 @@ export const useAppState = (activeProfileId: string | null) => {
         }
       }
 
-      // Atualiza Estados (Renderização)
       setActiveUser(u);
       setProfileEditForm(u);
       setNavOrder(u.ui_nav_order || DEFAULT_NAV);
@@ -219,136 +195,84 @@ export const useAppState = (activeProfileId: string | null) => {
       setLoans(mappedLoans);
       setStaffMembers(mappedStaff);
 
-      // --- PERSISTE NO CACHE (ATUALIZAÇÃO) ---
       writeCache(profileId, {
-          activeUser: u,
-          clients: mappedClients,
-          sources: mappedSources,
-          loans: mappedLoans,
-          staffMembers: mappedStaff,
-          navOrder: u.ui_nav_order || DEFAULT_NAV,
-          hubOrder: u.ui_hub_order || DEFAULT_HUB
+        activeUser: u,
+        clients: mappedClients,
+        sources: mappedSources,
+        loans: mappedLoans,
+        staffMembers: mappedStaff,
+        navOrder: u.ui_nav_order || DEFAULT_NAV,
+        hubOrder: u.ui_hub_order || DEFAULT_HUB
       });
 
     } catch (error: any) {
       console.error('Erro ao carregar dados:', error);
-      setActiveUser(prev => {
-          if (!prev) setLoadError(error.message || 'Erro de conexão.');
-          return prev;
-      });
+      setLoadError(error.message || 'Erro de conexão.');
     } finally {
       setIsLoadingData(false);
-      // console.timeEnd('[BOOT] fetchFullData');
     }
   }, []);
 
-  // --- BOOT COM CACHE INTELIGENTE ---
   useEffect(() => {
-    if (!activeProfileId || activeProfileId === 'null') {
-      setActiveUser(null);
-      setLoadError(null);
-      setIsLoadingData(false);
-      setLoans([]);
-      setClients([]);
-      setSources([]);
-      setStaffMembers([]);
-      return;
-    } 
-        
+    if (!activeProfileId) return;
+
     const cached = readCache(activeProfileId);
-    
+
     if (cached?.activeUser) {
-          // 1. Cache VÁLIDO (< 2min): Renderiza instantaneamente
-          // console.log('[BOOT] Cache válido (< 2min). Renderizando instantaneamente.');
-          setActiveUser(cached.activeUser);
-          setProfileEditForm(cached.activeUser);
-          setNavOrder(cached.navOrder || DEFAULT_NAV);
-          setHubOrder(cached.hubOrder || DEFAULT_HUB);
-          
-          setClients(cached.clients || []);
-          setSources(cached.sources || []);
-          setLoans(cached.loans || []);
-          setStaffMembers(cached.staffMembers || []);
-          
-          setIsLoadingData(false);
-          setLoadError(null);
+      setActiveUser(cached.activeUser);
+      setProfileEditForm(cached.activeUser);
+      setNavOrder(cached.navOrder);
+      setHubOrder(cached.hubOrder);
+      setClients(cached.clients);
+      setSources(cached.sources);
+      setLoans(cached.loans);
+      setStaffMembers(cached.staffMembers);
 
-          // 2. Revalidação silenciosa em background (sem bloquear UI)
-          setTimeout(() => {
-              fetchFullData(activeProfileId);
-          }, 1000);
-
+      setTimeout(() => {
+        fetchFullData(activeProfileId);
+      }, 1000);
     } else {
-          // 3. Cache EXPIRADO ou INEXISTENTE: Fetch imediato
-          // console.log('[BOOT] Cache expirado. Fetch imediato.');
-          fetchFullData(activeProfileId);
+      fetchFullData(activeProfileId);
     }
-    
-  }, [activeProfileId]); 
+  }, [activeProfileId]);
 
   const saveNavConfig = async (newNav: AppTab[], newHub: AppTab[]) => {
     if (!activeUser) return;
-
     setNavOrder(newNav);
     setHubOrder(newHub);
-
     const updatedUser = { ...activeUser, ui_nav_order: newNav, ui_hub_order: newHub };
     setActiveUser(updatedUser);
-
-    // Atualiza cache local imediatamente para consistência no próximo F5
-    const cached = readCache(activeUser.id);
-    if (cached) {
-        writeCache(activeUser.id, { ...cached, activeUser: updatedUser, navOrder: newNav, hubOrder: newHub });
-    }
 
     if (profileEditForm?.id === activeUser.id) {
       setProfileEditForm(updatedUser);
     }
 
     if (activeUser.id !== 'DEMO') {
-      try {
-        await supabase
-          .from('perfis')
-          .update({ ui_nav_order: newNav, ui_hub_order: newHub })
-          .eq('id', activeUser.id);
-      } catch (e) {
-        console.error('Erro técnico na persistência dos menus:', e);
-      }
+        try {
+            await supabase.from('perfis').update({ ui_nav_order: newNav, ui_hub_order: newHub }).eq('id', activeUser.id);
+        } catch (e) { console.error(e); }
     }
   };
 
   return {
-    loans,
-    setLoans,
-    clients,
-    setClients,
-    sources,
-    setSources,
-    activeUser,
-    setActiveUser,
-    staffMembers,
-    systemUsers: staffMembers,
-    isLoadingData,
-    setIsLoadingData,
-    loadError,
-    setLoadError,
-    fetchFullData,
-    activeTab,
-    setActiveTab,
-    statusFilter,
-    setStatusFilter,
-    sortOption,
-    setSortOption,
-    searchTerm,
-    setSearchTerm,
-    clientSearchTerm,
-    setClientSearchTerm,
-    profileEditForm,
-    setProfileEditForm,
-    selectedStaffId,
-    setSelectedStaffId,
+    loans, setLoans,
+    clients, setClients,
+    sources, setSources,
+    activeUser, setActiveUser,
+    staffMembers, systemUsers: staffMembers,
     navOrder,
     hubOrder,
+    isLoadingData, setIsLoadingData,
+    loadError, setLoadError,
+    fetchFullData,
+    // Returned extra states
+    selectedStaffId, setSelectedStaffId,
+    activeTab, setActiveTab,
+    statusFilter, setStatusFilter,
+    sortOption, setSortOption,
+    searchTerm, setSearchTerm,
+    clientSearchTerm, setClientSearchTerm,
+    profileEditForm, setProfileEditForm,
     saveNavConfig
   };
 };
