@@ -148,36 +148,31 @@ export const paymentsService = {
 
     // =========================
     // 3) RPC CANÔNICA (backend calcula deltas/abatimento)
-    //    ✅ Agora com modo JUROS-ONLY nas modalidades de juros
+    //    Regra: paga juros; se zerar e sobrar, excedente vai para principal (pagamento+AV).
+    //    Mantemos flag para modalidades de juros (se você quiser branches futuras no SQL).
     // =========================
     const { error } = await supabase.rpc('process_payment_atomic', {
       p_installment_id: inst.id,
       p_amount: amountToPay,
       p_idempotency_key: idempotencyKey,
       p_interest_only: paymentType === 'PARTIAL_INTEREST' || paymentType === 'RENEW_INTEREST',
+      p_notes: finalNote,
     });
 
-    if (error) throw new Error('Falha na persistência: ' + error.message);
+    if (error) {
+      const msg = error.message || '';
 
-    // =========================
-    // 4) (Opcional) ajustar "date" + notes do ledger por idempotency_key
-    // =========================
-    if (realDate && !isSameDay(realDate, new Date())) {
-      setTimeout(async () => {
-        await supabase
-          .from('transacoes')
-          .update({ date: paymentDateISO, notes: finalNote })
-          .eq('idempotency_key', idempotencyKey);
-      }, 300);
-    } else {
-      // garante notes mesmo sem realDate
-      setTimeout(async () => {
-        await supabase
-          .from('transacoes')
-          .update({ notes: finalNote })
-          .eq('idempotency_key', idempotencyKey);
-      }, 150);
+      if (
+        msg.includes('Pagamento excede o saldo da parcela') ||
+        msg.includes('Pagamento duplicado detectado')
+      ) {
+        throw new Error(msg);
+      }
+
+      throw new Error('Falha na persistência: ' + msg);
     }
+
+
 
     return { amountToPay, paymentType };
   },

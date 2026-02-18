@@ -9,7 +9,7 @@ const DEFAULT_NAV: AppTab[] = ['DASHBOARD', 'CLIENTS', 'TEAM'];
 const DEFAULT_HUB: AppTab[] = ['SOURCES', 'LEGAL', 'PROFILE', 'MASTER', 'PERSONAL_FINANCE'];
 
 const CACHE_KEY = (profileId: string) => `cm_cache_${profileId}`;
-const CACHE_MAX_AGE = 2 * 60 * 1000;
+const CACHE_MAX_AGE = 24 * 60 * 60 * 1000; // 24 horas
 
 type AppCacheSnapshot = {
   ts: number;

@@ -26,6 +26,25 @@ export const useExitGuard = (
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [activeUser, isPublicView]);
 
+  // 3. Interceptação de Teclas de Atualização (F5, Ctrl+R, Cmd+R)
+  useEffect(() => {
+    if (!activeUser || isPublicView) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // F5 ou Ctrl+R ou Cmd+R
+      if (
+        e.key === 'F5' ||
+        ((e.ctrlKey || e.metaKey) && e.key === 'r')
+      ) {
+        e.preventDefault();
+        showToast('Atualização bloqueada para manter o sistema online. Use o menu para sair.', 'warning');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeUser, isPublicView, showToast]);
+
   // 2. Proteção de Botão Voltar (Android PWA / Mobile Browser)
   useEffect(() => {
     if (!activeUser || isPublicView) return;
