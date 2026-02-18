@@ -2,10 +2,13 @@
 import { useMemo } from 'react';
 import { Loan, CapitalSource, LoanStatus } from '../../../types';
 import { getDaysDiff, parseDateOnlyUTC, addDaysUTC } from '../../../utils/dateHelpers';
-import { getInstallmentStatusLogic } from '../../../domain/finance/calculations';
+import { getInstallmentStatusLogic, rebuildLoanStateFromLedger } from '../../../domain/finance/calculations';
 import { modalityRegistry } from '../../../domain/finance/modalities/registry';
 
-export const useLoanCardComputed = (loan: Loan, sources: CapitalSource[], isStealthMode: boolean = false) => {
+export const useLoanCardComputed = (loanRaw: Loan, sources: CapitalSource[], isStealthMode: boolean = false) => {
+  // 1. Reconstrói o estado financeiro do contrato para garantir que parciais sejam abatidos
+  const loan = useMemo(() => rebuildLoanStateFromLedger(loanRaw), [loanRaw]);
+
   const strategy = useMemo(() => modalityRegistry.get(loan.billingCycle), [loan.billingCycle]);
   const showProgress = strategy.card.showProgress;
 
@@ -21,8 +24,9 @@ export const useLoanCardComputed = (loan: Loan, sources: CapitalSource[], isStea
   const isDailyFree = loan.billingCycle === 'DAILY_FREE';
   const isFixedTerm = loan.billingCycle === 'DAILY_FIXED_TERM';
 
+  // O totalDebt agora usa os installments reconstruídos com os saldos abatidos
   const totalDebt = useMemo(() => 
-    loan.installments.reduce((acc, i) => acc + i.principalRemaining + i.interestRemaining, 0), 
+    loan.installments.reduce((acc, i) => acc + (Number(i.principalRemaining) || 0) + (Number(i.interestRemaining) || 0), 0), 
   [loan.installments]);
   
   const isZeroBalance = totalDebt < 0.10;
@@ -70,7 +74,6 @@ export const useLoanCardComputed = (loan: Loan, sources: CapitalSource[], isStea
   }
   else if (!isLate && !hasActiveAgreement) {
     const daysUntilDue = Math.min(...loan.installments.filter(i => i.status !== LoanStatus.PAID).map(i => {
-        // FIX: Se for Mensal e datas iguais (recém renovado), força 30 dias para evitar card Laranja
         if (!loan.billingCycle.includes('DAILY') && loan.startDate && i.dueDate) {
              const d1 = parseDateOnlyUTC(loan.startDate).getTime();
              const d2 = parseDateOnlyUTC(i.dueDate).getTime();

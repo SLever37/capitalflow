@@ -29,7 +29,7 @@ export const LoanCard: React.FC<LoanCardProps> = (props) => {
   const {
     strategy, showProgress, isPaid, isLate, hasNotes, isDailyFree, isFixedTerm,
     hasActiveAgreement, isFullyFinalized, fixedTermStats, cardStyle, iconStyle,
-    allLedger, orderedInstallments, isZeroBalance
+    allLedger, orderedInstallments, isZeroBalance, totalDebt
   } = computed;
 
   // Helpers de Apresentação
@@ -64,6 +64,7 @@ export const LoanCard: React.FC<LoanCardProps> = (props) => {
           iconStyle={iconStyle}
           isStealthMode={isStealthMode}
           isExpanded={isExpanded}
+          currentDebt={totalDebt} // Passa o total calculado real para exibir no card
         />
 
         {/* Área Expansível */}

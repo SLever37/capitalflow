@@ -106,7 +106,28 @@ export const useAuth = () => {
           try { setSavedProfiles(JSON.parse(saved)); } catch {}
         }
         
-        const { data: s } = await supabase.auth.getSession();
+        const { data: s, error: sessionError } = await supabase.auth.getSession();
+
+        // 🛑 Tratamento de Erro de Token Inválido
+        if (sessionError) {
+          if (isDev) console.warn('[BOOT] Auth Session Error:', sessionError.message);
+          
+          if (
+            sessionError.message.includes('Refresh Token Not Found') || 
+            sessionError.message.includes('Invalid Refresh Token')
+          ) {
+            // Limpeza forçada
+            localStorage.removeItem('cm_session');
+            localStorage.removeItem('cm_supabase_auth');
+            await supabase.auth.signOut().catch(() => {});
+            if (mounted) {
+              setActiveProfileId(null);
+              setBootFinished(true);
+            }
+            return;
+          }
+        }
+        
         const session = localStorage.getItem('cm_session');
         
         if (session && mounted) {
@@ -134,6 +155,9 @@ export const useAuth = () => {
         }
       } catch (err) {
         if (isDev) console.error('[BOOT] Erro:', err);
+        // Fallback de segurança
+        localStorage.removeItem('cm_session');
+        setActiveProfileId(null);
       } finally {
         if (mounted) setBootFinished(true);
       }

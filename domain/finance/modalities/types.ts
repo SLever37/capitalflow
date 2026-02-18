@@ -1,3 +1,4 @@
+
 import { Loan, Installment, LoanPolicy, LoanBillingModality } from "../../../types";
 
 // Tipos de Cálculo existentes
@@ -8,6 +9,9 @@ export interface CalculationResult {
     lateFee: number;
     baseForFine: number;
     daysLate: number;
+    // Novos campos para detalhamento preciso
+    finePart?: number; // Valor puro da Multa Fixa
+    moraPart?: number; // Valor puro dos Juros de Mora
 }
 
 export interface RenewalResult {
@@ -42,9 +46,9 @@ export interface InstallmentGenerationResult {
 
 // Configuração Visual do Card
 export interface CardConfig {
-    dueDateLabel: (inst: Installment, loan?: Loan) => string; // Updated to include Loan context
-    statusLabel: (inst: Installment, daysDiff: number) => { text: string; color: string } | null; // Override de status padrão
-    showProgress: boolean; // Barra de progresso (Legacy)
+    dueDateLabel: (inst: Installment, loan?: Loan) => string; 
+    statusLabel: (inst: Installment, daysDiff: number) => { text: string; color: string } | null; 
+    showProgress: boolean; 
 }
 
 // INTERFACE DO MÓDULO (STRATEGY PATTERN)
@@ -54,7 +58,7 @@ export interface ModalityStrategy {
     // Core Financeiro
     calculate: (loan: Loan, inst: Installment, policy: LoanPolicy) => CalculationResult;
     
-    // Renovação com suporte a Data Manual (Autonomia)
+    // Renovação com suporte a Data Manual
     renew: (
         loan: Loan, 
         inst: Installment, 
@@ -62,7 +66,7 @@ export interface ModalityStrategy {
         allocation: PaymentAllocation, 
         today: Date, 
         forgivePenalty: boolean,
-        manualDate?: Date | null // Novo parâmetro opcional
+        manualDate?: Date | null
     ) => RenewalResult;
     
     // Fábrica de Parcelas

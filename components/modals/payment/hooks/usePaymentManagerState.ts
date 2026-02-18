@@ -1,7 +1,10 @@
+
 import { useState, useMemo, useEffect } from 'react';
 import { Loan, Installment } from '../../../../types';
 import { parseDateOnlyUTC, addDaysUTC, todayDateOnlyUTC, toISODateOnlyUTC, getDaysDiff } from '../../../../utils/dateHelpers';
 import { paymentModalityDispatcher } from '../../../../features/payments/modality/index';
+import { formatMoney } from '../../../../utils/formatters';
+import { calculateTotalDue } from '../../../../domain/finance/calculations';
 
 interface UsePaymentManagerProps {
     data: {loan: Loan, inst: Installment, calculations: any} | null;
@@ -19,104 +22,120 @@ export const usePaymentManagerState = ({ data, paymentType, setPaymentType, avAm
     const [realPaymentDateStr, setRealPaymentDateStr] = useState(toISODateOnlyUTC(new Date()));
     const [subMode, setSubMode] = useState<'DAYS' | 'AMORTIZE'>('DAYS');
     
-    // Novo estado de perdão granular
     const [forgivenessMode, setForgivenessMode] = useState<ForgivenessMode>('NONE');
     const [interestHandling, setInterestHandling] = useState<'CAPITALIZE' | 'KEEP_PENDING'>('KEEP_PENDING');
 
-    // 1. Detalhamento da Dívida (Recálculo local para separar Multa de Mora)
     const debtBreakdown = useMemo(() => {
         if (!data) return { principal: 0, interest: 0, fine: 0, dailyMora: 0, total: 0 };
-
-        const { loan, inst, calculations } = data;
-        const daysLate = Math.max(0, getDaysDiff(inst.dueDate));
         
-        const principal = calculations.principal;
-        const interest = calculations.interest; // Juros do ciclo (lucro)
-        
-        // Recalcula multa fixa e mora diária separadamente
-        let fine = 0;
-        let dailyMora = 0;
+        // Recalcula usando a função corrigida que separa os baldes
+        const freshCalc = calculateTotalDue(data.loan, data.inst);
 
-        if (daysLate > 0) {
-            const base = principal + interest;
-            fine = base * (loan.finePercent / 100);
-            dailyMora = base * (loan.dailyInterestPercent / 100) * daysLate;
+        let finalFine = freshCalc.finePart || 0; // Multa Fixa Pura
+        let finalMora = freshCalc.moraPart || 0; // Mora Diária Pura
+        
+        // Se a estratégia não retornou partes (fallback), tenta usar lateFee como multa fixa se não houver mora explícita
+        if (finalFine === 0 && finalMora === 0 && freshCalc.lateFee > 0) {
+            finalFine = freshCalc.lateFee;
         }
 
-        // Aplica o perdão selecionado
-        let finalFine = fine;
-        let finalMora = dailyMora;
-
-        if (forgivenessMode === 'FINE_ONLY') finalFine = 0;
-        if (forgivenessMode === 'INTEREST_ONLY') finalMora = 0;
-        if (forgivenessMode === 'BOTH') { finalFine = 0; finalMora = 0; }
+        // Aplica perdão visual se selecionado
+        if (forgivenessMode === 'FINE_ONLY') {
+            finalFine = 0;
+        } else if (forgivenessMode === 'INTEREST_ONLY') {
+            finalMora = 0;
+        } else if (forgivenessMode === 'BOTH') {
+            finalFine = 0;
+            finalMora = 0;
+        }
 
         return {
-            principal,
-            interest,
+            principal: freshCalc.principal,
+            interest: freshCalc.interest,
             fine: finalFine,
             dailyMora: finalMora,
-            total: principal + interest + finalFine + finalMora
+            total: freshCalc.principal + freshCalc.interest + finalFine + finalMora
         };
     }, [data, forgivenessMode]);
 
-    // 2. Cálculo de Mensalidades Virtuais (Acumuladas no atraso)
+    // Lógica Visual de Ciclos (Regra: Atraso pertence ao próximo ciclo)
     const virtualSchedule = useMemo(() => {
         if (!data) return [];
-        const { inst } = data;
+        const { inst, loan } = data;
         const today = todayDateOnlyUTC();
-        const dueDate = parseDateOnlyUTC(inst.dueDate);
         
+        const dueDate = parseDateOnlyUTC(inst.dueDate);
+        const currentInterestDebt = Number(inst.interestRemaining);
+        const fullMonthlyInterest = (Number(inst.scheduledPrincipal) * Number(loan.interestRate)) / 100;
+
+        // Dias de atraso reais da parcela atual
+        const realDaysLate = Math.max(0, getDaysDiff(inst.dueDate));
+
         const schedule = [];
-        let cursorDate = new Date(dueDate);
+        
+        for (let i = 0; i < 3; i++) {
+            const date = addDaysUTC(dueDate, i * 30);
+            
+            let label = '';
+            let status = 'OPEN';
+            
+            const monthName = date.toLocaleDateString('pt-BR', { month: 'long' });
+            const year = date.getFullYear();
+            const dateStr = `${monthName}/${year}`;
+            const fullDate = date.toLocaleDateString('pt-BR');
 
-        // Adiciona a parcela original
-        // Enquanto a data do cursor for menor ou igual a hoje (com margem de ciclo), adiciona
-        // Limitado a 12 meses para performance
-        let count = 1;
-        while (count <= 12) {
-             const diff = Math.round((today.getTime() - cursorDate.getTime()) / 86400000);
-             let status: 'LATE' | 'OPEN' | 'FUTURE' = 'OPEN';
-             
-             if (diff > 0) status = 'LATE';
-             else if (diff < -30) status = 'FUTURE';
-             
-             // Se for muito futuro, para
-             if (status === 'FUTURE') break;
+            if (i === 0) {
+                // CICLO ATUAL
+                label = `[30 Dias Contrato]`;
+                status = realDaysLate > 0 ? 'LATE' : 'OPEN';
 
-             schedule.push({
-                 date: new Date(cursorDate),
-                 daysDiff: diff,
-                 number: count
-             });
+                // Se parcial
+                const isPartial = currentInterestDebt < (fullMonthlyInterest - 1) && currentInterestDebt > 0.1;
+                if (isPartial) {
+                    label += ` • Restam ${formatMoney(currentInterestDebt)}`;
+                    status = 'PARTIAL';
+                }
+            } else if (i === 1) {
+                // PRÓXIMO CICLO (Herda atraso)
+                if (realDaysLate > 0) {
+                    label = `[${realDaysLate} Dias Atraso]`; 
+                    status = 'LATE';
+                } else {
+                    label = `[em aberto]`;
+                    status = 'FUTURE';
+                }
+            } else {
+                // FUTUROS
+                label = `[em aberto]`;
+                status = 'FUTURE';
+            }
 
-             // Avança 30 dias (ciclo padrão para visualização)
-             cursorDate = addDaysUTC(cursorDate, 30);
-             count++;
+            schedule.push({
+                dateStr,
+                label,
+                fullDate,
+                status,
+                originalDate: date
+            });
         }
 
         return schedule;
-    }, [data?.inst?.dueDate]);
+    }, [data?.inst?.dueDate, data?.inst?.interestRemaining, data?.inst?.principalRemaining, data?.inst?.paidLateFee]);
 
     const fixedTermData = useMemo(() => {
         if (data?.loan?.billingCycle === 'DAILY_FIXED_TERM' && data.inst) {
             try {
                 const start = parseDateOnlyUTC(data.loan.startDate);
                 const due = parseDateOnlyUTC(data.inst.dueDate);
-                
                 const startMs = start.getTime();
                 const dueMs = due.getTime();
-                
                 const days = Math.round((dueMs - startMs) / 86400000);
                 const safeDays = days > 0 ? days : 1; 
                 const dailyVal = (data.loan.totalToReceive || 0) / safeDays;
-
                 const currentDebt = (Number(data.inst.principalRemaining) || 0) + (Number(data.inst.interestRemaining) || 0);
                 const amountPaid = Math.max(0, (data.loan.totalToReceive || 0) - currentDebt);
-                
                 const paidDays = dailyVal > 0 ? Math.floor((amountPaid + 0.1) / dailyVal) : 0;
                 const paidUntil = addDaysUTC(start, paidDays);
-
                 return { dailyVal, paidUntil, totalDays: safeDays, paidDays, currentDebt };
             } catch (e) { console.error(e); }
         }

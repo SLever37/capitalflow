@@ -25,7 +25,8 @@ export const deriveUserFacingStatus = (inst: Installment): string => {
 };
 
 export const getInstallmentStatusLogic = (inst: Installment): LoanStatus => {
-  if (round(inst.principalRemaining) <= 0) return LoanStatus.PAID;
+  const totalRemaining = round((inst.principalRemaining || 0) + (inst.interestRemaining || 0));
+  if (totalRemaining <= 0.05) return LoanStatus.PAID;
   if (getDaysDiff(inst.dueDate) > 0) return LoanStatus.LATE;
   if (inst.paidTotal > 0) return LoanStatus.PARTIAL;
   return LoanStatus.PENDING;
@@ -38,7 +39,20 @@ export const calculateTotalDue = (loan: Loan, inst: Installment): CalculationRes
     finePercent: loan.finePercent,
     dailyInterestPercent: loan.dailyInterestPercent
   };
-  return financeDispatcher.calculate(loan, inst, policy);
+  
+  // 1. Calcula valores BRUTOS (Multa total, Mora total, Juros do mês)
+  // A strategy deve respeitar o inst.interestRemaining que já vem descontado do rebuild
+  const rawCalc = financeDispatcher.calculate(loan, inst, policy);
+
+  // 2. ABATIMENTOS DE ENCARGOS (Visual)
+  // Distribui o valor JÁ PAGO de encargos entre Fixa e Mora para exibição
+  const paidLateFee = Number(inst.paidLateFee) || 0;
+  
+  const grossFine = rawCalc.finePart ?? 0;
+  const grossMora = rawCalc.moraPart ?? 0;
+  const grossTotalLate = rawCalc.lateFee; // Total de encargos DEVENDO AGORA (calculado pela strategy)
+
+  return rawCalc;
 };
 
 export interface PaymentResult {
@@ -48,14 +62,29 @@ export interface PaymentResult {
   avGenerated: number;
 }
 
-export const allocatePayment = (paymentAmount: number, debt: CalculationResult): PaymentResult => {
+export const allocatePayment = (params: { 
+  installment: Installment, 
+  paymentAmount: number, 
+  paymentPriority?: 'INTEREST_FIRST' | 'PRINCIPAL_FIRST' 
+}): PaymentResult => {
+  const { installment, paymentAmount } = params;
   let remaining = round(paymentAmount);
-  const payLateFee = Math.min(remaining, debt.lateFee);
+  
+  // Prioridade Padrão: Multa -> Juros -> Principal
+  
+  const lateFeeDue = Number(installment.lateFeeAccrued) || 0;
+  const interestDue = Number(installment.interestRemaining) || 0;
+  const principalDue = Number(installment.principalRemaining) || 0;
+
+  const payLateFee = Math.min(remaining, lateFeeDue);
   remaining = round(remaining - payLateFee);
-  const payInterest = Math.min(remaining, debt.interest);
+  
+  const payInterest = Math.min(remaining, interestDue);
   remaining = round(remaining - payInterest);
-  const payPrincipal = Math.min(remaining, debt.principal);
+  
+  const payPrincipal = Math.min(remaining, principalDue);
   remaining = round(remaining - payPrincipal);
+  
   const avGenerated = remaining;
 
   return {
@@ -70,10 +99,12 @@ export const allocatePayment = (paymentAmount: number, debt: CalculationResult):
 export const rebuildLoanStateFromLedger = (loan: Loan): Loan => {
   if (loan.isArchived && (!loan.ledger || loan.ledger.length === 0)) return loan;
 
+  // 1. Reset para o estado "Agendado" (Baseline)
   const rebuiltInstallments = loan.installments.map(inst => ({
     ...inst,
-    principalRemaining: round(inst.scheduledPrincipal),
-    interestRemaining: round(inst.scheduledInterest),
+    // Garante que usamos números válidos
+    principalRemaining: round(Number(inst.scheduledPrincipal) || 0), 
+    interestRemaining: round(Number(inst.scheduledInterest) || 0),
     lateFeeAccrued: 0,
     avApplied: 0,
     paidPrincipal: 0,
@@ -83,34 +114,49 @@ export const rebuildLoanStateFromLedger = (loan: Loan): Loan => {
     status: LoanStatus.PENDING,
     logs: [] as string[],
     renewalCount: 0,
-    // Fix: Added paidDate initialization to prevent TypeScript errors in downstream usage
     paidDate: undefined as string | undefined
   }));
 
+  // 2. Processa o Ledger
   const sortedLedger = [...(loan.ledger || [])].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  
-  // CORREÇÃO: Removido filtro de data baseado em startDate para evitar que pagamentos antigos registrados sumam do cálculo se a data do contrato for alterada.
 
   sortedLedger.forEach(entry => {
-    if (entry.installmentId) {
-      const inst = rebuiltInstallments.find(i => i.id === entry.installmentId);
+    // Normalização de ID para comparação robusta
+    const entryInstId = entry.installmentId ? String(entry.installmentId).trim() : null;
+
+    if (entryInstId) {
+      const inst = rebuiltInstallments.find(i => String(i.id).trim() === entryInstId);
+      
       if (inst) {
-        inst.paidPrincipal = round(inst.paidPrincipal + entry.principalDelta);
-        inst.paidInterest = round(inst.paidInterest + entry.interestDelta);
-        inst.paidLateFee = round(inst.paidLateFee + entry.lateFeeDelta);
-        inst.paidTotal = round(inst.paidTotal + entry.amount);
-        inst.principalRemaining = round(Math.max(0, inst.principalRemaining - entry.principalDelta));
-        inst.interestRemaining = round(Math.max(0, inst.interestRemaining - entry.interestDelta));
-        if (['PAYMENT_PARTIAL', 'PAYMENT_INTEREST_ONLY', 'PAYMENT_FULL'].includes(entry.type)) inst.renewalCount = (inst.renewalCount || 0) + 1;
+        // Acumula Pagamentos
+        inst.paidPrincipal = round(inst.paidPrincipal + (Number(entry.principalDelta) || 0));
+        inst.paidInterest = round(inst.paidInterest + (Number(entry.interestDelta) || 0));
+        inst.paidLateFee = round(inst.paidLateFee + (Number(entry.lateFeeDelta) || 0));
+        inst.paidTotal = round(inst.paidTotal + (Number(entry.amount) || 0));
+        
+        // ABATIMENTO DE SALDO (CRÍTICO)
+        const pDelta = Number(entry.principalDelta) || 0;
+        const iDelta = Number(entry.interestDelta) || 0;
+
+        inst.principalRemaining = Math.max(0, round(inst.principalRemaining - pDelta));
+        inst.interestRemaining = Math.max(0, round(inst.interestRemaining - iDelta));
+        
+        if (['PAYMENT_PARTIAL', 'PAYMENT_INTEREST_ONLY', 'PAYMENT_FULL'].includes(entry.type)) {
+            if (iDelta > 0 && pDelta === 0) {
+                 inst.renewalCount = (inst.renewalCount || 0) + 1;
+            }
+        }
         if (entry.notes) inst.logs?.push(entry.notes);
       }
     }
   });
 
+  // 3. Atualiza Status Final
   rebuiltInstallments.forEach(inst => {
     inst.status = getInstallmentStatusLogic(inst);
     if (inst.status === LoanStatus.PAID && !inst.paidDate) {
-       const lastPayment = sortedLedger.filter(e => e.installmentId === inst.id).pop();
+       const instId = String(inst.id).trim();
+       const lastPayment = sortedLedger.filter(e => String(e.installmentId).trim() === instId).pop();
        if (lastPayment) inst.paidDate = lastPayment.date;
     }
   });
@@ -123,7 +169,10 @@ export const refreshAllLateFees = (loans: Loan[]): Loan[] => {
     const rebuiltLoan = rebuildLoanStateFromLedger(loan);
     const updatedInstallments = rebuiltLoan.installments.map(inst => {
       const debt = calculateTotalDue(rebuiltLoan, inst);
-      return { ...inst, lateFeeAccrued: debt.lateFee };
+      return { 
+          ...inst, 
+          lateFeeAccrued: debt.lateFee 
+      };
     });
     return { ...rebuiltLoan, installments: updatedInstallments };
   });

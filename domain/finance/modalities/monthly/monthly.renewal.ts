@@ -1,7 +1,8 @@
-
 import { Loan, Installment } from "@/types";
-import { parseDateOnlyUTC, toISODateOnlyUTC, addDaysUTC, getDaysDiff, todayDateOnlyUTC } from "@/utils/dateHelpers";
+import { parseDateOnlyUTC, toISODateOnlyUTC, addDaysUTC, todayDateOnlyUTC } from "@/utils/dateHelpers";
 import { RenewalResult, PaymentAllocation } from "../types";
+
+const round = (num: number) => Math.round((num + Number.EPSILON) * 100) / 100;
 
 export const renewMonthly = (
     loan: Loan, 
@@ -15,41 +16,74 @@ export const renewMonthly = (
     
     // Data de vencimento atual registrada no contrato
     const currentDueDate = parseDateOnlyUTC(inst.dueDate);
-    const daysLate = getDaysDiff(inst.dueDate); 
     
-    let baseDate: Date;
+    // Valores Base
+    const currentPrincipal = Number(inst.principalRemaining) || 0;
+    const currentInterest = Number(inst.interestRemaining) || 0;
     
+    // Valores Pagos (Alocados)
+    const principalPaid = Number(allocation?.principalPaid) || 0;
+    const avPaid = Number(allocation?.avGenerated) || 0;
+    const interestPaid = Number(allocation?.interestPaid) || 0;
+    
+    // 1. Novo Saldo de Principal
+    const newPrincipalRemaining = Math.max(0, round(currentPrincipal - principalPaid - avPaid));
+
+    // 2. Novo Saldo de Juros (Lógica do Balde)
+    // Subtrai o que foi pago. Se sobrar algo, fica como pendência para o mesmo mês.
+    let newInterestRemaining = Math.max(0, round(currentInterest - interestPaid));
+
+    // 3. Cálculo de Movimento de Data (Ciclos de 30 dias)
+    // Calcula quanto vale 1 mês de juros deste contrato
+    const monthlyInterestRateValue = round(currentPrincipal * (loan.interestRate / 100));
+    
+    let newDueDate = currentDueDate;
+    let newStartDateISO = loan.startDate;
+
     if (manualDate) {
-        // 1. Data Manual (Soberania do operador)
-        baseDate = manualDate;
-    } else if (daysLate > 0 && (Number(allocation?.principalPaid) || 0) > 0) {
-        // 2. Atraso com amortização: reseta o ciclo para hoje (renegociação implícita)
-        baseDate = today;
+        newDueDate = manualDate;
     } else {
-        // 3. Pagamento de Juros (Renovação Padrão):
-        // Sempre avança 30 dias EM CIMA da data teórica de vencimento.
-        // Isso impede que, se o cliente pagar adiantado 10 dias, ele "perca" esses 10 dias de juros.
-        baseDate = currentDueDate;
+        // Lógica Automática: "O dinheiro pago cobre quantos meses?"
+        let monthsPaid = 0;
+        
+        if (monthlyInterestRateValue > 0) {
+            // Tolerância de R$ 1,00 para arredondamentos
+            if (interestPaid >= (monthlyInterestRateValue - 1)) {
+                monthsPaid = Math.floor((interestPaid + 1) / monthlyInterestRateValue);
+            }
+        } else {
+            monthsPaid = 1; 
+        }
+
+        if (monthsPaid > 0) {
+            // Avança a data em blocos de 30 dias
+            newDueDate = addDaysUTC(currentDueDate, monthsPaid * 30);
+            
+            // Se avançou o mês, o saldo de juros deve ser o residual do próximo mês?
+            // NÃO. O sistema de pagamento (payments.service) já lidou com a alocação.
+            // Aqui devolvemos apenas o que SOBROU da conta matemática.
+            
+            // EXCEÇÃO: Se mudou a data, mas sobrou juros (ex: pagou 1.5 meses),
+            // o newInterestRemaining calculado acima (current - paid) já está correto (ficou negativo e virou 0, ou sobrou resto).
+            
+            // Mas espere: se interestPaid foi muito alto (pagou 2 meses), newInterestRemaining acima seria 0.
+            // O sistema RPC vai recalcular o ScheduledInterest para o novo período.
+        }
+        // Se monthsPaid == 0 (Parcial), a data NÃO muda. O cliente continua devendo o resto do mês atual.
     }
 
-    // Calcula o novo início e novo vencimento (Ciclo de 30 dias)
-    const newStartDateISO = toISODateOnlyUTC(baseDate); 
-    const newDueDateISO = toISODateOnlyUTC(addDaysUTC(baseDate, 30));
+    const newDueDateISO = toISODateOnlyUTC(newDueDate);
 
-    const currentPrincipalRemaining = Number(inst.principalRemaining) || 0;
-    const principalPaidNow = (Number(allocation?.principalPaid) || 0) + (Number(allocation?.avGenerated) || 0);
-    const newPrincipalRemaining = Math.max(0, currentPrincipalRemaining - principalPaidNow);
-    
-    // O próximo juro é projetado sobre o novo saldo para o mês seguinte
-    const nextMonthInterest = newPrincipalRemaining * (loan.interestRate / 100);
-    
+    // O "Scheduled" (previsto) para o próximo mês é baseado no novo principal
+    const nextMonthScheduledInterest = round(newPrincipalRemaining * (loan.interestRate / 100));
+
     return {
         newStartDateISO,
         newDueDateISO,
         newPrincipalRemaining,
-        newInterestRemaining: nextMonthInterest,
+        newInterestRemaining, // Saldo residual estrito
         newScheduledPrincipal: newPrincipalRemaining,
-        newScheduledInterest: nextMonthInterest,
-        newAmount: newPrincipalRemaining + nextMonthInterest
+        newScheduledInterest: nextMonthScheduledInterest,
+        newAmount: round(newPrincipalRemaining + newInterestRemaining)
     };
 };

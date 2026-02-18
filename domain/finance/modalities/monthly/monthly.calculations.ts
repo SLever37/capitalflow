@@ -8,20 +8,33 @@ const round = (num: number) => Math.round((num + Number.EPSILON) * 100) / 100;
 export const calculateMonthly = (loan: Loan, inst: Installment, policy: LoanPolicy): CalculationResult => {
     const daysLate = Math.max(0, getDaysDiff(inst.dueDate));
     const principal = inst.principalRemaining;
+    
+    // CRÍTICO: Usa o interestRemaining processado pelo rebuild.
+    // Isso garante que se houve pagamento parcial, o valor aqui já está abatido.
     const interest = inst.interestRemaining;
     
+    let fineFixed = 0;
+    let fineDaily = 0;
     let currentLateFee = 0;
+
+    // Calcula encargos apenas se houver saldo devedor e atraso
     if (daysLate > 0 && (principal + interest) > 0) {
-        const fineFixed = (principal + interest) * (policy.finePercent / 100);
-        const fineDaily = (principal + interest) * (policy.dailyInterestPercent / 100) * daysLate;
+        // Multa Fixa (%) - Baseada no saldo devedor total atual
+        fineFixed = round((principal + interest) * (policy.finePercent / 100));
+        
+        // Juros Mora Diária (%)
+        fineDaily = round((principal + interest) * (policy.dailyInterestPercent / 100) * daysLate);
+        
         currentLateFee = round(fineFixed + fineDaily);
     }
 
     return {
         total: round(principal + interest + currentLateFee),
         principal,
-        interest,
+        interest, // Retorna o saldo restante de juros, não o total do mês
         lateFee: currentLateFee,
+        finePart: fineFixed,
+        moraPart: fineDaily,
         baseForFine: round(principal + interest),
         daysLate
     };
