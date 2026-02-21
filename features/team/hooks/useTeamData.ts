@@ -30,6 +30,12 @@ export const useTeamData = (activeUserId: string | null | undefined) => {
 
       if (tErr) {
         console.error('[TEAM_LOAD] Erro ao buscar equipes:', tErr);
+        // Se for erro de fetch (network), não lança erro fatal, apenas loga
+        if (tErr.message && (tErr.message.includes('fetch') || tErr.message.includes('Network'))) {
+             setFetchError('Erro de conexão. Verifique sua internet.');
+             setLoading(false);
+             return;
+        }
         throw new Error(`Erro RLS/Banco (Equipes): ${tErr.message}`);
       }
 
@@ -57,6 +63,11 @@ export const useTeamData = (activeUserId: string | null | undefined) => {
 
         if (mErr) {
           console.error('[TEAM_LOAD] Erro ao buscar membros:', mErr);
+           if (mErr.message && (mErr.message.includes('fetch') || mErr.message.includes('Network'))) {
+             setFetchError('Erro de conexão ao buscar membros.');
+             setLoading(false);
+             return;
+           }
           throw new Error(`Erro RLS/Banco (Membros): ${mErr.message}`);
         }
 
@@ -98,7 +109,12 @@ export const useTeamData = (activeUserId: string | null | undefined) => {
       }
     } catch (err: any) {
       console.error('[TEAM_LOAD] Erro Crítico:', err);
-      setFetchError(err.message || 'Erro desconhecido ao carregar time.');
+      // Tratamento específico para TypeError: Failed to fetch
+      if (err.message === 'TypeError: Failed to fetch' || err.name === 'TypeError') {
+          setFetchError('Falha de conexão com o servidor. Verifique sua internet.');
+      } else {
+          setFetchError(err.message || 'Erro desconhecido ao carregar time.');
+      }
     } finally {
       setLoading(false);
     }

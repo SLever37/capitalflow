@@ -105,7 +105,7 @@ export const CalculatorModal = ({ onClose }: { onClose: () => void }) => {
                                 inputMode="decimal" 
                                 placeholder="0,00" 
                                 className="w-full bg-transparent text-white text-2xl font-black outline-none placeholder:text-slate-700" 
-                                value={principal} 
+                                value={principal || ''} 
                                 onChange={e => setPrincipal(e.target.value.replace(/[^0-9.,]/g, ''))}
                                 autoFocus
                             />
@@ -122,7 +122,7 @@ export const CalculatorModal = ({ onClose }: { onClose: () => void }) => {
                                         inputMode="decimal" 
                                         placeholder="30" 
                                         className="w-full bg-transparent text-white text-xl font-bold outline-none placeholder:text-slate-700" 
-                                        value={rate} 
+                                        value={rate || ''} 
                                         onChange={e => setRate(e.target.value.replace(/[^0-9.,]/g, ''))}
                                     />
                                     <Percent size={14} className="text-slate-500"/>
@@ -137,7 +137,7 @@ export const CalculatorModal = ({ onClose }: { onClose: () => void }) => {
                                     inputMode="decimal" 
                                     placeholder={mode === 'MONTHLY' ? "1" : "30"} 
                                     className="w-full bg-transparent text-white text-xl font-bold outline-none placeholder:text-slate-700" 
-                                    value={duration} 
+                                    value={duration || ''} 
                                     onChange={e => setDuration(e.target.value.replace(/[^0-9.,]/g, ''))}
                                 />
                             </div>

@@ -31,7 +31,7 @@ export const ResetDataModal: React.FC<DangerModalProps> = ({ ui, closeModal, act
                             <KeyRound size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600"/>
                             <input 
                                 type="password" 
-                                value={ui.resetPasswordInput}
+                                value={ui.resetPasswordInput || ''}
                                 onChange={e => ui.setResetPasswordInput(e.target.value)}
                                 className="w-full bg-slate-950 border border-slate-800 rounded-xl py-4 pl-12 pr-4 text-white font-bold outline-none focus:border-rose-500 transition-colors"
                                 placeholder="Senha de acesso"
@@ -70,7 +70,7 @@ export const DeleteAccountModal: React.FC<DangerModalProps> = ({ ui, closeModal,
                     <label className="flex items-start gap-4 p-4 bg-slate-950 border border-slate-800 rounded-2xl cursor-pointer group hover:border-rose-500/50 transition-colors">
                         <input 
                             type="checkbox" 
-                            checked={ui.deleteAccountAgree}
+                            checked={!!ui.deleteAccountAgree}
                             onChange={e => ui.setDeleteAccountAgree(e.target.checked)}
                             className="w-5 h-5 mt-1 accent-rose-600 rounded"
                         />
@@ -85,7 +85,7 @@ export const DeleteAccountModal: React.FC<DangerModalProps> = ({ ui, closeModal,
                                 <label className="text-[10px] font-black uppercase text-slate-500 mb-2 block">Sua Senha:</label>
                                 <input 
                                     type="password" 
-                                    value={ui.resetPasswordInput}
+                                    value={ui.resetPasswordInput || ''}
                                     onChange={e => ui.setResetPasswordInput(e.target.value)}
                                     className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white font-bold text-sm outline-none focus:border-rose-500"
                                     placeholder="Senha atual"
@@ -95,7 +95,7 @@ export const DeleteAccountModal: React.FC<DangerModalProps> = ({ ui, closeModal,
                                 <label className="text-[10px] font-black uppercase text-slate-500 mb-2 block">Digite "DELETAR":</label>
                                 <input 
                                     type="text" 
-                                    value={ui.deleteAccountConfirm}
+                                    value={ui.deleteAccountConfirm || ''}
                                     onChange={e => ui.setDeleteAccountConfirm(e.target.value.toUpperCase())}
                                     className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white font-bold text-sm outline-none focus:border-rose-500"
                                     placeholder="Confirmação"

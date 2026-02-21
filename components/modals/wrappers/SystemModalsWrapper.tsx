@@ -141,7 +141,7 @@ export const SystemModalsWrapper = () => {
                            <input 
                                 type="checkbox" 
                                 id="refundCheck" 
-                                checked={ui.refundChecked} 
+                                checked={!!ui.refundChecked} 
                                 onChange={e => ui.setRefundChecked(e.target.checked)} 
                                 className="w-5 h-5 accent-emerald-500 rounded cursor-pointer" 
                            />

@@ -245,10 +245,10 @@ const InviteActivationView = ({ inviteData, form, setForm, onConfirm, isLoading,
         )}
 
         <div className="space-y-3">
-            <input type="text" className="w-full bg-slate-800/50 p-4 rounded-xl text-white outline-none border border-slate-700 text-sm font-bold" placeholder="Nome Completo" value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
-            <input type="email" className="w-full bg-slate-800/50 p-4 rounded-xl text-white outline-none border border-slate-700 text-sm font-bold" placeholder="Seu E-mail" value={form.email} onChange={e => setForm({...form, email: e.target.value})} />
-            <input type="text" className="w-full bg-slate-800/50 p-4 rounded-xl text-white outline-none border border-slate-700 text-sm font-bold" placeholder="CPF" value={form.document} onChange={e => setForm({...form, document: maskDocument(e.target.value)})} />
-            <input type="text" maxLength={4} className="w-full bg-slate-800/50 p-4 rounded-xl text-white outline-none border border-slate-700 text-sm font-bold" placeholder="Crie um PIN de 4 dígitos" value={form.accessCode} onChange={e => setForm({...form, accessCode: onlyDigits(e.target.value)})} />
+            <input type="text" className="w-full bg-slate-800/50 p-4 rounded-xl text-white outline-none border border-slate-700 text-sm font-bold" placeholder="Nome Completo" value={form.name || ''} onChange={e => setForm({...form, name: e.target.value})} />
+            <input type="email" className="w-full bg-slate-800/50 p-4 rounded-xl text-white outline-none border border-slate-700 text-sm font-bold" placeholder="Seu E-mail" value={form.email || ''} onChange={e => setForm({...form, email: e.target.value})} />
+            <input type="text" className="w-full bg-slate-800/50 p-4 rounded-xl text-white outline-none border border-slate-700 text-sm font-bold" placeholder="CPF" value={form.document || ''} onChange={e => setForm({...form, document: maskDocument(e.target.value)})} />
+            <input type="text" maxLength={4} className="w-full bg-slate-800/50 p-4 rounded-xl text-white outline-none border border-slate-700 text-sm font-bold" placeholder="Crie um PIN de 4 dígitos" value={form.accessCode || ''} onChange={e => setForm({...form, accessCode: onlyDigits(e.target.value)})} />
         </div>
 
         <button onClick={onConfirm} disabled={isLoading} className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-xs font-black uppercase flex items-center justify-center gap-2">
@@ -263,7 +263,7 @@ const LoginView = ({ loginUser, setLoginUser, loginPassword, setLoginPassword, s
         <div className="space-y-4 animate-in fade-in">
             <div className="bg-slate-800/50 p-2 rounded-2xl border border-slate-700 flex items-center gap-2 focus-within:border-blue-500 transition-colors">
                 <div className="p-3 bg-slate-800 rounded-xl"><User className="text-slate-400 w-5 h-5" /></div>
-                <input type="text" className="bg-transparent w-full text-white outline-none text-sm font-bold" placeholder="E-mail ou Usuário" value={loginUser} onChange={e => setLoginUser(e.target.value)} />
+                <input type="text" className="bg-transparent w-full text-white outline-none text-sm font-bold" placeholder="E-mail ou Usuário" value={loginUser || ''} onChange={e => setLoginUser(e.target.value)} />
             </div>
             <div className="bg-slate-800/50 p-2 rounded-2xl border border-slate-700 flex items-center gap-2 relative focus-within:border-blue-500 transition-colors">
                 <div className="p-3 bg-slate-800 rounded-xl"><KeyRound className="text-slate-400 w-5 h-5" /></div>
@@ -271,7 +271,7 @@ const LoginView = ({ loginUser, setLoginUser, loginPassword, setLoginPassword, s
                     type={showPassword ? "text" : "password"} 
                     className="bg-transparent w-full text-white outline-none text-sm font-bold pr-10" 
                     placeholder="Senha" 
-                    value={loginPassword} 
+                    value={loginPassword || ''} 
                     onChange={e => setLoginPassword(e.target.value)} 
                     onKeyDown={e => e.key === 'Enter' && submitLogin()} 
                 />
@@ -318,7 +318,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     const { inviteToken, inviteData, isProcessing: isProcessingInvite, cancelInvite } = useInviteFlow(showToast);
     const { form: memberForm, setForm: setMemberForm, handleActivate: handleActivateMember, errorText } = useMemberActivation(inviteData, submitTeamLogin, showToast, (l: any) => {});
     const { form: createForm, setForm: setCreateForm, handleCreate: handleCreateProfile } = useCreateProfile(setLoginUser, setIsCreatingProfile, showToast, (l: any) => {});
-    const { handleHelpSupport, handleRecovery } = useRecoveryAndSupport(setIsRecoveringPassword, showToast);
+    const { form: recoveryForm, setForm: setRecoveryForm, handleHelpSupport, handleRecovery } = useRecoveryAndSupport(setIsRecoveringPassword, showToast);
 
     const handleDemoMode = () => {
         localStorage.setItem('cm_session', JSON.stringify({ profileId: 'DEMO', ts: Date.now() }));
@@ -375,9 +375,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                         {isCreatingProfile && (
                             <div className="animate-in slide-in-from-right duration-300 space-y-4">
                                 <h3 className="text-center text-white font-black uppercase text-sm">Nova Conta</h3>
-                                <input type="text" placeholder="Seu Nome" className="w-full bg-slate-800 p-4 rounded-xl text-white outline-none" value={createForm.name} onChange={e => setCreateForm({...createForm, name: e.target.value})} />
-                                <input type="email" placeholder="E-mail" className="w-full bg-slate-800 p-4 rounded-xl text-white outline-none" value={createForm.email} onChange={e => setCreateForm({...createForm, email: e.target.value})} />
-                                <input type="password" placeholder="Senha" className="w-full bg-slate-800 p-4 rounded-xl text-white outline-none" value={createForm.password} onChange={e => setCreateForm({...createForm, password: e.target.value})} />
+                                <input type="text" placeholder="Seu Nome" className="w-full bg-slate-800 p-4 rounded-xl text-white outline-none" value={createForm.name || ''} onChange={e => setCreateForm({...createForm, name: e.target.value})} />
+                                <input type="email" placeholder="E-mail" className="w-full bg-slate-800 p-4 rounded-xl text-white outline-none" value={createForm.email || ''} onChange={e => setCreateForm({...createForm, email: e.target.value})} />
+                                <input type="password" placeholder="Senha" className="w-full bg-slate-800 p-4 rounded-xl text-white outline-none" value={createForm.password || ''} onChange={e => setCreateForm({...createForm, password: e.target.value})} />
                                 <button onClick={handleCreateProfile} className="w-full py-4 bg-blue-600 text-white rounded-xl font-black uppercase text-xs">Criar Perfil</button>
                                 <button onClick={() => setIsCreatingProfile(false)} className="w-full text-slate-500 text-[10px] uppercase font-bold">Voltar</button>
                             </div>
@@ -386,7 +386,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                         {isRecoveringPassword && (
                             <div className="animate-in slide-in-from-left duration-300 space-y-4">
                                 <h3 className="text-center text-white font-black uppercase text-sm">Recuperar</h3>
-                                <input type="email" placeholder="Seu e-mail cadastrado" className="w-full bg-slate-800 p-4 rounded-xl text-white outline-none" value={memberForm.email} onChange={e => setMemberForm({...memberForm, email: e.target.value})} />
+                                <input type="email" placeholder="Seu e-mail cadastrado" className="w-full bg-slate-800 p-4 rounded-xl text-white outline-none" value={recoveryForm.email || ''} onChange={e => setRecoveryForm({...recoveryForm, email: e.target.value})} />
                                 <button onClick={handleRecovery} className="w-full py-4 bg-blue-600 text-white rounded-xl font-black uppercase text-xs">Enviar E-mail</button>
                                 <button onClick={() => setIsRecoveringPassword(false)} className="w-full text-slate-500 text-[10px] uppercase font-bold">Voltar</button>
                             </div>

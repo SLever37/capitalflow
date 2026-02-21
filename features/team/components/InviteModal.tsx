@@ -55,7 +55,7 @@ export const InviteModal: React.FC<InviteModalProps> = ({
                 <input 
                     placeholder="Ex: Maria Souza" 
                     className="w-full bg-slate-950 border border-slate-800 p-4 rounded-xl text-white outline-none focus:border-blue-500 transition-colors text-sm font-bold" 
-                    value={form.name} 
+                    value={form.name || ''} 
                     onChange={e => setForm({...form, name: e.target.value})} 
                 />
             </div>
@@ -64,7 +64,7 @@ export const InviteModal: React.FC<InviteModalProps> = ({
                 <input 
                     placeholder="000.000.000-00" 
                     className="w-full bg-slate-950 border border-slate-800 p-4 rounded-xl text-white outline-none focus:border-blue-500 transition-colors text-sm font-bold" 
-                    value={form.cpf} 
+                    value={form.cpf || ''} 
                     onChange={e => setForm({...form, cpf: maskDocument(e.target.value)})} 
                 />
             </div>

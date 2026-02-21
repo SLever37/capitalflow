@@ -50,7 +50,7 @@ export const MemberEditorModal: React.FC<MemberEditorModalProps> = ({
                         <label className="text-[10px] font-black uppercase text-slate-500 ml-1 mb-1 block flex items-center gap-1"><ShieldCheck size={12}/> Função / Permissão</label>
                         <div className="relative group">
                             <select 
-                                value={role} 
+                                value={role || 'MEMBER'} 
                                 onChange={e => setRole(e.target.value)}
                                 className="w-full appearance-none bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 pr-10 text-white font-bold text-xs outline-none focus:border-blue-500 cursor-pointer"
                             >
@@ -65,7 +65,7 @@ export const MemberEditorModal: React.FC<MemberEditorModalProps> = ({
                         <label className="text-[10px] font-black uppercase text-slate-500 ml-1 mb-1 block flex items-center gap-1"><Layers size={12}/> Alocar na Equipe</label>
                         <div className="relative group">
                             <select 
-                                value={teamId} 
+                                value={teamId || ''} 
                                 onChange={e => setTeamId(e.target.value)}
                                 className="w-full appearance-none bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 pr-10 text-white font-bold text-xs outline-none focus:border-blue-500 cursor-pointer"
                             >

@@ -294,7 +294,7 @@ export const PaymentManagerModal: React.FC<PaymentManagerModalProps> = ({
                                                         <label className="text-[10px] font-black uppercase text-slate-500 block mb-1 flex items-center gap-1">
                                                             <CalendarClock size={12}/> Próximo Vencimento
                                                         </label>
-                                                        <input type="date" className="bg-transparent text-white font-bold text-sm outline-none w-full" value={manualDateStr} onChange={e => setManualDateStr(e.target.value)} />
+                                                        <input type="date" className="bg-transparent text-white font-bold text-sm outline-none w-full" value={manualDateStr || ''} onChange={e => setManualDateStr(e.target.value)} />
                                                     </div>
                                                 </div>
                                             )}
@@ -321,7 +321,7 @@ export const PaymentManagerModal: React.FC<PaymentManagerModalProps> = ({
                                                     <label className="text-[10px] font-black uppercase text-slate-500 mb-1 block">Valor Total do Pagamento</label>
                                                     <div className="flex items-center gap-2">
                                                         <span className="font-black text-xl text-blue-500">R$</span>
-                                                        <input type="text" inputMode="decimal" value={avAmount} onChange={e => setAvAmount(e.target.value.replace(/[^0-9.,]/g, ''))} className="w-full bg-transparent text-white text-2xl font-black outline-none placeholder:text-slate-800" placeholder="0,00" autoFocus />
+                                                        <input type="text" inputMode="decimal" value={avAmount || ''} onChange={e => setAvAmount(e.target.value.replace(/[^0-9.,]/g, ''))} className="w-full bg-transparent text-white text-2xl font-black outline-none placeholder:text-slate-800" placeholder="0,00" autoFocus />
                                                     </div>
                                                 </div>
 
@@ -329,7 +329,7 @@ export const PaymentManagerModal: React.FC<PaymentManagerModalProps> = ({
                                                     <label className="text-[10px] font-black uppercase text-slate-500 block mb-1 flex items-center gap-1">
                                                         <CalendarClock size={12}/> Próximo Vencimento
                                                     </label>
-                                                    <input type="date" className="bg-transparent text-white font-bold text-sm outline-none w-full" value={manualDateStr} onChange={e => setManualDateStr(e.target.value)} />
+                                                    <input type="date" className="bg-transparent text-white font-bold text-sm outline-none w-full" value={manualDateStr || ''} onChange={e => setManualDateStr(e.target.value)} />
                                                 </div>
                                             </div>
                                         )}
@@ -356,7 +356,7 @@ export const PaymentManagerModal: React.FC<PaymentManagerModalProps> = ({
                                                         <label className="text-[10px] font-black uppercase text-slate-500 mb-1 block">Valor Pago (Parcial)</label>
                                                         <div className="flex items-center gap-2">
                                                             <span className="font-black text-xl text-purple-500">R$</span>
-                                                            <input type="text" inputMode="decimal" value={avAmount} onChange={e => setAvAmount(e.target.value.replace(/[^0-9.,]/g, ''))} className="w-full bg-transparent text-white text-2xl font-black outline-none placeholder:text-slate-800" placeholder="0,00" autoFocus />
+                                                            <input type="text" inputMode="decimal" value={avAmount || ''} onChange={e => setAvAmount(e.target.value.replace(/[^0-9.,]/g, ''))} className="w-full bg-transparent text-white text-2xl font-black outline-none placeholder:text-slate-800" placeholder="0,00" autoFocus />
                                                         </div>
                                                     </div>
 

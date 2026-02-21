@@ -51,7 +51,7 @@ export const MasterEditModal: React.FC<MasterEditModalProps> = ({ user, onClose,
                     <div>
                         <p className="text-[10px] font-black uppercase text-slate-500">Nível de Acesso</p>
                         <select 
-                            value={formData.access_level}
+                            value={formData.access_level || 2}
                             onChange={e => setFormData({...formData, access_level: Number(e.target.value)})}
                             className="bg-transparent text-white font-bold outline-none text-sm cursor-pointer hover:text-blue-400 transition-colors"
                         >
@@ -67,7 +67,7 @@ export const MasterEditModal: React.FC<MasterEditModalProps> = ({ user, onClose,
                         <input 
                             type="text" 
                             className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm font-bold outline-none focus:border-blue-500 transition-colors"
-                            value={formData.nome_operador}
+                            value={formData.nome_operador || ''}
                             onChange={e => setFormData({...formData, nome_operador: e.target.value})}
                         />
                     </div>
@@ -76,7 +76,7 @@ export const MasterEditModal: React.FC<MasterEditModalProps> = ({ user, onClose,
                         <input 
                             type="text" 
                             className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm font-bold outline-none focus:border-blue-500 transition-colors"
-                            value={formData.nome_empresa}
+                            value={formData.nome_empresa || ''}
                             onChange={e => setFormData({...formData, nome_empresa: e.target.value})}
                         />
                     </div>
@@ -87,7 +87,7 @@ export const MasterEditModal: React.FC<MasterEditModalProps> = ({ user, onClose,
                     <input 
                         type="email" 
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm font-bold outline-none focus:border-blue-500 transition-colors"
-                        value={formData.email}
+                        value={formData.email || ''}
                         onChange={e => setFormData({...formData, email: e.target.value})}
                     />
                 </div>
@@ -97,7 +97,7 @@ export const MasterEditModal: React.FC<MasterEditModalProps> = ({ user, onClose,
                     <input 
                         type="text" 
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm font-bold outline-none focus:border-blue-500 transition-colors"
-                        value={formData.pix_key}
+                        value={formData.pix_key || ''}
                         onChange={e => setFormData({...formData, pix_key: e.target.value})}
                     />
                 </div>
@@ -108,7 +108,7 @@ export const MasterEditModal: React.FC<MasterEditModalProps> = ({ user, onClose,
                         type="text" 
                         className="w-full bg-slate-950 border border-rose-900/30 rounded-xl p-3 text-rose-200 text-sm font-bold outline-none focus:border-rose-500 transition-colors placeholder:text-rose-900/50"
                         placeholder="Digite nova senha para forçar alteração..."
-                        value={formData.new_password}
+                        value={formData.new_password || ''}
                         onChange={e => setFormData({...formData, new_password: e.target.value})}
                     />
                     <p className="text-[9px] text-slate-500 mt-1 ml-1">Deixe em branco para não alterar a senha atual do usuário.</p>

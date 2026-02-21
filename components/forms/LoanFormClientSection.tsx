@@ -23,7 +23,7 @@ export const LoanFormClientSection: React.FC<LoanFormClientSectionProps> = ({
         {/* Dropdown Elegante */}
         <div className="relative group">
             <select 
-                value={formData.clientId} 
+                value={formData.clientId || ''} 
                 onChange={e => handleClientSelect(e.target.value)} 
                 className="w-full appearance-none bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 pr-10 text-white outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all text-sm cursor-pointer hover:bg-slate-900"
             >
@@ -33,12 +33,12 @@ export const LoanFormClientSection: React.FC<LoanFormClientSectionProps> = ({
             <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none group-hover:text-blue-500 transition-colors" size={18} />
         </div>
 
-        <input required type="text" value={formData.debtorName} onChange={e => setFormData({...formData, debtorName: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 text-white text-sm focus:border-blue-500 outline-none" placeholder="Nome Completo" />
+        <input required type="text" value={formData.debtorName || ''} onChange={e => setFormData({...formData, debtorName: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 text-white text-sm focus:border-blue-500 outline-none" placeholder="Nome Completo" />
         <div className="flex gap-2">
-          <input required type="tel" value={formData.debtorPhone} onChange={e => setFormData({...formData, debtorPhone: maskPhone(e.target.value)})} className="flex-1 bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 text-white text-sm focus:border-blue-500 outline-none" placeholder="WhatsApp" />
+          <input required type="tel" value={formData.debtorPhone || ''} onChange={e => setFormData({...formData, debtorPhone: maskPhone(e.target.value)})} className="flex-1 bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 text-white text-sm focus:border-blue-500 outline-none" placeholder="WhatsApp" />
           <button type="button" onClick={handlePickContact} className="px-4 bg-slate-950 border border-slate-800 rounded-2xl text-slate-400 hover:text-emerald-500"><Search className="w-5 h-5" /></button>
         </div>
-        <input type="text" value={formData.debtorDocument} onChange={e => setFormData({...formData, debtorDocument: maskDocument(e.target.value)})} className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 text-white text-sm focus:border-blue-500 outline-none" placeholder="CPF/CNPJ" />
+        <input type="text" value={formData.debtorDocument || ''} onChange={e => setFormData({...formData, debtorDocument: maskDocument(e.target.value)})} className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 text-white text-sm focus:border-blue-500 outline-none" placeholder="CPF/CNPJ" />
       </div>
     </div>
   );

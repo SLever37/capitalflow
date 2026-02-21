@@ -52,7 +52,7 @@ export const LoanFormFinancialSection: React.FC<LoanFormFinancialSectionProps> =
                     <label className="text-[9px] text-purple-400 font-black uppercase ml-2">Tipo de Diária</label>
                     <div className="relative group">
                         <select 
-                            value={formData.billingCycle} 
+                            value={formData.billingCycle || ''} 
                             onChange={(e) => setFormData({...formData, billingCycle: e.target.value as LoanBillingModality})} 
                             className="w-full appearance-none bg-slate-900 border border-purple-500/30 rounded-2xl px-4 py-3 pr-10 text-white text-xs outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/20 transition-all cursor-pointer"
                         >
@@ -69,7 +69,7 @@ export const LoanFormFinancialSection: React.FC<LoanFormFinancialSectionProps> =
                         <input 
                             type="number" 
                             min="1"
-                            value={fixedDuration} 
+                            value={fixedDuration || ''} 
                             onChange={(e) => setFixedDuration(e.target.value)} 
                             className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-white font-bold text-sm"
                             placeholder="Ex: 30"
@@ -101,25 +101,25 @@ export const LoanFormFinancialSection: React.FC<LoanFormFinancialSectionProps> =
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
             <label className="text-[9px] text-slate-500 font-black uppercase ml-2">Principal</label>
-            <input required type="number" step="0.01" value={formData.principal} onChange={e => setFormData({...formData,principal: e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-white font-bold" />
+            <input required type="number" step="0.01" value={formData.principal || ''} onChange={e => setFormData({...formData,principal: e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-white font-bold" />
           </div>
           <div className="space-y-1">
             <label className="text-[9px] text-slate-500 font-black uppercase ml-2">{formData.billingCycle === 'MONTHLY' ? 'Juros (%) Mensal' : 'Taxa (%) Mensal'}</label>
-            <input required type="number" step="0.01" value={formData.interestRate} onChange={e => setFormData({...formData, interestRate: e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-white font-bold" />
+            <input required type="number" step="0.01" value={formData.interestRate || ''} onChange={e => setFormData({...formData, interestRate: e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-white font-bold" />
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
               <label className="text-[9px] text-slate-500 font-black uppercase ml-2">Data Empréstimo</label>
-              <input required type="date" value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-white text-sm" />
+              <input required type="date" value={formData.startDate || ''} onChange={e => setFormData({...formData, startDate: e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-white text-sm" />
           </div>
           <div className="space-y-1">
               <label className="text-[9px] text-blue-400 font-black uppercase ml-2 flex items-center gap-1"><CalendarDays size={10}/> Vencimento (1º)</label>
               <input 
                   required 
                   type="date" 
-                  value={manualFirstDueDate} 
+                  value={manualFirstDueDate || ''} 
                   onChange={e => setManualFirstDueDate(e.target.value)} 
                   className="w-full bg-slate-950 border border-blue-500/30 rounded-2xl px-5 py-4 text-white font-bold text-sm focus:border-blue-500 outline-none" 
               />
@@ -129,11 +129,11 @@ export const LoanFormFinancialSection: React.FC<LoanFormFinancialSectionProps> =
         <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
                 <label className="text-[9px] text-slate-500 font-black uppercase ml-2">Multa (%)</label>
-                <input type="number" step="0.1" value={formData.finePercent} onChange={e => setFormData({...formData, finePercent: e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-white text-sm" />
+                <input type="number" step="0.1" value={formData.finePercent || ''} onChange={e => setFormData({...formData, finePercent: e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-white text-sm" />
             </div>
             <div className="space-y-1">
                 <label className="text-[9px] text-slate-500 font-black uppercase ml-2">Mora Diária (%)</label>
-                <input type="number" step="0.1" value={formData.dailyInterestPercent} onChange={e => setFormData({...formData, dailyInterestPercent: e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-white text-sm" />
+                <input type="number" step="0.1" value={formData.dailyInterestPercent || ''} onChange={e => setFormData({...formData, dailyInterestPercent: e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-white text-sm" />
             </div>
         </div>
 
@@ -141,7 +141,7 @@ export const LoanFormFinancialSection: React.FC<LoanFormFinancialSectionProps> =
             <label className="text-[9px] text-slate-500 font-black uppercase ml-2">Fonte de Capital</label>
             <div className="relative group">
                 <select 
-                    value={formData.sourceId} 
+                    value={formData.sourceId || ''} 
                     onChange={e => setFormData({...formData, sourceId: e.target.value})} 
                     className="w-full appearance-none bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 pr-10 text-white text-sm outline-none focus:border-purple-500 transition-all cursor-pointer"
                 >

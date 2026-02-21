@@ -172,7 +172,34 @@ export const paymentsService = {
       throw new Error('Falha na persistência: ' + msg);
     }
 
+    // =========================
+    // 4) ATUALIZAÇÃO DE SALDOS (LUCRO E CAPITAL)
+    //    Garante que o Dashboard reflita os valores imediatamente.
+    // =========================
+    let profitDelta = 0;
+    let principalDelta = 0;
 
+    if (paymentType === 'FULL') {
+        profitDelta = (Number(calculations?.interest) || 0) + finalLateFee;
+        principalDelta = Number(calculations?.principal) || 0;
+    } else if (paymentType === 'RENEW_AV') {
+        principalDelta = amountToPay;
+    } else if (paymentType === 'PARTIAL_INTEREST' || paymentType === 'RENEW_INTEREST' || paymentType === 'CUSTOM') {
+        profitDelta = amountToPay;
+    }
+
+    if (profitDelta > 0 || principalDelta > 0) {
+        const { error: balanceError } = await supabase.rpc('rpc_adjust_balances', {
+            p_profile_id: ownerId,
+            p_profit_amount: profitDelta,
+            p_principal_amount: principalDelta
+        });
+
+        if (balanceError) {
+            console.error('[PAYMENT] Erro ao atualizar saldos:', balanceError);
+            // Não interrompe o fluxo principal, pois o pagamento foi registrado
+        }
+    }
 
     return { amountToPay, paymentType };
   },

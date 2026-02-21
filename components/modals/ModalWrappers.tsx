@@ -45,7 +45,7 @@ export const ConfirmationModalWrapper = () => {
                <p className="text-slate-400 text-sm">{ui.confirmation.message || 'Essa ação não pode ser desfeita facilmente.'}</p>
                {ui.confirmation.showRefundOption && (
                    <div className="flex items-center justify-center gap-2 bg-slate-950 p-3 rounded-xl border border-slate-800">
-                       <input type="checkbox" id="refundCheck" checked={ui.refundChecked} onChange={e => ui.setRefundChecked(e.target.checked)} className="w-5 h-5 accent-emerald-500" />
+                       <input type="checkbox" id="refundCheck" checked={!!ui.refundChecked} onChange={e => ui.setRefundChecked(e.target.checked)} className="w-5 h-5 accent-emerald-500" />
                        <label htmlFor="refundCheck" className="text-sm text-slate-300 font-bold select-none">Devolver capital para a Fonte?</label>
                    </div>
                )}
@@ -153,7 +153,7 @@ export const NoteWrapper = () => {
     return (
        <Modal onClose={closeModal} title="Anotações do Contrato">
            <div className="space-y-4">
-               <textarea className="w-full h-40 bg-slate-950 p-4 rounded-xl text-white outline-none border border-slate-800 resize-none" placeholder="Escreva observações aqui..." value={ui.noteText} onChange={e => ui.setNoteText(e.target.value)}></textarea>
+               <textarea className="w-full h-40 bg-slate-950 p-4 rounded-xl text-white outline-none border border-slate-800 resize-none" placeholder="Escreva observações aqui..." value={ui.noteText || ''} onChange={e => ui.setNoteText(e.target.value)}></textarea>
                <button onClick={loanCtrl.handleSaveNote} className="w-full py-4 bg-blue-600 text-white font-bold rounded-xl uppercase">Salvar Anotação</button>
            </div>
        </Modal>

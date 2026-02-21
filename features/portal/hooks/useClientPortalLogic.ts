@@ -60,14 +60,9 @@ export const useClientPortalLogic = (initialToken: string) => {
             // Para simplificar e manter segurança, usamos o fetchDetails que já pega parcelas
             
             // A solução mais robusta é buscar o contrato completo
-            const { data: fullLoanData, error } = await import('../../../lib/supabase').then(m => 
-                m.supabase.from('contratos')
-                .select('*, parcelas(*), sinalizacoes_pagamento(*)')
-                .eq('id', contractHeader.id)
-                .single()
-            );
+            const fullLoanData = await portalService.fetchFullLoanById(contractHeader.id);
             
-            if (error || !fullLoanData) return null;
+            if (!fullLoanData) return null;
 
             return mapLoanFromDB(
                 fullLoanData, 

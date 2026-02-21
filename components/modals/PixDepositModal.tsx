@@ -100,7 +100,7 @@ export default function PixDepositModal({ isOpen, onClose, sourceId }: PixDeposi
                 <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">Valor</label>
                 <input
                   type="text"
-                  value={amount}
+                  value={amount || ''}
                   onChange={(e) => setAmount(e.target.value)}
                   className="w-full bg-slate-950 p-3 rounded-xl text-white font-bold outline-none border border-slate-800 focus:border-blue-500 transition-colors"
                   placeholder="10.00"
@@ -111,7 +111,7 @@ export default function PixDepositModal({ isOpen, onClose, sourceId }: PixDeposi
                 <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">Nome</label>
                 <input
                   type="text"
-                  value={payerName}
+                  value={payerName || ''}
                   onChange={(e) => setPayerName(e.target.value)}
                   className="w-full bg-slate-950 p-3 rounded-xl text-white font-bold outline-none border border-slate-800 focus:border-blue-500 transition-colors"
                   placeholder="Cliente"
@@ -122,7 +122,7 @@ export default function PixDepositModal({ isOpen, onClose, sourceId }: PixDeposi
                 <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">E-mail</label>
                 <input
                   type="email"
-                  value={payerEmail}
+                  value={payerEmail || ''}
                   onChange={(e) => setPayerEmail(e.target.value)}
                   className="w-full bg-slate-950 p-3 rounded-xl text-white font-bold outline-none border border-slate-800 focus:border-blue-500 transition-colors"
                   placeholder="cliente@email.com"
@@ -170,7 +170,7 @@ export default function PixDepositModal({ isOpen, onClose, sourceId }: PixDeposi
             <div className="space-y-2">
               <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">Código Copia e Cola</label>
               <textarea
-                value={result.qr_code}
+                value={result.qr_code || ''}
                 readOnly
                 className="w-full bg-slate-950 p-3 rounded-xl text-white text-[11px] font-mono outline-none border border-slate-800"
                 rows={5}

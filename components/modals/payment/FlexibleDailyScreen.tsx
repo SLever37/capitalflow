@@ -85,7 +85,7 @@ export const FlexibleDailyScreen = ({
                         inputMode="decimal"
                         className="w-full bg-transparent text-3xl font-black text-white outline-none placeholder:text-slate-700"
                         placeholder="0,00"
-                        value={amount}
+                        value={amount || ''}
                         onChange={e => setAmount(e.target.value.replace(/[^0-9.,]/g, ''))}
                         autoFocus
                     />
@@ -134,7 +134,7 @@ export const FlexibleDailyScreen = ({
                     <input 
                         type="date" 
                         className="bg-transparent text-white font-bold text-sm outline-none w-full"
-                        value={manualDateStr}
+                        value={manualDateStr || ''}
                         onChange={e => setManualDateStr(e.target.value)}
                     />
                 </div>

@@ -65,7 +65,7 @@ export const TeamEditorModal: React.FC<TeamEditorModalProps> = ({
                     <label className="text-[10px] font-black uppercase text-slate-500 ml-1 mb-1 block">Nome da Equipe</label>
                     <input 
                         className="w-full bg-slate-950 border border-slate-800 p-4 rounded-xl text-white outline-none focus:border-blue-500 transition-colors text-sm font-bold"
-                        value={name}
+                        value={name || ''}
                         onChange={e => setName(e.target.value)}
                         placeholder="Ex: Time Comercial"
                         autoFocus

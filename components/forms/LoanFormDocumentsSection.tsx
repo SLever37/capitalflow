@@ -24,7 +24,7 @@ export const LoanFormDocumentsSection: React.FC<LoanFormDocumentsSectionProps> =
     <div className="space-y-4 sm:space-y-6">
       <h3 className="text-[10px] font-black uppercase tracking-widest text-emerald-500 flex items-center gap-2"><ShieldCheck className="w-4 h-4" /> Garantias e Docs</h3>
       <div className="space-y-4">
-        <textarea placeholder="Descrição da garantia..." value={formData.guaranteeDescription} onChange={e => setFormData({...formData, guaranteeDescription: e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-white min-h-[100px] text-xs resize-none" />
+        <textarea placeholder="Descrição da garantia..." value={formData.guaranteeDescription || ''} onChange={e => setFormData({...formData, guaranteeDescription: e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-5 py-4 text-white min-h-[100px] text-xs resize-none" />
         
         {/* Upload Section */}
         <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4">

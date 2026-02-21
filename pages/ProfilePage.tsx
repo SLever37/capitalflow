@@ -146,7 +146,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                             <div className="space-y-4">
                                 <div>
                                     <label className="text-[10px] font-black text-slate-500 uppercase ml-1">Nome de Acesso (Username)</label>
-                                    <input type="text" value={profileEditForm.name} onChange={e => setProfileEditForm({...profileEditForm, name: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:border-blue-500" />
+                                    <input type="text" value={profileEditForm.name || ''} onChange={e => setProfileEditForm({...profileEditForm, name: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:border-blue-500" />
                                 </div>
                                 <div>
                                     <label className="text-[10px] font-black text-slate-500 uppercase ml-1 flex items-center gap-1"><Mail size={12}/> E-mail</label>
@@ -154,11 +154,11 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                                 </div>
                                 <div>
                                     <label className="text-[10px] font-black text-slate-500 uppercase ml-1">Nome do Negócio</label>
-                                    <input type="text" value={profileEditForm.businessName} onChange={e => setProfileEditForm({...profileEditForm, businessName: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:border-blue-500" />
+                                    <input type="text" value={profileEditForm.businessName || ''} onChange={e => setProfileEditForm({...profileEditForm, businessName: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:border-blue-500" />
                                 </div>
                                 <div>
                                     <label className="text-[10px] font-black text-slate-500 uppercase ml-1 flex items-center gap-1"><CreditCard size={12}/> Chave PIX Padrão</label>
-                                    <input type="text" value={profileEditForm.pixKey} onChange={e => setProfileEditForm({...profileEditForm, pixKey: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-emerald-400 font-bold outline-none focus:border-emerald-500" placeholder="CPF, Email ou Telefone" />
+                                    <input type="text" value={profileEditForm.pixKey || ''} onChange={e => setProfileEditForm({...profileEditForm, pixKey: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-emerald-400 font-bold outline-none focus:border-emerald-500" placeholder="CPF, Email ou Telefone" />
                                 </div>
                             </div>
                             
@@ -173,20 +173,20 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                                 </div>
                                 <div>
                                     <label className="text-[10px] font-black text-slate-500 uppercase ml-1 flex items-center gap-1"><Phone size={12}/> WhatsApp de Contato</label>
-                                    <input type="text" value={profileEditForm.phone} onChange={e => setProfileEditForm({...profileEditForm, phone: maskPhone(e.target.value)})} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:border-blue-500" />
+                                    <input type="text" value={profileEditForm.phone || ''} onChange={e => setProfileEditForm({...profileEditForm, phone: maskPhone(e.target.value)})} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:border-blue-500" />
                                 </div>
                                 <div>
                                     <label className="text-[10px] font-black text-slate-500 uppercase ml-1 flex items-center gap-1"><MapPin size={12}/> Endereço Base</label>
-                                    <input type="text" value={profileEditForm.address} onChange={e => setProfileEditForm({...profileEditForm, address: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:border-blue-500" placeholder="Rua, Número, Bairro" />
+                                    <input type="text" value={profileEditForm.address || ''} onChange={e => setProfileEditForm({...profileEditForm, address: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:border-blue-500" placeholder="Rua, Número, Bairro" />
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="text-[10px] font-black text-slate-500 uppercase ml-1">Cidade</label>
-                                        <input type="text" value={profileEditForm.city} onChange={e => setProfileEditForm({...profileEditForm, city: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:border-blue-500" />
+                                        <input type="text" value={profileEditForm.city || ''} onChange={e => setProfileEditForm({...profileEditForm, city: e.target.value})} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:border-blue-500" />
                                     </div>
                                     <div>
                                         <label className="text-[10px] font-black text-slate-500 uppercase ml-1">Estado (UF)</label>
-                                        <input type="text" value={profileEditForm.state} onChange={e => setProfileEditForm({...profileEditForm, state: e.target.value.toUpperCase()})} maxLength={2} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:border-blue-500" />
+                                        <input type="text" value={profileEditForm.state || ''} onChange={e => setProfileEditForm({...profileEditForm, state: e.target.value.toUpperCase()})} maxLength={2} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:border-blue-500" />
                                     </div>
                                 </div>
                             </div>
@@ -197,7 +197,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                             <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
                                 <div>
                                     <label className="text-[10px] font-black text-slate-500 uppercase block mb-1">Logo URL (Opcional)</label>
-                                    <input type="text" value={profileEditForm.logoUrl} onChange={e => setProfileEditForm({...profileEditForm, logoUrl: e.target.value})} className="w-full bg-slate-900 border border-slate-800 rounded-lg p-3 text-xs text-white" placeholder="https://..." />
+                                    <input type="text" value={profileEditForm.logoUrl || ''} onChange={e => setProfileEditForm({...profileEditForm, logoUrl: e.target.value})} className="w-full bg-slate-900 border border-slate-800 rounded-lg p-3 text-xs text-white" placeholder="https://..." />
                                 </div>
                             </div>
                         </div>
@@ -215,26 +215,26 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
                                 <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">Juros Padrão (%)</label>
-                                <input type="number" value={profileEditForm.defaultInterestRate} onChange={e => setProfileEditForm({...profileEditForm, defaultInterestRate: parseFloat(e.target.value)})} className="w-full bg-transparent text-2xl font-black text-emerald-400 outline-none" />
+                                <input type="number" value={profileEditForm.defaultInterestRate || ''} onChange={e => setProfileEditForm({...profileEditForm, defaultInterestRate: parseFloat(e.target.value)})} className="w-full bg-transparent text-2xl font-black text-emerald-400 outline-none" />
                             </div>
                             <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
                                 <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">Multa Padrão (%)</label>
-                                <input type="number" value={profileEditForm.defaultFinePercent} onChange={e => setProfileEditForm({...profileEditForm, defaultFinePercent: parseFloat(e.target.value)})} className="w-full bg-transparent text-2xl font-black text-emerald-400 outline-none" />
+                                <input type="number" value={profileEditForm.defaultFinePercent || ''} onChange={e => setProfileEditForm({...profileEditForm, defaultFinePercent: parseFloat(e.target.value)})} className="w-full bg-transparent text-2xl font-black text-emerald-400 outline-none" />
                             </div>
                             <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
                                 <label className="text-[10px] font-black text-slate-500 uppercase block mb-2">Mora Diária (%)</label>
-                                <input type="number" value={profileEditForm.defaultDailyInterestPercent} onChange={e => setProfileEditForm({...profileEditForm, defaultDailyInterestPercent: parseFloat(e.target.value)})} className="w-full bg-transparent text-2xl font-black text-emerald-400 outline-none" />
+                                <input type="number" value={profileEditForm.defaultDailyInterestPercent || ''} onChange={e => setProfileEditForm({...profileEditForm, defaultDailyInterestPercent: parseFloat(e.target.value)})} className="w-full bg-transparent text-2xl font-black text-emerald-400 outline-none" />
                             </div>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-800">
                             <div>
                                 <label className="text-[10px] font-black text-slate-500 uppercase ml-1 block mb-2">Meta de Capital (R$)</label>
-                                <input type="number" value={profileEditForm.targetCapital} onChange={e => setProfileEditForm({...profileEditForm, targetCapital: parseFloat(e.target.value)})} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:border-emerald-500" />
+                                <input type="number" value={profileEditForm.targetCapital || ''} onChange={e => setProfileEditForm({...profileEditForm, targetCapital: parseFloat(e.target.value)})} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:border-emerald-500" />
                             </div>
                             <div>
                                 <label className="text-[10px] font-black text-slate-500 uppercase ml-1 block mb-2">Meta de Lucro (R$)</label>
-                                <input type="number" value={profileEditForm.targetProfit} onChange={e => setProfileEditForm({...profileEditForm, targetProfit: parseFloat(e.target.value)})} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:border-emerald-500" />
+                                <input type="number" value={profileEditForm.targetProfit || ''} onChange={e => setProfileEditForm({...profileEditForm, targetProfit: parseFloat(e.target.value)})} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:border-emerald-500" />
                             </div>
                         </div>
                     </div>

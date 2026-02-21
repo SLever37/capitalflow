@@ -128,7 +128,7 @@ export const NewAporteModal: React.FC<Props> = ({
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3">
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Valor do Aporte</p>
             <input
-              value={amount}
+              value={amount || ''}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="Ex: 1000 ou 1000,50"
               className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold outline-none focus:border-blue-600"
@@ -143,7 +143,7 @@ export const NewAporteModal: React.FC<Props> = ({
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Fonte (Carteira de Origem)</p>
             <div className="relative group">
                 <select
-                  value={sourceId}
+                  value={sourceId || ''}
                   onChange={(e) => setSourceId(e.target.value)}
                   className="w-full appearance-none bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 pr-10 text-white font-bold outline-none focus:border-blue-600 cursor-pointer"
                 >
@@ -163,7 +163,7 @@ export const NewAporteModal: React.FC<Props> = ({
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Aplicar em qual parcela?</p>
             <div className="relative group">
                 <select
-                  value={installmentId}
+                  value={installmentId || ''}
                   onChange={(e) => setInstallmentId(e.target.value)}
                   className="w-full appearance-none bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 pr-10 text-white font-bold outline-none focus:border-blue-600 cursor-pointer"
                 >
@@ -190,7 +190,7 @@ export const NewAporteModal: React.FC<Props> = ({
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3">
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Observações</p>
             <input
-              value={notes}
+              value={notes || ''}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Ex: Renovação, cliente pegou mais R$..."
               className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold outline-none focus:border-blue-600"

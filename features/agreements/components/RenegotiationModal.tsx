@@ -124,7 +124,7 @@ export const RenegotiationModal: React.FC<RenegotiationModalProps> = ({ loan, ac
 
                         <div>
                             <label className="text-[10px] uppercase font-bold text-slate-500">1º Vencimento</label>
-                            <input type="date" value={firstDueDate} onChange={e => setFirstDueDate(e.target.value)} className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none" />
+                            <input type="date" value={firstDueDate || ''} onChange={e => setFirstDueDate(e.target.value)} className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none" />
                         </div>
 
                         <button onClick={handleSimulate} className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black uppercase text-xs shadow-lg hover:bg-blue-500 transition-all flex items-center justify-center gap-2">

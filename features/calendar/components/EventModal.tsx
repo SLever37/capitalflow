@@ -76,7 +76,7 @@ export const EventModal: React.FC<EventModalProps> = ({ onClose, onSave, initial
               type="text" 
               placeholder="O que precisa ser feito?" 
               className="w-full bg-slate-950/50 border border-slate-800 rounded-2xl px-4 py-3 text-lg font-bold text-white outline-none focus:border-blue-500 transition-colors placeholder:text-slate-600"
-              value={title}
+              value={title || ''}
               onChange={e => setTitle(e.target.value)}
               autoFocus
             />
@@ -89,7 +89,7 @@ export const EventModal: React.FC<EventModalProps> = ({ onClose, onSave, initial
                 <input 
                     type="date" 
                     className="bg-transparent text-white text-xs font-bold outline-none w-full appearance-none relative z-10"
-                    value={date}
+                    value={date || ''}
                     onChange={e => setDate(e.target.value)}
                 />
                 <Calendar size={14} className="absolute right-3 top-3 text-slate-600 pointer-events-none"/>
@@ -99,7 +99,7 @@ export const EventModal: React.FC<EventModalProps> = ({ onClose, onSave, initial
                 <input 
                     type="time" 
                     className="bg-transparent text-white text-xs font-bold outline-none w-full appearance-none relative z-10"
-                    value={time}
+                    value={time || ''}
                     onChange={e => setTime(e.target.value)}
                 />
                 <Clock size={14} className="absolute right-3 top-3 text-slate-600 pointer-events-none"/>
@@ -109,7 +109,7 @@ export const EventModal: React.FC<EventModalProps> = ({ onClose, onSave, initial
                 <label className="text-[9px] font-black uppercase text-slate-500 mb-1 ml-1">Prioridade</label>
                 <select 
                     className="bg-transparent text-white text-xs font-bold outline-none w-full appearance-none relative z-10"
-                    value={priority}
+                    value={priority || 'MEDIUM'}
                     onChange={e => setPriority(e.target.value as any)}
                 >
                     <option value="LOW">Baixa</option>
@@ -123,7 +123,7 @@ export const EventModal: React.FC<EventModalProps> = ({ onClose, onSave, initial
                 <label className="text-[9px] font-black uppercase text-slate-500 mb-1 ml-1">Tipo</label>
                 <select 
                     className="bg-transparent text-white text-xs font-bold outline-none w-full appearance-none relative z-10"
-                    value={type}
+                    value={type || 'TASK'}
                     onChange={e => setType(e.target.value as any)}
                 >
                     <option value="TASK">Tarefa</option>
@@ -139,7 +139,7 @@ export const EventModal: React.FC<EventModalProps> = ({ onClose, onSave, initial
             <textarea 
                 placeholder="Detalhes adicionais..." 
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white text-xs leading-relaxed h-24 resize-none outline-none focus:border-blue-500 transition-colors"
-                value={description}
+                value={description || ''}
                 onChange={e => setDescription(e.target.value)}
             />
             <AlignLeft size={14} className="absolute right-3 top-3 text-slate-600 pointer-events-none group-focus-within:text-blue-500 transition-colors"/>
