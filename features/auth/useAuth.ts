@@ -22,19 +22,19 @@ const resolveSmartName = (p: any): string => {
     return ['usuário', 'usuario', 'user', 'operador', 'admin', 'gestor', 'undefined', 'null', ''].includes(clean);
   };
 
-  const display = asString(p.nome_exibicao);
+  const display = asString(p.nome_exibicao || p.display_name);
   if (display && !isGeneric(display)) return display;
 
-  const operator = asString(p.nome_operador);
+  const operator = asString(p.nome_operador || p.name || p.nome);
   if (operator && !isGeneric(operator)) return operator;
 
-  const business = asString(p.nome_empresa);
+  const business = asString(p.nome_empresa || p.business_name);
   if (business && !isGeneric(business)) return business;
 
-  const full = asString(p.nome_completo);
+  const full = asString(p.nome_completo || p.full_name);
   if (full && !isGeneric(full)) return full.split(' ')[0];
 
-  const email = asString(p.usuario_email || p.email);
+  const email = asString(p.usuario_email || p.email || p.auth_email);
   if (email && email.includes('@')) {
     const prefix = email.split('@')[0];
     return prefix.charAt(0).toUpperCase() + prefix.slice(1);
@@ -187,8 +187,19 @@ export const useAuth = () => {
 
   const handleLoginSuccess = (profile: any, showToast: any) => {
     const profileId = profile.id;
-    const profileName = resolveSmartName(profile);
-    const profileEmail = asString(profile.usuario_email || profile.email || 'equipe@sistema');
+    let profileName = resolveSmartName(profile);
+    let profileEmail = asString(profile.usuario_email || profile.email || profile.auth_email);
+
+    // Fallback inteligente usando o input de login
+    if (!profileEmail && loginUser.includes('@')) {
+      profileEmail = loginUser;
+    }
+    if (!profileEmail) profileEmail = 'equipe@sistema';
+
+    // Se resolveSmartName retornou 'Gestor' (genérico) e o login foi via username, usa o username
+    if (profileName === 'Gestor' && loginUser && !loginUser.includes('@')) {
+      profileName = loginUser;
+    }
 
     setActiveProfileId(profileId);
     trackAccess(profileId);

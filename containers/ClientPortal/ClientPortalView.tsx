@@ -14,7 +14,8 @@ import {
   Calendar,
   LogOut,
   Building,
-  CheckCircle2
+  CheckCircle2,
+  FileText
 } from 'lucide-react';
 
 import { useClientPortalLogic } from '../../features/portal/hooks/useClientPortalLogic';
@@ -27,6 +28,8 @@ import { resolveDebtSummary, resolveInstallmentDebt, getPortalDueLabel } from '.
 import { PortalInstallmentItem } from './components/PortalInstallmentItem';
 import { PortalEducationalAI } from '../../features/portal/components/PortalEducationalAI';
 import { formatMoney } from '../../utils/formatters';
+import { DocumentViewer } from '../../pages/Portal/DocumentViewer';
+import { legalDocumentService } from '../../services/legalDocument.service';
 
 interface ClientPortalViewProps {
   initialPortalToken: string;
@@ -130,12 +133,33 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({ initialPorta
   const [activeLoanForPayment, setActiveLoanForPayment] = useState<any>(null);
   const [activeLoanForChat, setActiveLoanForChat] = useState<any>(null);
   const [isLegalOpen, setIsLegalOpen] = useState(false);
+  const [activeDocId, setActiveDocId] = useState<string | null>(null);
+  const [docList, setDocList] = useState<any[]>([]);
+  const [loadingDocs, setLoadingDocs] = useState(false);
 
   useEffect(() => {
     if (!isLoading && loggedClient) {
         notificationService.requestPermission();
     }
   }, [isLoading, loggedClient]);
+
+  useEffect(() => {
+    if (isLegalOpen) {
+      loadDocs();
+    }
+  }, [isLegalOpen]);
+
+  const loadDocs = async () => {
+    setLoadingDocs(true);
+    try {
+      const docs = await legalDocumentService.listDocs(initialPortalToken);
+      setDocList(docs);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingDocs(false);
+    }
+  };
 
   usePortalPushNotifications(clientContracts, loggedClient?.id || null);
 
@@ -178,6 +202,22 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({ initialPorta
             <h2 className="text-white font-black text-xl mb-2">Acesso Indisponível</h2>
             <p className="text-slate-400 text-sm mb-4">{portalError || "Link inválido ou expirado."}</p>
         </div>
+      </div>
+    );
+  }
+
+  if (activeDocId) {
+    return (
+      <div className="fixed inset-0 z-[200] bg-slate-950">
+        <DocumentViewer 
+          token={initialPortalToken} 
+          docId={activeDocId} 
+          onBack={() => setActiveDocId(null)}
+          onSigned={() => {
+            setActiveDocId(null);
+            loadDocs();
+          }}
+        />
       </div>
     );
   }
@@ -307,19 +347,47 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({ initialPorta
 
       {isLegalOpen && (
         <div className="fixed inset-0 bg-slate-950/95 flex items-center justify-center z-[150] p-4 backdrop-blur-sm">
-          <div className="bg-slate-900 p-6 rounded-[2.5rem] border border-indigo-500/30 max-w-lg w-full shadow-2xl animate-in zoom-in-95 relative">
+          <div className="bg-slate-900 p-6 rounded-[2.5rem] border border-indigo-500/30 max-w-lg w-full shadow-2xl animate-in zoom-in-95 relative max-h-[80vh] overflow-y-auto">
             <button onClick={() => setIsLegalOpen(false)} className="absolute top-6 right-6 p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white"><X size={18}/></button>
             <div className="flex flex-col items-center text-center py-6">
                 <Lock size={40} className="text-indigo-500 mb-4"/>
                 <h2 className="text-white font-black uppercase text-lg mb-2">Central Jurídica</h2>
                 <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 w-full mb-6">
                     <Gavel className="mx-auto text-indigo-400 mb-2" size={24}/>
-                    <h4 className="text-white font-bold text-sm uppercase">Assinatura Pendente</h4>
+                    <h4 className="text-white font-bold text-sm uppercase">Assinatura Digital</h4>
                     <p className="text-[10px] text-slate-500 mt-1">Seus contratos estão disponíveis para regularização.</p>
                 </div>
-                <button onClick={() => handleSignDocument('CONFISSAO')} disabled={isSigning} className="w-full p-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black uppercase text-xs flex justify-center gap-2 items-center">
-                    {isSigning ? <RefreshCw className="animate-spin" size={16}/> : <><FileSignature size={16}/> Assinar Digitalmente</>}
-                </button>
+                
+                {loadingDocs ? (
+                  <div className="py-10"><RefreshCw className="animate-spin text-indigo-500 mx-auto"/></div>
+                ) : (
+                  <div className="w-full space-y-3">
+                    {docList.length === 0 ? (
+                      <p className="text-slate-500 text-xs py-4">Nenhum documento pendente.</p>
+                    ) : (
+                      docList.map(doc => (
+                        <button 
+                          key={doc.id}
+                          onClick={() => setActiveDocId(doc.id)}
+                          className="w-full p-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl flex items-center justify-between group transition-all"
+                        >
+                          <div className="flex items-center gap-3 text-left">
+                            <div className="p-2 bg-slate-900 rounded-lg text-slate-400"><FileText size={16}/></div>
+                            <div>
+                              <p className="text-xs font-bold text-white uppercase">{doc.tipo || 'Documento'}</p>
+                              <p className="text-[10px] text-slate-500">{new Date(doc.created_at).toLocaleDateString()}</p>
+                            </div>
+                          </div>
+                          {doc.status === 'ASSINADO' ? (
+                             <CheckCircle2 size={16} className="text-emerald-500"/>
+                          ) : (
+                             <span className="text-[9px] bg-amber-500/10 text-amber-500 px-2 py-1 rounded uppercase font-black">Assinar</span>
+                          )}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
             </div>
           </div>
         </div>

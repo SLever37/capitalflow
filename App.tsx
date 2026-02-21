@@ -25,6 +25,8 @@ import { notificationService } from './services/notification.service';
 import { MasterScreen } from './features/master/MasterScreen';
 import { LoadingScreen } from './components/ui/LoadingScreen';
 import { PersonalFinancesPage } from './pages/PersonalFinancesPage';
+import { LeadsPage } from './pages/LeadsPage';
+import { CustomerAcquisitionPage } from './pages/CustomerAcquisitionPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { isDev } from './utils/isDev';
 
@@ -211,6 +213,14 @@ export const App: React.FC = () => {
 
             {activeTab === 'PERSONAL_FINANCE' && activeUser && (
               <PersonalFinancesPage activeUser={activeUser} />
+            )}
+
+            {activeTab === 'LEADS' && activeUser && (
+              <LeadsPage activeUser={activeUser} />
+            )}
+
+            {activeTab === 'ACQUISITION' && (
+              <CustomerAcquisitionPage />
             )}
 
             {activeTab === 'SETTINGS' && (

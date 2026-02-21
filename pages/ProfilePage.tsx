@@ -53,6 +53,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
         case 'PROFILE': return 'Perfil';
         case 'MASTER': return 'Master';
         case 'PERSONAL_FINANCE': return 'Minhas Finanças';
+        case 'LEADS': return 'Leads';
+        case 'ACQUISITION': return 'Captação';
         default: return tab;
     }
   };
