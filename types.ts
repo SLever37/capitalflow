@@ -26,6 +26,30 @@ export interface Lead {
   owner_id?: string;
 }
 
+export interface Campaign {
+  id: string;
+  name: string;
+  description?: string;
+  source: string;
+  link: string;
+  createdAt: string;
+  status: 'ACTIVE' | 'INACTIVE';
+  values: number[];
+  messageTemplate: string;
+  imageUrl?: string;
+  clicks: number;
+  leads: number;
+}
+
+export interface CampaignLead {
+  id: string;
+  campaignId: string;
+  name: string;
+  whatsapp: string;
+  selectedValue: number;
+  createdAt: string;
+}
+
 export interface Client {
   id: string;
   profile_id: string;

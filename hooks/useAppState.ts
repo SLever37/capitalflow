@@ -65,6 +65,10 @@ const mapProfileFromDB = (data: any): UserProfile => {
     hubOrder = [...hubOrder, 'PERSONAL_FINANCE'];
   }
 
+  if (Array.isArray(hubOrder) && !hubOrder.includes('ACQUISITION')) {
+    hubOrder = [...hubOrder, 'ACQUISITION'];
+  }
+
   return {
     id: data.id,
     name: asString(data.nome_operador),

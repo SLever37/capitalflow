@@ -13,9 +13,9 @@ export const DocumentRenderer: React.FC<DocumentRendererProps> = ({
     htmlContent && htmlContent.trim().length > 0
       ? htmlContent
       : `
-        <div style="font-family: Arial, sans-serif; padding: 24px;">
-          <h2>Documento não disponível</h2>
-          <p>O conteúdo do documento ainda não foi gerado.</p>
+        <div style="font-family: Arial, sans-serif; padding: 40px; text-align: center; color: #666;">
+          <h2 style="margin-bottom: 16px;">Documento não disponível</h2>
+          <p>O conteúdo do documento ainda não foi gerado ou está vazio.</p>
         </div>
       `;
 

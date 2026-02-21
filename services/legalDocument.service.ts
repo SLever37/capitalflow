@@ -1,14 +1,14 @@
 // src/services/legalDocument.service.ts
 import { supabasePortal } from '../lib/supabasePortal';
 
-type PortalDocListItem = {
+export type PortalDocListItem = {
   id: string;
   tipo: string;
   status_assinatura: string;
   created_at: string;
 };
 
-type PortalDoc = {
+export type PortalDoc = {
   id: string;
   tipo: string;
   status_assinatura: string;
@@ -43,14 +43,16 @@ export const legalDocumentService = {
     if (error) throw new Error(error.message || 'Falha ao buscar documento.');
     if (!data) throw new Error('Documento não encontrado.');
 
+    const doc = data as any;
+
     return {
-      id: data.id,
-      tipo: data.tipo,
-      status_assinatura: data.status_assinatura,
-      snapshot: data.snapshot,
+      id: doc.id,
+      tipo: doc.tipo,
+      status_assinatura: doc.status_assinatura, // Garante uso do campo correto
+      snapshot: doc.snapshot,
       snapshot_rendered_html:
-        data.snapshot_rendered_html ?? data.rendered_html ?? null,
-      ...data,
+        doc.snapshot_rendered_html ?? doc.rendered_html ?? null,
+      ...doc,
     };
   },
 
@@ -64,26 +66,23 @@ export const legalDocumentService = {
     });
 
     if (error) throw new Error(error.message || 'Falha ao validar campos.');
+    // RPC pode retornar array ou objeto direto dependendo da versão
     const payload = Array.isArray(data) ? data[0] : data;
-    return payload;
+    return payload || { missing: [], can_sign: false };
   },
 
   /**
-   * Atualiza campos faltantes (NÃO IMPLEMENTADO AINDA)
-   * Motivo: você tem trigger de imutabilidade e não vimos RPC segura para patch do snapshot.
-   * Crie uma RPC SECURITY DEFINER do tipo: rpc_doc_patch_snapshot(p_documento_id uuid, p_patch jsonb)
-   * com validação de dono e status=PENDENTE.
+   * Atualiza campos faltantes (DESABILITADO)
    */
   async updateFields(_docId: string, _fields: any) {
     throw new Error(
-      'updateFields ainda não foi habilitado: falta RPC segura para patch do snapshot.'
+      'A atualização de campos pelo portal está temporariamente desabilitada. Entre em contato com o emissor.'
     );
   },
 
   /**
    * Assina o documento (Portal)
-   * RPC recomendada (já existe no seu banco):
-   * portal_sign_document(p_token uuid, p_documento_id uuid, p_papel text, p_nome text, p_cpf text, p_email text, p_phone text, p_ip text, p_user_agent text, p_hash_assinado text) -> json
+   * RPC: portal_sign_document(...)
    */
   async signDoc(payload: {
     token: string;

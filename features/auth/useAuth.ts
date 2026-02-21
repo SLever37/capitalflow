@@ -44,16 +44,36 @@ const resolveSmartName = (p: any): string => {
 };
 
 const mapLoginError = (err: any) => {
-  const raw = String(err?.message || err || '');
-
-  // ✅ NÃO mascarar: mostra o erro real do Auth quando vier do ensureAuthSession
-  if (raw.startsWith('AUTH_SIGNIN_FAILED:')) return raw;
-
+  let raw = String(err?.message || err || '');
   const l = raw.toLowerCase();
-  if (l.includes('invalid login')) return 'Usuário ou senha inválidos.';
-  if (l.includes('invalid_credentials')) return 'Usuário ou senha inválidos.';
-  if (l.includes('email not confirmed')) return 'E-mail não confirmado. Verifique sua caixa de entrada.';
-  if (l.includes('network') || l.includes('failed to fetch')) return 'Falha de conexão. Verifique a internet.';
+
+  // Prioridade para erro de conexão (antes de qualquer outra checagem)
+  if (
+    l.includes('network') ||
+    l.includes('failed to fetch') ||
+    l.includes('load failed') ||
+    l.includes('connection error')
+  ) {
+    return 'Falha de conexão. Verifique a internet.';
+  }
+
+  // Tenta extrair mensagem interna se for erro do ensureAuthSession
+  if (raw.startsWith('AUTH_SIGNIN_FAILED:')) {
+    try {
+        const jsonPart = raw.replace('AUTH_SIGNIN_FAILED: ', '');
+        const details = JSON.parse(jsonPart);
+        if (details.message) raw = details.message;
+    } catch (e) {
+        // falha ao parsear, mantem raw
+    }
+  }
+
+  // Re-calcula lowercase após extração (caso tenha mudado)
+  const l2 = raw.toLowerCase();
+  if (l2.includes('invalid login')) return 'Usuário ou senha inválidos.';
+  if (l2.includes('invalid_credentials')) return 'Usuário ou senha inválidos.';
+  if (l2.includes('email not confirmed')) return 'E-mail não confirmado. Verifique sua caixa de entrada.';
+  
   return raw || 'Erro desconhecido no login.';
 };
 
@@ -82,7 +102,13 @@ export const useAuth = () => {
     const cleanEmail = String(email || '').toLowerCase().trim();
     const cleanPass = String(pass || '');
 
-    const { data: s } = await supabase.auth.getSession();
+    const { data: s, error: sessionError } = await supabase.auth.getSession();
+
+    // Se houver erro na sessão (ex: token inválido), limpa estado antes de prosseguir
+    if (sessionError) {
+      if (isDev) console.warn('[AUTH_SYNC] Erro na sessão atual, forçando limpeza:', sessionError.message);
+      await supabase.auth.signOut().catch(() => {});
+    }
 
     // mesma sessão já ativa
     if (s?.session?.user?.email?.toLowerCase() === cleanEmail) {
@@ -138,8 +164,16 @@ export const useAuth = () => {
             sessionError.message.includes('Refresh Token Not Found') ||
             sessionError.message.includes('Invalid Refresh Token')
           ) {
+            console.warn('[AUTH] Token inválido detectado. Limpando sessão...');
             localStorage.removeItem('cm_session');
             localStorage.removeItem('cm_supabase_auth');
+            // Força limpeza de qualquer chave de auth do supabase
+            Object.keys(localStorage).forEach(key => {
+                if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+                    localStorage.removeItem(key);
+                }
+            });
+            
             await supabase.auth.signOut().catch(() => {});
             if (mounted) {
               setActiveProfileId(null);
@@ -180,7 +214,19 @@ export const useAuth = () => {
     };
 
     boot();
+
+    // Escuta mudanças de estado (ex: token expirado, logout em outra aba)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        if (isDev) console.log('[AUTH] Evento de logout detectado:', event);
+        localStorage.removeItem('cm_session');
+        localStorage.removeItem('cm_supabase_auth');
+        if (mounted) setActiveProfileId(null);
+      }
+    });
+
     return () => {
+      subscription.unsubscribe();
       mounted = false;
     };
   }, []);
@@ -410,9 +456,17 @@ export const useAuth = () => {
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut().catch(() => {});
     setActiveProfileId(null);
     localStorage.removeItem('cm_session');
+    localStorage.removeItem('cm_supabase_auth');
+    
+    // Limpeza profunda de tokens residuais
+    Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+            localStorage.removeItem(key);
+        }
+    });
   };
 
   return {

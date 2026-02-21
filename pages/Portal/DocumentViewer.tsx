@@ -23,7 +23,6 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({ token, docId, on
   const [role, setRole] = useState('DEVEDOR');
   const [signerName, setSignerName] = useState('');
   const [signerDoc, setSignerDoc] = useState('');
-  const [missingValues, setMissingValues] = useState<any>({});
 
   useEffect(() => {
     loadDocument();
@@ -44,24 +43,6 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({ token, docId, on
       setError(err.message || 'Erro ao carregar documento.');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleUpdateFields = async () => {
-    setSigning(true);
-    try {
-      await legalDocumentService.updateFields(docId, missingValues);
-      // Re-check
-      const check: any = await legalDocumentService.missingFields(docId);
-      setMissingFields(check.missing || []);
-      setCanSign(check.can_sign);
-      if (check.can_sign) {
-        alert('Campos atualizados! Agora você pode assinar.');
-      }
-    } catch (err: any) {
-      alert('Erro ao atualizar campos: ' + err.message);
-    } finally {
-      setSigning(false);
     }
   };
 
@@ -89,6 +70,9 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({ token, docId, on
       });
       
       alert('Documento assinado com sucesso!');
+      
+      // Recarrega para confirmar status
+      await loadDocument();
       onSigned();
     } catch (err: any) {
       alert('Erro ao assinar: ' + err.message);
@@ -117,6 +101,8 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({ token, docId, on
     );
   }
 
+  const isSigned = document?.status_assinatura === 'ASSINADO';
+
   return (
     <div className="flex flex-col h-full bg-slate-950">
       {/* Header */}
@@ -131,7 +117,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({ token, docId, on
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {document.status === 'ASSINADO' ? (
+          {isSigned ? (
              <span className="bg-emerald-500/10 text-emerald-500 px-3 py-1 rounded-full text-[10px] font-black uppercase flex items-center gap-1 border border-emerald-500/20">
                <CheckCircle2 size={12}/> Assinado
              </span>
@@ -153,37 +139,29 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({ token, docId, on
         </div>
 
         {/* Sidebar Actions */}
-        {document.status !== 'ASSINADO' && (
+        {!isSigned && (
           <div className="w-full lg:w-80 bg-slate-900 border-l border-slate-800 p-6 overflow-y-auto">
             <h3 className="text-white font-bold uppercase text-xs mb-6 flex items-center gap-2">
               <FileSignature size={16} className="text-blue-500"/> Assinatura Digital
             </h3>
 
-            {/* Missing Fields Form */}
+            {/* Missing Fields Warning */}
             {missingFields.length > 0 && (
               <div className="mb-8 p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl">
                 <p className="text-rose-400 text-[10px] font-black uppercase mb-3 flex items-center gap-1">
                   <AlertTriangle size={12}/> Dados Pendentes
                 </p>
-                <div className="space-y-3">
+                <div className="space-y-2 mb-4">
                   {missingFields.map(field => (
-                    <div key={field}>
-                      <label className="text-[10px] text-slate-400 uppercase font-bold block mb-1">{field}</label>
-                      <input 
-                        type="text" 
-                        className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white text-xs"
-                        onChange={e => setMissingValues({...missingValues, [field]: e.target.value})}
-                      />
+                    <div key={field} className="text-[10px] text-slate-400 uppercase font-bold flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                        {field}
                     </div>
                   ))}
-                  <button 
-                    onClick={handleUpdateFields}
-                    disabled={signing}
-                    className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-[10px] font-black uppercase mt-2"
-                  >
-                    {signing ? 'Salvando...' : 'Salvar Dados'}
-                  </button>
                 </div>
+                <p className="text-[10px] text-slate-500 leading-relaxed">
+                    Este documento possui campos obrigatórios não preenchidos. Entre em contato com o emissor para correção antes de assinar.
+                </p>
               </div>
             )}
 

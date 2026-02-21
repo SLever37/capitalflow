@@ -2,6 +2,7 @@ import React from 'react';
 import { ClientPortalView } from '../containers/ClientPortal/ClientPortalView';
 import { PublicLegalSignPage } from '../features/legal/components/PublicLegalSignPage';
 import { PublicLoanLeadPage } from '../pages/PublicLoanLeadPage';
+import { CampaignLandingPage } from '../pages/Public/CampaignLandingPage';
 import { AuthScreen } from '../features/auth/AuthScreen';
 
 interface AppGateProps {
@@ -41,6 +42,12 @@ export const AppGate: React.FC<AppGateProps> = ({
   const params = new URLSearchParams(window.location.search);
   if (params.get('public') === 'emprestimo') {
     return <PublicLoanLeadPage />;
+  }
+
+  // 0.1 Rota Pública: Landing Page de Campanha
+  const campaignId = params.get('campaign_id');
+  if (campaignId) {
+    return <CampaignLandingPage campaignId={campaignId} />;
   }
 
   // 1. Rota Pública: Portal Financeiro (Acesso via Token)
