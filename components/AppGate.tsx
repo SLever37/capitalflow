@@ -2,7 +2,8 @@ import React from 'react';
 import { ClientPortalView } from '../containers/ClientPortal/ClientPortalView';
 import { PublicLegalSignPage } from '../features/legal/components/PublicLegalSignPage';
 import { PublicLoanLeadPage } from '../pages/PublicLoanLeadPage';
-import { CampaignLandingPage } from '../pages/Public/CampaignLandingPage';
+import { CampanhaLanding } from '../pages/Campanha/CampanhaLanding';
+import { CampanhaChat } from '../pages/Campanha/CampanhaChat';
 import { AuthScreen } from '../features/auth/AuthScreen';
 
 interface AppGateProps {
@@ -35,7 +36,7 @@ export const AppGate: React.FC<AppGateProps> = ({
   // Props de Login
   loginUser, setLoginUser, loginPassword, setLoginPassword, submitLogin, submitTeamLogin,
   savedProfiles, handleSelectSavedProfile, handleRemoveSavedProfile,
-  isLoadingData, setIsLoadingData, showToast, toast
+  isLoadingData, setIsLoadingData, showToast, toast, loadError
 }) => {
   
   // 0. Rota Pública: Lead de Empréstimo
@@ -46,8 +47,24 @@ export const AppGate: React.FC<AppGateProps> = ({
 
   // 0.1 Rota Pública: Landing Page de Campanha
   const campaignId = params.get('campaign_id');
-  if (campaignId) {
-    return <CampaignLandingPage campaignId={campaignId} />;
+  const path = window.location.pathname;
+
+  // Suporte a /campanha/chat
+  if (path === '/campanha/chat') {
+    return <CampanhaChat />;
+  }
+
+  // Suporte a /campanha?campaign_id=... ou /?campaign_id=...
+  if (path === '/campanha' || campaignId) {
+    // Se não tiver ID, mostra erro ou redireciona
+    if (!campaignId) {
+       return (
+         <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-500 text-sm font-bold uppercase">
+           Campanha não especificada.
+         </div>
+       );
+    }
+    return <CampanhaLanding campaignId={campaignId} />;
   }
 
   // 1. Rota Pública: Portal Financeiro (Acesso via Token)
@@ -59,6 +76,13 @@ export const AppGate: React.FC<AppGateProps> = ({
   if (legalSignToken) {
      return <PublicLegalSignPage token={legalSignToken} />;
   }
+
+  // Exibe erro de carregamento se houver
+  React.useEffect(() => {
+    if (loadError) {
+      showToast(loadError, 'error');
+    }
+  }, [loadError, showToast]);
 
   // 3. Rota Privada: Sistema (Requer Login)
   if (!activeUser) {

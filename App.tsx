@@ -26,7 +26,7 @@ import { MasterScreen } from './features/master/MasterScreen';
 import { LoadingScreen } from './components/ui/LoadingScreen';
 import { PersonalFinancesPage } from './pages/PersonalFinancesPage';
 import { LeadsPage } from './pages/LeadsPage';
-import { CustomerAcquisitionPage } from './pages/CustomerAcquisitionPage';
+import { CustomerAcquisitionPage } from './pages/Comercial/CaptacaoClientes';
 import { SettingsPage } from './pages/SettingsPage';
 import { isDev } from './utils/isDev';
 

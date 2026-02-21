@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Megaphone, Link as LinkIcon, Copy, CheckCircle2, ArrowRight, Trash2, Calendar, MousePointer2, Image as ImageIcon, Loader2, MessageCircle, Share2, Plus } from 'lucide-react';
-import { Campaign } from '../types';
-import { campaignService } from '../services/campaign.service';
+import { Campaign } from '../../types';
+import { campaignService } from '../../services/campaign.service';
 import { GoogleGenAI } from "@google/genai";
 
 const DEFAULT_VALUES = [300, 500, 800, 1000, 1500];
@@ -53,11 +53,15 @@ export const CustomerAcquisitionPage: React.FC = () => {
       leads: form.leads || 0
     };
 
-    campaignService.saveCampaign(newCampaign);
-    loadCampaigns();
-    setView('LIST');
-    setForm({ values: DEFAULT_VALUES, messageTemplate: DEFAULT_TEMPLATE, status: 'ACTIVE' });
-    setGeneratedImage(null);
+    try {
+      campaignService.saveCampaign(newCampaign);
+      loadCampaigns();
+      setView('LIST');
+      setForm({ values: DEFAULT_VALUES, messageTemplate: DEFAULT_TEMPLATE, status: 'ACTIVE' });
+      setGeneratedImage(null);
+    } catch (e: any) {
+      alert(e.message || 'Erro ao salvar campanha. Tente usar uma imagem menor.');
+    }
   };
 
   const handleDelete = (id: string) => {
