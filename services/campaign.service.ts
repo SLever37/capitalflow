@@ -131,3 +131,34 @@ export const campaignService = {
     return payload.session_token;
   }
 };
+
+export type CampaignChatMessage = {
+  id: string;
+  session_token: string;
+  sender: 'LEAD' | 'BOT' | 'OPERATOR';
+  message: string;
+  created_at: string;
+};
+
+export const campaignChatService = {
+  async listMessages(sessionToken: string): Promise<CampaignChatMessage[]> {
+    const { data, error } = await supabasePortal.rpc('campaign_list_messages', {
+      p_session_token: sessionToken,
+    });
+
+    if (error) throw new Error(error.message || 'Falha ao listar mensagens.');
+    return (data ?? []) as CampaignChatMessage[];
+  },
+
+  async sendLeadMessage(sessionToken: string, message: string) {
+    const { data, error } = await supabasePortal.rpc('campaign_add_message', {
+      p_session_token: sessionToken,
+      p_sender: 'LEAD', // IMPORTANTE: seu CHECK bloqueia CLIENT
+      p_message: message,
+    });
+
+    if (error) throw new Error(error.message || 'Falha ao enviar mensagem.');
+    const out = Array.isArray(data) ? data[0] : data;
+    return out ?? { ok: true };
+  },
+};
