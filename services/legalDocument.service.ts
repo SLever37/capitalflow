@@ -20,7 +20,6 @@ export type PortalDoc = {
 export const legalDocumentService = {
   /**
    * Lista documentos disponíveis para o token do portal
-   * RPC: portal_list_docs(p_token uuid) -> TABLE(id uuid, tipo text, status_assinatura text, created_at timestamptz)
    */
   async listDocs(token: string): Promise<PortalDocListItem[]> {
     const { data, error } = await supabasePortal.rpc('portal_list_docs', {
@@ -32,12 +31,14 @@ export const legalDocumentService = {
   },
 
   /**
-   * Busca um documento específico (HTML renderizado + snapshot)
-   * RPC: portal_get_doc(p_token uuid, p_doc_id uuid) -> jsonb
+   * Busca documento específico (HTML renderizado + snapshot)
    */
   async getDoc(token: string, docId: string): Promise<PortalDoc> {
     const { data, error } = await supabasePortal
-      .rpc('portal_get_doc', { p_token: token, p_doc_id: docId })
+      .rpc('portal_get_doc', {
+        p_token: token,
+        p_doc_id: docId,
+      })
       .single();
 
     if (error) throw new Error(error.message || 'Falha ao buscar documento.');
@@ -48,7 +49,7 @@ export const legalDocumentService = {
     return {
       id: doc.id,
       tipo: doc.tipo,
-      status_assinatura: doc.status_assinatura, // Garante uso do campo correto
+      status_assinatura: doc.status_assinatura,
       snapshot: doc.snapshot,
       snapshot_rendered_html:
         doc.snapshot_rendered_html ?? doc.rendered_html ?? null,
@@ -58,7 +59,6 @@ export const legalDocumentService = {
 
   /**
    * Verifica campos faltantes antes de assinar
-   * RPC: rpc_doc_missing_fields(p_documento_id uuid) -> json
    */
   async missingFields(docId: string) {
     const { data, error } = await supabasePortal.rpc('rpc_doc_missing_fields', {
@@ -66,23 +66,34 @@ export const legalDocumentService = {
     });
 
     if (error) throw new Error(error.message || 'Falha ao validar campos.');
-    // RPC pode retornar array ou objeto direto dependendo da versão
+
     const payload = Array.isArray(data) ? data[0] : data;
-    return payload || { missing: [], can_sign: false };
+
+    return payload ?? { missing: [], can_sign: false };
   },
 
   /**
-   * Atualiza campos faltantes (DESABILITADO)
+   * Atualiza campos faltantes via RPC segura
    */
-  async updateFields(_docId: string, _fields: any) {
-    throw new Error(
-      'A atualização de campos pelo portal está temporariamente desabilitada. Entre em contato com o emissor.'
+  async updateFields(docId: string, fields: Record<string, any>) {
+    const { data, error } = await supabasePortal.rpc(
+      'rpc_doc_patch_snapshot',
+      {
+        p_documento_id: docId,
+        p_patch: fields,
+      }
     );
+
+    if (error)
+      throw new Error(
+        error.message || 'Falha ao atualizar dados do documento.'
+      );
+
+    return Array.isArray(data) ? data[0] : data;
   },
 
   /**
-   * Assina o documento (Portal)
-   * RPC: portal_sign_document(...)
+   * Assina documento (Portal)
    */
   async signDoc(payload: {
     token: string;
@@ -96,21 +107,25 @@ export const legalDocumentService = {
     phone?: string | null;
     assinaturaHash?: string | null;
   }) {
-    const { data, error } = await supabasePortal.rpc('portal_sign_document', {
-      p_token: payload.token,
-      p_documento_id: payload.docId,
-      p_papel: payload.role,
-      p_nome: payload.name,
-      p_cpf: payload.cpf,
-      p_email: payload.email ?? null,
-      p_phone: payload.phone ?? null,
-      p_ip: payload.ip,
-      p_user_agent: payload.userAgent,
-      p_hash_assinado: payload.assinaturaHash ?? null,
-    });
+    const { data, error } = await supabasePortal.rpc(
+      'portal_sign_document',
+      {
+        p_token: payload.token,
+        p_documento_id: payload.docId,
+        p_papel: payload.role,
+        p_nome: payload.name,
+        p_cpf: payload.cpf,
+        p_email: payload.email ?? null,
+        p_phone: payload.phone ?? null,
+        p_ip: payload.ip,
+        p_user_agent: payload.userAgent,
+        p_hash_assinado: payload.assinaturaHash ?? null,
+      }
+    );
 
-    if (error) throw new Error(error.message || 'Falha ao assinar documento.');
-    const out = Array.isArray(data) ? data[0] : data;
-    return out ?? { ok: true };
+    if (error)
+      throw new Error(error.message || 'Falha ao assinar documento.');
+
+    return Array.isArray(data) ? data[0] : data ?? { ok: true };
   },
 };
