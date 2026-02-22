@@ -154,60 +154,30 @@ export const useAuth = () => {
           } catch {}
         }
 
+        // Tenta recuperar sessão do Supabase, mas NÃO desloga se falhar
         const { data: s, error: sessionError } = await supabase.auth.getSession();
 
-        // token inválido -> limpa
-        if (sessionError) {
-          if (isDev) console.warn('[BOOT] Auth Session Error:', sessionError.message);
-
-          if (
-            sessionError.message.includes('Refresh Token Not Found') ||
-            sessionError.message.includes('Invalid Refresh Token')
-          ) {
-            console.warn('[AUTH] Token inválido detectado. Limpando sessão...');
-            localStorage.removeItem('cm_session');
-            localStorage.removeItem('cm_supabase_auth');
-            // Força limpeza de qualquer chave de auth do supabase
-            Object.keys(localStorage).forEach(key => {
-                if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
-                    localStorage.removeItem(key);
-                }
-            });
-            
-            await supabase.auth.signOut().catch(() => {});
-            if (mounted) {
-              setActiveProfileId(null);
-              setBootFinished(true);
-            }
-            return;
-          }
+        if (sessionError && isDev) {
+           console.warn('[BOOT] Auth Session Error (ignoring):', sessionError.message);
         }
 
         const session = localStorage.getItem('cm_session');
         if (session && mounted) {
           try {
             const parsed = JSON.parse(session);
-            const hasAuth = !!s?.session?.user?.id;
-
-            // se não tem auth, não restaura profile (evita travar) — exceto DEMO
-            if (!hasAuth && parsed?.profileId !== 'DEMO') {
-              localStorage.removeItem('cm_session');
-              setActiveProfileId(null);
-              return;
-            }
-
+            
+            // Restaura profileId SEMPRE, independente do estado do Auth
             if (parsed?.profileId) {
               setActiveProfileId(parsed.profileId);
               trackAccess(parsed.profileId);
             }
           } catch {
+            // Se o JSON estiver corrompido, aí sim limpamos
             localStorage.removeItem('cm_session');
           }
         }
       } catch (err) {
-        if (isDev) console.error('[BOOT] Erro:', err);
-        localStorage.removeItem('cm_session');
-        setActiveProfileId(null);
+        if (isDev) console.error('[BOOT] Erro não fatal:', err);
       } finally {
         if (mounted) setBootFinished(true);
       }
@@ -215,14 +185,10 @@ export const useAuth = () => {
 
     boot();
 
-    // Escuta mudanças de estado (ex: token expirado, logout em outra aba)
+    // Escuta mudanças de estado apenas para log (não desloga automaticamente)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT') {
-        if (isDev) console.log('[AUTH] Evento de logout detectado:', event);
-        localStorage.removeItem('cm_session');
-        localStorage.removeItem('cm_supabase_auth');
-        if (mounted) setActiveProfileId(null);
-      }
+      if (isDev) console.log('[AUTH] Evento detectado:', event);
+      // NÃO fazemos nada no SIGNED_OUT automático para manter a persistência local
     });
 
     return () => {
@@ -469,6 +435,20 @@ export const useAuth = () => {
     });
   };
 
+  const reauthenticate = async (password: string) => {
+    if (!activeProfileId) throw new Error('Nenhum perfil ativo.');
+    
+    const profile = savedProfiles.find(p => p.id === activeProfileId);
+    if (!profile?.email) {
+        throw new Error('E-mail do perfil não encontrado. Faça login novamente.');
+    }
+
+    // Força logout para garantir nova sessão limpa
+    await supabase.auth.signOut().catch(() => {});
+
+    await ensureAuthSession(profile.email, password);
+  };
+
   return {
     activeProfileId,
     setActiveProfileId,
@@ -480,6 +460,7 @@ export const useAuth = () => {
     submitLogin,
     submitTeamLogin,
     handleLogout,
+    reauthenticate,
     handleSelectSavedProfile,
     handleRemoveSavedProfile,
     bootFinished,

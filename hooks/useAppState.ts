@@ -212,21 +212,13 @@ export const useAppState = (activeProfileId: string | null) => {
     } catch (error: any) {
       console.error('Erro ao carregar dados:', error);
 
-      // Se for erro de token inválido, força logout para renovar
+      // Se for erro de token inválido, sinaliza necessidade de reauth
       if (
         error.message?.includes('Refresh Token') || 
         error.message?.includes('JWT') ||
         error.code === 'PGRST301' // JWT expired
       ) {
-        localStorage.removeItem('cm_session');
-        localStorage.removeItem('cm_supabase_auth');
-        // Limpa tokens do supabase
-        Object.keys(localStorage).forEach(key => {
-            if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
-                localStorage.removeItem(key);
-            }
-        });
-        window.location.reload();
+        setLoadError('SESSAO_EXPIRADA');
         return;
       }
 

@@ -46,6 +46,7 @@ export const App: React.FC = () => {
     handleRemoveSavedProfile,
     bootFinished,
     isLoading: authLoading,
+    reauthenticate,
   } = useAuth();
 
   const {
@@ -150,6 +151,11 @@ export const App: React.FC = () => {
           showToast={showToast}
           setIsLoadingData={setIsLoadingData}
           toast={toast}
+          reauthenticate={reauthenticate}
+          onReauthSuccess={() => {
+            setLoadError(null);
+            if (activeProfileId) fetchFullData(activeProfileId);
+          }}
         >
           <AppShell
             toast={toast}

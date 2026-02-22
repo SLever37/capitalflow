@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ClientPortalView } from '../containers/ClientPortal/ClientPortalView';
 import { PublicLegalSignPage } from '../features/legal/components/PublicLegalSignPage';
 import { PublicLoanLeadPage } from '../pages/PublicLoanLeadPage';
 import { CampanhaLanding } from '../pages/Campanha/CampanhaLanding';
 import { CampanhaChat } from '../pages/Campanha/CampanhaChat';
 import { AuthScreen } from '../features/auth/AuthScreen';
+import { Lock, Loader2 } from 'lucide-react';
 
 interface AppGateProps {
   portalToken?: string | null;
@@ -26,6 +27,8 @@ interface AppGateProps {
   setIsLoadingData: (v: boolean) => void;
   toast: any;
   children: React.ReactNode;
+  reauthenticate: (pass: string) => Promise<void>;
+  onReauthSuccess: () => void;
 }
 
 export const AppGate: React.FC<AppGateProps> = ({
@@ -36,8 +39,11 @@ export const AppGate: React.FC<AppGateProps> = ({
   // Props de Login
   loginUser, setLoginUser, loginPassword, setLoginPassword, submitLogin, submitTeamLogin,
   savedProfiles, handleSelectSavedProfile, handleRemoveSavedProfile,
-  isLoadingData, setIsLoadingData, showToast, toast, loadError
+  isLoadingData, setIsLoadingData, showToast, toast, loadError,
+  reauthenticate, onReauthSuccess
 }) => {
+  const [reauthPass, setReauthPass] = useState('');
+  const [isReauthing, setIsReauthing] = useState(false);
   
   // 0. Rota Pública: Lead de Empréstimo
   const params = new URLSearchParams(window.location.search);
@@ -77,12 +83,26 @@ export const AppGate: React.FC<AppGateProps> = ({
      return <PublicLegalSignPage token={legalSignToken} />;
   }
 
-  // Exibe erro de carregamento se houver
+  // Exibe erro de carregamento se houver (exceto se for sessão expirada, que mostra modal)
   React.useEffect(() => {
-    if (loadError) {
+    if (loadError && loadError !== 'SESSAO_EXPIRADA') {
       showToast(loadError, 'error');
     }
   }, [loadError, showToast]);
+
+  const handleReauthSubmit = async () => {
+    if (!reauthPass) return;
+    setIsReauthing(true);
+    try {
+        await reauthenticate(reauthPass);
+        setReauthPass('');
+        onReauthSuccess();
+    } catch (e: any) {
+        showToast(e.message || 'Senha incorreta.', 'error');
+    } finally {
+        setIsReauthing(false);
+    }
+  };
 
   // 3. Rota Privada: Sistema (Requer Login)
   if (!activeUser) {
@@ -104,6 +124,49 @@ export const AppGate: React.FC<AppGateProps> = ({
     );
   }
 
-  // 4. Usuário Autenticado: Renderiza o App Shell
-  return <>{children}</>;
+  // 4. Usuário Autenticado: Renderiza o App Shell + Modal de Reauth se necessário
+  return (
+    <>
+      {children}
+      
+      {loadError === 'SESSAO_EXPIRADA' && (
+        <div className="fixed inset-0 z-[200] bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300">
+           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 w-full max-w-sm shadow-2xl relative overflow-hidden">
+              <div className="absolute inset-0 bg-blue-600/5 blur-3xl rounded-full pointer-events-none"></div>
+              
+              <div className="relative z-10 text-center">
+                  <div className="w-16 h-16 bg-slate-800 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-slate-700 shadow-inner">
+                    <Lock className="text-blue-500" size={32} />
+                  </div>
+                  
+                  <h2 className="text-white font-black text-xl uppercase tracking-tight mb-2">Sessão Expirada</h2>
+                  <p className="text-slate-400 text-xs font-medium mb-6 leading-relaxed">
+                    Por segurança, confirme sua senha para continuar acessando o sistema.
+                  </p>
+                  
+                  <div className="space-y-3">
+                      <input 
+                        type="password" 
+                        value={reauthPass}
+                        onChange={e => setReauthPass(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && handleReauthSubmit()}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white text-sm font-bold outline-none focus:border-blue-500 transition-colors text-center tracking-widest"
+                        placeholder="Sua senha"
+                        autoFocus
+                      />
+                      
+                      <button 
+                        onClick={handleReauthSubmit}
+                        disabled={isReauthing || !reauthPass}
+                        className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black uppercase text-xs py-4 rounded-xl shadow-lg shadow-blue-600/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      >
+                        {isReauthing ? <Loader2 className="animate-spin" size={16}/> : 'Confirmar Acesso'}
+                      </button>
+                  </div>
+              </div>
+           </div>
+        </div>
+      )}
+    </>
+  );
 };
