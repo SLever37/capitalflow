@@ -229,7 +229,10 @@ export const useAppState = (activeProfileId: string | null) => {
   }, []);
 
   useEffect(() => {
-    if (!activeProfileId) return;
+    if (!activeProfileId) {
+      setActiveUser(null);
+      return;
+    }
 
     const cached = readCache(activeProfileId);
 

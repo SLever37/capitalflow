@@ -7,6 +7,7 @@ import { DocumentTemplates } from '../templates/DocumentTemplates';
 import { legalService } from '../services/legalService';
 import { witnessService } from '../services/witness.service';
 import { WitnessBaseManager } from './WitnessBaseManager';
+import { getOrCreatePortalLink } from '../../../utils/portalLink';
 
 interface ConfissaoDividaViewProps {
     loans: Loan[];
@@ -110,14 +111,20 @@ export const ConfissaoDividaView: React.FC<ConfissaoDividaViewProps> = ({ loans,
             const { doc } = await legalService.getFullAuditData(selectedLoan.id); 
             showToast("Gerando link seguro...", "info");
             
-            const token = doc?.public_access_token;
-            const url = token 
-                ? `${window.location.origin}/?legal_sign=${token}`
-                : `${window.location.origin}/?portal=${selectedLoan.id}&legal_sign=true`;
+            let url = '';
+            if (doc?.public_access_token) {
+                // Se já existe token específico de documento legal, usa ele
+                url = `${window.location.origin}/?legal_sign=${doc.public_access_token}`;
+            } else {
+                // Se não, usa o link do portal (agora com shortcode garantido) + flag legal_sign
+                const portalLink = await getOrCreatePortalLink(selectedLoan.id);
+                url = `${portalLink}&legal_sign=true`;
+            }
 
             navigator.clipboard.writeText(url);
             showToast("Link do Portal (Jurídico) copiado!", "success");
         } catch (e) {
+            console.error(e);
             showToast("Erro ao gerar link.", "error");
         }
     };

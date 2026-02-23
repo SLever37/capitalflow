@@ -187,6 +187,7 @@ export function mapLoanFromDB(
     skipWeekends: !!(l?.skip_weekends ?? l?.skipWeekends),
 
     portalToken: asString(l?.portal_token ?? l?.portalToken),
+    portalShortcode: asString(l?.portal_shortcode ?? l?.portalShortcode),
 
     activeAgreement,
   } as Loan;

@@ -124,8 +124,9 @@ export const useLoanController = (
       const accessCode = (client as any)?.access_code || (client as any)?.accessCode;
 
       let url = await getOrCreatePortalLink(loan.id);
-      if (accessCode) url += `&code=${accessCode}`;
-
+      // O getOrCreatePortalLink já inclui o &code=SHORTCODE gerado/recuperado do contrato.
+      // Não devemos adicionar outro code do cliente para evitar duplicidade ou conflito.
+      
       await navigator.clipboard.writeText(url);
       showToast('Link do Portal copiado!', 'success');
     } catch (e: any) {

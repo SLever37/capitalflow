@@ -8,9 +8,10 @@ interface NavHubProps {
     onNavigate: (tab: string, modal?: string) => void;
     userLevel: number;
     hubOrder: AppTab[];
+    unreadCampaignCount?: number;
 }
 
-export const NavHub: React.FC<NavHubProps> = ({ onClose, onNavigate, userLevel, hubOrder }) => {
+export const NavHub: React.FC<NavHubProps> = ({ onClose, onNavigate, userLevel, hubOrder, unreadCampaignCount = 0 }) => {
     const getTabMeta = (tab: AppTab) => {
         switch (tab) {
             case 'PROFILE': return { icon: <User size={32}/>, label: 'Meu Perfil', color: 'text-blue-500', hover: 'hover:border-blue-600' };
@@ -41,9 +42,14 @@ export const NavHub: React.FC<NavHubProps> = ({ onClose, onNavigate, userLevel, 
                         const meta = getTabMeta(tab);
                         if (tab === 'MASTER' && userLevel !== 1) return null;
                         return (
-                            <button key={tab} onClick={() => onNavigate(tab)} className={`p-6 bg-slate-900 border border-slate-800 rounded-3xl transition-all group flex flex-col items-center justify-center gap-3 ${meta.hover}`}>
+                            <button key={tab} onClick={() => onNavigate(tab)} className={`p-6 bg-slate-900 border border-slate-800 rounded-3xl transition-all group flex flex-col items-center justify-center gap-3 relative ${meta.hover}`}>
                                 <div className={`p-4 bg-slate-800 rounded-2xl ${meta.color} group-hover:scale-110 transition-transform`}>{meta.icon}</div>
                                 <span className="font-bold text-white uppercase text-xs tracking-widest text-center">{meta.label}</span>
+                                {tab === 'ACQUISITION' && unreadCampaignCount > 0 && (
+                                    <span className="absolute top-4 right-4 bg-rose-500 text-white text-[10px] font-black w-6 h-6 flex items-center justify-center rounded-full ring-4 ring-slate-900 animate-bounce shadow-lg shadow-rose-500/50">
+                                        {unreadCampaignCount > 99 ? '99+' : unreadCampaignCount}
+                                    </span>
+                                )}
                             </button>
                         );
                     })}

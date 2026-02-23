@@ -251,6 +251,7 @@ export interface Loan {
   fundingFeePercent?: number;
   updatedAt?: string;
   portalToken?: string;
+  portalShortcode?: string;
 }
 
 export interface Installment {

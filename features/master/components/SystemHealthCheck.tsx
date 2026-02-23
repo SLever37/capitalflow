@@ -100,10 +100,11 @@ export const SystemHealthCheck = () => {
         // --- 3. TESTES DE PORTAL/LINKS ---
         try {
             const mockId = '123e4567-e89b-12d3-a456-426614174000';
-            const url = `${window.location.origin}/?portal=${mockId}`;
+            const mockCode = '123456';
+            const url = `${window.location.origin}/?portal=${mockId}&code=${mockCode}`;
             tests.push({
                 id: 'port-1', category: 'PORTAL', name: 'Estrutura de Link Seguro',
-                passed: url.includes('?portal=') && url.includes(mockId),
+                passed: url.includes('?portal=') && url.includes(mockId) && url.includes('&code='),
                 details: `URL Gerada: ${url}`
             });
         } catch (e: any) {

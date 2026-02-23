@@ -120,6 +120,30 @@ const ContractBlock: React.FC<ContractBlockProps> = ({ loan, onPay, onChat }) =>
 };
 
 export const ClientPortalView: React.FC<ClientPortalViewProps> = ({ initialPortalToken }) => {
+  if (initialPortalToken === 'VALIDATING') {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 gap-4">
+        <RefreshCw className="w-12 h-12 text-blue-500 animate-spin" />
+        <p className="text-slate-500 text-xs font-black uppercase tracking-widest animate-pulse">Validando Acesso...</p>
+      </div>
+    );
+  }
+
+  if (initialPortalToken === 'INVALID_ACCESS') {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 max-w-md w-full text-center">
+            <ShieldCheck size={48} className="mx-auto text-rose-500 mb-4" />
+            <h2 className="text-white font-black text-xl mb-2">Acesso Negado</h2>
+            <p className="text-slate-400 text-sm mb-4">Link inválido, expirado ou código de segurança ausente.</p>
+            <button onClick={() => window.location.href = '/'} className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold uppercase text-xs transition-all">
+                Voltar ao Início
+            </button>
+        </div>
+      </div>
+    );
+  }
+
   const {
     isLoading,
     portalError,
@@ -251,7 +275,14 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({ initialPorta
                     <h3 className="text-white font-bold text-sm leading-none">{loggedClient.name.split(' ')[0]}</h3>
                 </div>
             </div>
-            <button onClick={() => window.location.href = '/'} className="p-2 bg-slate-900 border border-slate-800 text-slate-400 rounded-xl hover:text-white transition-colors">
+            <button 
+                onClick={() => {
+                    // Limpa URL e força reload para garantir logout completo
+                    window.history.replaceState(null, '', '/');
+                    window.location.reload();
+                }} 
+                className="p-2 bg-slate-900 border border-slate-800 text-slate-400 rounded-xl hover:text-white transition-colors"
+            >
                 <LogOut size={18}/>
             </button>
         </div>

@@ -422,17 +422,22 @@ export const useAuth = () => {
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut().catch(() => {});
+    // 1. Limpa estado visual imediatamente
     setActiveProfileId(null);
+    setBootFinished(true); // Garante que não fique em loading
+
+    // 2. Limpa armazenamento local
     localStorage.removeItem('cm_session');
     localStorage.removeItem('cm_supabase_auth');
     
-    // Limpeza profunda de tokens residuais
     Object.keys(localStorage).forEach(key => {
         if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
             localStorage.removeItem(key);
         }
     });
+
+    // 3. Dispara logout do Supabase em background (sem travar a UI)
+    supabase.auth.signOut().catch(() => {});
   };
 
   const reauthenticate = async (password: string) => {
