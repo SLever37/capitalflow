@@ -6,6 +6,7 @@ import { BottomNav } from './BottomNav';
 import { UserProfile } from '../types';
 import { supabase } from '../lib/supabase';
 import { notificationService } from '../services/notification.service';
+import { useCampaignNotifications } from '../hooks/useCampaignNotifications';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -26,6 +27,9 @@ export const AppShell: React.FC<AppShellProps> = ({
   children, toast, activeTab, setActiveTab, activeUser, isLoadingData, onOpenNav, onNewLoan, isStealthMode, toggleStealthMode, onOpenSupport, navOrder
 }) => {
   const [unreadSupport, setUnreadSupport] = useState(0);
+  const { unreadCampaignCount } = useCampaignNotifications(activeUser);
+
+  const totalUnread = unreadSupport + unreadCampaignCount;
 
   useEffect(() => {
     if (!activeUser || activeUser.id === 'DEMO') return;
@@ -105,9 +109,9 @@ export const AppShell: React.FC<AppShellProps> = ({
             className="fixed bottom-24 md:bottom-8 right-6 z-40 p-4 bg-blue-600 text-white rounded-full shadow-2xl shadow-blue-600/40 hover:scale-110 transition-all active:scale-95 group"
           >
               <MessageSquare size={24}/>
-              {unreadSupport > 0 && (
+              {totalUnread > 0 && (
                   <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[10px] font-black w-6 h-6 flex items-center justify-center rounded-full ring-4 ring-slate-950 animate-bounce">
-                      {unreadSupport}
+                      {totalUnread > 99 ? '99+' : totalUnread}
                   </span>
               )}
               <span className="absolute right-full mr-4 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-2xl">Atendimento Online</span>

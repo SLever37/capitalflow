@@ -1,10 +1,15 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ShieldCheck, X, ChevronLeft, MessageCircle, Lock, Unlock, Trash2 } from 'lucide-react';
 import { supportChatService } from '../../services/supportChat.service';
+import { campaignOperatorService } from '../../services/campaignOperator.service';
 import { ChatContainer } from './ChatContainer';
 import { ChatSidebar } from './components/ChatSidebar';
 import { useSupportRealtime } from './hooks/useSupportRealtime';
+import { useCampaignChat } from '../../hooks/useCampaignChat';
+import { useCampaignNotifications } from '../../hooks/useCampaignNotifications';
+import { ChatInput } from './components/ChatInput';
+import { ChatMessages } from './components/ChatMessages';
 
 function diffLabel(ts: string | number | Date) {
   if (!ts) return '';
@@ -65,13 +70,83 @@ const ActiveChatWrapper = ({ loanId, activeUser, clientName, onChatDeleted }: an
     );
 };
 
+const CampaignChatWrapper = ({ sessionToken, clientName }: { sessionToken: string; clientName: string }) => {
+    const { messages, sendMessage, sendAttachment, uploading, selectLead, leads } = useCampaignChat();
+    const scrollRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const lead = leads.find(l => l.session_token === sessionToken);
+        if (lead) {
+            selectLead(lead);
+        } else {
+            // Se não achou na lista local (ex: abriu direto), cria um mock básico para o hook funcionar
+            selectLead({ session_token: sessionToken, nome: clientName });
+        }
+    }, [sessionToken, leads]);
+
+    useEffect(() => {
+        if (scrollRef.current) {
+            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }
+    }, [messages]);
+
+    const handleSend = async (text: string, type?: any, file?: File) => {
+        try {
+            if (file) {
+                await sendAttachment(file);
+            } else {
+                await sendMessage(text);
+            }
+        } catch (e) {
+            alert('Erro ao enviar mensagem');
+        }
+    };
+
+    return (
+        <div className="flex-1 flex flex-col relative min-h-0">
+            <ChatMessages 
+                messages={messages.map(m => {
+                    const isAnexo = m.message?.startsWith('[ANEXO]');
+                    const fileUrl = isAnexo ? m.message.split(' ')[1] : undefined;
+                    const isImage = fileUrl?.match(/\.(jpeg|jpg|gif|png)$/i);
+                    
+                    return {
+                        ...m,
+                        content: isAnexo ? (isImage ? '📷 Imagem' : '📎 Arquivo') : m.message,
+                        sender_type: m.sender_type,
+                        created_at: m.created_at,
+                        type: isAnexo ? (isImage ? 'image' : 'file') : 'text',
+                        file_url: fileUrl
+                    };
+                })}
+                currentUserId="OPERATOR"
+                senderType="OPERATOR"
+                scrollRef={scrollRef}
+            />
+            <ChatInput 
+                onSend={handleSend}
+                isUploading={uploading}
+                placeholder="Responda ao lead..."
+            />
+        </div>
+    );
+};
+
 export const OperatorSupportChat = ({ activeUser, onClose }: { activeUser: any; onClose: () => void; }) => {
   const [activeChats, setActiveChats] = useState<any[]>([]);
   const [contracts, setContracts] = useState<any[]>([]);
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  const [campaignLeads, setCampaignLeads] = useState<any[]>([]);
   
   const [selectedChat, setSelectedChat] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
+
+  const { unreadCampaignCount, clearUnread } = useCampaignNotifications(activeUser);
+  const { leads: hookLeads, loadLeads } = useCampaignChat();
+
+  useEffect(() => {
+    setCampaignLeads(hookLeads);
+  }, [hookLeads]);
 
   // Identificação do dono para buscar dados corretos
   const ownerId = activeUser.supervisor_id || activeUser.id;
@@ -90,6 +165,9 @@ export const OperatorSupportChat = ({ activeUser, onClose }: { activeUser: any; 
     // 3. Equipe
     const team = await supportChatService.getTeamMembers(ownerId);
     setTeamMembers(team);
+
+    // 4. Captação
+    loadLeads();
   };
 
   useEffect(() => {
@@ -102,12 +180,22 @@ export const OperatorSupportChat = ({ activeUser, onClose }: { activeUser: any; 
   const filteredActive = useMemo(() => activeChats.filter(c => c.clientName.toLowerCase().includes(searchTerm.toLowerCase())), [activeChats, searchTerm]);
   const filteredClients = useMemo(() => contracts.filter(c => c.clientName.toLowerCase().includes(searchTerm.toLowerCase())), [contracts, searchTerm]);
   const filteredTeam = useMemo(() => teamMembers.filter(t => t.clientName.toLowerCase().includes(searchTerm.toLowerCase())), [teamMembers, searchTerm]);
+  const filteredCampaign = useMemo(() => campaignLeads.filter(l => (l.nome || '').toLowerCase().includes(searchTerm.toLowerCase()) || (l.whatsapp || '').includes(searchTerm)), [campaignLeads, searchTerm]);
 
   const handleSelectContact = (contact: any) => {
-      // Se for cliente (contrato) ou ativo, usa loanId
-      // Se for equipe, ainda não implementado full (placeholder)
       if (contact.type === 'TEAM') {
           alert("Chat interno de equipe em breve.");
+          return;
+      }
+
+      if (contact.type === 'CAMPAIGN') {
+          clearUnread();
+          setSelectedChat({
+              id: contact.id,
+              session_token: contact.session_token,
+              clientName: contact.nome || 'Lead sem nome',
+              type: 'CAMPAIGN'
+          });
           return;
       }
       
@@ -165,6 +253,8 @@ export const OperatorSupportChat = ({ activeUser, onClose }: { activeUser: any; 
             chats={filteredActive}
             clients={filteredClients}
             team={filteredTeam}
+            campaigns={filteredCampaign}
+            unreadCampaignCount={unreadCampaignCount}
             selectedChat={selectedChat}
             searchTerm={searchTerm}
             setSearchTerm={setSearchTerm}
@@ -188,18 +278,27 @@ export const OperatorSupportChat = ({ activeUser, onClose }: { activeUser: any; 
                   </div>
                   <div className="min-w-0">
                     <h2 className="text-sm font-black text-white uppercase truncate">{selectedChat.clientName}</h2>
-                    <p className="text-[10px] text-slate-500 font-mono">Contrato: {selectedChat.loanId.slice(0,8)}</p>
+                    <p className="text-[10px] text-slate-500 font-mono">
+                        {selectedChat.type === 'CAMPAIGN' ? 'Lead de Captação' : `Contrato: ${selectedChat.loanId.slice(0,8)}`}
+                    </p>
                   </div>
                 </div>
               </div>
 
               {/* Wrapper Ativo com Lógica Realtime */}
-              <ActiveChatWrapper 
-                  loanId={selectedChat.loanId} 
-                  activeUser={activeUser}
-                  clientName={selectedChat.clientName}
-                  onChatDeleted={() => { setSelectedChat(null); loadAllData(); }}
-              />
+              {selectedChat.type === 'CAMPAIGN' ? (
+                  <CampaignChatWrapper 
+                    sessionToken={selectedChat.session_token}
+                    clientName={selectedChat.clientName}
+                  />
+              ) : (
+                <ActiveChatWrapper 
+                    loanId={selectedChat.loanId} 
+                    activeUser={activeUser}
+                    clientName={selectedChat.clientName}
+                    onChatDeleted={() => { setSelectedChat(null); loadAllData(); }}
+                />
+              )}
             </>
           ) : (
             /* Empty State */

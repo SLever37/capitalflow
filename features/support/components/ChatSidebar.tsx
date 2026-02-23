@@ -1,11 +1,13 @@
 
 import React, { useState } from 'react';
-import { Search, MessageCircle, Users, Briefcase, ChevronRight, CheckSquare, Square, Trash2, X } from 'lucide-react';
+import { Search, MessageCircle, Users, Briefcase, ChevronRight, CheckSquare, Square, Trash2, X, Megaphone } from 'lucide-react';
 
 interface ChatSidebarProps {
     chats: any[];
     clients: any[];
     team: any[];
+    campaigns: any[];
+    unreadCampaignCount?: number;
     selectedChat: any;
     searchTerm: string;
     setSearchTerm: (v: string) => void;
@@ -15,9 +17,9 @@ interface ChatSidebarProps {
 }
 
 export const ChatSidebar: React.FC<ChatSidebarProps> = ({ 
-    chats, clients, team, selectedChat, searchTerm, setSearchTerm, onSelectChat, diffLabel, onBulkDelete 
+    chats, clients, team, campaigns, unreadCampaignCount = 0, selectedChat, searchTerm, setSearchTerm, onSelectChat, diffLabel, onBulkDelete 
 }) => {
-    const [activeTab, setActiveTab] = useState<'ACTIVE' | 'CLIENTS' | 'TEAM'>('ACTIVE');
+    const [activeTab, setActiveTab] = useState<'ACTIVE' | 'CLIENTS' | 'TEAM' | 'CAPTACAO'>('ACTIVE');
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
@@ -26,6 +28,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
         if (activeTab === 'ACTIVE') return chats;
         if (activeTab === 'CLIENTS') return clients;
         if (activeTab === 'TEAM') return team;
+        if (activeTab === 'CAPTACAO') return campaigns.map(c => ({ ...c, clientName: c.nome, type: 'CAMPAIGN' }));
         return [];
     };
 
@@ -93,6 +96,17 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                         >
                             <Briefcase size={12}/> Equipe
                         </button>
+                        <button 
+                            onClick={() => setActiveTab('CAPTACAO')}
+                            className={`flex-1 py-2 text-[10px] font-black uppercase rounded-lg transition-all flex items-center justify-center gap-1 relative ${activeTab === 'CAPTACAO' ? 'bg-slate-800 text-white shadow' : 'text-slate-500 hover:text-slate-300'}`}
+                        >
+                            <Megaphone size={12}/> Captação
+                            {unreadCampaignCount > 0 && (
+                                <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white text-[8px] font-black flex items-center justify-center rounded-full ring-2 ring-slate-900">
+                                    {unreadCampaignCount > 9 ? '9+' : unreadCampaignCount}
+                                </span>
+                            )}
+                        </button>
                     </div>
 
                     {activeTab === 'ACTIVE' && displayList.length > 0 && (
@@ -128,8 +142,10 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
             ) : (
               displayList.map((item: any) => {
                 // Identificador único depende do tipo
-                const key = item.loanId || item.profileId;
-                const isActive = (selectedChat?.loanId === item.loanId) || (selectedChat?.profileId === item.profileId);
+                const key = item.loanId || item.profileId || item.id;
+                const isActive = (selectedChat?.loanId === item.loanId && item.loanId) || 
+                                 (selectedChat?.profileId === item.profileId && item.profileId) ||
+                                 (selectedChat?.id === item.id && item.id);
                 const isSelected = selectedIds.includes(key);
                 
                 return (
@@ -158,6 +174,11 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                                 {item.unreadCount}
                                 </div>
                             )}
+                            {item.status === 'NOVO' && (
+                                <div className="absolute -bottom-1 -right-1 bg-amber-500 text-black text-[7px] font-black uppercase px-1 rounded shadow-sm">
+                                    Novo
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -180,6 +201,11 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                           {activeTab !== 'ACTIVE' && !isSelectionMode && <ChevronRight size={12} className="text-slate-600"/>}
                       </div>
                       
+                      {item.type === 'CAMPAIGN' && (
+                          <p className="text-[9px] text-slate-600 font-bold uppercase mt-1.5 tracking-wider">
+                            WhatsApp: {item.whatsapp || 'N/A'}
+                          </p>
+                      )}
                       {item.type === 'ACTIVE' && (
                           <p className="text-[9px] text-slate-600 font-bold uppercase mt-1.5 tracking-wider">
                             Contrato #{item.loanId?.slice(0,6)}
