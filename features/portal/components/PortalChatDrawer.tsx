@@ -2,6 +2,7 @@
 import React from 'react';
 import { X, MessageSquare, ShieldCheck, Monitor } from 'lucide-react';
 import { ChatContainer } from '../../support/ChatContainer';
+import { supabasePortal } from '../../../lib/supabasePortal';
 
 interface PortalChatDrawerProps {
     loan: any;
@@ -39,6 +40,7 @@ export const PortalChatDrawer: React.FC<PortalChatDrawerProps> = ({ loan, isOpen
                         profileId={loan.profile_id} 
                         senderType="CLIENT"
                         placeholder="Digite sua dúvida ou envie um comprovante..."
+                        supabaseClient={supabasePortal}
                     />
                 </div>
                 

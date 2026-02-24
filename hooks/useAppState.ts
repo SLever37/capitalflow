@@ -210,19 +210,20 @@ export const useAppState = (activeProfileId: string | null) => {
       });
 
     } catch (error: any) {
+      const errMsg = error.message || String(error);
       console.error('Erro ao carregar dados:', error);
 
       // Se for erro de token inválido, sinaliza necessidade de reauth
       if (
-        error.message?.includes('Refresh Token') || 
-        error.message?.includes('JWT') ||
+        errMsg.includes('Refresh Token') || 
+        errMsg.includes('JWT') ||
         error.code === 'PGRST301' // JWT expired
       ) {
         setLoadError('SESSAO_EXPIRADA');
         return;
       }
 
-      setLoadError(error.message || 'Erro de conexão.');
+      setLoadError(errMsg || 'Erro de conexão.');
     } finally {
       setIsLoadingData(false);
     }

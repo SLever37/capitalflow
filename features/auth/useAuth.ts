@@ -73,6 +73,9 @@ const mapLoginError = (err: any) => {
   if (l2.includes('invalid login')) return 'Usuário ou senha inválidos.';
   if (l2.includes('invalid_credentials')) return 'Usuário ou senha inválidos.';
   if (l2.includes('email not confirmed')) return 'E-mail não confirmado. Verifique sua caixa de entrada.';
+  if (l2.includes('refresh token not found') || l2.includes('invalid refresh token')) {
+    return 'Sessão expirada. Por favor, faça login novamente.';
+  }
   
   return raw || 'Erro desconhecido no login.';
 };
@@ -158,10 +161,11 @@ export const useAuth = () => {
         const { data: s, error: sessionError } = await supabase.auth.getSession();
 
         if (sessionError) {
-           if (isDev) console.warn('[BOOT] Auth Session Error:', sessionError.message);
+           const errMsg = sessionError.message || String(sessionError);
+           if (isDev) console.warn('[BOOT] Auth Session Error:', errMsg);
            
            // Se o token de refresh sumiu ou é inválido, limpamos o lixo do localStorage
-           if (sessionError.message?.includes('Refresh Token Not Found') || sessionError.message?.includes('invalid refresh token')) {
+           if (errMsg.includes('Refresh Token Not Found') || errMsg.includes('invalid refresh token')) {
                localStorage.removeItem('cm_supabase_auth');
                Object.keys(localStorage).forEach(key => {
                    if (key.startsWith('sb-') && key.endsWith('-auth-token')) {

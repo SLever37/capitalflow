@@ -13,6 +13,7 @@ interface ChatContainerProps {
   senderType: 'CLIENT' | 'OPERATOR';
   placeholder?: string;
   clientName?: string;
+  supabaseClient?: any;
 }
 
 export const ChatContainer: React.FC<ChatContainerProps> = ({
@@ -21,9 +22,10 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
   operatorId,
   senderType,
   placeholder,
+  supabaseClient,
 }) => {
   const { messages, ticketStatus, isOnline, isLoading, sendMessage, updateTicketStatus, deleteMessage } =
-    useSupportRealtime(loanId, profileId, senderType);
+    useSupportRealtime(loanId, profileId, senderType, supabaseClient);
 
   // ✅ CHAMADAS (voz/vídeo)
   const {
