@@ -52,7 +52,7 @@ export const paymentsService = {
       return { amountToPay: customAmount || Number(calculations?.total) || 0, paymentType };
     }
 
-    const ownerId = safeUUID((activeUser as any).supervisor_id) || safeUUID(activeUser.id);
+    const ownerId = safeUUID(loan.profile_id) || safeUUID((activeUser as any).supervisor_id) || safeUUID(activeUser.id);
     if (!ownerId) throw new Error('Perfil inválido. Refaça o login.');
 
     const idempotencyKey = generateUUID();
@@ -113,11 +113,19 @@ export const paymentsService = {
     let amountToPay = 0;
     let basePaymentNote = '';
 
+    const parseMoney = (v: string) => {
+      if (!v) return 0;
+      const clean = v.replace(/[R$\s]/g, '');
+      if (clean.includes('.') && clean.includes(',')) return parseFloat(clean.replace(/\./g, '').replace(',', '.')) || 0;
+      if (clean.includes(',')) return parseFloat(clean.replace(',', '.')) || 0;
+      return parseFloat(clean) || 0;
+    };
+
     if (paymentType === 'CUSTOM') {
       amountToPay = customAmount || 0;
       basePaymentNote = `Recebimento de Diária(s)`;
     } else if (paymentType === 'RENEW_AV') {
-      amountToPay = parseFloat(avAmount) || 0;
+      amountToPay = parseMoney(avAmount);
       basePaymentNote = `Amortização de Capital`;
     } else if (paymentType === 'FULL') {
       amountToPay =
@@ -126,7 +134,7 @@ export const paymentsService = {
         finalLateFee;
       basePaymentNote = 'Quitação Total do Contrato';
     } else if (paymentType === 'PARTIAL_INTEREST') {
-      amountToPay = parseFloat(avAmount) || 0;
+      amountToPay = parseMoney(avAmount);
       basePaymentNote = 'Pagamento Parcial (Juros)';
     } else {
       const interestOnly = Number(calculations?.interest) || 0;
@@ -140,41 +148,13 @@ export const paymentsService = {
     // 2) Nota (opcional)
     // =========================
     const paymentDate = realDate || todayDateOnlyUTC();
-    const paymentDateISO = paymentDate.toISOString();
     const formattedDate = paymentDate.toLocaleDateString('pt-BR');
 
     let finalNote = `${basePaymentNote}. Ref: ${formattedDate}.`;
     if (forgivenessMode !== 'NONE') finalNote += ` [Perdão aplicado]`;
 
     // =========================
-    // 3) RPC CANÔNICA (backend calcula deltas/abatimento)
-    //    Regra: paga juros; se zerar e sobrar, excedente vai para principal (pagamento+AV).
-    //    Mantemos flag para modalidades de juros (se você quiser branches futuras no SQL).
-    // =========================
-    const { error } = await supabase.rpc('process_payment_atomic', {
-      p_installment_id: inst.id,
-      p_amount: amountToPay,
-      p_idempotency_key: idempotencyKey,
-      p_interest_only: paymentType === 'PARTIAL_INTEREST' || paymentType === 'RENEW_INTEREST',
-      p_notes: finalNote,
-    });
-
-    if (error) {
-      const msg = error.message || '';
-
-      if (
-        msg.includes('Pagamento excede o saldo da parcela') ||
-        msg.includes('Pagamento duplicado detectado')
-      ) {
-        throw new Error(msg);
-      }
-
-      throw new Error('Falha na persistência: ' + msg);
-    }
-
-    // =========================
-    // 4) ATUALIZAÇÃO DE SALDOS (LUCRO E CAPITAL)
-    //    Garante que o Dashboard reflita os valores imediatamente.
+    // 3) Cálculo de Deltas para a RPC
     // =========================
     let profitDelta = 0;
     let principalDelta = 0;
@@ -188,17 +168,40 @@ export const paymentsService = {
         profitDelta = amountToPay;
     }
 
-    if (profitDelta > 0 || principalDelta > 0) {
-        const { error: balanceError } = await supabase.rpc('rpc_adjust_balances', {
-            p_profile_id: ownerId,
-            p_profit_amount: profitDelta,
-            p_principal_amount: principalDelta
-        });
+    // =========================
+    // 4) RPC ATÔMICA (Consolida tudo no banco)
+    //    Signature: 16 parâmetros conforme erro do cache
+    // =========================
+    const { error } = await supabase.rpc('process_payment_atomic', {
+      p_amount: amountToPay,
+      p_amount_to_pay: amountToPay,
+      p_idempotency_key: idempotencyKey,
+      p_installment_id: inst.id,
+      p_interest_delta: profitDelta,
+      p_interest_handling: params.interestHandling || 'KEEP_PENDING',
+      p_interest_only: paymentType === 'PARTIAL_INTEREST' || paymentType === 'RENEW_INTEREST',
+      p_late_fee_delta: 0,
+      p_notes: finalNote,
+      p_operator_id: safeUUID(activeUser.id),
+      p_payment_type: paymentType === 'FULL' ? 'PAYMENT_FULL' : 'PAYMENT_PARTIAL',
+      p_principal_delta: principalDelta,
+      p_principal_returned: principalDelta,
+      p_profile_id: ownerId,
+      p_profit_generated: profitDelta,
+      p_source_id: loan.sourceId
+    });
 
-        if (balanceError) {
-            console.error('[PAYMENT] Erro ao atualizar saldos:', balanceError);
-            // Não interrompe o fluxo principal, pois o pagamento foi registrado
-        }
+    if (error) {
+      const msg = error.message || '';
+
+      if (
+        msg.includes('Pagamento excede o saldo da parcela') ||
+        msg.includes('Pagamento duplicado detectado')
+      ) {
+        throw new Error(msg);
+      }
+
+      throw new Error('Falha na persistência: ' + msg);
     }
 
     return { amountToPay, paymentType };
