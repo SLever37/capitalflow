@@ -157,8 +157,19 @@ export const useAuth = () => {
         // Tenta recuperar sessão do Supabase, mas NÃO desloga se falhar
         const { data: s, error: sessionError } = await supabase.auth.getSession();
 
-        if (sessionError && isDev) {
-           console.warn('[BOOT] Auth Session Error (ignoring):', sessionError.message);
+        if (sessionError) {
+           if (isDev) console.warn('[BOOT] Auth Session Error:', sessionError.message);
+           
+           // Se o token de refresh sumiu ou é inválido, limpamos o lixo do localStorage
+           if (sessionError.message?.includes('Refresh Token Not Found') || sessionError.message?.includes('invalid refresh token')) {
+               localStorage.removeItem('cm_supabase_auth');
+               Object.keys(localStorage).forEach(key => {
+                   if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+                       localStorage.removeItem(key);
+                   }
+               });
+               await supabase.auth.signOut().catch(() => {});
+           }
         }
 
         const session = localStorage.getItem('cm_session');

@@ -27,12 +27,18 @@ export const TeamPage = ({ activeUser, showToast, ui }: any) => {
   useEffect(() => {
     if (!isDev) return;
     const checkAuth = async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        setAuthStatus({
-            authenticated: !!session,
-            uid: session?.user?.id || 'null',
-            email: session?.user?.email || 'null'
-        });
+        try {
+            const { data } = await supabase.auth.getSession();
+            const session = data?.session;
+            setAuthStatus({
+                authenticated: !!session,
+                uid: session?.user?.id || 'null',
+                email: session?.user?.email || 'null'
+            });
+        } catch (e) {
+            if (isDev) console.error('[TEAM] Auth check failed:', e);
+            setAuthStatus({ authenticated: false, uid: 'error', email: 'error' });
+        }
     };
     checkAuth();
   }, []);

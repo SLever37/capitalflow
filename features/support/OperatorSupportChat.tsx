@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ShieldCheck, X, ChevronLeft, MessageCircle, Lock, Unlock, Trash2 } from 'lucide-react';
 import { supportChatService } from '../../services/supportChat.service';
-import { campaignOperatorService } from '../../services/campaignOperator.service';
 import { ChatContainer } from './ChatContainer';
 import { ChatSidebar } from './components/ChatSidebar';
 import { useSupportRealtime } from './hooks/useSupportRealtime';

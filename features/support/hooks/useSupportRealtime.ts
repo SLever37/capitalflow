@@ -61,7 +61,11 @@ export const useSupportRealtime = (loanId: string, profileId: string, role: Role
           // Cria ticket inicial OPEN
           const { data: newTicket } = await supabase
             .from('support_tickets')
-            .insert({ loan_id: loanId, status: 'OPEN', profile_id: profileId })
+            .insert({ 
+              loan_id: loanId || null, 
+              status: 'OPEN', 
+              profile_id: profileId || null 
+            })
             .select('status')
             .single();
 
@@ -147,8 +151,8 @@ export const useSupportRealtime = (loanId: string, profileId: string, role: Role
     // Heartbeat
     const sendHeartbeat = async () => {
       const { error } = await supabase.from('support_presence').upsert({
-        profile_id: profileId,
-        loan_id: loanId,
+        profile_id: profileId || null,
+        loan_id: loanId || null,
         role,
         last_seen_at: new Date().toISOString(),
       });
@@ -199,13 +203,13 @@ export const useSupportRealtime = (loanId: string, profileId: string, role: Role
     }
 
     const payload: any = {
-      loan_id: loanId,
-      profile_id: profileId,
+      loan_id: loanId || null,
+      profile_id: profileId || null,
 
       // Dados de remetente
       sender: role,
       sender_type: role,
-      sender_user_id: profileId,
+      sender_user_id: profileId || null,
 
       // Conteúdo
       content: content ?? '',

@@ -157,13 +157,13 @@ export const supportChatService = {
     }
 
     const payload: any = {
-      profile_id: profileId,
-      loan_id: loanId,
+      profile_id: profileId || null,
+      loan_id: loanId || null,
 
       // legado + novo
       sender,
       sender_type: sender,
-      sender_user_id: uid,
+      sender_user_id: uid || null,
 
       text: text ?? null,
       content: text ?? null,
