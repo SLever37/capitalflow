@@ -1,3 +1,4 @@
+// feature/support/hooks/useSupportRealtime.ts
 import { useEffect, useRef, useState } from 'react';
 import { supabase as defaultSupabase } from '../../../lib/supabase';
 import { isDev } from '../../../utils/isDev';
@@ -139,24 +140,38 @@ export const useSupportRealtime = (
       .channel(`support-${loanId}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'mensagens_suporte', filter: `loan_id=eq.${loanId}` },
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'mensagens_suporte',
+          filter: `loan_id=eq.${loanId}`,
+        },
         (payload) => {
           setMessages((prev) => [...prev, payload.new]);
 
-          // Som somente se a mensagem não foi enviada por mim
-          const senderUserId =
-            (payload.new as any)?.sender_user_id ||
-            (payload.new as any)?.operator_id ||
-            (payload.new as any)?.profile_id ||
+          // 🔥 CORREÇÃO: notificar somente se NÃO foi enviado por mim
+          const n: any = payload.new;
+
+          // prioridade: campos que no seu INSERT carregam o profileId real
+          const senderProfileId =
+            n?.operator_id ??
+            n?.profile_id ??
+            n?.sender_user_id ??
             null;
 
-          const isMine = senderUserId ? String(senderUserId) === String(profileId) : false;
+          const isMine = senderProfileId && String(senderProfileId) === String(profileId);
+
           if (!isMine) playNotificationSound();
         }
       )
       .on(
         'postgres_changes',
-        { event: 'DELETE', schema: 'public', table: 'mensagens_suporte', filter: `loan_id=eq.${loanId}` },
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'mensagens_suporte',
+          filter: `loan_id=eq.${loanId}`,
+        },
         (payload) => {
           if (payload.old && (payload.old as any).id) {
             const oldId = (payload.old as any).id;
@@ -166,7 +181,12 @@ export const useSupportRealtime = (
       )
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'support_tickets', filter: `loan_id=eq.${loanId}` },
+        {
+          event: '*',
+          schema: 'public',
+          table: 'support_tickets',
+          filter: `loan_id=eq.${loanId}`,
+        },
         (payload) => {
           if ((payload.new as any)?.status) {
             setTicketStatus((payload.new as any).status as TicketStatus);
@@ -175,7 +195,12 @@ export const useSupportRealtime = (
       )
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'support_presence', filter: `loan_id=eq.${loanId}` },
+        {
+          event: '*',
+          schema: 'public',
+          table: 'support_presence',
+          filter: `loan_id=eq.${loanId}`,
+        },
         (payload) => {
           if (payload.new && (payload.new as any).role !== role) {
             setIsOnline(isOtherOnline((payload.new as any).last_seen_at));
@@ -191,8 +216,6 @@ export const useSupportRealtime = (
       if (!idsOk) return;
 
       // ✅ Para CLIENT: manter um profile_id válido.
-      // Se você setar null aqui, você perde rastreabilidade e ainda pode quebrar RLS.
-      // A policy de support_presence deve permitir upsert do cliente do contrato.
       const { error } = await supabase.from('support_presence').upsert({
         profile_id: profileId,
         loan_id: loanId,
@@ -242,7 +265,6 @@ export const useSupportRealtime = (
     if (!idsOk) {
       throw new Error('Não foi possível identificar o contrato para o atendimento. Volte e abra o chat pelo contrato.');
     }
-
     if (ticketStatus === 'CLOSED' && role === 'CLIENT') {
       throw new Error('Atendimento encerrado. Aguarde reabertura pelo operador ou abra um novo chamado.');
     }
@@ -255,8 +277,7 @@ export const useSupportRealtime = (
       sender: role,
       sender_type: role,
 
-      // ✅ IMPORTANTE:
-      // Para CLIENT, NÃO mande sender_user_id null. Isso atrapalha RLS e rastreio.
+      // ✅ Para CLIENT, NÃO mande sender_user_id null.
       sender_user_id: profileId,
 
       // Conteúdo
