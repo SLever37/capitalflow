@@ -28,6 +28,16 @@ const isUuid = (v?: string | null) =>
     String(v).trim()
   );
 
+/**
+ * Dedupe simples por id
+ */
+const pushUniqueById = (prev: any[], item: any) => {
+  const id = item?.id;
+  if (!id) return [...prev, item];
+  if (prev.some((m) => m?.id === id)) return prev;
+  return [...prev, item];
+};
+
 export const useSupportRealtime = (
   loanId: string,
   profileId: string,
@@ -71,7 +81,10 @@ export const useSupportRealtime = (
           .eq('loan_id', loanId)
           .order('created_at', { ascending: true });
 
-        if (!cancelled && !error && msgs) setMessages(msgs);
+        if (!cancelled) {
+          if (!error && msgs) setMessages(msgs);
+          if (error && isDev) console.error('[SUPPORT] load mensagens error:', error);
+        }
       }
 
       // Ticket (último)
@@ -84,11 +97,13 @@ export const useSupportRealtime = (
           .limit(1)
           .maybeSingle();
 
-        if (!cancelled && !tErr) {
+        if (!cancelled) {
+          if (tErr && isDev) console.error('[SUPPORT] load ticket error:', tErr);
+
           if (ticket?.status) {
             setTicketStatus(ticket.status as TicketStatus);
           } else {
-            // Cria ticket inicial OPEN (sem created_at manual)
+            // cria ticket inicial OPEN
             const { data: newTicket, error: insErr } = await supabase
               .from('support_tickets')
               .insert({
@@ -99,8 +114,9 @@ export const useSupportRealtime = (
               .select('status')
               .single();
 
-            if (!cancelled && !insErr && newTicket?.status) {
-              setTicketStatus(newTicket.status as TicketStatus);
+            if (!cancelled) {
+              if (insErr && isDev) console.error('[SUPPORT] create ticket error:', insErr);
+              if (!insErr && newTicket?.status) setTicketStatus(newTicket.status as TicketStatus);
             }
           }
         }
@@ -117,7 +133,8 @@ export const useSupportRealtime = (
           .limit(1)
           .maybeSingle();
 
-        if (!cancelled && !pErr) {
+        if (!cancelled) {
+          if (pErr && isDev) console.error('[SUPPORT] load presence error:', pErr);
           setIsOnline(isOtherOnline((presence as any)?.last_seen_at));
         }
       }
@@ -136,8 +153,18 @@ export const useSupportRealtime = (
   useEffect(() => {
     if (!idsOk) return;
 
+    // sempre limpar canal anterior antes de criar outro
+    if (channelRef.current) {
+      try {
+        supabase.removeChannel(channelRef.current);
+      } catch {}
+      channelRef.current = null;
+    }
+
     const channel = supabase
       .channel(`support-${loanId}`)
+
+      // Mensagens novas
       .on(
         'postgres_changes',
         {
@@ -147,23 +174,33 @@ export const useSupportRealtime = (
           filter: `loan_id=eq.${loanId}`,
         },
         (payload) => {
-          setMessages((prev) => [...prev, payload.new]);
-
-          // 🔥 CORREÇÃO: notificar somente se NÃO foi enviado por mim
           const n: any = payload.new;
 
-          // prioridade: campos que no seu INSERT carregam o profileId real
-          const senderProfileId =
-            n?.operator_id ??
-            n?.profile_id ??
-            n?.sender_user_id ??
-            null;
+          // adiciona sem duplicar
+          setMessages((prev) => pushUniqueById(prev, n));
 
+          /**
+           * ✅ FIX DEFINITIVO: notifica somente se NÃO foi enviado por mim
+           * IMPORTANTÍSSIMO:
+           * - sender_user_id no seu banco pode ser auth.uid() (UUID diferente do profileId)
+           * - então NÃO USAMOS sender_user_id aqui.
+           */
+          const senderProfileId = n?.operator_id ?? n?.profile_id ?? null;
           const isMine = senderProfileId && String(senderProfileId) === String(profileId);
 
-          if (!isMine) playNotificationSound();
+          if (!isMine) {
+            playNotificationSound();
+          } else if (isDev) {
+            console.log('[SUPPORT] mensagem minha, sem notificação', {
+              senderProfileId,
+              profileId,
+              msgId: n?.id,
+            });
+          }
         }
       )
+
+      // Mensagens deletadas
       .on(
         'postgres_changes',
         {
@@ -173,12 +210,13 @@ export const useSupportRealtime = (
           filter: `loan_id=eq.${loanId}`,
         },
         (payload) => {
-          if (payload.old && (payload.old as any).id) {
-            const oldId = (payload.old as any).id;
-            setMessages((prev) => prev.filter((m) => m.id !== oldId));
-          }
+          const oldId = (payload.old as any)?.id;
+          if (!oldId) return;
+          setMessages((prev) => prev.filter((m) => m?.id !== oldId));
         }
       )
+
+      // Tickets
       .on(
         'postgres_changes',
         {
@@ -188,11 +226,12 @@ export const useSupportRealtime = (
           filter: `loan_id=eq.${loanId}`,
         },
         (payload) => {
-          if ((payload.new as any)?.status) {
-            setTicketStatus((payload.new as any).status as TicketStatus);
-          }
+          const st = (payload.new as any)?.status;
+          if (st) setTicketStatus(st as TicketStatus);
         }
       )
+
+      // Presença
       .on(
         'postgres_changes',
         {
@@ -202,37 +241,37 @@ export const useSupportRealtime = (
           filter: `loan_id=eq.${loanId}`,
         },
         (payload) => {
-          if (payload.new && (payload.new as any).role !== role) {
-            setIsOnline(isOtherOnline((payload.new as any).last_seen_at));
+          const n: any = payload.new;
+          if (!n) return;
+          if (n.role !== role) {
+            setIsOnline(isOtherOnline(n.last_seen_at));
           }
         }
       )
-      .subscribe();
+      .subscribe((status: any) => {
+        if (isDev) console.log('[SUPPORT] realtime status:', status);
+      });
 
     channelRef.current = channel;
 
     // Heartbeat
     const sendHeartbeat = async () => {
       if (!idsOk) return;
-
-      // ✅ Para CLIENT: manter um profile_id válido.
       const { error } = await supabase.from('support_presence').upsert({
         profile_id: profileId,
         loan_id: loanId,
         role,
         last_seen_at: new Date().toISOString(),
       });
-
-      if (error) console.error('support_presence upsert error:', error);
+      if (error && isDev) console.error('[SUPPORT] heartbeat upsert error:', error);
     };
 
     sendHeartbeat();
     heartbeatRef.current = window.setInterval(sendHeartbeat, HEARTBEAT_MS);
 
-    // Poll online
+    // Poll online (fallback)
     const pollOnline = async () => {
       if (!idsOk) return;
-
       const { data, error } = await supabase
         .from('support_presence')
         .select('last_seen_at,role')
@@ -241,14 +280,18 @@ export const useSupportRealtime = (
         .order('last_seen_at', { ascending: false })
         .limit(1)
         .maybeSingle();
-
+      if (error && isDev) console.error('[SUPPORT] poll presence error:', error);
       if (!error) setIsOnline(isOtherOnline((data as any)?.last_seen_at));
     };
 
     onlinePollRef.current = window.setInterval(pollOnline, ONLINE_POLL_MS);
 
     return () => {
-      if (channelRef.current) supabase.removeChannel(channelRef.current);
+      if (channelRef.current) {
+        try {
+          supabase.removeChannel(channelRef.current);
+        } catch {}
+      }
       channelRef.current = null;
 
       if (heartbeatRef.current) window.clearInterval(heartbeatRef.current);
@@ -260,58 +303,69 @@ export const useSupportRealtime = (
   }, [idsOk, loanId, profileId, role, supabase]);
 
   // Envio simples (texto/link). Uploads: use supportChat.service.ts
-  const sendMessage = async (content: string, type: string = 'text', fileUrl?: string, metadata?: any) => {
-    // ✅ Bloqueio duro: não deixa cair em uuid null/""
+  const sendMessage = async (
+    content: string,
+    type: string = 'text',
+    fileUrl?: string,
+    metadata?: any
+  ) => {
     if (!idsOk) {
-      throw new Error('Não foi possível identificar o contrato para o atendimento. Volte e abra o chat pelo contrato.');
+      throw new Error(
+        'Não foi possível identificar o contrato para o atendimento. Volte e abra o chat pelo contrato.'
+      );
     }
+
     if (ticketStatus === 'CLOSED' && role === 'CLIENT') {
-      throw new Error('Atendimento encerrado. Aguarde reabertura pelo operador ou abra um novo chamado.');
+      throw new Error(
+        'Atendimento encerrado. Aguarde reabertura pelo operador ou abra um novo chamado.'
+      );
     }
 
     const payload: any = {
       loan_id: loanId,
       profile_id: profileId,
 
-      // Dados de remetente
+      // dados de remetente
       sender: role,
       sender_type: role,
 
-      // ✅ Para CLIENT, NÃO mande sender_user_id null.
+      /**
+       * ✅ manter sender_user_id preenchido (útil pra auditoria)
+       * MAS não use isso pra decidir notificação.
+       */
       sender_user_id: profileId,
 
-      // Conteúdo
+      // conteúdo
       content: content ?? '',
       text: content ?? '',
       type,
       file_url: fileUrl || null,
       metadata: metadata || null,
 
-      // Status inicial
+      // status inicial
       read: false,
-      // created_at: deixar o default do banco
     };
 
     if (role === 'OPERATOR') payload.operator_id = profileId;
 
-    if (isDev) console.log('[PORTAL_SUPPORT_SEND_PAYLOAD]', payload);
+    if (isDev) console.log('[SUPPORT_SEND_PAYLOAD]', payload);
 
     const { error } = await supabase.from('mensagens_suporte').insert(payload);
-
     if (error) {
-      if (isDev) console.error('[CHAT_SEND_ERROR]', error, payload);
+      if (isDev) console.error('[SUPPORT_SEND_ERROR]', error, payload);
       throw new Error(error.message || 'Falha ao enviar mensagem.');
     }
   };
 
-  // ✅ Enviar localização real
   const sendLocation = async (lat: number, lng: number) => {
     await sendMessage(`https://maps.google.com/?q=${lat},${lng}`, 'location', undefined, { lat, lng });
   };
 
   const updateTicketStatus = async (newStatus: TicketStatus) => {
     if (!idsOk) {
-      throw new Error('Não foi possível identificar o contrato para o atendimento. Volte e abra o chat pelo contrato.');
+      throw new Error(
+        'Não foi possível identificar o contrato para o atendimento. Volte e abra o chat pelo contrato.'
+      );
     }
 
     if (newStatus === 'CLOSED') {
@@ -330,18 +384,16 @@ export const useSupportRealtime = (
       return;
     }
 
-    // Reabrir = cria novo ticket OPEN (histórico preservado)
+    // Reabrir: cria novo ticket OPEN (histórico preservado)
     const { error } = await supabase.from('support_tickets').insert({
       loan_id: loanId,
       status: 'OPEN',
       profile_id: profileId,
-      // created_at/updated_at: defaults do banco, se existirem
     });
 
     if (error) throw new Error(error.message || 'Falha ao reabrir ticket.');
   };
 
-  // Nova função para deletar mensagem
   const deleteMessage = async (msgId: string) => {
     await supportChatService.deleteMessage(msgId);
   };
