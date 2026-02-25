@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -24,14 +24,11 @@ export const useToast = () => {
     };
   }, [toast]);
 
-  const playBeep = (type: ToastType) => {
+  const playBeep = useCallback((type: ToastType) => {
     if (type !== 'error' && type !== 'warning') return;
 
     try {
-      const AudioCtx =
-        (window as any).AudioContext ||
-        (window as any).webkitAudioContext;
-
+      const AudioCtx = (window as any).AudioContext || (window as any).webkitAudioContext;
       if (!AudioCtx) return;
 
       // 🔒 Reutiliza contexto (evita erro de limite no Chrome)
@@ -55,12 +52,15 @@ export const useToast = () => {
     } catch {
       // navegador pode bloquear áudio
     }
-  };
+  }, []);
 
-  const showToast = (msg: string, type: ToastType = 'success') => {
-    setToast({ msg, type });
-    playBeep(type);
-  };
+  const showToast = useCallback(
+    (msg: string, type: ToastType = 'success') => {
+      setToast({ msg, type });
+      playBeep(type);
+    },
+    [playBeep]
+  );
 
   return { toast, showToast };
 };

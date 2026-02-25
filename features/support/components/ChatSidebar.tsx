@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Search, MessageCircle, Users, Briefcase, ChevronRight, CheckSquare, Square, Trash2, X, Megaphone, ChevronDown } from 'lucide-react';
-import { groupContractsByDebtorName } from '../../../utils/chatGroupHelpers';
+import { groupContractsByClientNameAndId } from '../../../utils/groupClientContracts';
 
 interface ChatSidebarProps {
     chats: any[];
@@ -36,7 +36,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
         else if (activeTab === 'CAPTACAO') list = campaigns.map(c => ({ ...c, clientName: c.nome, type: 'CAMPAIGN' }));
 
         if (activeTab === 'ACTIVE' || activeTab === 'CLIENTS') {
-            return groupContractsByDebtorName(list);
+            return groupContractsByClientNameAndId(list);
         }
         return list;
     }, [activeTab, chats, clients, team, campaigns]);
@@ -245,16 +245,16 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
             ) : (
               displayList.map((item: any) => {
                 if (item.isGroup) {
-                    const isExpanded = expandedGroups.has(item.groupId);
+                    const isExpanded = expandedGroups.has(item.groupKey);
                     // Se o grupo tem apenas 1 item, renderiza o item diretamente para não ter clique duplo desnecessário
                     if (item.items.length === 1) {
                         return renderItem(item.items[0]);
                     }
 
                     return (
-                        <div key={item.groupId} className="w-full">
+                        <div key={item.groupKey} className="w-full">
                             <button
-                                onClick={() => toggleGroup(item.groupId)}
+                                onClick={() => toggleGroup(item.groupKey)}
                                 className="w-full p-3 rounded-xl flex items-center justify-between transition-all bg-slate-900/50 hover:bg-slate-900 border border-slate-800"
                             >
                                 <div className="flex items-center gap-3">

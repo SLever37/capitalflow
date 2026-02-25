@@ -278,16 +278,16 @@ export const supportChatService = {
 
     // 2. Busca nomes dos devedores (contratos) manualmente
     const loanIds = Array.from(new Set((messages || []).map((m: any) => m.loan_id).filter(Boolean)));
-    const contractsMap = new Map<string, string>();
+    const contractsMap = new Map<string, { name: string; clientId: string }>();
 
     if (loanIds.length > 0) {
         const { data: loans, error: loansError } = await supabase
             .from('contratos')
-            .select('id, debtor_name')
+            .select('id, debtor_name, client_id')
             .in('id', loanIds);
         
         if (!loansError && loans) {
-            loans.forEach((l: any) => contractsMap.set(l.id, l.debtor_name || 'Cliente'));
+            loans.forEach((l: any) => contractsMap.set(l.id, { name: l.debtor_name || 'Cliente', clientId: l.client_id }));
         }
     }
 
@@ -297,13 +297,14 @@ export const supportChatService = {
         const anyMsg = m as any;
         const loanId = anyMsg.loan_id;
         
-        const clientName = contractsMap.get(loanId);
-        if (!clientName) continue; // Ignora se contrato não existe ou sem acesso
+        const contractInfo = contractsMap.get(loanId);
+        if (!contractInfo) continue; // Ignora se contrato não existe ou sem acesso
 
         if (!chatsMap.has(loanId)) {
             chatsMap.set(loanId, {
                 loanId: loanId,
-                clientName: clientName,
+                clientId: contractInfo.clientId,
+                clientName: contractInfo.name,
                 timestamp: anyMsg.created_at,
                 lastMessage: anyMsg.content || anyMsg.text || 'Mídia enviada',
                 unreadCount: 0,
@@ -325,7 +326,7 @@ export const supportChatService = {
   async getAvailableContracts(ownerId: string) {
     const { data, error } = await supabase
       .from('contratos')
-      .select('id, debtor_name, debtor_document, debtor_phone')
+      .select('id, debtor_name, debtor_document, debtor_phone, client_id')
       .eq('owner_id', ownerId)
       .neq('is_archived', true)
       .order('debtor_name', { ascending: true })
@@ -335,6 +336,7 @@ export const supportChatService = {
 
     return (data || []).map((c: any) => ({
       loanId: c.id,
+      clientId: c.client_id,
       clientName: c.debtor_name || 'Sem Nome',
       debtorDocument: c.debtor_document,
       type: 'CLIENT',
