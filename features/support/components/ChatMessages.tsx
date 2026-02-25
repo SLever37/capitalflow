@@ -11,6 +11,7 @@ interface ChatMessagesProps {
   operatorId?: string;
   scrollRef?: React.RefObject<HTMLDivElement>;
   onDeleteMessage?: (id: string) => void;
+  chatTheme?: 'dark' | 'blue';
 }
 
 function buildMapsUrlFromMessage(m: SupportMessage): { url: string | null; lat?: number; lng?: number } {
@@ -47,14 +48,23 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
   senderType,
   operatorId,
   scrollRef,
-  onDeleteMessage
+  onDeleteMessage,
+  chatTheme = 'dark'
 }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll para a última mensagem quando a lista de mensagens mudar
+  // Auto-scroll inteligente
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    const container = scrollRef?.current;
+    if (!container) return;
+
+    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+    
+    // Se for a primeira carga (poucas mensagens) ou estiver perto do final, rola pra baixo
+    if (isNearBottom || messages.length <= 20) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, scrollRef]);
 
   const handleDelete = (id: string) => {
     if (confirm('Apagar esta mensagem permanentemente?')) {
@@ -183,8 +193,8 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
             <div
               className={`max-w-[85%] px-4 py-3 relative ${
                 isMe
-                  ? 'bg-blue-600 text-white rounded-2xl rounded-tr-sm'
-                  : 'bg-[#1e293b] text-slate-200 rounded-2xl rounded-tl-sm'
+                  ? 'bg-blue-600 text-white rounded-2xl rounded-tr-sm shadow-sm'
+                  : `${chatTheme === 'blue' ? 'bg-slate-800 border border-slate-700/50' : 'bg-[#1e293b]'} text-slate-200 rounded-2xl rounded-tl-sm shadow-sm`
               }`}
             >
               {renderContent(m)}

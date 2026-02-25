@@ -6,10 +6,20 @@ export function dedupeByLoanId(items: any[]) {
             continue;
         }
         if (!map.has(item.loanId)) {
-            map.set(item.loanId, item);
+            map.set(item.loanId, { ...item });
         } else {
             const existing = map.get(item.loanId);
+            // Merge unread count
             existing.unreadCount = (existing.unreadCount || 0) + (item.unreadCount || 0);
+            
+            // Keep newest timestamp and message
+            const timeExisting = existing.timestamp ? new Date(existing.timestamp).getTime() : 0;
+            const timeNew = item.timestamp ? new Date(item.timestamp).getTime() : 0;
+            
+            if (timeNew > timeExisting) {
+                existing.timestamp = item.timestamp;
+                existing.lastMessage = item.lastMessage;
+            }
         }
     }
     return Array.from(map.values());

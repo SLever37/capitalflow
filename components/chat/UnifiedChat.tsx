@@ -15,6 +15,7 @@ export interface UnifiedChatProps<TContext> {
   onClose?: () => void;
   showDeleteHistory?: boolean;
   onDeleteHistory?: () => Promise<void>;
+  chatTheme?: 'dark' | 'blue';
 }
 
 export function UnifiedChat<TContext>({
@@ -26,7 +27,8 @@ export function UnifiedChat<TContext>({
   subtitle,
   onClose,
   showDeleteHistory,
-  onDeleteHistory
+  onDeleteHistory,
+  chatTheme = 'dark'
 }: UnifiedChatProps<TContext>) {
   const {
     messages,
@@ -54,9 +56,9 @@ export function UnifiedChat<TContext>({
   const displaySubtitle = subtitle || headerInfo?.subtitle || '';
 
   return (
-    <div className="flex-1 flex flex-col bg-slate-900 relative min-h-0 overflow-hidden">
+    <div className={`flex-1 flex flex-col relative min-h-0 overflow-hidden ${chatTheme === 'blue' ? 'bg-slate-900/50' : 'bg-slate-900'}`}>
       {/* Header Interno do Chat (se não for passado externamente) */}
-      <div className="h-16 border-b border-slate-800 bg-slate-900 flex items-center justify-between px-4 sm:px-6 shrink-0 shadow-sm z-10">
+      <div className={`h-16 border-b flex items-center justify-between px-4 sm:px-6 shrink-0 shadow-sm z-10 ${chatTheme === 'blue' ? 'bg-slate-900/80 border-slate-700/50' : 'bg-slate-900 border-slate-800'}`}>
         <div className="flex items-center gap-3 min-w-0">
           {onClose && (
             <button 
@@ -105,13 +107,16 @@ export function UnifiedChat<TContext>({
       </div>
 
       {/* Mensagens */}
-      <ChatMessages 
-        messages={messages as any}
-        currentUserId={userId}
-        senderType={role === 'OPERATOR' ? 'OPERATOR' : 'CLIENT'}
-        scrollRef={scrollRef}
-        onDeleteMessage={features.canDelete ? deleteMessage : undefined}
-      />
+      <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+          <ChatMessages 
+            messages={messages as any}
+            currentUserId={userId}
+            senderType={role === 'OPERATOR' ? 'OPERATOR' : 'CLIENT'}
+            scrollRef={scrollRef}
+            onDeleteMessage={features.canDelete ? deleteMessage : undefined}
+            chatTheme={chatTheme}
+          />
+      </div>
 
       {/* Input */}
       <ChatInput 
@@ -120,6 +125,7 @@ export function UnifiedChat<TContext>({
         }}
         isUploading={isUploading}
         placeholder={ticketStatus === 'CLOSED' ? 'Atendimento encerrado' : 'Digite sua mensagem...'}
+        chatTheme={chatTheme}
       />
       
       {ticketStatus === 'CLOSED' && role !== 'OPERATOR' && (

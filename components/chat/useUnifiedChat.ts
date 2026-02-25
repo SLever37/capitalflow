@@ -26,13 +26,17 @@ export const useUnifiedChat = <TContext>({
   const scrollRef = useRef<HTMLDivElement>(null);
   const features = adapter.getFeatures();
 
-  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth', force = false) => {
     if (scrollRef.current) {
-      const { scrollHeight, clientHeight } = scrollRef.current;
-      scrollRef.current.scrollTo({
-        top: scrollHeight - clientHeight,
-        behavior
-      });
+      const { scrollHeight, clientHeight, scrollTop } = scrollRef.current;
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+      
+      if (force || isNearBottom) {
+        scrollRef.current.scrollTo({
+          top: scrollHeight - clientHeight,
+          behavior
+        });
+      }
     }
   }, []);
 
@@ -60,7 +64,7 @@ export const useUnifiedChat = <TContext>({
           }
 
           // Scroll inicial sem animação
-          setTimeout(() => scrollToBottom('auto'), 100);
+          setTimeout(() => scrollToBottom('auto', true), 100);
         }
       } catch (error) {
         console.error('[UnifiedChat] Error loading initial data:', error);
@@ -123,7 +127,7 @@ export const useUnifiedChat = <TContext>({
         role,
         userId
       });
-      scrollToBottom();
+      scrollToBottom('smooth', true);
     } catch (error) {
       console.error('[UnifiedChat] Error sending message:', error);
       throw error;

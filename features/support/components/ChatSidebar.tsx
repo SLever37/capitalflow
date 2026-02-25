@@ -15,15 +15,17 @@ interface ChatSidebarProps {
     onSelectChat: (chat: any) => void;
     diffLabel: (ts: string) => string;
     onBulkDelete: (ids: string[]) => void;
+    chatTheme?: 'dark' | 'blue';
 }
 
 export const ChatSidebar: React.FC<ChatSidebarProps> = ({ 
-    chats, clients, team, campaigns, unreadCampaignCount = 0, selectedChat, searchTerm, setSearchTerm, onSelectChat, diffLabel, onBulkDelete 
+    chats, clients, team, campaigns, unreadCampaignCount = 0, selectedChat, searchTerm, setSearchTerm, onSelectChat, diffLabel, onBulkDelete, chatTheme = 'dark'
 }) => {
     const [activeTab, setActiveTab] = useState<'ACTIVE' | 'CLIENTS' | 'TEAM' | 'CAPTACAO'>('ACTIVE');
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+    const [isLightTheme, setIsLightTheme] = useState(false);
 
     // Filtra a lista correta baseada na aba e agrupa
     const displayList = useMemo(() => {
@@ -159,11 +161,12 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
 
     return (
         <div className={`
-            flex flex-col w-full md:w-[380px] lg:w-[420px] bg-slate-950 border-r border-slate-800 transition-all duration-300
+            flex flex-col w-full md:w-[380px] lg:w-[420px] transition-all duration-300
+            ${chatTheme === 'blue' ? 'bg-slate-900 border-r border-slate-700/50' : 'bg-slate-950 border-r border-slate-800'}
             ${selectedChat ? 'hidden md:flex' : 'flex'}
         `}>
           {/* Header de Busca e Abas */}
-          <div className="p-4 border-b border-slate-800 space-y-3">
+          <div className={`p-4 border-b space-y-3 ${chatTheme === 'blue' ? 'border-slate-700/50' : 'border-slate-800'}`}>
             {!isSelectionMode ? (
                 <>
                     <div className="relative group">

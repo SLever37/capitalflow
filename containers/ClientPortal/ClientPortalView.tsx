@@ -17,7 +17,6 @@ import {
   CheckCircle2,
   FileText
 } from 'lucide-react';
-
 import { useClientPortalLogic } from '../../features/portal/hooks/useClientPortalLogic';
 import { usePortalClientNotifications } from '../../features/portal/hooks/usePortalClientNotifications';
 import { usePortalPushNotifications } from '../../features/portal/hooks/usePortalPushNotifications';
@@ -36,87 +35,113 @@ interface ClientPortalViewProps {
 }
 
 interface ContractBlockProps {
-    loan: any;
-    onPay: () => void;
-    onChat: () => void;
+  loan: any;
+  onPay: () => void;
+  onChat: () => void;
 }
 
 const ContractBlock: React.FC<ContractBlockProps> = ({ loan, onPay, onChat }) => {
-    const summary = useMemo(() => resolveDebtSummary(loan, loan.installments), [loan]);
-    const { hasLateInstallments, totalDue, pendingCount, nextDueDate } = summary;
-    const nextInst = loan.installments.find((i: any) => i.status !== 'PAID');
-    const statusInfo = nextInst ? getPortalDueLabel(resolveInstallmentDebt(loan, nextInst).daysLate, nextInst.dueDate) : { label: 'Quitado', variant: 'OK' };
-    const isPaidOff = pendingCount === 0;
+  const summary = useMemo(() => resolveDebtSummary(loan, loan.installments), [loan]);
+  const { hasLateInstallments, totalDue, pendingCount, nextDueDate } = summary;
+  const nextInst = loan.installments.find((i: any) => i.status !== 'PAID');
+  const statusInfo = nextInst
+    ? getPortalDueLabel(resolveInstallmentDebt(loan, nextInst).daysLate, nextInst.dueDate)
+    : { label: 'Quitado', variant: 'OK' };
+  const isPaidOff = pendingCount === 0;
 
-    return (
-        <div className={`border rounded-2xl p-4 transition-all ${hasLateInstallments ? 'bg-rose-950/10 border-rose-500/30' : isPaidOff ? 'bg-emerald-950/10 border-emerald-500/20' : 'bg-slate-900 border-slate-800'}`}>
-            <div className="flex justify-between items-start mb-3">
-                <div>
-                    <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Contrato</span>
-                        <span className="text-[10px] font-mono text-slate-600">#{loan.id.substring(0,6).toUpperCase()}</span>
-                    </div>
-                    <h4 className="text-white font-bold text-sm mt-0.5">{loan.billingCycle === 'DAILY_FREE' ? 'Modalidade Diária' : 'Crédito Mensal'}</h4>
-                </div>
-                <div className={`px-2 py-1 rounded text-[9px] font-black uppercase border ${
-                    statusInfo.variant === 'OVERDUE' ? 'bg-rose-500 text-white border-rose-600' :
-                    statusInfo.variant === 'DUE_TODAY' ? 'bg-amber-500 text-black border-amber-600' :
-                    isPaidOff ? 'bg-emerald-500 text-white border-emerald-600' :
-                    'bg-slate-800 text-slate-400 border-slate-700'
-                }`}>
-                    {isPaidOff ? 'Finalizado' : statusInfo.label}
-                </div>
-            </div>
-
-            {!isPaidOff && (
-                <div className="flex justify-between items-end mb-4">
-                    <div>
-                        <p className="text-[10px] text-slate-500 uppercase font-bold">Total Aberto</p>
-                        <p className={`text-xl font-black ${hasLateInstallments ? 'text-rose-400' : 'text-white'}`}>
-                            {formatMoney(totalDue)}
-                        </p>
-                    </div>
-                    {nextDueDate && (
-                        <div className="text-right">
-                            <p className="text-[9px] text-slate-500 uppercase font-bold">Próx. Vencimento</p>
-                            <p className="text-xs text-white font-bold">{new Date(nextDueDate).toLocaleDateString('pt-BR')}</p>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {!isPaidOff && (
-                <div className="space-y-2 mb-4 bg-slate-950/50 p-2 rounded-xl border border-slate-800/50">
-                    {loan.installments.filter((i:any) => i.status !== 'PAID').slice(0, 2).map((inst: any) => (
-                         <PortalInstallmentItem key={inst.id} loan={loan} installment={inst} />
-                    ))}
-                    {pendingCount > 2 && (
-                        <p className="text-[9px] text-center text-slate-500 italic py-1">...e mais {pendingCount - 2} parcelas</p>
-                    )}
-                </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-2 mt-2">
-                <button 
-                    onClick={onPay}
-                    disabled={isPaidOff}
-                    className={`py-2.5 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-2 transition-all ${
-                        isPaidOff ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 
-                        hasLateInstallments ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-900/20' : 
-                        'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/20'
-                    }`}
-                >
-                    <Wallet size={14}/> {isPaidOff ? 'Quitado' : 'Pagar Agora'}
-                </button>
-                <button 
-                    onClick={onChat}
-                    className="py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-2 transition-all"
-                >
-                    <MessageCircle size={14}/> Ajuda
-                </button>
-            </div>
+  return (
+    <div
+      className={`border rounded-2xl p-4 transition-all ${
+        hasLateInstallments
+          ? 'bg-rose-950/10 border-rose-500/30'
+          : isPaidOff
+          ? 'bg-emerald-950/10 border-emerald-500/20'
+          : 'bg-slate-900 border-slate-800'
+      }`}
+    >
+      <div className="flex justify-between items-start mb-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Contrato</span>
+            <span className="text-[10px] font-mono text-slate-600">#{loan.id.substring(0, 6).toUpperCase()}</span>
+          </div>
+          <h4 className="text-white font-bold text-sm mt-0.5">
+            {loan.billingCycle === 'DAILY_FREE' ? 'Modalidade Diária' : 'Crédito Mensal'}
+          </h4>
         </div>
-    );
+
+        <div
+          className={`px-2 py-1 rounded text-[9px] font-black uppercase border ${
+            statusInfo.variant === 'OVERDUE'
+              ? 'bg-rose-500 text-white border-rose-600'
+              : statusInfo.variant === 'DUE_TODAY'
+              ? 'bg-amber-500 text-black border-amber-600'
+              : isPaidOff
+              ? 'bg-emerald-500 text-white border-emerald-600'
+              : 'bg-slate-800 text-slate-400 border-slate-700'
+          }`}
+        >
+          {isPaidOff ? 'Finalizado' : statusInfo.label}
+        </div>
+      </div>
+
+      {!isPaidOff && (
+        <div className="flex justify-between items-end mb-4">
+          <div>
+            <p className="text-[10px] text-slate-500 uppercase font-bold">Total Aberto</p>
+            <p className={`text-xl font-black ${hasLateInstallments ? 'text-rose-400' : 'text-white'}`}>
+              {formatMoney(totalDue)}
+            </p>
+          </div>
+
+          {nextDueDate && (
+            <div className="text-right">
+              <p className="text-[9px] text-slate-500 uppercase font-bold">Próx. Vencimento</p>
+              <p className="text-xs text-white font-bold">{new Date(nextDueDate).toLocaleDateString('pt-BR')}</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {!isPaidOff && (
+        <div className="space-y-2 mb-4 bg-slate-950/50 p-2 rounded-xl border border-slate-800/50">
+          {loan.installments
+            .filter((i: any) => i.status !== 'PAID')
+            .slice(0, 2)
+            .map((inst: any) => (
+              <PortalInstallmentItem key={inst.id} loan={loan} installment={inst} />
+            ))}
+
+          {pendingCount > 2 && (
+            <p className="text-[9px] text-center text-slate-500 italic py-1">...e mais {pendingCount - 2} parcelas</p>
+          )}
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-2 mt-2">
+        <button
+          onClick={onPay}
+          disabled={isPaidOff}
+          className={`py-2.5 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-2 transition-all ${
+            isPaidOff
+              ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+              : hasLateInstallments
+              ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-900/20'
+              : 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/20'
+          }`}
+        >
+          <Wallet size={14} /> {isPaidOff ? 'Quitado' : 'Pagar Agora'}
+        </button>
+
+        <button
+          onClick={onChat}
+          className="py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 rounded-xl text-[10px] font-black uppercase flex items-center justify-center gap-2 transition-all"
+        >
+          <MessageCircle size={14} /> Ajuda
+        </button>
+      </div>
+    </div>
+  );
 };
 
 export const ClientPortalView: React.FC<ClientPortalViewProps> = ({ initialPortalToken }) => {
@@ -133,80 +158,88 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({ initialPorta
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 max-w-md w-full text-center">
-            <ShieldCheck size={48} className="mx-auto text-rose-500 mb-4" />
-            <h2 className="text-white font-black text-xl mb-2">Acesso Negado</h2>
-            <p className="text-slate-400 text-sm mb-4">Link inválido, expirado ou código de segurança ausente.</p>
-            <button onClick={() => window.location.href = '/'} className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold uppercase text-xs transition-all">
-                Voltar ao Início
-            </button>
+          <ShieldCheck size={48} className="mx-auto text-rose-500 mb-4" />
+          <h2 className="text-white font-black text-xl mb-2">Acesso Negado</h2>
+          <p className="text-slate-400 text-sm mb-4">Link inválido, expirado ou código de segurança ausente.</p>
+          <button
+            onClick={() => (window.location.href = '/')}
+            className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold uppercase text-xs transition-all"
+          >
+            Voltar ao Início
+          </button>
         </div>
       </div>
     );
   }
 
-  const {
-    isLoading,
-    portalError,
-    loggedClient,
-    clientContracts,
-    loadFullPortalData,
-    handleSignDocument,
-    isSigning
-  } = useClientPortalLogic(initialPortalToken);
+  const { isLoading, portalError, loggedClient, clientContracts, loadFullPortalData } =
+    useClientPortalLogic(initialPortalToken);
 
   const [activeLoanForPayment, setActiveLoanForPayment] = useState<any>(null);
   const [activeLoanForChat, setActiveLoanForChat] = useState<any>(null);
   const [isLegalOpen, setIsLegalOpen] = useState(false);
   const [activeDocId, setActiveDocId] = useState<string | null>(null);
+
+  // Bloco A — estado novo
   const [docList, setDocList] = useState<any[]>([]);
   const [loadingDocs, setLoadingDocs] = useState(false);
+  const [legalDocsError, setLegalDocsError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoading && loggedClient) {
-        notificationService.requestPermission();
+      notificationService.requestPermission();
     }
   }, [isLoading, loggedClient]);
 
-  useEffect(() => {
-    if (isLegalOpen) {
-      loadDocs();
-    }
-  }, [isLegalOpen]);
-
+  // Bloco B — função loadDocs (substituída inteira)
   const loadDocs = async () => {
     setLoadingDocs(true);
+    setLegalDocsError(null);
+
     try {
       const docs = await legalDocumentService.listDocs(initialPortalToken);
       setDocList(docs);
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      console.error('[PORTAL][LEGAL] loadDocs error:', e);
+      setDocList([]);
+      setLegalDocsError(e?.message || 'Falha ao carregar documentos jurídicos.');
     } finally {
       setLoadingDocs(false);
     }
   };
 
+  useEffect(() => {
+    if (isLegalOpen) {
+      loadDocs();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLegalOpen]);
+
   usePortalPushNotifications(clientContracts, loggedClient?.id || null);
 
   const globalSummary = useMemo(() => {
-      let total = 0;
-      let lateCount = 0;
-      let maxLate = 0;
-      clientContracts.forEach(c => {
-          const sum = resolveDebtSummary(c, c.installments);
-          total += sum.totalDue;
-          if (sum.hasLateInstallments) {
-              lateCount++;
-              if (sum.maxDaysLate > maxLate) maxLate = sum.maxDaysLate;
-          }
-      });
-      return { total, lateCount, maxLate };
+    let total = 0;
+    let lateCount = 0;
+    let maxLate = 0;
+
+    clientContracts.forEach((c) => {
+      const sum = resolveDebtSummary(c, c.installments);
+      total += sum.totalDue;
+      if (sum.hasLateInstallments) {
+        lateCount++;
+        if (sum.maxDaysLate > maxLate) maxLate = sum.maxDaysLate;
+      }
+    });
+
+    return { total, lateCount, maxLate };
   }, [clientContracts]);
 
   const alertTheme = globalSummary.lateCount > 0;
-  const clientNotification = usePortalClientNotifications(initialPortalToken, { 
-    overdueCount: globalSummary.lateCount, 
-    maxDaysLate: globalSummary.maxLate, 
-    nextDueDate: null 
+
+  const clientNotification = usePortalClientNotifications(initialPortalToken, {
+    overdueCount: globalSummary.lateCount,
+    maxDaysLate: globalSummary.maxLate,
+    nextDueDate: null
   });
 
   if (isLoading) {
@@ -222,9 +255,9 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({ initialPorta
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 max-w-md w-full text-center">
-            <ShieldCheck size={48} className="mx-auto text-rose-500 mb-4" />
-            <h2 className="text-white font-black text-xl mb-2">Acesso Indisponível</h2>
-            <p className="text-slate-400 text-sm mb-4">{portalError || "Link inválido ou expirado."}</p>
+          <ShieldCheck size={48} className="mx-auto text-rose-500 mb-4" />
+          <h2 className="text-white font-black text-xl mb-2">Acesso Indisponível</h2>
+          <p className="text-slate-400 text-sm mb-4">{portalError || 'Link inválido ou expirado.'}</p>
         </div>
       </div>
     );
@@ -233,9 +266,9 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({ initialPorta
   if (activeDocId) {
     return (
       <div className="fixed inset-0 z-[200] bg-slate-950">
-        <DocumentViewer 
-          token={initialPortalToken} 
-          docId={activeDocId} 
+        <DocumentViewer
+          token={initialPortalToken}
+          docId={activeDocId}
           onBack={() => setActiveDocId(null)}
           onSigned={() => {
             setActiveDocId(null);
@@ -248,182 +281,217 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({ initialPorta
 
   return (
     <div className="min-h-screen bg-slate-950 flex justify-center p-0 sm:p-4 overflow-hidden">
-      
       {clientNotification && clientNotification.show && (
-          <div className="fixed top-6 left-4 right-4 z-[200] animate-in slide-in-from-top-6 duration-500 pointer-events-none">
-             <div className="bg-slate-900 text-white p-4 rounded-2xl shadow-2xl border-l-4 border-rose-500 flex items-start gap-3 max-w-sm mx-auto pointer-events-auto ring-1 ring-white/10">
-                <div className="p-2 bg-rose-500/10 rounded-full text-rose-500 shrink-0">
-                    <BellRing size={18} className="animate-pulse"/>
-                </div>
-                <div>
-                    <h4 className="text-sm font-bold text-white mb-1">Aviso Importante</h4>
-                    <p className="text-xs text-slate-300 leading-relaxed">{clientNotification.message}</p>
-                </div>
-             </div>
+        <div className="fixed top-6 left-4 right-4 z-[200] animate-in slide-in-from-top-6 duration-500 pointer-events-none">
+          <div className="bg-slate-900 text-white p-4 rounded-2xl shadow-2xl border-l-4 border-rose-500 flex items-start gap-3 max-w-sm mx-auto pointer-events-auto ring-1 ring-white/10">
+            <div className="p-2 bg-rose-500/10 rounded-full text-rose-500 shrink-0">
+              <BellRing size={18} className="animate-pulse" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-white mb-1">Aviso Importante</h4>
+              <p className="text-xs text-slate-300 leading-relaxed">{clientNotification.message}</p>
+            </div>
           </div>
+        </div>
       )}
 
       <div className="w-full max-w-lg bg-slate-900 sm:rounded-[2.5rem] flex flex-col h-full sm:h-[90vh] sm:border border-slate-800 shadow-2xl overflow-hidden relative">
-        
         <div className="bg-slate-950 border-b border-slate-800 p-5 flex items-center justify-between shrink-0 relative z-10">
-            <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white font-black text-sm shadow-lg border-2 border-slate-900">
-                    {loggedClient.name.charAt(0)}
-                </div>
-                <div>
-                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Portal do Cliente</p>
-                    <h3 className="text-white font-bold text-sm leading-none">{loggedClient.name.split(' ')[0]}</h3>
-                </div>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white font-black text-sm shadow-lg border-2 border-slate-900">
+              {loggedClient.name.charAt(0)}
             </div>
-            <button 
-                onClick={() => {
-                    // Limpa URL e força reload para garantir logout completo
-                    window.history.replaceState(null, '', '/');
-                    window.location.reload();
-                }} 
-                className="p-2 bg-slate-900 border border-slate-800 text-slate-400 rounded-xl hover:text-white transition-colors"
-            >
-                <LogOut size={18}/>
-            </button>
+            <div>
+              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Portal do Cliente</p>
+              <h3 className="text-white font-bold text-sm leading-none">{loggedClient.name.split(' ')[0]}</h3>
+            </div>
+          </div>
+
+          <button
+            onClick={() => {
+              window.history.replaceState(null, '', '/');
+              window.location.reload();
+            }}
+            className="p-2 bg-slate-900 border border-slate-800 text-slate-400 rounded-xl hover:text-white transition-colors"
+          >
+            <LogOut size={18} />
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-6 relative pb-20">
-            
-            {alertTheme && <div className="absolute top-0 right-0 w-full h-64 bg-rose-900/10 blur-[80px] pointer-events-none"></div>}
+          {alertTheme && <div className="absolute top-0 right-0 w-full h-64 bg-rose-900/10 blur-[80px] pointer-events-none"></div>}
 
-            <div className={`p-6 rounded-[2rem] border relative overflow-hidden transition-all ${alertTheme ? 'bg-gradient-to-br from-rose-950 to-slate-900 border-rose-500/30' : 'bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700'}`}>
-                 <div className="relative z-10">
-                     <p className={`text-[10px] font-black uppercase mb-1 flex items-center gap-1 ${alertTheme ? 'text-rose-300' : 'text-slate-400'}`}>
-                        {alertTheme ? <AlertTriangle size={12}/> : <ShieldCheck size={12}/>} Total Consolidado
-                     </p>
-                     <p className="text-3xl font-black text-white tracking-tight">{formatMoney(globalSummary.total)}</p>
-                     
-                     <div className="mt-4 flex gap-2">
-                        {globalSummary.lateCount > 0 ? (
-                            <span className="text-[9px] font-black uppercase bg-rose-500 text-white px-2 py-1 rounded-lg animate-pulse">
-                                {globalSummary.lateCount} Contratos em Atraso
-                            </span>
-                        ) : (
-                            <span className="text-[9px] font-black uppercase bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded-lg flex items-center gap-1">
-                                <CheckCircle2 size={10}/> Situação Regular
-                            </span>
-                        )}
-                        <span className="text-[9px] font-black uppercase bg-slate-950/50 text-slate-400 px-2 py-1 rounded-lg">
-                            {clientContracts.length} Contratos
-                        </span>
-                     </div>
-                 </div>
-            </div>
+          <div
+            className={`p-6 rounded-[2rem] border relative overflow-hidden transition-all ${
+              alertTheme ? 'bg-gradient-to-br from-rose-950 to-slate-900 border-rose-500/30' : 'bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700'
+            }`}
+          >
+            <div className="relative z-10">
+              <p className={`text-[10px] font-black uppercase mb-1 flex items-center gap-1 ${alertTheme ? 'text-rose-300' : 'text-slate-400'}`}>
+                {alertTheme ? <AlertTriangle size={12} /> : <ShieldCheck size={12} />} Total Consolidado
+              </p>
+              <p className="text-3xl font-black text-white tracking-tight">{formatMoney(globalSummary.total)}</p>
 
-            <button onClick={() => setIsLegalOpen(true)} className="w-full bg-slate-800 border border-slate-700 p-4 rounded-2xl flex items-center justify-between group hover:bg-slate-700 transition-all">
-                <div className="flex items-center gap-3">
-                    <div className="p-2 bg-indigo-500/10 text-indigo-400 rounded-xl group-hover:bg-indigo-500 group-hover:text-white transition-all"><FileSignature size={18}/></div>
-                    <div className="text-left">
-                        <p className="text-xs font-bold text-white uppercase">Meus Documentos</p>
-                        <p className="text-[10px] text-slate-500">Visualizar contratos e termos</p>
-                    </div>
-                </div>
-                <ChevronRight size={16} className="text-slate-500"/>
-            </button>
-
-            <div className="space-y-4">
-                <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest pl-1">Seus Contratos</h3>
-                {clientContracts.length === 0 ? (
-                    <div className="text-center py-10 text-slate-600 text-xs font-bold uppercase border-2 border-dashed border-slate-800 rounded-2xl">
-                        Nenhum contrato ativo encontrado.
-                    </div>
+              <div className="mt-4 flex gap-2">
+                {globalSummary.lateCount > 0 ? (
+                  <span className="text-[9px] font-black uppercase bg-rose-500 text-white px-2 py-1 rounded-lg animate-pulse">
+                    {globalSummary.lateCount} Contratos em Atraso
+                  </span>
                 ) : (
-                    clientContracts.map(contract => (
-                        <ContractBlock 
-                            key={contract.id} 
-                            loan={contract}
-                            onPay={() => setActiveLoanForPayment(contract)}
-                            onChat={() => setActiveLoanForChat(contract)}
-                        />
-                    ))
+                  <span className="text-[9px] font-black uppercase bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded-lg flex items-center gap-1">
+                    <CheckCircle2 size={10} /> Situação Regular
+                  </span>
                 )}
-            </div>
-            
-            {/* IA EDUCACIONAL NO FINAL */}
-            <PortalEducationalAI contracts={clientContracts} clientName={loggedClient.name} />
 
-            {clientContracts.length > 0 && (
-                <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800/50 flex items-center gap-3 opacity-60">
-                    <div className="p-2 bg-slate-800 rounded-xl text-slate-400"><Building size={16}/></div>
-                    <div className="overflow-hidden flex-1">
-                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-0.5">Credor Responsável</p>
-                        <p className="text-[10px] text-white font-bold truncate">{(clientContracts[0] as any).creditorName || 'Empresa'}</p>
-                    </div>
-                </div>
+                <span className="text-[9px] font-black uppercase bg-slate-950/50 text-slate-400 px-2 py-1 rounded-lg">
+                  {clientContracts.length} Contratos
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setIsLegalOpen(true)}
+            className="w-full bg-slate-800 border border-slate-700 p-4 rounded-2xl flex items-center justify-between group hover:bg-slate-700 transition-all"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-indigo-500/10 text-indigo-400 rounded-xl group-hover:bg-indigo-500 group-hover:text-white transition-all">
+                <FileSignature size={18} />
+              </div>
+              <div className="text-left">
+                <p className="text-xs font-bold text-white uppercase">Meus Documentos</p>
+                <p className="text-[10px] text-slate-500">Visualizar contratos e termos</p>
+              </div>
+            </div>
+            <ChevronRight size={16} className="text-slate-500" />
+          </button>
+
+          <div className="space-y-4">
+            <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest pl-1">Seus Contratos</h3>
+
+            {clientContracts.length === 0 ? (
+              <div className="text-center py-10 text-slate-600 text-xs font-bold uppercase border-2 border-dashed border-slate-800 rounded-2xl">
+                Nenhum contrato ativo encontrado.
+              </div>
+            ) : (
+              clientContracts.map((contract) => (
+                <ContractBlock
+                  key={contract.id}
+                  loan={contract}
+                  onPay={() => setActiveLoanForPayment(contract)}
+                  onChat={() => setActiveLoanForChat(contract)}
+                />
+              ))
             )}
+          </div>
+
+          <PortalEducationalAI contracts={clientContracts} clientName={loggedClient.name} />
+
+          {clientContracts.length > 0 && (
+            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800/50 flex items-center gap-3 opacity-60">
+              <div className="p-2 bg-slate-800 rounded-xl text-slate-400">
+                <Building size={16} />
+              </div>
+              <div className="overflow-hidden flex-1">
+                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-0.5">Credor Responsável</p>
+                <p className="text-[10px] text-white font-bold truncate">{(clientContracts[0] as any).creditorName || 'Empresa'}</p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       {activeLoanForPayment && (
-          <PortalPaymentModal 
-              loan={activeLoanForPayment} 
-              installment={activeLoanForPayment.installments.find((i:any) => i.status!=='PAID') || activeLoanForPayment.installments[0]} 
-              clientData={{ name: loggedClient.name, doc: loggedClient.document, id: loggedClient.id }} 
-              onClose={() => { setActiveLoanForPayment(null); loadFullPortalData(); }} 
-          />
+        <PortalPaymentModal
+          loan={activeLoanForPayment}
+          installment={
+            activeLoanForPayment.installments.find((i: any) => i.status !== 'PAID') || activeLoanForPayment.installments[0]
+          }
+          clientData={{ name: loggedClient.name, doc: loggedClient.document, id: loggedClient.id }}
+          onClose={() => {
+            setActiveLoanForPayment(null);
+            loadFullPortalData();
+          }}
+        />
       )}
 
       {activeLoanForChat && (
-          <PortalChatDrawer 
-              loan={activeLoanForChat} 
-              isOpen={!!activeLoanForChat} 
-              onClose={() => setActiveLoanForChat(null)} 
-          />
+        <PortalChatDrawer loan={activeLoanForChat} isOpen={!!activeLoanForChat} onClose={() => setActiveLoanForChat(null)} />
       )}
 
       {isLegalOpen && (
         <div className="fixed inset-0 bg-slate-950/95 flex items-center justify-center z-[150] p-4 backdrop-blur-sm">
           <div className="bg-slate-900 p-6 rounded-[2.5rem] border border-indigo-500/30 max-w-lg w-full shadow-2xl animate-in zoom-in-95 relative max-h-[80vh] overflow-y-auto">
-            <button onClick={() => setIsLegalOpen(false)} className="absolute top-6 right-6 p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white"><X size={18}/></button>
+            <button
+              onClick={() => setIsLegalOpen(false)}
+              className="absolute top-6 right-6 p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white"
+            >
+              <X size={18} />
+            </button>
+
             <div className="flex flex-col items-center text-center py-6">
-                <Lock size={40} className="text-indigo-500 mb-4"/>
-                <h2 className="text-white font-black uppercase text-lg mb-2">Central Jurídica</h2>
-                <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 w-full mb-6">
-                    <Gavel className="mx-auto text-indigo-400 mb-2" size={24}/>
-                    <h4 className="text-white font-bold text-sm uppercase">Assinatura Digital</h4>
-                    <p className="text-[10px] text-slate-500 mt-1">Seus contratos estão disponíveis para regularização.</p>
+              <Lock size={40} className="text-indigo-500 mb-4" />
+              <h2 className="text-white font-black uppercase text-lg mb-2">Central Jurídica</h2>
+
+              <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 w-full mb-6">
+                <Gavel className="mx-auto text-indigo-400 mb-2" size={24} />
+                <h4 className="text-white font-bold text-sm uppercase">Assinatura Digital</h4>
+                <p className="text-[10px] text-slate-500 mt-1">Seus contratos estão disponíveis para regularização.</p>
+              </div>
+
+              {/* Bloco C — render com erro + retry */}
+              {loadingDocs ? (
+                <div className="py-10">
+                  <RefreshCw className="animate-spin text-indigo-500 mx-auto" />
                 </div>
-                
-                {loadingDocs ? (
-                  <div className="py-10"><RefreshCw className="animate-spin text-indigo-500 mx-auto"/></div>
-                ) : (
-                  <div className="w-full space-y-3">
-                    {docList.length === 0 ? (
-                      <p className="text-slate-500 text-xs py-4">Nenhum documento pendente.</p>
-                    ) : (
-                      docList.map(doc => (
-                        <button 
-                          key={doc.id}
-                          onClick={() => setActiveDocId(doc.id)}
-                          className="w-full p-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl flex items-center justify-between group transition-all"
-                        >
-                          <div className="flex items-center gap-3 text-left">
-                            <div className="p-2 bg-slate-900 rounded-lg text-slate-400"><FileText size={16}/></div>
-                            <div>
-                              <p className="text-xs font-bold text-white uppercase">{doc.tipo || 'Documento'}</p>
-                              <p className="text-[10px] text-slate-500">{new Date(doc.created_at).toLocaleDateString()}</p>
-                            </div>
+              ) : legalDocsError ? (
+                <div className="w-full bg-rose-500/10 border border-rose-500/30 rounded-xl p-4 text-left">
+                  <p className="text-rose-300 text-xs font-bold uppercase mb-1">Erro ao carregar documentos</p>
+                  <p className="text-rose-100 text-[11px]">{legalDocsError}</p>
+                  <button
+                    onClick={loadDocs}
+                    className="mt-3 px-3 py-2 bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-black uppercase rounded-lg"
+                  >
+                    Tentar novamente
+                  </button>
+                </div>
+              ) : (
+                <div className="w-full space-y-3">
+                  {docList.length === 0 ? (
+                    <p className="text-slate-500 text-xs py-4">Nenhum documento pendente.</p>
+                  ) : (
+                    docList.map((doc) => (
+                      <button
+                        key={doc.id}
+                        onClick={() => setActiveDocId(doc.id)}
+                        className="w-full p-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl flex items-center justify-between group transition-all"
+                      >
+                        <div className="flex items-center gap-3 text-left">
+                          <div className="p-2 bg-slate-900 rounded-lg text-slate-400">
+                            <FileText size={16} />
                           </div>
-                          {doc.status === 'ASSINADO' ? (
-                             <CheckCircle2 size={16} className="text-emerald-500"/>
-                          ) : (
-                             <span className="text-[9px] bg-amber-500/10 text-amber-500 px-2 py-1 rounded uppercase font-black">Assinar</span>
-                          )}
-                        </button>
-                      ))
-                    )}
-                  </div>
-                )}
+                          <div>
+                            <p className="text-xs font-bold text-white uppercase">{doc.tipo || 'Documento'}</p>
+                            <p className="text-[10px] text-slate-500">{new Date(doc.created_at).toLocaleDateString()}</p>
+                          </div>
+                        </div>
+
+                        {(doc.status_assinatura || '').toUpperCase() === 'ASSINADO' ? (
+                          <CheckCircle2 size={16} className="text-emerald-500" />
+                        ) : (
+                          <span className="text-[9px] bg-amber-500/10 text-amber-500 px-2 py-1 rounded uppercase font-black">
+                            Assinar
+                          </span>
+                        )}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 };

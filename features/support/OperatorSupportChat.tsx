@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { ShieldCheck, X, MessageCircle } from 'lucide-react';
+import { ShieldCheck, X, MessageCircle, Palette } from 'lucide-react';
 import { supportChatService } from '../../services/supportChat.service';
 import { ChatSidebar } from './components/ChatSidebar';
 import { useCampaignChat } from '../../hooks/useCampaignChat';
@@ -31,6 +31,7 @@ export const OperatorSupportChat = ({ activeUser, onClose }: { activeUser: any; 
   
   const [selectedChat, setSelectedChat] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [chatTheme, setChatTheme] = useState<'dark' | 'blue'>('dark');
 
   const supportAdapter = useMemo(() => createSupportAdapter('OPERATOR'), []);
   const captacaoAdapter = useMemo(() => createCaptacaoAdapter('OPERATOR'), []);
@@ -148,9 +149,14 @@ export const OperatorSupportChat = ({ activeUser, onClose }: { activeUser: any; 
             <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-widest">Painel do Operador</p>
           </div>
         </div>
-        <button onClick={onClose} className="p-2.5 bg-slate-900 text-slate-400 hover:text-white hover:bg-rose-950/30 hover:border-rose-900 border border-slate-800 rounded-xl transition-all group">
-          <X size={18} className="group-hover:scale-110 transition-transform"/>
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setChatTheme(prev => prev === 'dark' ? 'blue' : 'dark')} className="p-2.5 bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800 rounded-xl transition-all group" title="Alternar Tema (Escuro / Azul)">
+            <Palette size={18} className="group-hover:scale-110 transition-transform"/>
+          </button>
+          <button onClick={onClose} className="p-2.5 bg-slate-900 text-slate-400 hover:text-white hover:bg-rose-950/30 hover:border-rose-900 border border-slate-800 rounded-xl transition-all group">
+            <X size={18} className="group-hover:scale-110 transition-transform"/>
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 flex overflow-hidden">
@@ -168,10 +174,11 @@ export const OperatorSupportChat = ({ activeUser, onClose }: { activeUser: any; 
             onSelectChat={handleSelectContact}
             diffLabel={diffLabel}
             onBulkDelete={handleBulkDelete}
+            chatTheme={chatTheme}
         />
 
         {/* ÁREA DE CHAT */}
-        <div className={`flex-1 flex flex-col bg-slate-900 relative ${!selectedChat ? 'hidden md:flex' : 'flex'}`}>
+        <div className={`flex-1 flex flex-col relative ${!selectedChat ? 'hidden md:flex' : 'flex'} ${chatTheme === 'blue' ? 'bg-slate-900/50' : 'bg-slate-900'}`}>
           {selectedChat ? (
             selectedChat.type === 'CAMPAIGN' ? (
               <UnifiedChat
@@ -180,6 +187,7 @@ export const OperatorSupportChat = ({ activeUser, onClose }: { activeUser: any; 
                 role="OPERATOR"
                 userId={activeUser.id}
                 onClose={() => setSelectedChat(null)}
+                chatTheme={chatTheme}
               />
             ) : (
               <UnifiedChat
@@ -190,11 +198,12 @@ export const OperatorSupportChat = ({ activeUser, onClose }: { activeUser: any; 
                 onClose={() => setSelectedChat(null)}
                 showDeleteHistory={true}
                 onDeleteHistory={handleDeleteHistory}
+                chatTheme={chatTheme}
               />
             )
           ) : (
             /* Empty State */
-            <div className="flex-1 flex flex-col items-center justify-center text-slate-600 bg-slate-900/50">
+            <div className={`flex-1 flex flex-col items-center justify-center text-slate-600 ${chatTheme === 'blue' ? 'bg-blue-950/20' : 'bg-slate-900/50'}`}>
               <div className="w-24 h-24 bg-slate-800/50 rounded-3xl flex items-center justify-center mb-6 border-2 border-dashed border-slate-700">
                  <MessageCircle size={40} className="opacity-50"/>
               </div>

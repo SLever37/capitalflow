@@ -9,9 +9,10 @@ interface ChatInputProps {
   onSend: (text: string, type?: SupportMessageType, file?: File, meta?: any) => Promise<void>;
   isUploading: boolean;
   placeholder?: string;
+  chatTheme?: 'dark' | 'blue';
 }
 
-export const ChatInput: React.FC<ChatInputProps> = ({ onSend, isUploading, placeholder }) => {
+export const ChatInput: React.FC<ChatInputProps> = ({ onSend, isUploading, placeholder, chatTheme = 'dark' }) => {
   const [text, setText] = useState('');
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
@@ -86,7 +87,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, isUploading, place
   };
 
   return (
-    <div className="px-4 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] bg-[#0f172a] border-t border-slate-800/50 relative select-none z-30 shrink-0">
+    <div className={`px-4 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] border-t relative select-none z-30 shrink-0 ${chatTheme === 'blue' ? 'bg-slate-900 border-slate-700/50' : 'bg-[#0f172a] border-slate-800/50'}`}>
       {showAttachMenu && <AttachMenu onSelect={handleAttachSelect} fileInputRef={fileInputRef} />}
 
       <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileChange} />
