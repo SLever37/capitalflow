@@ -36,7 +36,6 @@ export const DashboardContainer: React.FC<DashboardContainerProps> = ({
   const scopeLoans = useMemo(() => {
     if (!activeUser || activeUser.accessLevel !== 1) return loans;
     if (selectedStaffId === 'ALL') return loans;
-    if (selectedStaffId === 'ONLY_MASTER') return loans.filter(l => !l.operador_responsavel_id || l.operador_responsavel_id === activeUser.id);
     return loans.filter(l => l.operador_responsavel_id === selectedStaffId);
   }, [loans, selectedStaffId, activeUser]);
 

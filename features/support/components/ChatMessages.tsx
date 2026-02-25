@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { SupportMessage } from '../../../services/supportChat.service';
 import { AudioPlayer } from './AudioPlayer';
 import { Check, CheckCheck, FileText, Image as ImageIcon, MapPin, User, ExternalLink, Trash2 } from 'lucide-react';
@@ -9,7 +9,7 @@ interface ChatMessagesProps {
   currentUserId: string;
   senderType: 'CLIENT' | 'OPERATOR';
   operatorId?: string;
-  scrollRef: React.RefObject<HTMLDivElement>;
+  scrollRef?: React.RefObject<HTMLDivElement>;
   onDeleteMessage?: (id: string) => void;
 }
 
@@ -49,6 +49,13 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
   scrollRef,
   onDeleteMessage
 }) => {
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll para a última mensagem quando a lista de mensagens mudar
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
   const handleDelete = (id: string) => {
     if (confirm('Apagar esta mensagem permanentemente?')) {
         onDeleteMessage?.(id);
@@ -165,7 +172,7 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
   };
 
   return (
-    <div className="flex-1 p-4 sm:p-6 overflow-y-auto custom-scrollbar space-y-2 pt-16 min-h-0" ref={scrollRef}>
+    <div className="flex-1 p-4 sm:p-6 overflow-y-auto custom-scrollbar space-y-2 min-h-0" ref={scrollRef}>
       {messages.map((m, index) => {
         const isMe = m.sender_type === senderType;
         const prevM = messages[index - 1];
@@ -210,6 +217,7 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
           </div>
         );
       })}
+      <div ref={bottomRef} className="h-4" />
     </div>
   );
 };

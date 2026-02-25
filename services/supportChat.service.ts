@@ -37,6 +37,7 @@ type SendMessageParams = {
   type?: SupportMessageType;
   file?: File;
   metadata?: any;
+  supabaseClient?: any;
 };
 
 const BUCKET = 'support_chat';
@@ -97,9 +98,9 @@ async function signPath(path: string) {
 }
 
 export const supportChatService = {
-  async getMessages(loanId: string) {
+  async getMessages(loanId: string, supabaseClient: any = supabase) {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseClient
         .from('mensagens_suporte')
         .select('*')
         .eq('loan_id', loanId)
@@ -115,7 +116,10 @@ export const supportChatService = {
         const hasFile = (m.type === 'audio' || m.type === 'image' || m.type === 'file') && m.file_url;
         if (hasFile && m.file_url && !isHttpUrl(m.file_url)) {
           try {
-            const signed = await signPath(m.file_url);
+            const { data: signedData, error: signedError } = await supabaseClient.storage.from(BUCKET).createSignedUrl(m.file_url, SIGNED_URL_TTL);
+            if (signedError) throw new Error(`SignedUrl falhou: ${signedError.message}`);
+            const signed = signedData.signedUrl;
+            
             out.push({
               ...m,
               // aqui troco o file_url por signed URL para tocar/abrir direto
@@ -142,16 +146,39 @@ export const supportChatService = {
   },
 
   async sendMessage(params: SendMessageParams) {
-    const { profileId, loanId, sender, operatorId, text, type = 'text', file, metadata } = params;
+    const { profileId, loanId, sender, operatorId, text, type = 'text', file, metadata, supabaseClient = supabase } = params;
 
-    const uid = await getAuthUid();
-    if (!uid) throw new Error('Sem sessão do Supabase Auth. Faça login novamente.');
+    let uid = null;
+    if (sender === 'OPERATOR') {
+      uid = await getAuthUid();
+      if (!uid) throw new Error('Sem sessão do Supabase Auth. Faça login novamente.');
+    } else {
+      uid = profileId;
+    }
 
     let filePath: string | null = null;
     let finalMeta: any = metadata || {};
 
     if (file) {
-      const { path } = await uploadToStorage({ loanId, file });
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+
+      const safeName = (file.name || 'upload').replace(/[^\w.\-]+/g, '_');
+      const ext = safeName.includes('.') ? safeName.split('.').pop() : extFromMime(file.type);
+      const fileName = `${crypto.randomUUID()}.${ext}`;
+
+      const path = `loans/${loanId}/${yyyy}-${mm}-${dd}/${fileName}`;
+
+      const { error: upErr } = await supabaseClient.storage.from(BUCKET).upload(path, file, {
+        cacheControl: '3600',
+        upsert: false,
+        contentType: file.type || 'application/octet-stream',
+      });
+
+      if (upErr) throw new Error(`Storage upload falhou: ${upErr.message}`);
+
       filePath = path;
 
       finalMeta = {
@@ -185,16 +212,19 @@ export const supportChatService = {
       created_at: new Date().toISOString(),
     };
 
-    const { error } = await supabase.from('mensagens_suporte').insert(payload);
+    const { error } = await supabaseClient.from('mensagens_suporte').insert(payload);
     if (error) throw new Error(error.message);
 
     return true;
   },
 
-  async markAsRead(loanId: string, viewer: 'CLIENT' | 'OPERATOR') {
-    const uid = await getAuthUid();
+  async markAsRead(loanId: string, viewer: 'CLIENT' | 'OPERATOR', supabaseClient: any = supabase) {
+    let uid = null;
+    if (viewer === 'OPERATOR') {
+      uid = await getAuthUid();
+    }
 
-    const { error } = await supabase
+    const { error } = await supabaseClient
       .from('mensagens_suporte')
       .update({
         read: true,
@@ -209,16 +239,16 @@ export const supportChatService = {
     return true;
   },
 
-  async deleteMessage(messageId: string) {
-    const { error } = await supabase.from('mensagens_suporte').delete().eq('id', messageId);
+  async deleteMessage(messageId: string, supabaseClient: any = supabase) {
+    const { error } = await supabaseClient.from('mensagens_suporte').delete().eq('id', messageId);
     if (error) throw error;
   },
 
-  async deleteChatHistory(loanId: string) {
-    const { error } = await supabase.from('mensagens_suporte').delete().eq('loan_id', loanId);
+  async deleteChatHistory(loanId: string, supabaseClient: any = supabase) {
+    const { error } = await supabaseClient.from('mensagens_suporte').delete().eq('loan_id', loanId);
     if (error) throw error;
     // Opcional: Apagar ticket também se quiser resetar status
-    await supabase.from('support_tickets').delete().eq('loan_id', loanId);
+    await supabaseClient.from('support_tickets').delete().eq('loan_id', loanId);
   },
 
   async deleteMultipleChats(loanIds: string[]) {

@@ -22,7 +22,6 @@ import { TeamPage } from './pages/TeamPage';
 import { InvitePage } from './pages/InvitePage';
 import { SetupPasswordPage } from './pages/SetupPasswordPage';
 import { notificationService } from './services/notification.service';
-import { MasterScreen } from './features/master/MasterScreen';
 import { LoadingScreen } from './components/ui/LoadingScreen';
 import { PersonalFinancesPage } from './pages/PersonalFinancesPage';
 import { LeadsPage } from './pages/LeadsPage';

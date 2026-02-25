@@ -83,7 +83,7 @@ export const BottomNav: React.FC<BottomNavProps & { isStaff?: boolean }> = ({
        {/* MENU HUB (Slot 4) - SEMPRE PRESENTE NO MOBILE */}
        <button 
           onClick={onOpenNav} 
-          className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${activeTab === 'PROFILE' || activeTab === 'MASTER' || activeTab === 'LEGAL' ? 'text-blue-500' : 'text-slate-500'}`}
+          className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${activeTab === 'PROFILE' || activeTab === 'LEGAL' ? 'text-blue-500' : 'text-slate-500'}`}
        >
            <LayoutGrid size={20}/>
            <span className="text-[9px] font-bold uppercase">Menu</span>

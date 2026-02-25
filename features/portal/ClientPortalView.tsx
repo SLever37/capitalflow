@@ -223,29 +223,31 @@ export const ClientPortalView = ({ initialLoanId }: { initialLoanId: string }) =
             {alertTheme && <div className="absolute top-0 right-0 w-full h-64 bg-rose-900/10 blur-[80px] pointer-events-none"></div>}
 
             {/* RESUMO GLOBAL */}
-            <div className={`p-6 rounded-[2rem] border relative overflow-hidden transition-all ${alertTheme ? 'bg-gradient-to-br from-rose-950 to-slate-900 border-rose-500/30' : 'bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700'}`}>
-                 <div className="relative z-10">
-                     <p className={`text-[10px] font-black uppercase mb-1 flex items-center gap-1 ${alertTheme ? 'text-rose-300' : 'text-slate-400'}`}>
-                        {alertTheme ? <AlertTriangle size={12}/> : <ShieldCheck size={12}/>} Total Consolidado
-                     </p>
-                     <p className="text-3xl font-black text-white tracking-tight">{formatMoney(globalSummary.total)}</p>
-                     
-                     <div className="mt-4 flex gap-2">
-                        {globalSummary.lateCount > 0 ? (
-                            <span className="text-[9px] font-black uppercase bg-rose-500 text-white px-2 py-1 rounded-lg animate-pulse">
-                                {globalSummary.lateCount} Contratos em Atraso
+            {clientContracts.length >= 2 && (
+                <div className={`p-6 rounded-[2rem] border relative overflow-hidden transition-all ${alertTheme ? 'bg-gradient-to-br from-rose-950 to-slate-900 border-rose-500/30' : 'bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700'}`}>
+                     <div className="relative z-10">
+                         <p className={`text-[10px] font-black uppercase mb-1 flex items-center gap-1 ${alertTheme ? 'text-rose-300' : 'text-slate-400'}`}>
+                            {alertTheme ? <AlertTriangle size={12}/> : <ShieldCheck size={12}/>} Total Consolidado
+                         </p>
+                         <p className="text-3xl font-black text-white tracking-tight">{formatMoney(globalSummary.total)}</p>
+                         
+                         <div className="mt-4 flex gap-2">
+                            {globalSummary.lateCount > 0 ? (
+                                <span className="text-[9px] font-black uppercase bg-rose-500 text-white px-2 py-1 rounded-lg animate-pulse">
+                                    {globalSummary.lateCount} Contratos em Atraso
+                                </span>
+                            ) : (
+                                <span className="text-[9px] font-black uppercase bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded-lg flex items-center gap-1">
+                                    <CheckCircle2 size={10}/> Situação Regular
+                                </span>
+                            )}
+                            <span className="text-[9px] font-black uppercase bg-slate-950/50 text-slate-400 px-2 py-1 rounded-lg">
+                                {clientContracts.length} Contratos
                             </span>
-                        ) : (
-                            <span className="text-[9px] font-black uppercase bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded-lg flex items-center gap-1">
-                                <CheckCircle2 size={10}/> Situação Regular
-                            </span>
-                        )}
-                        <span className="text-[9px] font-black uppercase bg-slate-950/50 text-slate-400 px-2 py-1 rounded-lg">
-                            {clientContracts.length} Contratos
-                        </span>
+                         </div>
                      </div>
-                 </div>
-            </div>
+                </div>
+            )}
 
             {/* AÇÕES GERAIS */}
             <button onClick={() => setIsLegalOpen(true)} className="w-full bg-slate-800 border border-slate-700 p-4 rounded-2xl flex items-center justify-between group hover:bg-slate-700 transition-all">

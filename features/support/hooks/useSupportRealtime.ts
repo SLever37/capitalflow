@@ -395,7 +395,7 @@ export const useSupportRealtime = (
   };
 
   const deleteMessage = async (msgId: string) => {
-    await supportChatService.deleteMessage(msgId);
+    await supportChatService.deleteMessage(msgId, supabase);
   };
 
   return {

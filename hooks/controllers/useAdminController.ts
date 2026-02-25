@@ -71,7 +71,7 @@ export const useAdminController = (
 
   const handleAdminResetPassword = async (user: any) => {
     ui.setMasterEditUser(user);
-    ui.openModal('MASTER_EDIT_USER');
+    // Removed MASTER_EDIT_USER call
   };
 
   const handleMasterUpdateUser = async (updatedData: any) => {

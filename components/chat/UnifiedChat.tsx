@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { ChatAdapter, ChatRole } from './chatAdapter';
 import { useUnifiedChat } from './useUnifiedChat';
@@ -6,7 +5,7 @@ import { ChatMessages } from '../../features/support/components/ChatMessages';
 import { ChatInput } from '../../features/support/components/ChatInput';
 import { Loader2, MessageCircle, ShieldCheck, Lock, Unlock, Trash2, ChevronLeft } from 'lucide-react';
 
-interface UnifiedChatProps<TContext> {
+export interface UnifiedChatProps<TContext> {
   adapter: ChatAdapter<TContext>;
   context: TContext;
   role: ChatRole;
@@ -106,15 +105,13 @@ export function UnifiedChat<TContext>({
       </div>
 
       {/* Mensagens */}
-      <div className="flex-1 relative min-h-0">
-        <ChatMessages 
-          messages={messages as any}
-          currentUserId={userId}
-          senderType={role === 'OPERATOR' ? 'OPERATOR' : 'CLIENT'}
-          scrollRef={scrollRef}
-          onDeleteMessage={features.canDelete ? deleteMessage : undefined}
-        />
-      </div>
+      <ChatMessages 
+        messages={messages as any}
+        currentUserId={userId}
+        senderType={role === 'OPERATOR' ? 'OPERATOR' : 'CLIENT'}
+        scrollRef={scrollRef}
+        onDeleteMessage={features.canDelete ? deleteMessage : undefined}
+      />
 
       {/* Input */}
       <ChatInput 
@@ -134,4 +131,4 @@ export function UnifiedChat<TContext>({
       )}
     </div>
   );
-};
+}

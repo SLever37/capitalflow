@@ -19,7 +19,6 @@ export type ModalType =
     | 'RECEIPT'
     | 'PROOF_VIEW'
     | 'NOTE'
-    | 'MASTER_EDIT_USER'
     | 'IMPORT_SHEET_SELECT'
     | 'IMPORT_MAPPING'
     | 'IMPORT_PREVIEW'

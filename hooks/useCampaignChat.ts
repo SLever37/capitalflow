@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { campaignOperatorService } from '../services/campaignOperator.service';
 import { supabase } from '../lib/supabase';
 
@@ -40,8 +40,6 @@ export const useCampaignChat = () => {
     setSending(true);
     try {
       await campaignOperatorService.sendMessage(selectedSession.session_token, text);
-    } catch (e) {
-      throw e;
     } finally {
       setSending(false);
     }
@@ -51,10 +49,8 @@ export const useCampaignChat = () => {
     if (!selectedSession || uploading) return;
     setUploading(true);
     try {
-      const url = await campaignOperatorService.uploadAttachment(file);
+      const url = await campaignOperatorService.uploadAttachment(file, selectedSession.session_token);
       await campaignOperatorService.sendMessage(selectedSession.session_token, `[ANEXO] ${url}`);
-    } catch (e) {
-      throw e;
     } finally {
       setUploading(false);
     }
@@ -65,36 +61,45 @@ export const useCampaignChat = () => {
     loadMessages(lead.session_token);
   };
 
-  // Realtime para novos leads
   useEffect(() => {
-    const channel = supabase.channel('operator-leads-global')
+    const channel = supabase
+      .channel('operator-leads-global')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'campaign_leads' }, (payload) => {
-        setLeads(prev => [payload.new, ...prev]);
+        setLeads(prev => {
+          const exists = prev.some(l => l.id === (payload.new as any).id);
+          if (exists) return prev;
+          return [payload.new, ...prev];
+        });
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'campaign_leads' }, (payload) => {
-        setLeads(prev => prev.map(l => l.id === payload.new.id ? payload.new : l));
+        setLeads(prev => prev.map(l => (l.id === (payload.new as any).id ? payload.new : l)));
       })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  // Realtime para mensagens da sessão selecionada
   useEffect(() => {
     if (!selectedSession) return;
 
-    const channel = supabase.channel(`session-chat-${selectedSession.session_token}`)
-      .on('postgres_changes', { 
-        event: 'INSERT', 
-        schema: 'public', 
-        table: 'campaign_messages',
-        filter: `session_token=eq.${selectedSession.session_token}`
-      }, (payload) => {
-        setMessages(prev => {
-          if (prev.find(m => m.id === payload.new.id)) return prev;
-          return [...prev, payload.new];
-        });
-      })
+    const token = selectedSession.session_token;
+    const channel = supabase
+      .channel(`session-chat-${token}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'campaign_messages',
+          filter: `session_token=eq.${token}`
+        },
+        (payload) => {
+          setMessages(prev => {
+            if (prev.find(m => m.id === (payload.new as any).id)) return prev;
+            return [...prev, payload.new];
+          });
+        }
+      )
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };

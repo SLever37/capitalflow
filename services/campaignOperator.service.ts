@@ -1,12 +1,17 @@
 import { supabase } from '../lib/supabase';
 
+const sanitizeExt = (name: string) => {
+  const ext = (name.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '');
+  return ext || 'bin';
+};
+
 export const campaignOperatorService = {
   async getLeads() {
     const { data, error } = await supabase
       .from('campaign_leads')
       .select('*')
       .order('created_at', { ascending: false });
-    
+
     if (error) throw error;
     return data;
   },
@@ -41,14 +46,19 @@ export const campaignOperatorService = {
     return data;
   },
 
-  async uploadAttachment(file: File) {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Math.random()}.${fileExt}`;
-    const filePath = `campaign_attachments/${fileName}`;
+  async uploadAttachment(file: File, sessionToken?: string) {
+    const fileExt = sanitizeExt(file.name);
+    const uid = crypto.randomUUID();
+    const folder = sessionToken ? `campaign_attachments/${sessionToken}` : 'campaign_attachments';
+    const filePath = `${folder}/${uid}.${fileExt}`;
 
     const { error: uploadError } = await supabase.storage
       .from('public_assets')
-      .upload(filePath, file);
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false,
+        contentType: file.type || 'application/octet-stream'
+      });
 
     if (uploadError) throw uploadError;
 

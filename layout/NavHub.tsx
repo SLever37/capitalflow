@@ -39,7 +39,6 @@ export const NavHub: React.FC<NavHubProps> = ({ onClose, onNavigate, userLevel, 
                 <div className="grid grid-cols-2 gap-4">
                     {hubOrder.map(tab => {
                         const meta = getTabMeta(tab);
-                        if (tab === 'MASTER') return null;
                         return (
                             <button key={tab} onClick={() => onNavigate(tab)} className={`p-6 bg-slate-900 border border-slate-800 rounded-3xl transition-all group flex flex-col items-center justify-center gap-3 relative ${meta.hover}`}>
                                 <div className={`p-4 bg-slate-800 rounded-2xl ${meta.color} group-hover:scale-110 transition-transform`}>{meta.icon}</div>

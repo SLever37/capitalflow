@@ -53,6 +53,7 @@ export interface ChatAdapter<TContext> {
     userId: string;
   }): Promise<void>;
   deleteMessage?(context: TContext, messageId: string): Promise<void>;
+  markAsRead?(context: TContext): Promise<void>;
   closeTicket?(context: TContext): Promise<void>;
   reopenTicket?(context: TContext): Promise<void>;
 }

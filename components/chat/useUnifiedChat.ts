@@ -54,6 +54,11 @@ export const useUnifiedChat = <TContext>({
           if (header.status) setTicketStatus(header.status);
           if (header.isOnline !== undefined) setIsOnline(header.isOnline);
           
+          // Marca como lido na carga inicial
+          if (adapter.markAsRead) {
+            adapter.markAsRead(context).catch(e => console.warn('[UnifiedChat] Error marking as read:', e));
+          }
+
           // Scroll inicial sem animação
           setTimeout(() => scrollToBottom('auto'), 100);
         }
@@ -77,7 +82,12 @@ export const useUnifiedChat = <TContext>({
         
         // Som se não for minha
         const isMine = msg.sender_user_id === userId || msg.operator_id === userId;
-        if (!isMine) playNotificationSound();
+        if (!isMine) {
+          playNotificationSound();
+          if (adapter.markAsRead) {
+            adapter.markAsRead(context).catch(e => console.warn('[UnifiedChat] Error marking as read on new message:', e));
+          }
+        }
         
         setTimeout(() => scrollToBottom(), 100);
       },

@@ -75,7 +75,7 @@ export const createSupportAdapter = (role: ChatRole, supabaseClient: SupabaseCli
 
   async listMessages(context: SupportContext): Promise<ChatMessage[]> {
     if (!isUuid(context.loanId)) return [];
-    const msgs = await supportChatService.getMessages(context.loanId);
+    const msgs = await supportChatService.getMessages(context.loanId, supabaseClient);
     return msgs.map(m => ({
       ...m,
       content: m.content || (m as any).text
@@ -155,12 +155,17 @@ export const createSupportAdapter = (role: ChatRole, supabaseClient: SupabaseCli
       text: payload.content,
       type: payload.type as any,
       file: payload.file,
-      metadata: payload.metadata
+      metadata: payload.metadata,
+      supabaseClient
     });
   },
 
   async deleteMessage(_context, messageId): Promise<void> {
-    await supportChatService.deleteMessage(messageId);
+    await supportChatService.deleteMessage(messageId, supabaseClient);
+  },
+
+  async markAsRead(context: SupportContext): Promise<void> {
+    await supportChatService.markAsRead(context.loanId, role as any, supabaseClient);
   },
 
   async closeTicket(context): Promise<void> {

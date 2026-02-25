@@ -39,7 +39,6 @@ export const DashboardControls: React.FC<DashboardControlsProps> = ({
                             className="w-full appearance-none bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 pr-10 text-[10px] font-black uppercase text-white outline-none focus:border-indigo-500 transition-all cursor-pointer hover:bg-slate-800"
                         >
                             <option value="ALL">Visualizar: Toda a Equipe</option>
-                            <option value="ONLY_MASTER">Visualizar: Meus Contratos</option>
                             <optgroup label="Colaboradores">
                                 {staffMembers.map(s => (
                                     <option key={s.id} value={s.id}>Operador: {s.name}</option>
