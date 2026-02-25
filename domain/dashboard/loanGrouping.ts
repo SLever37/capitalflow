@@ -1,6 +1,7 @@
 import { Loan, LoanStatus, SortOption } from '../../types';
 import { getInstallmentStatusLogic } from '../../domain/finance/calculations';
 import { getDaysDiff } from '../../utils/dateHelpers';
+import { normalizeName, onlyDigits } from '../../utils/formatters';
 
 export interface ClientGroup {
   clientId: string;
@@ -31,14 +32,17 @@ export const groupLoansByClient = (loans: Loan[], sortOption: SortOption = 'DUE_
   loans.forEach(loan => {
     const rawId = loan.clientId;
     const rawName = (loan.debtorName || 'Cliente Desconhecido').trim();
+    const rawDoc = onlyDigits(loan.debtorDocument);
+    const ownerId = loan.owner_id || 'no-owner';
     
-    // DECISÃO DO OPERADOR: Se existe ID, usa ele como chave primária de agrupamento.
-    // Caso contrário, usa o nome normalizado como fallback.
-    let groupKey = '';
+    // BUG 2: Regra de agrupamento robusta (Multi-tenant + ID > DOC > NOME)
+    let groupKey = `${ownerId}|`;
     if (rawId && rawId !== 'no-id') {
-        groupKey = `id_${rawId}`;
+        groupKey += `id_${rawId}`;
+    } else if (rawDoc && rawDoc.length >= 11) {
+        groupKey += `doc_${rawDoc}`;
     } else {
-        groupKey = `name_${rawName.toLowerCase()}`;
+        groupKey += `name_${normalizeName(rawName)}`;
     }
 
     if (!groups[groupKey]) {

@@ -114,6 +114,7 @@ export const mapLoanFromDB = (l: any, clientsData: any[] = []): Loan => {
         id: asString(l.id, '', 'id'),
         clientId: asString(l.client_id),
         profile_id: asString(l.profile_id), 
+        owner_id: asString(l.owner_id),
         debtorName: asString(l.debtor_name, 'Cliente Desconhecido'),
         debtorPhone: maskPhone(asString(phone, '00000000000')),
         debtorDocument: l.debtor_document,

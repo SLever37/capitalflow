@@ -115,11 +115,18 @@ export const useClientController = (
           .from('clientes')
           .select('id, name')
           .eq('owner_id', ownerId)
-          .ilike('name', cleanName);
+          .ilike('name', cleanName)
+          .limit(1); // ✅ BUG 1: Garante no máximo 1 linha para evitar erro de multiple rows
 
         if (ui.editingClient?.id) qn = qn.neq('id', ui.editingClient.id);
 
-        const { data: existingName } = await qn.maybeSingle();
+        const { data: existingName, error: checkError } = await qn.maybeSingle();
+        
+        // @ts-ignore
+        if (import.meta.env.DEV) {
+          console.log('[DEV] Verificação de nome:', { cleanName, ownerId, found: !!existingName, error: checkError });
+        }
+
         if (existingName) {
           showToast(`Já existe cliente com esse nome: ${existingName.name}.`, 'error');
           ui.setIsSaving(false);

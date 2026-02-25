@@ -1,14 +1,13 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { ShieldCheck, X, ChevronLeft, MessageCircle, Lock, Unlock, Trash2 } from 'lucide-react';
+import { ShieldCheck, X, MessageCircle } from 'lucide-react';
 import { supportChatService } from '../../services/supportChat.service';
-import { ChatContainer } from './ChatContainer';
 import { ChatSidebar } from './components/ChatSidebar';
-import { useSupportRealtime } from './hooks/useSupportRealtime';
 import { useCampaignChat } from '../../hooks/useCampaignChat';
 import { useCampaignNotifications } from '../../hooks/useCampaignNotifications';
-import { ChatInput } from './components/ChatInput';
-import { ChatMessages } from './components/ChatMessages';
+import { UnifiedChat } from '../../components/chat/UnifiedChat';
+import { createSupportAdapter } from '../../components/chat/adapters/supportAdapter';
+import { createCaptacaoAdapter } from '../../components/chat/adapters/captacaoAdapter';
 
 function diffLabel(ts: string | number | Date) {
   if (!ts) return '';
@@ -24,113 +23,6 @@ function diffLabel(ts: string | number | Date) {
   return `${d}d`;
 }
 
-// Wrapper interno para ter acesso ao hook realtime dentro do chat selecionado
-const ActiveChatWrapper = ({ loanId, activeUser, clientName, onChatDeleted }: any) => {
-    const { updateTicketStatus, ticketStatus } = useSupportRealtime(loanId, activeUser.id, 'OPERATOR');
-
-    const handleDeleteHistory = async () => {
-        if (!confirm(`Tem certeza que deseja apagar TODO o histórico de conversa com ${clientName}? Essa ação é irreversível.`)) return;
-        try {
-            await supportChatService.deleteChatHistory(loanId);
-            onChatDeleted();
-        } catch (e: any) {
-            alert('Erro ao apagar histórico: ' + e.message);
-        }
-    };
-
-    return (
-        <div className="flex-1 flex flex-col relative min-h-0">
-             {/* Header de Ação Rápida */}
-             <div className="absolute top-14 right-4 z-20 flex gap-2">
-                <button 
-                    onClick={handleDeleteHistory}
-                    className="px-3 py-1.5 rounded-lg text-[10px] font-black uppercase backdrop-blur-md shadow-lg border border-rose-500/20 bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white transition-all flex items-center gap-1"
-                    title="Apagar Histórico"
-                >
-                    <Trash2 size={12}/>
-                </button>
-                <button 
-                    onClick={() => updateTicketStatus(ticketStatus === 'OPEN' ? 'CLOSED' : 'OPEN')}
-                    className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase backdrop-blur-md shadow-lg border transition-all flex items-center gap-1 ${ticketStatus === 'OPEN' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20 hover:bg-amber-500 hover:text-black' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500 hover:text-white'}`}
-                >
-                    {ticketStatus === 'OPEN' ? <><Lock size={12}/> Encerrar</> : <><Unlock size={12}/> Reabrir</>}
-                </button>
-             </div>
-
-             <ChatContainer
-                loanId={loanId}
-                profileId={activeUser.id}
-                operatorId={activeUser.id}
-                senderType="OPERATOR"
-                clientName={clientName}
-                placeholder="Digite sua resposta..."
-            />
-        </div>
-    );
-};
-
-const CampaignChatWrapper = ({ sessionToken, clientName }: { sessionToken: string; clientName: string }) => {
-    const { messages, sendMessage, sendAttachment, uploading, selectLead, leads } = useCampaignChat();
-    const scrollRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        const lead = leads.find(l => l.session_token === sessionToken);
-        if (lead) {
-            selectLead(lead);
-        } else {
-            // Se não achou na lista local (ex: abriu direto), cria um mock básico para o hook funcionar
-            selectLead({ session_token: sessionToken, nome: clientName });
-        }
-    }, [sessionToken, leads]);
-
-    useEffect(() => {
-        if (scrollRef.current) {
-            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-        }
-    }, [messages]);
-
-    const handleSend = async (text: string, type?: any, file?: File) => {
-        try {
-            if (file) {
-                await sendAttachment(file);
-            } else {
-                await sendMessage(text);
-            }
-        } catch (e) {
-            alert('Erro ao enviar mensagem');
-        }
-    };
-
-    return (
-        <div className="flex-1 flex flex-col relative min-h-0">
-            <ChatMessages 
-                messages={messages.map(m => {
-                    const isAnexo = m.message?.startsWith('[ANEXO]');
-                    const fileUrl = isAnexo ? m.message.split(' ')[1] : undefined;
-                    const isImage = fileUrl?.match(/\.(jpeg|jpg|gif|png)$/i);
-                    
-                    return {
-                        ...m,
-                        content: isAnexo ? (isImage ? '📷 Imagem' : '📎 Arquivo') : m.message,
-                        sender_type: m.sender_type,
-                        created_at: m.created_at,
-                        type: isAnexo ? (isImage ? 'image' : 'file') : 'text',
-                        file_url: fileUrl
-                    };
-                })}
-                currentUserId="OPERATOR"
-                senderType="OPERATOR"
-                scrollRef={scrollRef}
-            />
-            <ChatInput 
-                onSend={handleSend}
-                isUploading={uploading}
-                placeholder="Responda ao lead..."
-            />
-        </div>
-    );
-};
-
 export const OperatorSupportChat = ({ activeUser, onClose }: { activeUser: any; onClose: () => void; }) => {
   const [activeChats, setActiveChats] = useState<any[]>([]);
   const [contracts, setContracts] = useState<any[]>([]);
@@ -139,6 +31,22 @@ export const OperatorSupportChat = ({ activeUser, onClose }: { activeUser: any; 
   
   const [selectedChat, setSelectedChat] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
+
+  const supportAdapter = useMemo(() => createSupportAdapter('OPERATOR'), []);
+  const captacaoAdapter = useMemo(() => createCaptacaoAdapter('OPERATOR'), []);
+
+  const handleDeleteHistory = async () => {
+    if (!selectedChat || selectedChat.type === 'CAMPAIGN') return;
+    if (!confirm(`Tem certeza que deseja apagar TODO o histórico de conversa com ${selectedChat.clientName}? Essa ação é irreversível.`)) return;
+    
+    try {
+        await supportChatService.deleteChatHistory(selectedChat.loanId);
+        setSelectedChat(null);
+        loadAllData();
+    } catch (e: any) {
+        alert('Erro ao apagar histórico: ' + e.message);
+    }
+  };
 
   const { unreadCampaignCount, clearUnread } = useCampaignNotifications(activeUser);
   const { leads: hookLeads, loadLeads } = useCampaignChat();
@@ -265,40 +173,25 @@ export const OperatorSupportChat = ({ activeUser, onClose }: { activeUser: any; 
         {/* ÁREA DE CHAT */}
         <div className={`flex-1 flex flex-col bg-slate-900 relative ${!selectedChat ? 'hidden md:flex' : 'flex'}`}>
           {selectedChat ? (
-            <>
-              {/* TopBar Chat */}
-              <div className="h-16 border-b border-slate-800 bg-slate-900 flex items-center justify-between px-4 sm:px-6 shrink-0 shadow-sm z-10">
-                <div className="flex items-center gap-3 min-w-0">
-                  <button onClick={() => setSelectedChat(null)} className="md:hidden p-2 -ml-2 text-slate-400 hover:text-white">
-                    <ChevronLeft size={24} />
-                  </button>
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center text-white font-bold shrink-0">
-                    {selectedChat.clientName.charAt(0)}
-                  </div>
-                  <div className="min-w-0">
-                    <h2 className="text-sm font-black text-white uppercase truncate">{selectedChat.clientName}</h2>
-                    <p className="text-[10px] text-slate-500 font-mono">
-                        {selectedChat.type === 'CAMPAIGN' ? 'Lead de Captação' : `Contrato: ${selectedChat.loanId.slice(0,8)}`}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Wrapper Ativo com Lógica Realtime */}
-              {selectedChat.type === 'CAMPAIGN' ? (
-                  <CampaignChatWrapper 
-                    sessionToken={selectedChat.session_token}
-                    clientName={selectedChat.clientName}
-                  />
-              ) : (
-                <ActiveChatWrapper 
-                    loanId={selectedChat.loanId} 
-                    activeUser={activeUser}
-                    clientName={selectedChat.clientName}
-                    onChatDeleted={() => { setSelectedChat(null); loadAllData(); }}
-                />
-              )}
-            </>
+            selectedChat.type === 'CAMPAIGN' ? (
+              <UnifiedChat
+                adapter={captacaoAdapter}
+                context={{ sessionToken: selectedChat.session_token, clientName: selectedChat.clientName }}
+                role="OPERATOR"
+                userId={activeUser.id}
+                onClose={() => setSelectedChat(null)}
+              />
+            ) : (
+              <UnifiedChat
+                adapter={supportAdapter}
+                context={{ loanId: selectedChat.loanId, profileId: activeUser.id, clientName: selectedChat.clientName }}
+                role="OPERATOR"
+                userId={activeUser.id}
+                onClose={() => setSelectedChat(null)}
+                showDeleteHistory={true}
+                onDeleteHistory={handleDeleteHistory}
+              />
+            )
           ) : (
             /* Empty State */
             <div className="flex-1 flex flex-col items-center justify-center text-slate-600 bg-slate-900/50">

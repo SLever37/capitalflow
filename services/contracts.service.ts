@@ -48,7 +48,13 @@ export const contractsService = {
           .eq('owner_id', ownerId)
           // ✅ importante: compara no padrão do BD (somente dígitos)
           .eq('document', cleanDoc)
+          .limit(1)
           .maybeSingle();
+
+        // @ts-ignore
+        if (import.meta.env.DEV) {
+          console.log('[DEV] Busca cliente por DOC:', { cleanDoc, ownerId, found: !!existingByDoc, error: e1 });
+        }
 
         if (e1) throw new Error(e1.message);
         if (existingByDoc?.id) finalClientId = existingByDoc.id;
@@ -61,7 +67,13 @@ export const contractsService = {
           .select('id, phone')
           .eq('owner_id', ownerId)
           .eq('phone', cleanPhone)
+          .limit(1)
           .maybeSingle();
+
+        // @ts-ignore
+        if (import.meta.env.DEV) {
+          console.log('[DEV] Busca cliente por FONE:', { cleanPhone, ownerId, found: !!existingByPhone, error: ePhone });
+        }
 
         if (ePhone) throw new Error(ePhone.message);
         if (existingByPhone?.id) finalClientId = existingByPhone.id;
@@ -74,7 +86,13 @@ export const contractsService = {
           .select('id')
           .eq('owner_id', ownerId)
           .ilike('name', cleanName)
+          .limit(1)
           .maybeSingle();
+
+        // @ts-ignore
+        if (import.meta.env.DEV) {
+          console.log('[DEV] Busca cliente por NOME:', { cleanName, ownerId, found: !!existingByName, error: e2 });
+        }
 
         if (e2) throw new Error(e2.message);
         if (existingByName?.id) finalClientId = existingByName.id;

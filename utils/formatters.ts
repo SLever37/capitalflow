@@ -111,3 +111,13 @@ export const normalizeBrazilianPhone = (value: string | undefined | null): strin
 export const isTestClientName = (name: string | undefined | null): boolean => {
   return asString(name).toUpperCase().includes('TESTE');
 };
+
+export const normalizeName = (name: string | undefined | null): string => {
+  return asString(name)
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // Remove acentos
+    .replace(/[^\w\s]/gi, '') // Remove pontuação
+    .replace(/\s+/g, ' '); // Remove múltiplos espaços
+};

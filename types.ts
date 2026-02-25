@@ -212,6 +212,7 @@ export interface Loan {
   id: string;
   clientId: string;
   profile_id: string;
+  owner_id?: string;
   operador_responsavel_id?: string;
   debtorName: string;
   debtorPhone: string;
