@@ -17,7 +17,6 @@ export const NavHub: React.FC<NavHubProps> = ({ onClose, onNavigate, userLevel, 
             case 'PROFILE': return { icon: <User size={32}/>, label: 'Meu Perfil', color: 'text-blue-500', hover: 'hover:border-blue-600' };
             case 'SOURCES': return { icon: <Wallet size={32}/>, label: 'Meus Fundos', color: 'text-emerald-500', hover: 'hover:border-emerald-600' };
             case 'LEGAL': return { icon: <Scale size={32}/>, label: 'Jurídico', color: 'text-indigo-500', hover: 'hover:border-indigo-600' };
-            case 'MASTER': return { icon: <Shield size={32}/>, label: 'SAC', color: 'text-rose-500', hover: 'hover:border-rose-600' };
             case 'TEAM': return { icon: <Briefcase size={32}/>, label: 'Minha Equipe', color: 'text-purple-500', hover: 'hover:border-purple-600' };
             case 'CLIENTS': return { icon: <Users size={32}/>, label: 'Clientes', color: 'text-amber-500', hover: 'hover:border-amber-600' };
             case 'DASHBOARD': return { icon: <LayoutDashboard size={32}/>, label: 'Painel Geral', color: 'text-cyan-500', hover: 'hover:border-cyan-600' };
@@ -40,7 +39,7 @@ export const NavHub: React.FC<NavHubProps> = ({ onClose, onNavigate, userLevel, 
                 <div className="grid grid-cols-2 gap-4">
                     {hubOrder.map(tab => {
                         const meta = getTabMeta(tab);
-                        if (tab === 'MASTER' && userLevel !== 1) return null;
+                        if (tab === 'MASTER') return null;
                         return (
                             <button key={tab} onClick={() => onNavigate(tab)} className={`p-6 bg-slate-900 border border-slate-800 rounded-3xl transition-all group flex flex-col items-center justify-center gap-3 relative ${meta.hover}`}>
                                 <div className={`p-4 bg-slate-800 rounded-2xl ${meta.color} group-hover:scale-110 transition-transform`}>{meta.icon}</div>

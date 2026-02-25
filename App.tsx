@@ -233,16 +233,6 @@ export const App: React.FC = () => {
               <SettingsPage />
             )}
 
-            {activeTab === 'MASTER' && activeUser?.accessLevel === 1 && (
-              <MasterScreen
-                activeUser={activeUser}
-                systemUsers={systemUsers}
-                fetchFullData={fetchFullData}
-                handleLogout={handleLogout}
-                showToast={showToast}
-              />
-            )}
-
             <ModalHostContainer
               ui={ui} activeUser={activeUser} clients={clients} sources={sources} loans={loans}
               isLoadingData={isLoadingData} loanCtrl={loanCtrl} clientCtrl={clientCtrl}

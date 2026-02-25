@@ -31,33 +31,46 @@ export const createSupportAdapter = (role: ChatRole, supabaseClient: SupabaseCli
     const { loanId } = context;
     if (!isUuid(loanId)) return { title: context.clientName, subtitle: 'Contrato inválido' };
 
-    const { data: ticket } = await supabaseClient
-      .from('support_tickets')
-      .select('status')
-      .eq('loan_id', loanId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    try {
+      const { data: ticket } = await supabaseClient
+        .from('support_tickets')
+        .select('status')
+        .eq('loan_id', loanId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-    const { data: presence } = await supabaseClient
-      .from('support_presence')
-      .select('last_seen_at')
-      .eq('loan_id', loanId)
-      .neq('role', role)
-      .order('last_seen_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      const { data: presence } = await supabaseClient
+        .from('support_presence')
+        .select('last_seen_at')
+        .eq('loan_id', loanId)
+        .neq('role', role)
+        .order('last_seen_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-    const isOnline = presence?.last_seen_at 
-      ? (Date.now() - new Date(presence.last_seen_at).getTime() < 60000)
-      : false;
+      const isOnline = presence?.last_seen_at 
+        ? (Date.now() - new Date(presence.last_seen_at).getTime() < 60000)
+        : false;
 
-    return {
-      title: context.clientName,
-      subtitle: `Contrato: ${loanId.slice(0, 8)}`,
-      status: (ticket?.status as any) || 'OPEN',
-      isOnline
-    };
+      return {
+        title: context.clientName,
+        subtitle: `Contrato: ${loanId.slice(0, 8)}`,
+        status: (ticket?.status as any) || 'OPEN',
+        isOnline
+      };
+    } catch (err: any) {
+      if (err.message === 'TypeError: Failed to fetch' || err.name === 'TypeError' || err.message?.includes('Failed to fetch')) {
+        console.warn('[supportAdapter] Failed to fetch header (Network Error):', err);
+        return {
+          title: context.clientName,
+          subtitle: `Contrato: ${loanId.slice(0, 8)}`,
+          status: 'OPEN',
+          isOnline: false
+        };
+      }
+      throw err;
+    }
   },
 
   async listMessages(context: SupportContext): Promise<ChatMessage[]> {

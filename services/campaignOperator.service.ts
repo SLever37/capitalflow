@@ -12,14 +12,22 @@ export const campaignOperatorService = {
   },
 
   async getMessages(sessionToken: string) {
-    const { data, error } = await supabase
-      .from('campaign_messages')
-      .select('*')
-      .eq('session_token', sessionToken)
-      .order('created_at', { ascending: true });
+    try {
+      const { data, error } = await supabase
+        .from('campaign_messages')
+        .select('*')
+        .eq('session_token', sessionToken)
+        .order('created_at', { ascending: true });
 
-    if (error) throw error;
-    return data;
+      if (error) throw error;
+      return data;
+    } catch (err: any) {
+      if (err.message === 'TypeError: Failed to fetch' || err.name === 'TypeError' || err.message?.includes('Failed to fetch')) {
+        console.warn('[campaignOperatorService] Failed to fetch messages (Network Error):', err);
+        return [];
+      }
+      throw err;
+    }
   },
 
   async sendMessage(sessionToken: string, message: string) {

@@ -98,39 +98,47 @@ async function signPath(path: string) {
 
 export const supportChatService = {
   async getMessages(loanId: string) {
-    const { data, error } = await supabase
-      .from('mensagens_suporte')
-      .select('*')
-      .eq('loan_id', loanId)
-      .order('created_at', { ascending: true });
+    try {
+      const { data, error } = await supabase
+        .from('mensagens_suporte')
+        .select('*')
+        .eq('loan_id', loanId)
+        .order('created_at', { ascending: true });
 
-    if (error) throw new Error(error.message);
+      if (error) throw new Error(error.message);
 
-    const msgs = (data || []) as SupportMessage[];
+      const msgs = (data || []) as SupportMessage[];
 
-    // Gera signed URLs para anexos (quando file_url é PATH e não http)
-    const out: SupportMessage[] = [];
-    for (const m of msgs) {
-      const hasFile = (m.type === 'audio' || m.type === 'image' || m.type === 'file') && m.file_url;
-      if (hasFile && m.file_url && !isHttpUrl(m.file_url)) {
-        try {
-          const signed = await signPath(m.file_url);
-          out.push({
-            ...m,
-            // aqui troco o file_url por signed URL para tocar/abrir direto
-            file_url: signed,
-            metadata: { ...(m.metadata || {}), storage_path: m.file_url, signed_expires_in: SIGNED_URL_TTL },
-          });
-        } catch {
-          // se falhar, mantém path (e o UI pode mostrar "indisponível")
+      // Gera signed URLs para anexos (quando file_url é PATH e não http)
+      const out: SupportMessage[] = [];
+      for (const m of msgs) {
+        const hasFile = (m.type === 'audio' || m.type === 'image' || m.type === 'file') && m.file_url;
+        if (hasFile && m.file_url && !isHttpUrl(m.file_url)) {
+          try {
+            const signed = await signPath(m.file_url);
+            out.push({
+              ...m,
+              // aqui troco o file_url por signed URL para tocar/abrir direto
+              file_url: signed,
+              metadata: { ...(m.metadata || {}), storage_path: m.file_url, signed_expires_in: SIGNED_URL_TTL },
+            });
+          } catch {
+            // se falhar, mantém path (e o UI pode mostrar "indisponível")
+            out.push(m);
+          }
+        } else {
           out.push(m);
         }
-      } else {
-        out.push(m);
       }
-    }
 
-    return out;
+      return out;
+    } catch (err: any) {
+      if (err.message === 'TypeError: Failed to fetch' || err.name === 'TypeError' || err.message?.includes('Failed to fetch')) {
+        console.warn('[supportChatService] Failed to fetch messages (Network Error):', err);
+        return [];
+      }
+      throw err;
+    }
   },
 
   async sendMessage(params: SendMessageParams) {

@@ -6,7 +6,7 @@ import { mapLoanFromDB } from '../services/adapters/dbAdapters';
 import { asString, asNumber } from '../utils/safe';
 
 const DEFAULT_NAV: AppTab[] = ['DASHBOARD', 'CLIENTS', 'TEAM'];
-const DEFAULT_HUB: AppTab[] = ['SOURCES', 'LEGAL', 'PROFILE', 'MASTER', 'PERSONAL_FINANCE', 'LEADS', 'ACQUISITION'];
+const DEFAULT_HUB: AppTab[] = ['SOURCES', 'LEGAL', 'PROFILE', 'PERSONAL_FINANCE', 'LEADS', 'ACQUISITION'];
 
 const CACHE_KEY = (profileId: string) => `cm_cache_${profileId}`;
 const CACHE_MAX_AGE = 24 * 60 * 60 * 1000; // 24 horas
@@ -150,8 +150,7 @@ export const useAppState = (activeProfileId: string | null) => {
 
       const u = mapProfileFromDB(profileData);
 
-      const isStaff = u.accessLevel === 3;
-      const ownerId = isStaff ? (u.supervisor_id || u.id) : u.id;
+      const ownerId = profileData.owner_profile_id || profileData.id;
 
       const [clientsRes, sourcesRes, loansRes] = await Promise.all([
         supabase.from('clientes').select('*').eq('owner_id', ownerId),
@@ -179,15 +178,14 @@ export const useAppState = (activeProfileId: string | null) => {
 
       let mappedStaff: UserProfile[] = [];
 
-      if (u.accessLevel === 1) {
-        const { data: staffData } = await supabase
-          .from('perfis')
-          .select('*')
-          .order('nome_operador', { ascending: true });
+      const { data: staffData } = await supabase
+        .from('perfis')
+        .select('*')
+        .eq('owner_profile_id', ownerId)
+        .order('nome_operador', { ascending: true });
 
-        if (staffData) {
-          mappedStaff = staffData.map(s => mapProfileFromDB(s));
-        }
+      if (staffData) {
+        mappedStaff = staffData.map(s => mapProfileFromDB(s));
       }
 
       setActiveUser(u);

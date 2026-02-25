@@ -34,30 +34,38 @@ export const createCaptacaoAdapter = (role: ChatRole): ChatAdapter<CaptacaoConte
   async listMessages(context: CaptacaoContext): Promise<ChatMessage[]> {
     if (!isUuid(context.sessionToken)) return [];
     
-    const { data, error } = await supabase
-      .from('campaign_messages')
-      .select('*')
-      .eq('session_token', context.sessionToken)
-      .order('created_at', { ascending: true });
+    try {
+      const { data, error } = await supabase
+        .from('campaign_messages')
+        .select('*')
+        .eq('session_token', context.sessionToken)
+        .order('created_at', { ascending: true });
 
-    if (error) throw error;
+      if (error) throw error;
 
-    return (data || []).map(m => {
-        const isAnexo = m.message?.startsWith('[ANEXO]');
-        const fileUrl = isAnexo ? m.message.split(' ')[1] : undefined;
-        const isImage = fileUrl?.match(/\.(jpeg|jpg|gif|png)$/i);
+      return (data || []).map(m => {
+          const isAnexo = m.message?.startsWith('[ANEXO]');
+          const fileUrl = isAnexo ? m.message.split(' ')[1] : undefined;
+          const isImage = fileUrl?.match(/\.(jpeg|jpg|gif|png)$/i);
 
-        return {
-            id: m.id,
-            content: isAnexo ? (isImage ? '📷 Imagem' : '📎 Arquivo') : m.message,
-            text: m.message,
-            type: isAnexo ? (isImage ? 'image' : 'file') : 'text',
-            sender_type: m.sender === 'LEAD' ? 'CLIENT' : 'OPERATOR',
-            sender_user_id: m.sender === 'LEAD' ? 'LEAD' : 'OPERATOR',
-            created_at: m.created_at,
-            file_url: fileUrl
-        };
-    }) as any;
+          return {
+              id: m.id,
+              content: isAnexo ? (isImage ? '📷 Imagem' : '📎 Arquivo') : m.message,
+              text: m.message,
+              type: isAnexo ? (isImage ? 'image' : 'file') : 'text',
+              sender_type: m.sender === 'LEAD' ? 'CLIENT' : 'OPERATOR',
+              sender_user_id: m.sender === 'LEAD' ? 'LEAD' : 'OPERATOR',
+              created_at: m.created_at,
+              file_url: fileUrl
+          };
+      }) as any;
+    } catch (err: any) {
+      if (err.message === 'TypeError: Failed to fetch' || err.name === 'TypeError' || err.message?.includes('Failed to fetch')) {
+        console.warn('[captacaoAdapter] Failed to fetch messages (Network Error):', err);
+        return [];
+      }
+      throw err;
+    }
   },
 
   subscribeMessages(context: CaptacaoContext, handlers) {

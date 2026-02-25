@@ -43,16 +43,28 @@ export const notificationService = {
           vibrate: [200, 100, 200, 100, 200] // Padrão de vibração urgente
         };
 
-        const n = new Notification(title, options);
+        try {
+          const n = new Notification(title, options);
 
-        n.onclick = (e) => {
-            e.preventDefault();
-            window.focus();
-            if (onClick) {
-                onClick();
-            }
-            n.close();
-        };
+          n.onclick = (e) => {
+              e.preventDefault();
+              window.focus();
+              if (onClick) {
+                  onClick();
+              }
+              n.close();
+          };
+        } catch (err: any) {
+          if (err.name === 'TypeError' || err.message.includes('Illegal constructor')) {
+            navigator.serviceWorker?.getRegistration().then(registration => {
+              if (registration) {
+                registration.showNotification(title, options);
+              }
+            });
+          } else {
+            throw err;
+          }
+        }
       } catch (e) {
         console.warn("Falha ao disparar notificação nativa:", e);
       }

@@ -19,7 +19,8 @@ const resolveSmartName = (p: any): string => {
   const isGeneric = (s: string) => {
     if (!s) return true;
     const clean = s.toLowerCase().trim();
-    return ['usuário', 'usuario', 'user', 'operador', 'admin', 'gestor', 'undefined', 'null', ''].includes(clean);
+    return ['usuário','usuario','user','operador','admin','gestor','undefined','null','']
+      .includes(clean);
   };
 
   const display = asString(p.nome_exibicao || p.display_name);
@@ -47,7 +48,6 @@ const mapLoginError = (err: any) => {
   let raw = String(err?.message || err || '');
   const l = raw.toLowerCase();
 
-  // Prioridade para erro de conexão (antes de qualquer outra checagem)
   if (
     l.includes('network') ||
     l.includes('failed to fetch') ||
@@ -57,26 +57,23 @@ const mapLoginError = (err: any) => {
     return 'Falha de conexão. Verifique a internet.';
   }
 
-  // Tenta extrair mensagem interna se for erro do ensureAuthSession
   if (raw.startsWith('AUTH_SIGNIN_FAILED:')) {
     try {
-        const jsonPart = raw.replace('AUTH_SIGNIN_FAILED: ', '');
-        const details = JSON.parse(jsonPart);
-        if (details.message) raw = details.message;
-    } catch (e) {
-        // falha ao parsear, mantem raw
-    }
+      const jsonPart = raw.replace('AUTH_SIGNIN_FAILED: ', '');
+      const details = JSON.parse(jsonPart);
+      if (details.message) raw = details.message;
+    } catch {}
   }
 
-  // Re-calcula lowercase após extração (caso tenha mudado)
   const l2 = raw.toLowerCase();
+
   if (l2.includes('invalid login')) return 'Usuário ou senha inválidos.';
   if (l2.includes('invalid_credentials')) return 'Usuário ou senha inválidos.';
-  if (l2.includes('email not confirmed')) return 'E-mail não confirmado. Verifique sua caixa de entrada.';
+  if (l2.includes('email not confirmed')) return 'E-mail não confirmado.';
   if (l2.includes('refresh token not found') || l2.includes('invalid refresh token')) {
-    return 'Sessão expirada. Por favor, faça login novamente.';
+    return 'Sessão expirada. Faça login novamente.';
   }
-  
+
   return raw || 'Erro desconhecido no login.';
 };
 
@@ -97,34 +94,24 @@ export const useAuth = () => {
     }
   };
 
-  /**
-   * Cria sessão no Supabase Auth (necessário para atravessar RLS).
-   * Se falhar, lança AUTH_SIGNIN_FAILED com detalhes (sem mascarar).
-   */
   const ensureAuthSession = async (email: string, pass: string) => {
     const cleanEmail = String(email || '').toLowerCase().trim();
     const cleanPass = String(pass || '');
 
     const { data: s, error: sessionError } = await supabase.auth.getSession();
 
-    // Se houver erro na sessão (ex: token inválido), limpa estado antes de prosseguir
     if (sessionError) {
-      if (isDev) console.warn('[AUTH_SYNC] Erro na sessão atual, forçando limpeza:', sessionError.message);
+      if (isDev) console.warn('[AUTH_SYNC] erro sessão:', sessionError.message);
       await supabase.auth.signOut().catch(() => {});
     }
 
-    // mesma sessão já ativa
     if (s?.session?.user?.email?.toLowerCase() === cleanEmail) {
-      if (isDev) console.log('[AUTH_SYNC] Sessão já ativa para:', cleanEmail);
       return;
     }
 
-    // sessão de outro user -> signOut antes
     if (s?.session) {
       await supabase.auth.signOut();
     }
-
-    if (isDev) console.log('[LOGIN] signInWithPassword email/passlen:', cleanEmail, cleanPass.length);
 
     const { data, error } = await supabase.auth.signInWithPassword({
       email: cleanEmail,
@@ -132,17 +119,16 @@ export const useAuth = () => {
     });
 
     if (error) {
-      const details = {
-        message: error.message,
-        status: (error as any).status,
-        name: (error as any).name,
-        code: (error as any).code,
-      };
-      if (isDev) console.error('[AUTH_SYNC] signInWithPassword error:', details);
-      throw new Error(`AUTH_SIGNIN_FAILED: ${JSON.stringify(details)}`);
+      throw new Error(
+        `AUTH_SIGNIN_FAILED: ${JSON.stringify({
+          message: error.message,
+          status: (error as any).status,
+          code: (error as any).code,
+        })}`
+      );
     }
 
-    if (isDev) console.log('[AUTH_SYNC] signIn ok:', !!data?.session);
+    if (isDev) console.log('[AUTH_SYNC] sessão criada:', !!data?.session);
   };
 
   useEffect(() => {
@@ -157,42 +143,78 @@ export const useAuth = () => {
           } catch {}
         }
 
-        // Tenta recuperar sessão do Supabase, mas NÃO desloga se falhar
-        const { data: s, error: sessionError } = await supabase.auth.getSession();
+        const { data: authData, error: sessionError } = await supabase.auth.getSession();
 
         if (sessionError) {
-           const errMsg = sessionError.message || String(sessionError);
-           if (isDev) console.warn('[BOOT] Auth Session Error:', errMsg);
-           
-           // Se o token de refresh sumiu ou é inválido, limpamos o lixo do localStorage
-           if (errMsg.includes('Refresh Token Not Found') || errMsg.includes('invalid refresh token')) {
-               localStorage.removeItem('cm_supabase_auth');
-               Object.keys(localStorage).forEach(key => {
-                   if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
-                       localStorage.removeItem(key);
-                   }
-               });
-               await supabase.auth.signOut().catch(() => {});
-           }
+          const msg = sessionError.message || '';
+          if (msg.includes('Refresh Token Not Found') || msg.toLowerCase().includes('invalid refresh token')) {
+            localStorage.removeItem('cm_supabase_auth');
+            Object.keys(localStorage).forEach((key) => {
+              if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+                localStorage.removeItem(key);
+              }
+            });
+            await supabase.auth.signOut().catch(() => {});
+            window.dispatchEvent(new Event('cm_auth_lost'));
+          }
         }
 
         const session = localStorage.getItem('cm_session');
         if (session && mounted) {
           try {
             const parsed = JSON.parse(session);
-            
-            // Restaura profileId SEMPRE, independente do estado do Auth
             if (parsed?.profileId) {
               setActiveProfileId(parsed.profileId);
               trackAccess(parsed.profileId);
             }
           } catch {
-            // Se o JSON estiver corrompido, aí sim limpamos
             localStorage.removeItem('cm_session');
           }
+        } else if (authData?.session?.user && mounted) {
+          // Usuário autenticado via OAuth (Google) mas sem sessão local
+          const user = authData.session.user;
+          let { data: profile } = await supabase.from('perfis').select('*').eq('user_id', user.id).maybeSingle();
+          
+          if (!profile) {
+            // Cria o perfil automaticamente para novos usuários do Google
+            const newProfile = {
+                id: user.id,
+                user_id: user.id,
+                owner_profile_id: user.id,
+                nome_operador: user.user_metadata?.full_name?.split(' ')[0] || 'Usuário',
+                nome_completo: user.user_metadata?.full_name || 'Usuário Google',
+                usuario_email: user.email,
+                email: user.email,
+                access_level: 1, 
+                created_at: new Date().toISOString()
+            };
+            const { data: createdProfile, error: createError } = await supabase.from('perfis').insert([newProfile]).select().single();
+            if (!createError && createdProfile) {
+              profile = createdProfile;
+            }
+          }
+
+          if (profile) {
+            setActiveProfileId(profile.id);
+            trackAccess(profile.id);
+            localStorage.setItem('cm_session', JSON.stringify({ profileId: profile.id, ts: Date.now() }));
+            
+            // Atualiza a lista de perfis salvos
+            const profileName = resolveSmartName(profile);
+            const profileEmail = asString(profile.usuario_email || profile.email || profile.auth_email) || user.email || '';
+            const saved = localStorage.getItem('cm_saved_profiles');
+            let savedProfilesList = [];
+            if (saved) {
+              try { savedProfilesList = JSON.parse(saved); } catch {}
+            }
+            const updated = [
+              { id: profile.id, name: profileName, email: profileEmail },
+              ...savedProfilesList.filter((p: any) => p.id !== profile.id),
+            ].slice(0, 5);
+            setSavedProfiles(updated);
+            localStorage.setItem('cm_saved_profiles', JSON.stringify(updated));
+          }
         }
-      } catch (err) {
-        if (isDev) console.error('[BOOT] Erro não fatal:', err);
       } finally {
         if (mounted) setBootFinished(true);
       }
@@ -200,11 +222,37 @@ export const useAuth = () => {
 
     boot();
 
-    // Escuta mudanças de estado apenas para log (não desloga automaticamente)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (isDev) console.log('[AUTH] Evento detectado:', event);
-      // NÃO fazemos nada no SIGNED_OUT automático para manter a persistência local
-    });
+    const { data: { subscription } } =
+      supabase.auth.onAuthStateChange(async (event, session) => {
+
+        const ev = String(event); // 🔥 evita erro TS2367
+
+        if (isDev) console.log('[AUTH EVENT]', ev, 'session?', !!session);
+
+        if (ev === 'SIGNED_OUT' || ev === 'TOKEN_REFRESH_FAILED') {
+          try {
+            const { data: s1 } = await supabase.auth.getSession();
+            if (s1?.session) {
+              window.dispatchEvent(new Event('cm_auth_restored'));
+              return;
+            }
+
+            const { data: s2 } = await supabase.auth.refreshSession();
+            if (s2?.session) {
+              window.dispatchEvent(new Event('cm_auth_restored'));
+              return;
+            }
+
+            window.dispatchEvent(new Event('cm_auth_lost'));
+          } catch {
+            window.dispatchEvent(new Event('cm_auth_lost'));
+          }
+        }
+
+        if (ev === 'TOKEN_REFRESHED' || ev === 'SIGNED_IN') {
+          window.dispatchEvent(new Event('cm_auth_restored'));
+        }
+      });
 
     return () => {
       subscription.unsubscribe();
@@ -214,156 +262,61 @@ export const useAuth = () => {
 
   const handleLoginSuccess = (profile: any, showToast: any) => {
     const profileId = profile.id;
-    let profileName = resolveSmartName(profile);
-    let profileEmail = asString(profile.usuario_email || profile.email || profile.auth_email);
-
-    // Fallback inteligente usando o input de login
-    if (!profileEmail && loginUser.includes('@')) {
-      profileEmail = loginUser;
-    }
-    if (!profileEmail) profileEmail = 'equipe@sistema';
-
-    // Se resolveSmartName retornou 'Gestor' (genérico) e o login foi via username, usa o username
-    if (profileName === 'Gestor' && loginUser && !loginUser.includes('@')) {
-      profileName = loginUser;
-    }
+    const profileName = resolveSmartName(profile);
+    const profileEmail =
+      asString(profile.usuario_email || profile.email || profile.auth_email) ||
+      loginUser;
 
     setActiveProfileId(profileId);
     trackAccess(profileId);
 
-    const updatedSaved = [
+    const updated = [
       { id: profileId, name: profileName, email: profileEmail },
       ...savedProfiles.filter((p) => p.id !== profileId),
     ].slice(0, 5);
 
-    setSavedProfiles(updatedSaved);
-    localStorage.setItem('cm_saved_profiles', JSON.stringify(updatedSaved));
-    localStorage.setItem('cm_session', JSON.stringify({ profileId, ts: Date.now() }));
+    setSavedProfiles(updated);
 
-    Object.keys(localStorage)
-      .filter((k) => k.startsWith('cm_cache_'))
-      .forEach((k) => localStorage.removeItem(k));
+    localStorage.setItem('cm_saved_profiles', JSON.stringify(updated));
+    localStorage.setItem('cm_session', JSON.stringify({ profileId, ts: Date.now() }));
 
     showToast(`Bem-vindo, ${profileName}!`, 'success');
     playNotificationSound();
+
+    window.dispatchEvent(new Event('cm_auth_restored'));
   };
 
   const submitLogin = async (
     showToast: (msg: string, type?: 'error' | 'success' | 'warning') => void
   ) => {
     setIsLoading(true);
-
     try {
-      const userInput = (loginUser || '').trim();
-      const pass = (loginPassword || '').trim();
-
-      // Supabase Auth exige >= 6
+      const userInput = loginUser.trim();
+      const pass = loginPassword.trim();
       const authPass = pass.length < 6 ? pass.padEnd(6, '0') : pass;
 
       if (!userInput || !pass) throw new Error('Preencha usuário e senha.');
+
       requestBrowserNotificationPermission();
 
-      // =========================================================
-      // 1) PERFIL (nível 2/3) via RPC (com fallback se RPC quebrar)
-      // =========================================================
-      let profileLogin: any = null;
-
-      try {
-        const { data, error } = await supabase.rpc('resolve_profile_login', {
-          p_identifier: userInput,
-          p_password: pass,
-        });
-
-        if (isDev) {
-          console.log('[RPC resolve_profile_login] error:', error);
-          console.log('[RPC resolve_profile_login] data:', data);
-        }
-
-        if (!error && data) profileLogin = data;
-
-        if (error && isDev) {
-          console.warn('[AUTH] resolve_profile_login falhou, seguindo fallback...', error);
-        }
-      } catch (rpcError) {
-        if (isDev) console.warn('[AUTH] Erro chamando resolve_profile_login, seguindo fallback...', rpcError);
-      }
-
-      if (isDev) console.log('[LOGIN] profileLogin:', profileLogin);
-
-      if (profileLogin) {
-        const profile = profileLogin as any;
-        const authEmail = String(profile.auth_email || '').trim();
-
-        if (!authEmail || !authEmail.includes('@')) {
-          throw new Error('Perfil sem e-mail válido para autenticação.');
-        }
-
-        if (isDev) {
-          console.log('[LOGIN] calling ensure_auth_user with:', {
-            profile_id: profile.id,
-            email: authEmail,
-            password: authPass,
-          });
-        }
-
-        // 1.1) Sincroniza credencial no Auth (Edge Function)
-        const { data: fnData, error: fnError } = await supabase.functions.invoke('ensure_auth_user', {
-          body: {
-            profile_id: profile.id,
-            email: authEmail,
-            password: authPass,
-          },
-        });
-
-        if (isDev) console.log('[LOGIN] ensure_auth_user result:', { fnError, fnData });
-
-        if (fnError) throw new Error('Serviço de autenticação indisponível no momento.');
-        if (!fnData?.ok) throw new Error(fnData?.error || 'Falha ao sincronizar credenciais de acesso.');
-
-        // 1.2) Cria sessão Auth (RLS)
-        await ensureAuthSession(authEmail, authPass);
-
-        // 1.3) Loga no app
-        handleLoginSuccess(profile, showToast);
-        return;
-      }
-
-      // =========================================================
-      // 2) FALLBACK: AUTH DIRETO (nível 1 / master ou legado)
-      // =========================================================
-      let emailForAuth = userInput;
-
-      if (!userInput.includes('@')) {
-        try {
-          const { data: resolvedEmail, error: resolveErr } = await supabase.rpc('resolve_login_email_by_operator', {
-            p_operator: userInput,
-          });
-          if (!resolveErr && resolvedEmail) emailForAuth = String(resolvedEmail);
-        } catch (e) {
-          if (isDev) console.warn('[AUTH] Falha ao resolver e-mail por operador (fallback continua):', e);
-        }
-      }
-
-      await ensureAuthSession(emailForAuth, authPass);
+      await ensureAuthSession(userInput, authPass);
 
       const { data: u } = await supabase.auth.getUser();
       const uid = u.user?.id;
-      if (!uid) throw new Error('Sessão inválida. Faça login novamente.');
+      if (!uid) throw new Error('Sessão inválida.');
 
-      // ✅ CapitalFlow usa "perfis"
-      const { data: profile, error: profError } = await supabase
+      const { data: profile } = await supabase
         .from('perfis')
         .select('*')
         .eq('user_id', uid)
         .maybeSingle();
 
-      if (profError || !profile) {
-        throw new Error('Perfil de acesso não localizado no banco de dados (user_id não vinculado).');
-      }
+      if (!profile) throw new Error('Perfil não encontrado.');
 
       handleLoginSuccess(profile, showToast);
     } catch (err: any) {
       showToast(mapLoginError(err), 'error');
+      window.dispatchEvent(new Event('cm_auth_lost'));
     } finally {
       setIsLoading(false);
     }
@@ -374,11 +327,9 @@ export const useAuth = () => {
     showToast: (msg: string, type?: 'error' | 'success' | 'warning') => void
   ) => {
     setIsLoading(true);
-
     try {
       const cleanDoc = onlyDigits(params.document);
       const cleanCode = params.code.trim();
-
       if (!cleanDoc || !cleanCode) throw new Error('Preencha todos os campos.');
 
       const { data: loginData, error: loginError } = await supabase.rpc('resolve_team_login', {
@@ -396,11 +347,7 @@ export const useAuth = () => {
       const authPass = cleanCode.length < 6 ? cleanCode.padEnd(6, '0') : cleanCode;
 
       const { data: fnData, error: fnError } = await supabase.functions.invoke('ensure_auth_user', {
-        body: {
-          profile_id: profile.id,
-          email: authEmail,
-          password: authPass,
-        },
+        body: { profile_id: profile.id, email: authEmail, password: authPass },
       });
 
       if (fnError) throw new Error('Serviço de autenticação indisponível no momento.');
@@ -410,6 +357,7 @@ export const useAuth = () => {
       handleLoginSuccess(profile, showToast);
     } catch (err: any) {
       showToast(mapLoginError(err), 'error');
+      window.dispatchEvent(new Event('cm_auth_lost'));
     } finally {
       setIsLoading(false);
     }
@@ -417,16 +365,17 @@ export const useAuth = () => {
 
   const handleSelectSavedProfile = async (p: SavedProfile, showToast: any) => {
     const { data: s } = await supabase.auth.getSession();
-
     if (s.session && s.session.user.email?.toLowerCase() === p.email.toLowerCase()) {
       setActiveProfileId(p.id);
       trackAccess(p.id);
       localStorage.setItem('cm_session', JSON.stringify({ profileId: p.id, ts: Date.now() }));
       showToast(`Bem-vindo de volta, ${p.name}!`, 'success');
       playNotificationSound();
+      window.dispatchEvent(new Event('cm_auth_restored'));
     } else {
       showToast('Sessão de segurança expirada. Digite sua senha.', 'warning');
       setLoginUser(p.email);
+      window.dispatchEvent(new Event('cm_auth_lost'));
     }
   };
 
@@ -437,36 +386,31 @@ export const useAuth = () => {
   };
 
   const handleLogout = async () => {
-    // 1. Limpa estado visual imediatamente
     setActiveProfileId(null);
-    setBootFinished(true); // Garante que não fique em loading
+    setBootFinished(true);
 
-    // 2. Limpa armazenamento local
     localStorage.removeItem('cm_session');
     localStorage.removeItem('cm_supabase_auth');
-    
-    Object.keys(localStorage).forEach(key => {
-        if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
-            localStorage.removeItem(key);
-        }
+
+    Object.keys(localStorage).forEach((key) => {
+      if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+        localStorage.removeItem(key);
+      }
     });
 
-    // 3. Dispara logout do Supabase em background (sem travar a UI)
-    supabase.auth.signOut().catch(() => {});
+    await supabase.auth.signOut().catch(() => {});
+    window.dispatchEvent(new Event('cm_auth_lost'));
   };
 
   const reauthenticate = async (password: string) => {
     if (!activeProfileId) throw new Error('Nenhum perfil ativo.');
-    
-    const profile = savedProfiles.find(p => p.id === activeProfileId);
-    if (!profile?.email) {
-        throw new Error('E-mail do perfil não encontrado. Faça login novamente.');
-    }
 
-    // Força logout para garantir nova sessão limpa
+    const profile = savedProfiles.find((p) => p.id === activeProfileId);
+    if (!profile?.email) throw new Error('E-mail do perfil não encontrado. Faça login novamente.');
+
     await supabase.auth.signOut().catch(() => {});
-
     await ensureAuthSession(profile.email, password);
+    window.dispatchEvent(new Event('cm_auth_restored'));
   };
 
   return {
