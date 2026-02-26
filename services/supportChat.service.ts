@@ -251,6 +251,11 @@ export const supportChatService = {
     await supabaseClient.from('support_tickets').delete().eq('loan_id', loanId);
   },
 
+  async deleteCampaignChatHistory(sessionToken: string, supabaseClient: any = supabase) {
+    const { error } = await supabaseClient.from('campaign_messages').delete().eq('session_token', sessionToken);
+    if (error) throw error;
+  },
+
   async deleteMultipleChats(loanIds: string[]) {
     if (loanIds.length === 0) return;
     const { error } = await supabase.from('mensagens_suporte').delete().in('loan_id', loanIds);

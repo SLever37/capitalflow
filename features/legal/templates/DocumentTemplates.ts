@@ -19,7 +19,21 @@ export const DocumentTemplates = {
             
             <p><strong>1. DO OBJETO:</strong> A dívida ora reconhecida é líquida e certa, referente à operação de mútuo financeiro detalhada no contrato eletrônico ID ${data.loanId.substring(0,8)}.</p>
             
-            <p><strong>2. DA VALIDADE DIGITAL:</strong> As partes reconhecem a validade desta assinatura eletrônica, conforme MP 2.200-2/2001 e Lei 14.063/2020, possuindo este documento plena eficácia executiva para todos os fins de direito.</p>
+            <p><strong>2. DO PAGAMENTO:</strong> O pagamento será realizado conforme as condições pactuadas no contrato original ou termo de acordo anexo, mediante transferência bancária, PIX ou boleto emitido pelo CREDOR.</p>
+
+            <p><strong>3. DA MORA E INADIMPLEMENTO:</strong> O não pagamento de qualquer parcela no seu vencimento importará no vencimento antecipado de toda a dívida, sujeitando o DEVEDOR ao pagamento do valor principal acrescido de:</p>
+            <ul style="list-style-type: disc; margin-left: 20px;">
+                <li>Correção monetária pelo índice INPC/IBGE (ou outro índice oficial que o substitua);</li>
+                <li>Juros de mora de 1% (um por cento) ao mês, calculados pro rata die;</li>
+                <li>Multa moratória de 2% (dois por cento) sobre o valor do débito;</li>
+                <li>Honorários advocatícios de 20% (vinte por cento) em caso de cobrança judicial ou extrajudicial.</li>
+            </ul>
+
+            <p><strong>4. DO VENCIMENTO ANTECIPADO:</strong> O CREDOR poderá considerar antecipadamente vencida toda a dívida, independentemente de aviso ou notificação judicial ou extrajudicial, caso o DEVEDOR deixe de cumprir qualquer das obrigações assumidas neste instrumento ou tenha títulos protestados.</p>
+
+            <p><strong>5. DA VALIDADE DIGITAL:</strong> As partes reconhecem a validade desta assinatura eletrônica, conforme MP 2.200-2/2001 e Lei 14.063/2020, possuindo este documento plena eficácia executiva para todos os fins de direito, renunciando o DEVEDOR à faculdade de impugnar a validade das assinaturas digitais aposta neste instrumento.</p>
+
+            <p><strong>6. DO FORO:</strong> As partes elegem o foro da Comarca de <strong>${data.city}/${data.state}</strong> para dirimir quaisquer dúvidas ou litígios oriundos deste instrumento, com renúncia expressa a qualquer outro, por mais privilegiado que seja.</p>
 
             <p style="margin-top: 40px; text-align: center;">${data.city}, ${new Date().toLocaleDateString('pt-BR')}.</p>
 
@@ -51,8 +65,14 @@ export const DocumentTemplates = {
                 <div style="border: 2px solid #000; padding: 10px 20px; font-size: 18pt; font-weight: 900; background: #eee;">${formatMoney(data.amount)}</div>
             </div>
             
+            <div style="position: absolute; top: 10px; right: 10px; font-size: 10px; color: #999;">VENCIMENTO: ${new Date(data.dueDate).toLocaleDateString('pt-BR')}</div>
+
             <p style="font-size: 16pt; line-height: 2.2; text-align: justify; margin-bottom: 40px; text-indent: 50px;">
                 Aos <b>${new Date(data.dueDate).toLocaleDateString('pt-BR')}</b>, pagarei por esta única via de <b>NOTA PROMISSÓRIA</b> a <b>${data.creditorName}</b>, CPF/CNPJ nº ${data.creditorDoc}, ou à sua ordem, a quantia líquida e certa de <b>${formatMoney(data.amount)} (${numberToWordsBRL(data.amount)})</b> em moeda corrente nacional, pagável na praça de <b>${data.city}</b>.
+            </p>
+
+            <p style="font-size: 10pt; text-align: justify; margin-bottom: 20px;">
+                O não pagamento na data do vencimento sujeitará o emitente aos encargos legais, juros de mora e atualização monetária, além das despesas de cobrança e honorários advocatícios.
             </p>
 
             <div style="margin-top: 40px; display: grid; grid-template-columns: 1.5fr 1fr; gap: 40px; font-size: 11pt;">
@@ -106,3 +126,4 @@ export const DocumentTemplates = {
         </div>
     `
 };
+

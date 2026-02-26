@@ -28,8 +28,17 @@ import { LeadsPage } from './pages/LeadsPage';
 import { CustomerAcquisitionPage } from './pages/Comercial/CaptacaoClientes';
 import { SettingsPage } from './pages/SettingsPage';
 import { isDev } from './utils/isDev';
+import { PublicCampaignPage } from './pages/Public/PublicCampaignPage';
 
 export const App: React.FC = () => {
+  // ROTA PÚBLICA DE CAMPANHA (Landing Page)
+  const urlParams = new URLSearchParams(window.location.search);
+  const campaignId = urlParams.get('campaign_id');
+
+  if (campaignId) {
+      return <PublicCampaignPage />;
+  }
+
   const { portalToken, legalSignToken } = usePortalRouting();
   const { toast, showToast } = useToast();
   

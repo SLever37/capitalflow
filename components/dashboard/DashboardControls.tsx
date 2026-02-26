@@ -27,7 +27,7 @@ export const DashboardControls: React.FC<DashboardControlsProps> = ({
     return (
         <div className="flex flex-col gap-3">
             {/* Seletor de Equipe (Apenas Master) */}
-            {isMaster && staffMembers.length > 0 && (
+            {isMaster && staffMembers.length > 1 && (
                 <div className="flex items-center gap-2 mb-2">
                     <div className="p-2 bg-indigo-600 rounded-xl text-white shadow-lg shadow-indigo-600/20">
                         <Users size={16}/>
@@ -84,7 +84,7 @@ export const DashboardControls: React.FC<DashboardControlsProps> = ({
                     <select 
                         value={sortOption} 
                         onChange={e => setSortOption(e.target.value as SortOption)}
-                        className="appearance-none bg-transparent text-white text-[10px] font-black uppercase outline-none p-2 pr-8 cursor-pointer"
+                        className="appearance-none bg-transparent text-white text-[10px] font-black uppercase outline-none p-2 pr-8 cursor-pointer [&>option]:bg-slate-900 [&>option]:text-white"
                     >
                         <option value="DUE_DATE_ASC">Vencimento Próximo</option>
                         <option value="NAME_ASC">Nome (A-Z)</option>

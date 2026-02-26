@@ -144,27 +144,42 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ activeUser, showToas
                         </div>
                     ) : (
                         dayEvents.map(ev => (
-                            <div key={ev.id} className="group bg-slate-900 border border-slate-800 hover:border-blue-500/50 p-5 rounded-2xl transition-all cursor-pointer relative overflow-hidden" onClick={() => ev.type.startsWith('SYSTEM') ? onSystemAction('PAYMENT', ev.meta) : null}>
-                                <div className="flex items-center gap-5 relative z-10">
-                                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 text-xl font-black border ${ev.type === 'SYSTEM_INSTALLMENT' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
-                                        {ev.type === 'SYSTEM_INSTALLMENT' ? <DollarSign/> : <CalIcon/>}
+                            <div key={ev.id} className="group flex gap-3 items-start animate-in slide-in-from-bottom-2 duration-300" onClick={() => ev.type.startsWith('SYSTEM') ? onSystemAction('PAYMENT', ev.meta) : null}>
+                                {/* Avatar/Icon Column */}
+                                <div className="flex-shrink-0 pt-1">
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center border ${ev.type === 'SYSTEM_INSTALLMENT' ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-900/20' : 'bg-slate-800 border-slate-700 text-slate-400'}`}>
+                                        {ev.type === 'SYSTEM_INSTALLMENT' ? <DollarSign size={16}/> : <CalIcon size={16}/>}
                                     </div>
-                                    
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex justify-between items-start">
-                                            <h4 className="font-bold text-white text-base truncate">{ev.title}</h4>
-                                            {ev.meta?.amount && <span className="text-sm font-black text-emerald-400 bg-emerald-950/30 px-2 py-1 rounded-lg border border-emerald-500/20">R$ {ev.meta.amount.toFixed(2)}</span>}
+                                </div>
+
+                                {/* Message Bubble */}
+                                <div className="flex-1 min-w-0">
+                                    <div className={`p-4 rounded-2xl rounded-tl-none border relative ${ev.type === 'SYSTEM_INSTALLMENT' ? 'bg-slate-900 border-slate-800 hover:border-blue-500/30' : 'bg-slate-900 border-slate-800'}`}>
+                                        <div className="flex justify-between items-start gap-4 mb-1">
+                                            <h4 className="font-bold text-white text-sm truncate">{ev.title}</h4>
+                                            <span className="text-[10px] font-black text-slate-500 whitespace-nowrap">{new Date(ev.start_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                                         </div>
-                                        <p className="text-xs text-slate-400 truncate mt-1">{ev.description}</p>
                                         
-                                        <div className="flex items-center gap-3 mt-3 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity translate-y-2 sm:group-hover:translate-y-0 duration-300">
+                                        <p className="text-xs text-slate-400 leading-relaxed break-words">{ev.description}</p>
+                                        
+                                        {ev.meta?.amount && (
+                                            <div className="mt-3 flex items-center gap-2">
+                                                <span className="text-xs font-black text-emerald-400 bg-emerald-950/30 px-2 py-1 rounded-lg border border-emerald-500/20">
+                                                    R$ {ev.meta.amount.toFixed(2)}
+                                                </span>
+                                                {ev.meta?.clientName && <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate border-l border-slate-700 pl-2">{ev.meta.clientName}</span>}
+                                            </div>
+                                        )}
+
+                                        {/* Actions */}
+                                        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-800/50">
                                             {ev.meta?.clientPhone && (
-                                                <button onClick={(e) => handleWhatsApp(e, ev.meta?.clientPhone!, ev.meta?.clientName!, 'REMINDER')} className="flex items-center gap-1 text-[10px] font-bold uppercase text-emerald-500 hover:text-white hover:bg-emerald-600 px-3 py-1.5 rounded-lg transition-colors bg-emerald-950/20">
+                                                <button onClick={(e) => handleWhatsApp(e, ev.meta?.clientPhone!, ev.meta?.clientName!, 'REMINDER')} className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-emerald-500 hover:text-white hover:bg-emerald-600 px-3 py-1.5 rounded-lg transition-colors bg-emerald-950/10">
                                                     <MessageSquare size={12}/> Cobrar
                                                 </button>
                                             )}
                                             {ev.type === 'SYSTEM_INSTALLMENT' && (
-                                                <button onClick={() => onSystemAction('PAYMENT', ev.meta)} className="flex items-center gap-1 text-[10px] font-bold uppercase text-blue-500 hover:text-white hover:bg-blue-600 px-3 py-1.5 rounded-lg transition-colors bg-blue-950/20">
+                                                <button onClick={() => onSystemAction('PAYMENT', ev.meta)} className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-blue-500 hover:text-white hover:bg-blue-600 px-3 py-1.5 rounded-lg transition-colors bg-blue-950/10">
                                                     <DollarSign size={12}/> Receber
                                                 </button>
                                             )}

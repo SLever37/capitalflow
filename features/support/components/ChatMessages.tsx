@@ -208,7 +208,7 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
                 {senderType === 'OPERATOR' && onDeleteMessage && (
                     <button 
                         onClick={(e) => { e.stopPropagation(); handleDelete(m.id); }} 
-                        className="mr-2 opacity-0 group-hover:opacity-100 transition-opacity hover:text-rose-300"
+                        className="mr-2 opacity-50 hover:opacity-100 transition-opacity hover:text-rose-300"
                         title="Apagar Mensagem"
                     >
                         <Trash2 size={10} />

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, Scroll, UserCheck, ShieldCheck, Link as LinkIcon, FileSignature, Users, User, MapPin, Save, Loader2, Scale, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Scroll, UserCheck, ShieldCheck, Link as LinkIcon, FileSignature, Users, User, MapPin, Save, Loader2, Scale, ChevronDown, Copy, ExternalLink, Send } from 'lucide-react';
 import { Loan, UserProfile, LegalWitness, LegalDocumentParams } from '../../../types';
 import { formatMoney } from '../../../utils/formatters';
 import { DocumentTemplates } from '../templates/DocumentTemplates';
@@ -25,6 +25,13 @@ export const ConfissaoDividaView: React.FC<ConfissaoDividaViewProps> = ({ loans,
     const [selectedW1, setSelectedW1] = useState<string>('');
     const [selectedW2, setSelectedW2] = useState<string>('');
 
+    const [signingLinks, setSigningLinks] = useState<{
+        debtor: string;
+        creditor: string;
+        witness1: string;
+        witness2: string;
+    } | null>(null);
+
     const creditorName = activeUser?.fullName || activeUser?.businessName || activeUser?.name || '';
     const creditorDoc = activeUser?.document || '';
     const creditorFullAddress = `${activeUser?.address || ''}, ${activeUser?.addressNumber || ''} - ${activeUser?.neighborhood || ''}, ${activeUser?.city || ''}/${activeUser?.state || ''}`;
@@ -44,6 +51,40 @@ export const ConfissaoDividaView: React.FC<ConfissaoDividaViewProps> = ({ loans,
     useEffect(() => {
         loadWitnesses();
     }, [loadWitnesses, showManager]);
+
+    // Limpa links ao mudar de empréstimo e tenta buscar existente
+    useEffect(() => {
+        if (!selectedLoan) {
+            setSigningLinks(null);
+            return;
+        }
+        const fetchExisting = async () => {
+            try {
+                const doc = await legalService.getDocumentByLoanId(selectedLoan.id);
+                if (doc) {
+                    const token = doc.public_access_token || doc.view_token;
+                    let baseUrl = '';
+                    if (token) {
+                        baseUrl = `${window.location.origin}/?legal_sign=${token}`;
+                    } else {
+                        const portalLink = await getOrCreatePortalLink(selectedLoan.id);
+                        baseUrl = `${portalLink}&legal_sign=true`;
+                    }
+                    setSigningLinks({
+                        debtor: `${baseUrl}&role=DEBTOR`,
+                        creditor: `${baseUrl}&role=CREDITOR`,
+                        witness1: `${baseUrl}&role=WITNESS_1`,
+                        witness2: `${baseUrl}&role=WITNESS_2`
+                    });
+                } else {
+                    setSigningLinks(null);
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        };
+        fetchExisting();
+    }, [selectedLoan]);
 
     const handleGenerateAndSave = async () => {
         if (!selectedLoan || !activeUser) return;
@@ -97,6 +138,17 @@ export const ConfissaoDividaView: React.FC<ConfissaoDividaViewProps> = ({ loans,
                 showToast("Documento registrado e aberto para impressão!", "success");
                 setTimeout(() => win.print(), 800);
             }
+            
+            // Gera links automaticamente após criar
+            const token = docRecord.public_access_token;
+            const baseUrl = `${window.location.origin}/?legal_sign=${token}`;
+            setSigningLinks({
+                debtor: `${baseUrl}&role=DEBTOR`,
+                creditor: `${baseUrl}&role=CREDITOR`,
+                witness1: `${baseUrl}&role=WITNESS_1`,
+                witness2: `${baseUrl}&role=WITNESS_2`
+            });
+
         } catch (e: any) {
             console.error(e);
             showToast("Falha na base de dados: " + e.message, "error");
@@ -105,28 +157,19 @@ export const ConfissaoDividaView: React.FC<ConfissaoDividaViewProps> = ({ loans,
         }
     };
 
-    const copySigningLink = async () => {
-        if (!selectedLoan || !activeUser) return;
-        try {
-            const { doc } = await legalService.getFullAuditData(selectedLoan.id); 
-            showToast("Gerando link seguro...", "info");
-            
-            let url = '';
-            if (doc?.public_access_token) {
-                // Se já existe token específico de documento legal, usa ele
-                url = `${window.location.origin}/?legal_sign=${doc.public_access_token}`;
-            } else {
-                // Se não, usa o link do portal (agora com shortcode garantido) + flag legal_sign
-                const portalLink = await getOrCreatePortalLink(selectedLoan.id);
-                url = `${portalLink}&legal_sign=true`;
-            }
+    const copyToClipboard = (text: string, label: string) => {
+        navigator.clipboard.writeText(text);
+        showToast(`Link de ${label} copiado!`, "success");
+    };
 
-            navigator.clipboard.writeText(url);
-            showToast("Link do Portal (Jurídico) copiado!", "success");
-        } catch (e) {
-            console.error(e);
-            showToast("Erro ao gerar link.", "error");
+    const sendViaWhatsApp = (link: string, name: string) => {
+        if (!selectedLoan?.debtorPhone) {
+            showToast("Telefone do cliente não cadastrado.", "warning");
+            return;
         }
+        const message = `Olá ${name}, segue o link para assinatura digital do seu documento: ${link}`;
+        const url = `https://wa.me/${selectedLoan.debtorPhone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
+        window.open(url, '_blank');
     };
 
     return (
@@ -222,19 +265,61 @@ export const ConfissaoDividaView: React.FC<ConfissaoDividaViewProps> = ({ loans,
                                 disabled={!selectedLoan || isGenerating || !selectedW1 || !selectedW2}
                                 className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black uppercase text-xs shadow-lg hover:bg-indigo-500 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                             >
-                                {isGenerating ? <Loader2 className="animate-spin" size={18}/> : <><FileSignature size={20}/> Registrar Confissão de Dívida</>}
+                                {isGenerating ? <Loader2 className="animate-spin" size={18}/> : <><FileSignature size={20}/> Registrar & Gerar Links</>}
                             </button>
-                            
-                            <div className="flex gap-2">
-                                <button 
-                                    onClick={copySigningLink}
-                                    disabled={!selectedLoan}
-                                    className="flex-1 py-4 bg-slate-800 text-blue-400 rounded-2xl font-black uppercase text-[10px] hover:bg-slate-700 transition-all flex items-center justify-center gap-2"
-                                >
-                                    <LinkIcon size={16}/> Link p/ Assinatura
-                                </button>
-                            </div>
                         </div>
+
+                        {/* LINKS DE ASSINATURA */}
+                        {signingLinks && (
+                            <div className="bg-slate-950 border border-slate-800 p-4 rounded-2xl space-y-3 animate-in fade-in slide-in-from-bottom-4">
+                                <h4 className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-2">
+                                    <LinkIcon size={12}/> Links de Assinatura Digital
+                                </h4>
+                                
+                                <div className="grid grid-cols-1 gap-2">
+                                    {/* Link Devedor */}
+                                    <div className="flex items-center gap-2 bg-slate-900 p-2 rounded-xl border border-slate-800">
+                                        <div className="p-2 bg-blue-500/10 rounded-lg text-blue-400"><User size={14}/></div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-[9px] font-bold text-slate-500 uppercase">Cliente (Devedor)</p>
+                                            <p className="text-[10px] text-white truncate">{signingLinks.debtor}</p>
+                                        </div>
+                                        <button onClick={() => copyToClipboard(signingLinks.debtor, 'Cliente')} className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white"><Copy size={14}/></button>
+                                        <button onClick={() => window.open(signingLinks.debtor, '_blank')} className="p-2 hover:bg-slate-800 rounded-lg text-indigo-400 hover:text-indigo-300" title="Visualizar/Assinar"><ExternalLink size={14}/></button>
+                                        <button onClick={() => sendViaWhatsApp(signingLinks.debtor, selectedLoan?.debtorName || 'Cliente')} className="p-2 hover:bg-slate-800 rounded-lg text-emerald-400 hover:text-emerald-300" title="Enviar via WhatsApp"><Send size={14}/></button>
+                                    </div>
+
+                                    {/* Link Credor */}
+                                    <div className="flex items-center gap-2 bg-slate-900 p-2 rounded-xl border border-slate-800">
+                                        <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-400"><ShieldCheck size={14}/></div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-[9px] font-bold text-slate-500 uppercase">Operador (Credor)</p>
+                                            <p className="text-[10px] text-white truncate">{signingLinks.creditor}</p>
+                                        </div>
+                                        <button onClick={() => copyToClipboard(signingLinks.creditor, 'Operador')} className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white"><Copy size={14}/></button>
+                                        <button onClick={() => window.open(signingLinks.creditor, '_blank')} className="p-2 hover:bg-slate-800 rounded-lg text-indigo-400 hover:text-indigo-300" title="Visualizar/Assinar"><ExternalLink size={14}/></button>
+                                    </div>
+
+                                    {/* Link Testemunhas */}
+                                    <div className="flex items-center gap-2 bg-slate-900 p-2 rounded-xl border border-slate-800">
+                                        <div className="p-2 bg-amber-500/10 rounded-lg text-amber-400"><Users size={14}/></div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-[9px] font-bold text-slate-500 uppercase">Testemunha 1</p>
+                                            <p className="text-[10px] text-white truncate">{signingLinks.witness1}</p>
+                                        </div>
+                                        <button onClick={() => copyToClipboard(signingLinks.witness1, 'Testemunha 1')} className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white"><Copy size={14}/></button>
+                                    </div>
+                                    <div className="flex items-center gap-2 bg-slate-900 p-2 rounded-xl border border-slate-800">
+                                        <div className="p-2 bg-amber-500/10 rounded-lg text-amber-400"><Users size={14}/></div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-[9px] font-bold text-slate-500 uppercase">Testemunha 2</p>
+                                            <p className="text-[10px] text-white truncate">{signingLinks.witness2}</p>
+                                        </div>
+                                        <button onClick={() => copyToClipboard(signingLinks.witness2, 'Testemunha 2')} className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white"><Copy size={14}/></button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         <div className="bg-blue-900/10 border border-blue-500/20 p-4 rounded-2xl flex items-start gap-3">
                             <Scale size={20} className="text-blue-500 shrink-0 mt-0.5"/>

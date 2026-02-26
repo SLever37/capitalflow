@@ -1,6 +1,7 @@
 import { supabase } from '../../lib/supabase';
 import { CapitalSource, UserProfile } from '../../types';
 import { parseCurrency } from '../../utils/formatters';
+import { personalFinanceService } from '../../features/personal-finance/services/personalFinanceService';
 
 /* helpers */
 const isUUID = (v: any) =>
@@ -115,6 +116,22 @@ export const useSourceController = (
       showToast('Erro ao adicionar fundos: ' + error.message, 'error');
     } else {
       showToast('Saldo atualizado com segurança!', 'success');
+      
+      // Integração com Minhas Finanças (Aporte = Despesa Pessoal)
+      try {
+        await personalFinanceService.addTransaction({
+            descricao: `Aporte em ${ui.activeModal.payload.name}`,
+            valor: amount,
+            tipo: 'DESPESA',
+            data: new Date().toISOString().split('T')[0],
+            status: 'CONSOLIDADO',
+            categoria_id: '',
+            fixo: false
+        }, activeUser.id);
+      } catch (e) {
+        console.error("Erro ao integrar com Minhas Finanças", e);
+      }
+
       ui.closeModal();
       await fetchFullData(ownerId); // ✅ recarrega pelo DONO
     }
@@ -124,6 +141,8 @@ export const useSourceController = (
     if (!activeUser || !ui.editingSource) return;
 
     const newBalance = parseCurrency(ui.editingSource.balance);
+    const oldBalance = sources.find(s => s.id === ui.editingSource.id)?.balance || 0;
+    const delta = newBalance - oldBalance;
 
     if (activeUser.id === 'DEMO') {
       setSources(sources.map((s) => (s.id === ui.editingSource?.id ? { ...s, balance: newBalance } : s)));
@@ -143,6 +162,24 @@ export const useSourceController = (
       if (error) throw error;
 
       showToast('Inventário da fonte atualizado!', 'success');
+
+      // Integração com Minhas Finanças
+      if (Math.abs(delta) > 0.01) {
+          try {
+            await personalFinanceService.addTransaction({
+                descricao: delta > 0 ? `Ajuste (+) em ${ui.editingSource.name}` : `Ajuste (-) em ${ui.editingSource.name}`,
+                valor: Math.abs(delta),
+                tipo: delta > 0 ? 'DESPESA' : 'RECEITA', // Se aumentou saldo da fonte, saiu do bolso (Despesa). Se diminuiu, entrou no bolso (Receita).
+                data: new Date().toISOString().split('T')[0],
+                status: 'CONSOLIDADO',
+                categoria_id: '',
+                fixo: false
+            }, activeUser.id);
+          } catch (e) {
+            console.error("Erro ao integrar com Minhas Finanças", e);
+          }
+      }
+
       ui.setEditingSource(null);
       await fetchFullData(ownerId); // ✅ recarrega pelo DONO
     } catch (e: any) {
@@ -198,6 +235,24 @@ export const useSourceController = (
       showToast('Falha no resgate: ' + error.message, 'error');
     } else {
       showToast('Resgate processado com sucesso!', 'success');
+
+      // Integração com Minhas Finanças (Se for saque externo)
+      if (!targetSourceId) {
+          try {
+            await personalFinanceService.addTransaction({
+                descricao: 'Resgate de Lucro (Caixa Livre)',
+                valor: amount,
+                tipo: 'RECEITA',
+                data: new Date().toISOString().split('T')[0],
+                status: 'CONSOLIDADO',
+                categoria_id: '',
+                fixo: false
+            }, activeUser.id);
+          } catch (e) {
+            console.error("Erro ao integrar com Minhas Finanças", e);
+          }
+      }
+
       ui.closeModal();
       await fetchFullData(ownerId); // ✅ recarrega pelo DONO
     }

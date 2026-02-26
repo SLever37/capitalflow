@@ -26,6 +26,7 @@ export const PersonalFinancesPage: React.FC<Props> = ({ activeUser }) => {
 
     const [isTxModalOpen, setIsTxModalOpen] = useState(false);
     const [isManageModalOpen, setIsManageModalOpen] = useState(false);
+    const [suggestion, setSuggestion] = useState<string | null>(null);
     
     const [newTx, setNewTx] = useState({ 
         descricao: '', 
@@ -37,6 +38,33 @@ export const PersonalFinancesPage: React.FC<Props> = ({ activeUser }) => {
         data: new Date().toISOString().split('T')[0],
         fixo: false 
     });
+
+    // Lógica de Sugestão Inteligente (Matching Names)
+    useEffect(() => {
+        if (newTx.tipo === 'DESPESA' && newTx.descricao) {
+            const matchCard = cards.find(c => newTx.descricao.toLowerCase().includes(c.nome.toLowerCase()));
+            if (matchCard) {
+                setSuggestion(`Detectamos "${matchCard.nome}". Registrar como pagamento de fatura?`);
+            } else {
+                setSuggestion(null);
+            }
+        } else {
+            setSuggestion(null);
+        }
+    }, [newTx.descricao, newTx.tipo, cards]);
+
+    const applySuggestion = () => {
+        const matchCard = cards.find(c => newTx.descricao.toLowerCase().includes(c.nome.toLowerCase()));
+        if (matchCard) {
+            setNewTx(prev => ({
+                ...prev,
+                tipo: 'TRANSFERENCIA',
+                cartao_id: matchCard.id,
+                // Mantém a conta origem se já estiver selecionada, ou deixa vazio
+            }));
+            setSuggestion(null);
+        }
+    };
 
     const loadData = async () => {
         setLoading(true);
@@ -260,6 +288,13 @@ export const PersonalFinancesPage: React.FC<Props> = ({ activeUser }) => {
                         <div className="space-y-1">
                             <label className="text-[10px] font-black uppercase text-slate-500 ml-1">Descrição do Lançamento</label>
                             <input type="text" placeholder="Ex: Salário Mensal, Renda Fixa..." className="w-full bg-slate-950 p-3 rounded-xl border border-slate-800 text-white text-xs outline-none focus:border-pink-500" value={newTx.descricao} onChange={e => setNewTx({...newTx, descricao: e.target.value})} />
+                            
+                            {/* SUGESTÃO INTELIGENTE */}
+                            {suggestion && (
+                                <button onClick={applySuggestion} className="w-full p-2 bg-blue-600/20 border border-blue-500/30 rounded-lg flex items-center justify-center gap-2 text-[10px] font-bold text-blue-300 hover:bg-blue-600/30 transition-colors animate-in fade-in slide-in-from-top-2 mt-1">
+                                    <ArrowRightLeft size={12}/> {suggestion}
+                                </button>
+                            )}
                         </div>
                         
                         <div className="grid grid-cols-2 gap-4">

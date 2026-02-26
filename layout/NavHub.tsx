@@ -65,6 +65,12 @@ export const NavHub: React.FC<NavHubProps> = ({ onClose, onNavigate, userLevel, 
                         </div>
                         <span className="font-bold text-white uppercase text-xs tracking-widest text-center">Simulador</span>
                     </button>
+                    <button onClick={() => onNavigate('DASHBOARD', 'FLOW')} className="p-6 bg-slate-900 border border-slate-800 rounded-3xl transition-all group flex flex-col items-center justify-center gap-3 hover:border-emerald-400">
+                        <div className="p-4 bg-slate-800 rounded-2xl text-emerald-400 group-hover:scale-110 transition-transform">
+                            <ArrowRightLeft size={32}/>
+                        </div>
+                        <span className="font-bold text-white uppercase text-xs tracking-widest text-center">Extrato Geral</span>
+                    </button>
                 </div>
             </div>
         </div>

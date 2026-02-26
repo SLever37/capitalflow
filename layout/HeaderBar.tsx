@@ -60,7 +60,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
                     Capital<span style={{ color: primaryColor }}>Flow</span>
                 </h1>
                 <p className="text-[10px] sm:text-xs text-emerald-500 animate-pulse font-extrabold uppercase tracking-widest mt-0.5">
-                    {activeUser?.businessName || 'Gestor'}
+                    Olá, {activeUser?.name?.split(' ')[0] || 'Gestor'}
                 </p>
               </div>
            </div>

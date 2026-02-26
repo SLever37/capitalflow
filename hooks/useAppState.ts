@@ -59,7 +59,7 @@ const DEMO_USER: UserProfile = {
 };
 
 const mapProfileFromDB = (data: any): UserProfile => {
-  let hubOrder = (data.ui_hub_order || DEFAULT_HUB) as AppTab[];
+  let hubOrder = ((data.ui_hub_order || DEFAULT_HUB) as string[]).filter(t => t !== 'MASTER') as AppTab[];
 
   if (Array.isArray(hubOrder) && !hubOrder.includes('PERSONAL_FINANCE')) {
     hubOrder = [...hubOrder, 'PERSONAL_FINANCE'];

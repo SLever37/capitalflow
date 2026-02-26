@@ -78,13 +78,14 @@ export const TeamEditorModal: React.FC<TeamEditorModalProps> = ({
                             type="button"
                             onClick={handleDelete} 
                             disabled={isLoading}
-                            className="p-4 bg-rose-950/30 text-rose-500 border border-rose-500/20 rounded-xl hover:bg-rose-950/50 transition-all"
+                            className="p-4 bg-rose-950/30 text-rose-500 border border-rose-500/20 rounded-xl hover:bg-rose-950/50 transition-all flex items-center justify-center"
                             title="Excluir Equipe"
                         >
-                            <Trash2 size={20}/>
+                            {isLoading ? <Loader2 className="animate-spin" size={20}/> : <Trash2 size={20}/>}
                         </button>
                     )}
                     <button 
+                        type="button"
                         onClick={handleSave} 
                         disabled={isLoading || !name.trim()} 
                         className="flex-1 py-4 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl font-black uppercase text-xs flex items-center justify-center gap-2 shadow-lg transition-all"

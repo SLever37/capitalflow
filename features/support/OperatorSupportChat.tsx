@@ -37,11 +37,21 @@ export const OperatorSupportChat = ({ activeUser, onClose }: { activeUser: any; 
   const captacaoAdapter = useMemo(() => createCaptacaoAdapter('OPERATOR'), []);
 
   const handleDeleteHistory = async () => {
-    if (!selectedChat || selectedChat.type === 'CAMPAIGN') return;
-    if (!confirm(`Tem certeza que deseja apagar TODO o histórico de conversa com ${selectedChat.clientName}? Essa ação é irreversível.`)) return;
+    if (!selectedChat) return;
+    
+    const isCampaign = selectedChat.type === 'CAMPAIGN';
+    const confirmMsg = isCampaign 
+        ? `Tem certeza que deseja apagar TODO o histórico de conversa com este Lead? Essa ação é irreversível.`
+        : `Tem certeza que deseja apagar TODO o histórico de conversa com ${selectedChat.clientName}? Essa ação é irreversível.`;
+
+    if (!confirm(confirmMsg)) return;
     
     try {
-        await supportChatService.deleteChatHistory(selectedChat.loanId);
+        if (isCampaign) {
+            await supportChatService.deleteCampaignChatHistory(selectedChat.session_token);
+        } else {
+            await supportChatService.deleteChatHistory(selectedChat.loanId);
+        }
         setSelectedChat(null);
         loadAllData();
     } catch (e: any) {
@@ -188,6 +198,8 @@ export const OperatorSupportChat = ({ activeUser, onClose }: { activeUser: any; 
                 userId={activeUser.id}
                 onClose={() => setSelectedChat(null)}
                 chatTheme={chatTheme}
+                showDeleteHistory={true}
+                onDeleteHistory={handleDeleteHistory}
               />
             ) : (
               <UnifiedChat

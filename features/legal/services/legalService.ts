@@ -57,6 +57,16 @@ export const legalService = {
     };
   },
 
+  async getDocumentByLoanId(loanId: string) {
+    const { data } = await supabase.from('documentos_juridicos')
+      .select('*')
+      .eq('loan_id', loanId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return data;
+  },
+
   async getFullAuditData(docId: string) {
     const { data: doc } = await supabase.from('documentos_juridicos').select('*').eq('id', docId).single();
     if (!doc) return { doc: null, signatures: [], logs: [] };
