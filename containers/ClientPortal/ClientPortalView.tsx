@@ -403,6 +403,7 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({ initialPorta
 
       {activeLoanForPayment && (
         <PortalPaymentModal
+          portalToken={initialPortalToken}
           loan={activeLoanForPayment}
           installment={
             activeLoanForPayment.installments.find((i: any) => i.status !== 'PAID') || activeLoanForPayment.installments[0]

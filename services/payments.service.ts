@@ -180,22 +180,16 @@ export const paymentsService = {
     const nextDueDateISO = manualDate ? manualDate.toISOString().slice(0, 10) : null;
 
     const rpcParams: any = {
-      p_amount: amountToPay,
-      p_amount_to_pay: amountToPay,
       p_idempotency_key: idempotencyKey,
+      p_loan_id: loan.id,
       p_installment_id: inst.id,
-      p_interest_delta: interestDelta,
-      p_interest_handling: params.interestHandling || 'KEEP_PENDING',
-      p_interest_only: paymentType === 'PARTIAL_INTEREST' || paymentType === 'RENEW_INTEREST',
-      p_late_fee_delta: lateFeeDelta,
-      p_notes: finalNote,
-      p_operator_id: safeUUID(activeUser.id),
-      p_payment_type: paymentType === 'FULL' ? 'PAYMENT_FULL' : 'PAYMENT_PARTIAL',
-      p_principal_delta: principalDelta,
-      p_principal_returned: principalDelta,
       p_profile_id: ownerId,
-      p_profit_generated: totalProfitDelta,
-      p_source_id: loan.sourceId
+      p_operator_id: safeUUID(activeUser.id),
+      p_source_id: loan.sourceId,
+      p_amount_to_pay: amountToPay,
+      p_notes: finalNote,
+      p_category: 'RECEITA',
+      p_payment_type: paymentType === 'FULL' ? 'PAYMENT_FULL' : 'PAYMENT_PARTIAL',
     };
 
     if (nextDueDateISO) {

@@ -108,6 +108,22 @@ export const portalService = {
   },
 
   /**
+   * Registra intenção de pagamento via portal_token
+   */
+  async submitPaymentIntentByPortalToken(portalToken: string, tipo: string, comprovanteUrl?: string | null) {
+    if (!portalToken) throw new Error('Token do portal não fornecido.');
+    
+    const { data, error } = await supabasePortal.rpc('portal_registrar_intencao', {
+      p_portal_token: portalToken,
+      p_tipo: tipo,
+      p_comprovante_url: comprovanteUrl ?? null
+    });
+
+    if (error) throw new Error(error.message || 'Falha ao registrar intenção.');
+    return data;
+  },
+
+  /**
    * Lista documentos disponíveis para o token atual
    */
   async listDocuments(token: string) {

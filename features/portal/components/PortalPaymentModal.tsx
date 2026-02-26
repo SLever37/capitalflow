@@ -7,13 +7,14 @@ import { resolvePaymentOptions, debugDebtCheck } from '../mappers/portalDebtRule
 import { BillingView, NotifyingView, SuccessView } from './payment/PaymentViews';
 
 interface PortalPaymentModalProps {
+  portalToken: string;
   loan: Loan;
   installment: Installment;
   clientData: { name: string; email?: string; doc?: string; id?: string };
   onClose: () => void;
 }
 
-export const PortalPaymentModal: React.FC<PortalPaymentModalProps> = ({ loan, installment, clientData, onClose }) => {
+export const PortalPaymentModal: React.FC<PortalPaymentModalProps> = ({ portalToken, loan, installment, clientData, onClose }) => {
   const [step, setStep] = useState<'BILLING' | 'NOTIFYING' | 'SUCCESS'>('BILLING');
   const [error, setError] = useState<string | null>(null);
 
@@ -26,15 +27,14 @@ export const PortalPaymentModal: React.FC<PortalPaymentModalProps> = ({ loan, in
   const pixKey = (loan as any).pixKey || (loan as any).pix_key || "";
   
   const handleNotifyPayment = async () => {
-    if (!clientData.id) return;
     setStep('NOTIFYING');
     setError(null);
     try {
-      await portalService.submitPaymentIntent(
-        clientData.id,
-        (loan as any).id,
-        (loan as any).profile_id,
-        'PAGAR_PIX'
+      const comprovanteUrl = null;
+      await portalService.submitPaymentIntentByPortalToken(
+        portalToken,
+        'COMPROVANTE',
+        comprovanteUrl ?? null
       );
       setStep('SUCCESS');
     } catch (e: any) {
