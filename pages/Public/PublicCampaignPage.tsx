@@ -16,7 +16,7 @@ export const PublicCampaignPage = () => {
         const params = new URLSearchParams(window.location.search);
         const id = params.get('campaign_id');
         if (id) {
-            const camp = campaignService.getCampaignById(id);
+            const camp = campaignService.getCampaign(id);
             if (camp) {
                 setCampaign(camp);
                 // Registrar clique

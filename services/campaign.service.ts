@@ -64,6 +64,15 @@ export const campaignService = {
     }
   },
 
+  trackLead: (id: string) => {
+    const campaigns = campaignService.getCampaigns();
+    const campaign = campaigns.find(c => c.id === id);
+    if (campaign) {
+      campaign.leads = (campaign.leads || 0) + 1;
+      campaignService.saveCampaign(campaign);
+    }
+  },
+
   saveLead: (lead: CampaignLead) => {
     try {
       const saved = localStorage.getItem(LEADS_KEY);
