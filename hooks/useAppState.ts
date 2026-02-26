@@ -143,7 +143,7 @@ export const useAppState = (activeProfileId: string | null) => {
         .from('perfis')
         .select('*')
         .eq('id', profileId)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       if (!profileData) throw new Error('Perfil não encontrado');

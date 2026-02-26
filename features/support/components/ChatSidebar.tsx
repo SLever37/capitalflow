@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Search, MessageCircle, Users, Briefcase, ChevronRight, CheckSquare, Square, Trash2, X, Megaphone, ChevronDown } from 'lucide-react';
-import { groupContractsByClientNameAndId } from '../../../utils/groupClientContracts';
+import { groupContractsByDebtorName } from '../../../utils/chatGroupHelpers';
 
 interface ChatSidebarProps {
     chats: any[];
@@ -36,7 +36,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
         else if (activeTab === 'CAPTACAO') list = campaigns.map(c => ({ ...c, clientName: c.nome, type: 'CAMPAIGN' }));
 
         if (activeTab === 'ACTIVE' || activeTab === 'CLIENTS') {
-            return groupContractsByClientNameAndId(list);
+            return groupContractsByDebtorName(list);
         }
         return list;
     }, [activeTab, chats, clients, team, campaigns]);

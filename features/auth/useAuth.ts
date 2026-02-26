@@ -188,7 +188,7 @@ export const useAuth = () => {
                 access_level: 1, 
                 created_at: new Date().toISOString()
             };
-            const { data: createdProfile, error: createError } = await supabase.from('perfis').insert([newProfile]).select().single();
+            const { data: createdProfile, error: createError } = await supabase.from('perfis').insert([newProfile]).select().maybeSingle();
             if (!createError && createdProfile) {
               profile = createdProfile;
             }
