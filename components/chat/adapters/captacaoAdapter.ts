@@ -19,7 +19,7 @@ export const createCaptacaoAdapter = (role: ChatRole): ChatAdapter<CaptacaoConte
       hasTicket: false,
       hasPresence: false,
       canClose: false,
-      canDelete: false,
+      canDelete: role === 'OPERATOR',
       canUpload: true
     };
   },
@@ -95,6 +95,13 @@ export const createCaptacaoAdapter = (role: ChatRole): ChatAdapter<CaptacaoConte
           } as any);
         }
       )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'campaign_messages', filter: `session_token=eq.${sessionToken}` },
+        (payload) => {
+          if (payload.old?.id) handlers.onDeleteMessage?.(payload.old.id);
+        }
+      )
       .subscribe();
 
     return () => {
@@ -109,15 +116,6 @@ export const createCaptacaoAdapter = (role: ChatRole): ChatAdapter<CaptacaoConte
     let finalMessage = payload.content;
 
     if (payload.file) {
-        // Simula upload se não houver infra (ou usa a existente se soubermos)
-        // No CapitalFlow, o upload geralmente é feito via storage.
-        // Vou assumir que o payload.file deve ser enviado via service se existir.
-        // Mas o pedido diz "se já existir infra".
-        // O hook useCampaignChat usa sendAttachment.
-        // Como não quero duplicar lógica de upload complexa aqui, vou tentar usar o que o useCampaignChat faz.
-        // Mas o adapter deve ser independente.
-        
-        // Se houver arquivo, precisamos fazer o upload para o bucket 'campaign-attachments'
         const fileExt = payload.file.name.split('.').pop();
         const fileName = `${sessionToken}/${Math.random().toString(36).slice(2)}.${fileExt}`;
         
@@ -140,6 +138,11 @@ export const createCaptacaoAdapter = (role: ChatRole): ChatAdapter<CaptacaoConte
       message: finalMessage
     });
 
+    if (error) throw error;
+  },
+
+  async deleteMessage(_context, messageId): Promise<void> {
+    const { error } = await supabase.from('campaign_messages').delete().eq('id', messageId);
     if (error) throw error;
   }
 });

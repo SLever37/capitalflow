@@ -204,8 +204,8 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
                   isMe ? 'opacity-70 text-blue-100' : 'opacity-50 text-slate-400'
                 }`}
               >
-                {/* Botão de Deletar para Operador */}
-                {senderType === 'OPERATOR' && isMe && onDeleteMessage && (
+                {/* Botão de Deletar para Operador (pode deletar qualquer mensagem se tiver permissão) */}
+                {senderType === 'OPERATOR' && onDeleteMessage && (
                     <button 
                         onClick={(e) => { e.stopPropagation(); handleDelete(m.id); }} 
                         className="mr-2 opacity-0 group-hover:opacity-100 transition-opacity hover:text-rose-300"

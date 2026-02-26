@@ -261,26 +261,30 @@ export const supportChatService = {
 
   async getActiveChats(operatorId: string) {
     if (isDev) {
-       console.log('[BUILD-MARK] supportChatService.getActiveChats v5 (SEM JOIN contratos)');
+       console.log('[BUILD-MARK] supportChatService.getActiveChats v6 (Optimized)');
     }
     
-    // 1. Busca mensagens recentes
-    const { data: messages, error } = await supabase
-      .from('mensagens_suporte')
-      .select('id, loan_id, content, text, created_at, read, sender_type')
-      .order('created_at', { ascending: false })
-      .limit(200);
+    try {
+        // 1. Busca mensagens recentes (apenas colunas essenciais, limite reduzido)
+        const { data: messages, error } = await supabase
+          .from('mensagens_suporte')
+          .select('id, loan_id, content, text, created_at, read, sender_type')
+          .order('created_at', { ascending: false })
+          .limit(100); // Reduzido para 100 para evitar timeout
 
-    if (error) {
-      console.error('Erro ao buscar chats ativos:', error);
-      return [];
-    }
+        if (error) throw error;
 
-    // 2. Busca nomes dos devedores (contratos) manualmente
-    const loanIds = Array.from(new Set((messages || []).map((m: any) => m.loan_id).filter(Boolean)));
-    const contractsMap = new Map<string, { name: string; clientId: string }>();
+        if (!messages || messages.length === 0) return [];
 
-    if (loanIds.length > 0) {
+        // 2. Extrai IDs únicos de contratos
+        const loanIds = Array.from(new Set(messages.map((m: any) => m.loan_id).filter(Boolean)));
+        
+        if (loanIds.length === 0) return [];
+
+        // 3. Busca nomes dos devedores em lote
+        const contractsMap = new Map<string, { name: string; clientId: string }>();
+        
+        // Divide em chunks se houver muitos IDs (embora com limit 100 msg, loanIds será <= 100)
         const { data: loans, error: loansError } = await supabase
             .from('contratos')
             .select('id, debtor_name, client_id')
@@ -289,35 +293,38 @@ export const supportChatService = {
         if (!loansError && loans) {
             loans.forEach((l: any) => contractsMap.set(l.id, { name: l.debtor_name || 'Cliente', clientId: l.client_id }));
         }
-    }
 
-    const chatsMap = new Map();
+        const chatsMap = new Map();
 
-    for (const m of (messages || [])) {
-        const anyMsg = m as any;
-        const loanId = anyMsg.loan_id;
-        
-        const contractInfo = contractsMap.get(loanId);
-        if (!contractInfo) continue; // Ignora se contrato não existe ou sem acesso
+        for (const m of messages) {
+            const anyMsg = m as any;
+            const loanId = anyMsg.loan_id;
+            
+            const contractInfo = contractsMap.get(loanId);
+            if (!contractInfo) continue;
 
-        if (!chatsMap.has(loanId)) {
-            chatsMap.set(loanId, {
-                loanId: loanId,
-                clientId: contractInfo.clientId,
-                clientName: contractInfo.name,
-                timestamp: anyMsg.created_at,
-                lastMessage: anyMsg.content || anyMsg.text || 'Mídia enviada',
-                unreadCount: 0,
-                type: 'ACTIVE'
-            });
+            if (!chatsMap.has(loanId)) {
+                chatsMap.set(loanId, {
+                    loanId: loanId,
+                    clientId: contractInfo.clientId,
+                    clientName: contractInfo.name,
+                    timestamp: anyMsg.created_at,
+                    lastMessage: anyMsg.content || anyMsg.text || 'Mídia enviada',
+                    unreadCount: 0,
+                    type: 'ACTIVE'
+                });
+            }
+
+            if (anyMsg.sender_type === 'CLIENT' && !anyMsg.read) {
+                chatsMap.get(loanId).unreadCount += 1;
+            }
         }
 
-        if (anyMsg.sender_type === 'CLIENT' && !anyMsg.read) {
-            chatsMap.get(loanId).unreadCount += 1;
-        }
+        return Array.from(chatsMap.values());
+    } catch (err: any) {
+        console.warn('[supportChatService] getActiveChats error:', err);
+        return [];
     }
-
-    return Array.from(chatsMap.values());
   },
 
   /**
