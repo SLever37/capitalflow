@@ -104,7 +104,7 @@ const mapProfileFromDB = (data: any): UserProfile => {
   };
 };
 
-export const useAppState = (activeProfileId: string | null) => {
+export const useAppState = (activeProfileId: string | null, onProfileNotFound?: () => void) => {
   const [activeUser, setActiveUser] = useState<UserProfile | null>(null);
   const [loans, setLoans] = useState<Loan[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -125,7 +125,7 @@ export const useAppState = (activeProfileId: string | null) => {
   const [profileEditForm, setProfileEditForm] = useState<UserProfile | null>(null);
 
   const fetchFullData = useCallback(async (profileId: string) => {
-    if (!profileId || profileId === 'null') return;
+    if (!profileId || profileId === 'null' || profileId === 'undefined') return;
 
     if (profileId === 'DEMO') {
       setActiveUser(DEMO_USER);
@@ -145,8 +145,18 @@ export const useAppState = (activeProfileId: string | null) => {
         .eq('id', profileId)
         .maybeSingle();
 
-      if (error) throw error;
-      if (!profileData) throw new Error('Perfil não encontrado');
+      if (error) {
+        setLoadError(error.message);
+        setIsLoadingData(false);
+        return;
+      }
+
+      if (!profileData) {
+        if (onProfileNotFound) onProfileNotFound();
+        setLoadError('Perfil não encontrado');
+        setIsLoadingData(false);
+        return;
+      }
 
       const u = mapProfileFromDB(profileData);
 
@@ -228,8 +238,9 @@ export const useAppState = (activeProfileId: string | null) => {
   }, []);
 
   useEffect(() => {
-    if (!activeProfileId) {
+    if (!activeProfileId || activeProfileId === 'undefined' || activeProfileId === 'null') {
       setActiveUser(null);
+      setLoadError(null);
       return;
     }
 

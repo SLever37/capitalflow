@@ -4,7 +4,6 @@ import { useModal } from '../../contexts/ModalContext';
 import { Modal } from '../ui/Modal';
 import { PaymentManagerModal } from './PaymentManagerModal';
 import { CalculatorModal } from './CalculatorModal';
-import { AgendaModal } from './AgendaModal';
 import { FlowModal } from './FlowModal';
 import { ReceiptModal } from './ReceiptModal';
 import { MessageHubModal } from './MessageHubModal';
@@ -115,11 +114,6 @@ export const DonateModalWrapper = () => {
             </div>
         </Modal>
     );
-};
-
-export const AgendaWrapper = ({ onSystemAction }: { onSystemAction: any }) => {
-    const { closeModal, activeUser } = useModal();
-    return <AgendaModal onClose={closeModal} activeUser={activeUser} onSystemAction={onSystemAction} />;
 };
 
 export const FlowWrapper = () => {

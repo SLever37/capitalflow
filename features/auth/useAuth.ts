@@ -163,9 +163,11 @@ export const useAuth = () => {
         if (session && mounted) {
           try {
             const parsed = JSON.parse(session);
-            if (parsed?.profileId) {
+            if (parsed?.profileId && parsed.profileId !== 'undefined' && parsed.profileId !== 'null') {
               setActiveProfileId(parsed.profileId);
               trackAccess(parsed.profileId);
+            } else {
+              localStorage.removeItem('cm_session');
             }
           } catch {
             localStorage.removeItem('cm_session');
@@ -305,13 +307,37 @@ export const useAuth = () => {
       const uid = u.user?.id;
       if (!uid) throw new Error('Sessão inválida.');
 
-      const { data: profile } = await supabase
+      let { data: profile } = await supabase
         .from('perfis')
         .select('*')
         .eq('user_id', uid)
         .maybeSingle();
 
-      if (!profile) throw new Error('Perfil não encontrado.');
+      if (!profile) {
+        // Tenta criar um perfil básico se não existir (fallback de segurança)
+        const newProfile = {
+          id: uid,
+          user_id: uid,
+          owner_profile_id: uid,
+          nome_operador: userInput.split('@')[0],
+          nome_completo: userInput.split('@')[0],
+          usuario_email: userInput,
+          email: userInput,
+          access_level: 1,
+          created_at: new Date().toISOString()
+        };
+        
+        const { data: created, error: createError } = await supabase
+          .from('perfis')
+          .insert([newProfile])
+          .select()
+          .maybeSingle();
+          
+        if (createError || !created) {
+          throw new Error('Perfil não encontrado e falha ao criar perfil automático.');
+        }
+        profile = created;
+      }
 
       handleLoginSuccess(profile, showToast);
     } catch (err: any) {

@@ -1,11 +1,21 @@
 
-import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, Plus, ShieldAlert, MessageSquare, DollarSign, CheckCircle2, Calendar as CalIcon } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { 
+  ChevronLeft, 
+  Search, 
+  Filter, 
+  Clock, 
+  AlertCircle, 
+  CheckCircle2, 
+  Calendar as CalIcon,
+  MessageSquare,
+  DollarSign,
+  ArrowRight,
+  X
+} from 'lucide-react';
 import { useCalendar } from './hooks/useCalendar';
-import { useCalendarComputed } from './hooks/useCalendarComputed';
-import { EventModal } from './components/EventModal';
-import { SmartSidebar } from './components/SmartSidebar'; 
 import { UserProfile } from '../../types';
+import { formatMoney } from '../../utils/formatters';
 
 interface CalendarViewProps {
     activeUser: UserProfile | null;
@@ -14,21 +24,77 @@ interface CalendarViewProps {
     onSystemAction: (actionType: string, meta: any) => void;
 }
 
-export const CalendarView: React.FC<CalendarViewProps> = ({ activeUser, showToast, onClose, onSystemAction }) => {
-    const { events, addEvent } = useCalendar(activeUser, showToast);
-    const [selectedDate, setSelectedDate] = useState(new Date());
-    const [isEventModalOpen, setIsEventModalOpen] = useState(false);
-    const [targetDateForModal, setTargetDateForModal] = useState<Date>(new Date());
-    const [showRadar, setShowRadar] = useState(false);
-    
-    // LÓGICA DE COMPUTADA EXTRAÍDA
-    const { 
-        dayStrip, urgentEvents, lateEvents, radarCount, dayEvents, dayTotalReceivable 
-    } = useCalendarComputed(events, selectedDate);
+type FilterType = 'ATRASADOS' | 'HOJE' | 'PROXIMOS_7_DIAS' | 'TODOS';
 
-    // Navegação
-    const handleNextDay = () => { const d = new Date(selectedDate); d.setDate(d.getDate() + 1); setSelectedDate(d); };
-    const handlePrevDay = () => { const d = new Date(selectedDate); d.setDate(d.getDate() - 1); setSelectedDate(d); };
+export const CalendarView: React.FC<CalendarViewProps> = ({ activeUser, showToast, onClose, onSystemAction }) => {
+    const { events, isLoading } = useCalendar(activeUser, showToast);
+    const [filter, setFilter] = useState<FilterType>('HOJE');
+    const [searchTerm, setSearchTerm] = useState('');
+
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+    // Filtering logic
+    const filteredEvents = useMemo(() => {
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const next7Days = new Date(today);
+        next7Days.setDate(today.getDate() + 7);
+
+        return events.filter(event => {
+            const eventDate = new Date(event.start_time);
+            const eventDay = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+
+            // Search filter
+            const matchesSearch = !searchTerm || 
+                event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                event.description?.toLowerCase().includes(searchTerm.toLowerCase());
+
+            if (!matchesSearch) return false;
+
+            switch (filter) {
+                case 'ATRASADOS':
+                    return event.status === 'LATE' || eventDay < today;
+                case 'HOJE':
+                    return eventDay.getTime() === today.getTime();
+                case 'PROXIMOS_7_DIAS':
+                    return eventDay >= today && eventDay <= next7Days;
+                case 'TODOS':
+                default:
+                    return true;
+            }
+        });
+    }, [events, filter, searchTerm]);
+
+    // Grouping logic
+    const groupedEvents = useMemo(() => {
+        const groups: Record<string, typeof events> = {};
+        filteredEvents.forEach(event => {
+            const date = new Date(event.start_time);
+            const day = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+            const key = day.toISOString();
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(event);
+        });
+
+        const sortedKeys = Object.keys(groups).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+        
+        return sortedKeys.map(key => ({
+            date: new Date(key),
+            events: groups[key].sort((a, b) => {
+                // Prioritize: URGENT > LATE > HIGH > MEDIUM > LOW
+                const priorityMap = { 'URGENT': 0, 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3 };
+                const aPrio = priorityMap[a.priority as keyof typeof priorityMap] ?? 99;
+                const bPrio = priorityMap[b.priority as keyof typeof priorityMap] ?? 99;
+                if (aPrio !== bPrio) return aPrio - bPrio;
+                
+                // Then by status
+                if (a.status === 'LATE' && b.status !== 'LATE') return -1;
+                if (a.status !== 'LATE' && b.status === 'LATE') return 1;
+                
+                return new Date(a.start_time).getTime() - new Date(b.start_time).getTime();
+            })
+        }));
+    }, [filteredEvents]);
 
     const handleWhatsApp = (e: React.MouseEvent, phone: string, name: string, type: string) => {
         e.stopPropagation();
@@ -40,183 +106,268 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ activeUser, showToas
         window.open(`https://wa.me/55${num}?text=${encodeURIComponent(text)}`, '_blank');
     };
 
-    const openNewTaskModal = (date?: Date) => {
-        setTargetDateForModal(date || selectedDate);
-        setIsEventModalOpen(true);
+    const getDayLabel = (date: Date) => {
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(today.getDate() + 1);
+        const yesterday = new Date(today);
+        yesterday.setDate(today.getDate() - 1);
+
+        const d = new Date(date);
+        d.setHours(0,0,0,0);
+
+        if (d.getTime() === today.getTime()) return 'Hoje';
+        if (d.getTime() === tomorrow.getTime()) return 'Amanhã';
+        if (d.getTime() === yesterday.getTime()) return 'Ontem';
+
+        return d.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'short' });
     };
 
-    const selectedStr = selectedDate.toDateString();
-
     return (
-        <div className="flex flex-col h-[85vh] -m-6 sm:-m-12 overflow-hidden bg-slate-950 relative">
-            
-            {/* --- HEADER SUPERIOR --- */}
-            <div className="px-6 pt-6 pb-4 border-b border-slate-800 bg-slate-900/50 backdrop-blur-md z-20 flex flex-col gap-4">
-                <div className="flex justify-between items-center">
-                    <div>
-                        <h2 className="text-2xl font-black text-white uppercase tracking-tighter flex items-center gap-2">
-                            <CalIcon className="text-purple-500"/> Agenda
-                        </h2>
-                        <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">
-                            {selectedDate.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+        <div className="fixed inset-0 z-[200] bg-slate-950 flex flex-col animate-in fade-in duration-300 font-sans h-[100dvh]">
+            {/* Header - Estilo Central de Atendimento */}
+            <div className="h-16 border-b border-slate-800 bg-slate-950 flex items-center justify-between px-4 sm:px-6 shrink-0 z-20">
+                <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg flex items-center justify-center text-white shrink-0 shadow-lg shadow-purple-900/50">
+                        <CalIcon size={20} />
+                    </div>
+                    <div className="min-w-0">
+                        <h1 className="text-sm font-black text-white uppercase tracking-wider leading-none">Central de Antecipação</h1>
+                        <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-widest">
+                            {filteredEvents.length} itens encontrados
                         </p>
                     </div>
-                    <div className="flex gap-3">
-                        <button 
-                            onClick={() => setShowRadar(true)} 
-                            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-2 border ${radarCount > 0 ? 'bg-rose-600 border-rose-500 text-white animate-pulse' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'}`}
-                        >
-                            <ShieldAlert size={14}/> 
-                            Radar
-                            {radarCount > 0 && <span className="bg-white text-rose-600 px-1.5 py-0.5 rounded-full text-[9px]">{radarCount}</span>}
-                        </button>
-                    </div>
                 </div>
-
-                {/* Day Strip Navigator */}
-                <div className="flex items-center justify-between gap-2">
-                    <button onClick={handlePrevDay} className="p-2 hover:bg-slate-800 rounded-lg text-slate-500"><ChevronLeft size={20}/></button>
-                    <div className="flex-1 grid grid-cols-7 gap-2 sm:gap-4">
-                        {dayStrip.map((date, i) => {
-                            const isSelected = date.toDateString() === selectedStr;
-                            const isToday = date.toDateString() === new Date().toDateString();
-                            const hasEvents = events.some(e => new Date(e.start_time).toDateString() === date.toDateString() && e.priority !== 'URGENT');
-                            
-                            return (
-                                <div 
-                                    key={i} 
-                                    className={`relative group flex flex-col items-center justify-center p-2 rounded-xl transition-all border cursor-pointer select-none ${isSelected ? 'bg-blue-600 border-blue-500 shadow-lg scale-105' : 'bg-slate-900 border-slate-800 hover:border-slate-600'}`} 
-                                    onClick={() => setSelectedDate(date)}
-                                    onDoubleClick={(e) => { e.stopPropagation(); openNewTaskModal(date); }}
-                                >
-                                    <span className={`text-[9px] font-black uppercase mb-1 ${isSelected ? 'text-blue-200' : 'text-slate-500'}`}>{date.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.','')}</span>
-                                    <span className={`text-lg font-black ${isSelected ? 'text-white' : isToday ? 'text-blue-400' : 'text-slate-300'}`}>{date.getDate()}</span>
-                                    {hasEvents && !isSelected && <div className="w-1 h-1 rounded-full bg-blue-500 mt-1"></div>}
-                                    
-                                    <button 
-                                        onClick={(e) => { e.stopPropagation(); openNewTaskModal(date); }}
-                                        className={`absolute -top-2 -right-2 bg-emerald-500 text-white p-1 rounded-full shadow-sm hover:scale-110 transition-all ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-                                        title="Adicionar para este dia"
-                                    >
-                                        <Plus size={10} strokeWidth={4}/>
-                                    </button>
-                                </div>
-                            );
-                        })}
-                    </div>
-                    <button onClick={handleNextDay} className="p-2 hover:bg-slate-800 rounded-lg text-slate-500"><ChevronRight size={20}/></button>
+                
+                <div className="flex items-center gap-2">
+                    <button 
+                        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                        className="md:hidden p-2.5 bg-slate-900 text-slate-400 border border-slate-800 rounded-xl transition-all"
+                    >
+                        <Filter size={18} />
+                    </button>
+                    <button 
+                        onClick={onClose}
+                        className="p-2.5 bg-slate-900 text-slate-400 hover:text-white hover:bg-rose-950/30 hover:border-rose-900 border border-slate-800 rounded-xl transition-all group"
+                    >
+                        <X size={18} className="group-hover:scale-110 transition-transform" />
+                    </button>
                 </div>
             </div>
 
-            {/* --- MAIN FEED --- */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 bg-slate-900/20">
-                
-                {/* Stats do Dia */}
-                {dayEvents.length > 0 && (
-                    <div className="grid grid-cols-2 gap-4 mb-6 max-w-4xl mx-auto">
-                        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl flex items-center justify-between">
-                            <div>
-                                <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">A Receber</p>
-                                <p className="text-xl font-black text-emerald-400">R$ {dayTotalReceivable.toFixed(2)}</p>
+            <div className="flex-1 flex overflow-hidden">
+                {/* Sidebar de Filtros - Desktop e Mobile (Overlay) */}
+                <div className={`
+                    absolute md:relative inset-y-0 left-0 z-30 w-72 bg-slate-950 border-r border-slate-800 transform transition-transform duration-300 ease-in-out
+                    ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+                `}>
+                    <div className="p-4 space-y-6">
+                        {/* Search Bar */}
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Buscar Cliente</label>
+                            <div className="relative group">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-500 transition-colors" size={16}/>
+                                <input 
+                                    type="text" 
+                                    placeholder="Nome ou descrição..." 
+                                    className="w-full bg-slate-900 border border-slate-800 rounded-xl py-3 pl-10 pr-4 text-xs font-bold text-white outline-none focus:border-blue-500 transition-all placeholder:text-slate-600"
+                                    value={searchTerm}
+                                    onChange={e => setSearchTerm(e.target.value)}
+                                />
                             </div>
-                            <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-500"><DollarSign size={20}/></div>
                         </div>
-                        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl flex items-center justify-between">
-                            <div>
-                                <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Tarefas</p>
-                                <p className="text-xl font-black text-white">{dayEvents.length}</p>
+
+                        {/* Filter Chips */}
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Período</label>
+                            <div className="flex flex-col gap-2">
+                                {[
+                                    { id: 'ATRASADOS', label: 'Atrasados', icon: AlertCircle, color: 'text-rose-500', bg: 'bg-rose-500/10' },
+                                    { id: 'HOJE', label: 'Hoje', icon: Clock, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+                                    { id: 'PROXIMOS_7_DIAS', label: 'Próximos 7 Dias', icon: CalIcon, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+                                    { id: 'TODOS', label: 'Todos os Registros', icon: Filter, color: 'text-slate-400', bg: 'bg-slate-800' }
+                                ].map((f) => (
+                                    <button
+                                        key={f.id}
+                                        onClick={() => {
+                                            setFilter(f.id as FilterType);
+                                            if (window.innerWidth < 768) setIsSidebarOpen(false);
+                                        }}
+                                        className={`flex items-center justify-between w-full px-4 py-3 rounded-xl text-[10px] font-black uppercase transition-all border ${
+                                            filter === f.id 
+                                            ? `${f.bg} ${f.color} border-${f.color.split('-')[1]}-500/30 shadow-lg` 
+                                            : 'bg-slate-900 border-slate-800 text-slate-500 hover:border-slate-700'
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <f.icon size={14} />
+                                            {f.label}
+                                        </div>
+                                        {filter === f.id && <ArrowRight size={12} />}
+                                    </button>
+                                ))}
                             </div>
-                            <div className="p-3 bg-blue-500/10 rounded-xl text-blue-500"><CheckCircle2 size={20}/></div>
+                        </div>
+
+                        {/* Resumo Rápido */}
+                        <div className="p-4 bg-blue-500/5 border border-blue-500/10 rounded-2xl">
+                            <div className="flex items-center gap-2 mb-3">
+                                <DollarSign size={14} className="text-blue-500" />
+                                <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">Resumo do Filtro</span>
+                            </div>
+                            <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-[10px] text-slate-500 font-bold uppercase">Total Itens:</span>
+                                    <span className="text-xs font-black text-white">{filteredEvents.length}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-[10px] text-slate-500 font-bold uppercase">Volume Total:</span>
+                                    <span className="text-xs font-black text-emerald-500">
+                                        {formatMoney(filteredEvents.reduce((acc, ev) => acc + (ev.meta?.amount || 0), 0))}
+                                    </span>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                )}
 
-                {/* Lista de Tarefas */}
-                <div className="space-y-3 max-w-4xl mx-auto pb-10">
-                    {dayEvents.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-64 text-slate-600">
-                            <div className="w-16 h-16 bg-slate-900 rounded-full flex items-center justify-center mb-4 border border-slate-800">
-                                <CheckCircle2 size={32} className="opacity-50"/>
-                            </div>
-                            <p className="text-sm font-bold uppercase tracking-widest">Dia Livre</p>
-                            <p className="text-xs mt-2 opacity-60">Nenhuma tarefa agendada para {selectedDate.toLocaleDateString()}.</p>
-                            <button onClick={() => openNewTaskModal()} className="mt-4 px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-[10px] font-black uppercase hover:bg-slate-700">Adicionar Tarefa</button>
-                        </div>
-                    ) : (
-                        dayEvents.map(ev => (
-                            <div key={ev.id} className="group flex gap-3 items-start animate-in slide-in-from-bottom-2 duration-300" onClick={() => ev.type.startsWith('SYSTEM') ? onSystemAction('PAYMENT', ev.meta) : null}>
-                                {/* Avatar/Icon Column */}
-                                <div className="flex-shrink-0 pt-1">
-                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center border ${ev.type === 'SYSTEM_INSTALLMENT' ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-900/20' : 'bg-slate-800 border-slate-700 text-slate-400'}`}>
-                                        {ev.type === 'SYSTEM_INSTALLMENT' ? <DollarSign size={16}/> : <CalIcon size={16}/>}
-                                    </div>
-                                </div>
-
-                                {/* Message Bubble */}
-                                <div className="flex-1 min-w-0">
-                                    <div className={`p-4 rounded-2xl rounded-tl-none border relative ${ev.type === 'SYSTEM_INSTALLMENT' ? 'bg-slate-900 border-slate-800 hover:border-blue-500/30' : 'bg-slate-900 border-slate-800'}`}>
-                                        <div className="flex justify-between items-start gap-4 mb-1">
-                                            <h4 className="font-bold text-white text-sm truncate">{ev.title}</h4>
-                                            <span className="text-[10px] font-black text-slate-500 whitespace-nowrap">{new Date(ev.start_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                                        </div>
-                                        
-                                        <p className="text-xs text-slate-400 leading-relaxed break-words">{ev.description}</p>
-                                        
-                                        {ev.meta?.amount && (
-                                            <div className="mt-3 flex items-center gap-2">
-                                                <span className="text-xs font-black text-emerald-400 bg-emerald-950/30 px-2 py-1 rounded-lg border border-emerald-500/20">
-                                                    R$ {ev.meta.amount.toFixed(2)}
-                                                </span>
-                                                {ev.meta?.clientName && <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate border-l border-slate-700 pl-2">{ev.meta.clientName}</span>}
-                                            </div>
-                                        )}
-
-                                        {/* Actions */}
-                                        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-800/50">
-                                            {ev.meta?.clientPhone && (
-                                                <button onClick={(e) => handleWhatsApp(e, ev.meta?.clientPhone!, ev.meta?.clientName!, 'REMINDER')} className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-emerald-500 hover:text-white hover:bg-emerald-600 px-3 py-1.5 rounded-lg transition-colors bg-emerald-950/10">
-                                                    <MessageSquare size={12}/> Cobrar
-                                                </button>
-                                            )}
-                                            {ev.type === 'SYSTEM_INSTALLMENT' && (
-                                                <button onClick={() => onSystemAction('PAYMENT', ev.meta)} className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-blue-500 hover:text-white hover:bg-blue-600 px-3 py-1.5 rounded-lg transition-colors bg-blue-950/10">
-                                                    <DollarSign size={12}/> Receber
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        ))
+                    {/* Mobile Close Button for Sidebar */}
+                    {isSidebarOpen && (
+                        <button 
+                            onClick={() => setIsSidebarOpen(false)}
+                            className="md:hidden absolute top-4 right-[-50px] p-2 bg-slate-900 text-white rounded-full border border-slate-800 shadow-xl"
+                        >
+                            <X size={20} />
+                        </button>
                     )}
                 </div>
-            </div>
 
-            {/* --- RADAR OVERLAY --- */}
-            {showRadar && (
-                <div className="absolute inset-0 z-50 bg-slate-950/95 backdrop-blur-md animate-in slide-in-from-right duration-300 flex justify-end">
-                    <div className="w-full max-w-md h-full relative">
-                        <button onClick={() => setShowRadar(false)} className="absolute top-4 right-4 z-50 p-2 bg-slate-800 rounded-full text-white"><ChevronRight/></button>
-                        <SmartSidebar 
-                            events={events} 
-                            currentDate={selectedDate}
-                            onAction={(ev) => {
-                                if (ev.type === 'SYSTEM_PORTAL_REQUEST') onSystemAction('PORTAL_REVIEW', ev.meta);
-                                else if (ev.type === 'SYSTEM_INSTALLMENT') onSystemAction('PAYMENT', ev.meta);
-                                setShowRadar(false);
-                            }}
+                {/* Main Content - Scrollable List */}
+                <div className="flex-1 overflow-y-auto custom-scrollbar bg-slate-900/50 relative">
+                    {/* Overlay for mobile when sidebar is open */}
+                    {isSidebarOpen && (
+                        <div 
+                            className="md:hidden absolute inset-0 bg-slate-950/60 backdrop-blur-sm z-20 animate-in fade-in duration-300"
+                            onClick={() => setIsSidebarOpen(false)}
                         />
+                    )}
+
+                    <div className="p-4 sm:p-8 max-w-4xl mx-auto">
+                        {isLoading ? (
+                            <div className="flex flex-col items-center justify-center py-20 gap-4">
+                                <div className="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
+                                <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Sincronizando Agenda...</p>
+                            </div>
+                        ) : groupedEvents.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-20 text-slate-600">
+                                <div className="w-20 h-20 bg-slate-900 rounded-3xl flex items-center justify-center mb-4 border border-slate-800 shadow-xl">
+                                    <CheckCircle2 size={40} className="opacity-20 text-emerald-500"/>
+                                </div>
+                                <p className="text-sm font-black uppercase tracking-widest text-white">Tudo em dia!</p>
+                                <p className="text-xs mt-2 opacity-60 max-w-[200px] text-center">Nenhum item pendente para este filtro.</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-10 pb-20">
+                                {groupedEvents.map((group) => (
+                                    <div key={group.date.toISOString()} className="space-y-4">
+                                        <div className="flex items-center gap-4 sticky top-0 z-10 py-2 bg-slate-950/80 backdrop-blur-md -mx-4 px-4 sm:-mx-8 sm:px-8">
+                                            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] whitespace-nowrap">
+                                                {getDayLabel(group.date)}
+                                            </h3>
+                                            <div className="h-px bg-slate-800/50 flex-1"></div>
+                                            <span className="text-[10px] font-mono text-slate-600">{group.events.length} itens</span>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 gap-4">
+                                            {group.events.map((ev) => {
+                                                const isLate = ev.status === 'LATE' || new Date(ev.start_time) < new Date(new Date().setHours(0,0,0,0));
+                                                const isUrgent = ev.priority === 'URGENT';
+                                                
+                                                return (
+                                                    <div 
+                                                        key={ev.id} 
+                                                        onClick={() => onSystemAction('PAYMENT', ev.meta)}
+                                                        className={`group relative bg-slate-900 border border-slate-800 rounded-2xl p-5 hover:border-blue-500/50 transition-all cursor-pointer shadow-sm hover:shadow-blue-900/20 animate-in fade-in slide-in-from-bottom-2 duration-300`}
+                                                    >
+                                                        {/* Status Indicator Bar */}
+                                                        <div className={`absolute left-0 top-5 bottom-5 w-1 rounded-r-full ${
+                                                            isUrgent ? 'bg-emerald-500' : isLate ? 'bg-rose-500' : 'bg-amber-500'
+                                                        }`} />
+
+                                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                                                            <div className="min-w-0 flex-1">
+                                                                <div className="flex items-center gap-2 mb-1.5">
+                                                                    <h4 className="font-black text-white text-base truncate uppercase tracking-tight">
+                                                                        {ev.title}
+                                                                    </h4>
+                                                                    {isUrgent && (
+                                                                        <span className="bg-emerald-500/10 text-emerald-500 text-[8px] font-black px-1.5 py-0.5 rounded border border-emerald-500/20 uppercase tracking-widest">
+                                                                            Portal
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                                                                    <Clock size={10} />
+                                                                    {ev.description}
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center shrink-0 bg-slate-950/50 sm:bg-transparent p-3 sm:p-0 rounded-xl border border-slate-800 sm:border-0">
+                                                                <p className={`text-lg font-black ${isLate ? 'text-rose-400' : 'text-emerald-400'}`}>
+                                                                    {formatMoney(ev.meta?.amount || 0)}
+                                                                </p>
+                                                                <p className="text-[10px] text-slate-500 font-mono uppercase tracking-tighter">
+                                                                    Vencimento: {new Date(ev.start_time).toLocaleDateString('pt-BR')}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="flex items-center justify-between pt-4 border-t border-slate-800/50">
+                                                            <div className="flex items-center gap-3">
+                                                                {ev.meta?.clientPhone && (
+                                                                    <button 
+                                                                        onClick={(e) => handleWhatsApp(e, ev.meta?.clientPhone!, ev.meta?.clientName!, isLate ? 'LATE' : 'REMINDER')}
+                                                                        className="flex items-center gap-2 px-3 py-2 bg-emerald-500/10 text-emerald-500 rounded-xl text-[10px] font-black uppercase hover:bg-emerald-500 hover:text-white transition-all border border-emerald-500/20"
+                                                                    >
+                                                                        <MessageSquare size={14} />
+                                                                        WhatsApp
+                                                                    </button>
+                                                                )}
+                                                                <button 
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        onSystemAction('OPEN_CHAT', { loanId: ev.meta?.loanId });
+                                                                    }}
+                                                                    className="flex items-center gap-2 px-3 py-2 bg-blue-500/10 text-blue-500 rounded-xl text-[10px] font-black uppercase hover:bg-blue-500 hover:text-white transition-all border border-blue-500/20"
+                                                                >
+                                                                    <MessageSquare size={14} />
+                                                                    Chat
+                                                                </button>
+                                                            </div>
+                                                            
+                                                            <div className="flex items-center gap-3">
+                                                                {isLate && (
+                                                                    <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 bg-rose-500/10 text-rose-500 rounded-lg border border-rose-500/20">
+                                                                        <AlertCircle size={12} />
+                                                                        <span className="text-[9px] font-black uppercase">Atrasado</span>
+                                                                    </div>
+                                                                )}
+                                                                <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 group-hover:bg-blue-600 group-hover:text-white transition-all">
+                                                                    <ArrowRight size={16} />
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
-            )}
-
-            {isEventModalOpen && (
-                <EventModal 
-                    onClose={() => setIsEventModalOpen(false)}
-                    onSave={(evt) => { addEvent(evt); setIsEventModalOpen(false); }}
-                    selectedDate={targetDateForModal}
-                />
-            )}
+            </div>
         </div>
     );
 };
+

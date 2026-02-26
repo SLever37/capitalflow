@@ -19,7 +19,9 @@ interface PaymentManagerModalProps {
         manualDate?: Date | null, 
         customAmount?: number,
         realDate?: Date | null,
-        interestHandling?: 'CAPITALIZE' | 'KEEP_PENDING'
+        interestHandling?: 'CAPITALIZE' | 'KEEP_PENDING',
+        paymentTypeOverride?: string,
+        avAmountOverride?: string
     ) => void;
     onOpenMessage: (loan: Loan) => void;
 }
@@ -60,7 +62,7 @@ export const PaymentManagerModal: React.FC<PaymentManagerModalProps> = ({
     let amountEntering = 0;
     if (paymentType === 'FULL') amountEntering = debtBreakdown.total;
     else if (paymentType === 'RENEW_INTEREST') amountEntering = totalInterestDue;
-    else amountEntering = safeParse(avAmount);
+    else amountEntering = paymentType === 'CUSTOM' ? safeParse(customAmount) : safeParse(avAmount);
 
     const remainingInterest = Math.max(0, totalInterestDue - amountEntering);
     
@@ -80,14 +82,12 @@ export const PaymentManagerModal: React.FC<PaymentManagerModalProps> = ({
             const val = safeParse(customAmount);
             if (!val || val <= 0) return;
             if (subMode === 'AMORTIZE') {
-                setPaymentType('RENEW_AV');
-                setAvAmount(String(val));
-                onConfirm(forgivenessMode, nextDueDate, 0, realPaymentDate, interestHandling);
+                onConfirm(forgivenessMode, nextDueDate, 0, realPaymentDate, interestHandling, 'RENEW_AV', String(val));
             } else {
-                onConfirm(forgivenessMode, nextDueDate, val, realPaymentDate, interestHandling);
+                onConfirm(forgivenessMode, nextDueDate, val, realPaymentDate, interestHandling, 'CUSTOM');
             }
         } else {
-            onConfirm(forgivenessMode, nextDueDate, undefined, realPaymentDate, interestHandling);
+            onConfirm(forgivenessMode, nextDueDate, undefined, realPaymentDate, interestHandling, paymentType, avAmount);
         }
     };
 
@@ -330,6 +330,26 @@ export const PaymentManagerModal: React.FC<PaymentManagerModalProps> = ({
                                                         <CalendarClock size={12}/> Próximo Vencimento
                                                     </label>
                                                     <input type="date" className="bg-transparent text-white font-bold text-sm outline-none w-full" value={manualDateStr || ''} onChange={e => setManualDateStr(e.target.value)} />
+                                                </div>
+
+                                                <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-xl space-y-2 animate-in zoom-in-95">
+                                                    <p className="text-[10px] font-black text-blue-400 uppercase mb-1">Detalhamento do Recebimento</p>
+                                                    <div className="flex justify-between text-[10px]">
+                                                        <span className="text-slate-400 uppercase font-bold">Juros do Período (Lucro):</span>
+                                                        <span className="text-white font-bold">{formatMoney(Math.min(safeParse(avAmount), totalInterestDue))}</span>
+                                                    </div>
+                                                    <div className="flex justify-between text-[10px]">
+                                                        <span className="text-slate-400 uppercase font-bold">Amortização (Abate Capital):</span>
+                                                        <span className="text-emerald-400 font-bold">{formatMoney(Math.max(0, safeParse(avAmount) - totalInterestDue))}</span>
+                                                    </div>
+                                                    <div className="h-px bg-slate-800" />
+                                                    <div className="flex justify-between text-[10px]">
+                                                        <span className="text-slate-400 uppercase font-bold">Novo Saldo Devedor:</span>
+                                                        <span className="text-white font-black">{formatMoney(Math.max(0, debtBreakdown.principal - Math.max(0, safeParse(avAmount) - totalInterestDue)))}</span>
+                                                    </div>
+                                                    <p className="text-[8px] text-slate-500 italic mt-2">
+                                                        * O valor pago primeiro cobre os juros acumulados e o excedente reduz diretamente o capital principal do contrato.
+                                                    </p>
                                                 </div>
                                             </div>
                                         )}

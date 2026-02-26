@@ -45,6 +45,7 @@ export const paymentsService = {
       forgivenessMode = 'NONE',
       customAmount,
       realDate,
+      manualDate,
     } = params;
 
     // DEMO
@@ -110,9 +111,6 @@ export const paymentsService = {
     // =========================
     // 1) Determina valor a pagar
     // =========================
-    let amountToPay = 0;
-    let basePaymentNote = '';
-
     const parseMoney = (v: string) => {
       if (!v) return 0;
       const clean = v.replace(/[R$\s]/g, '');
@@ -121,6 +119,13 @@ export const paymentsService = {
       return parseFloat(clean) || 0;
     };
 
+    const interestDue = Number(inst.interestRemaining) || 0;
+    const lateFeeDue = Number(inst.lateFeeAccrued) || 0;
+    const principalDue = Number(inst.principalRemaining) || 0;
+
+    let amountToPay = 0;
+    let basePaymentNote = '';
+
     if (paymentType === 'CUSTOM') {
       amountToPay = customAmount || 0;
       basePaymentNote = `Recebimento de Diária(s)`;
@@ -128,17 +133,15 @@ export const paymentsService = {
       amountToPay = parseMoney(avAmount);
       basePaymentNote = `Amortização de Capital`;
     } else if (paymentType === 'FULL') {
-      amountToPay =
-        (Number(calculations?.principal) || 0) +
-        (Number(calculations?.interest) || 0) +
-        finalLateFee;
+      // Quitação usa valores reais + multa calculada (respeitando perdão)
+      amountToPay = principalDue + interestDue + finalLateFee;
       basePaymentNote = 'Quitação Total do Contrato';
     } else if (paymentType === 'PARTIAL_INTEREST') {
       amountToPay = parseMoney(avAmount);
       basePaymentNote = 'Pagamento Parcial (Juros)';
     } else {
-      const interestOnly = Number(calculations?.interest) || 0;
-      amountToPay = interestOnly + finalLateFee;
+      // RENEW_INTEREST
+      amountToPay = interestDue + finalLateFee;
       basePaymentNote = 'Pagamento de Juros / Renovação';
     }
 
@@ -154,54 +157,75 @@ export const paymentsService = {
     if (forgivenessMode !== 'NONE') finalNote += ` [Perdão aplicado]`;
 
     // =========================
-    // 3) Cálculo de Deltas para a RPC
+    // 3) Cálculo de Deltas para a RPC (Ordem: Late Fee -> Interest -> Principal)
     // =========================
-    let profitDelta = 0;
-    let principalDelta = 0;
+    let remaining = amountToPay;
+    
+    const lateFeeDelta = Math.max(0, Math.min(remaining, lateFeeDue));
+    remaining -= lateFeeDelta;
 
-    if (paymentType === 'FULL') {
-        profitDelta = (Number(calculations?.interest) || 0) + finalLateFee;
-        principalDelta = Number(calculations?.principal) || 0;
-    } else if (paymentType === 'RENEW_AV') {
-        principalDelta = amountToPay;
-    } else if (paymentType === 'PARTIAL_INTEREST' || paymentType === 'RENEW_INTEREST' || paymentType === 'CUSTOM') {
-        profitDelta = amountToPay;
+    const interestDelta = Math.max(0, Math.min(remaining, interestDue));
+    remaining -= interestDelta;
+
+    let principalDelta = 0;
+    if (paymentType !== 'RENEW_INTEREST' && paymentType !== 'PARTIAL_INTEREST') {
+        principalDelta = Math.max(0, Math.min(remaining, principalDue));
     }
+
+    const totalProfitDelta = interestDelta + lateFeeDelta;
 
     // =========================
     // 4) RPC ATÔMICA (Consolida tudo no banco)
-    //    Signature: 16 parâmetros conforme erro do cache
     // =========================
-    const { error } = await supabase.rpc('process_payment_atomic', {
+    const nextDueDateISO = manualDate ? manualDate.toISOString().slice(0, 10) : null;
+
+    const rpcParams: any = {
       p_amount: amountToPay,
       p_amount_to_pay: amountToPay,
       p_idempotency_key: idempotencyKey,
       p_installment_id: inst.id,
-      p_interest_delta: profitDelta,
+      p_interest_delta: interestDelta,
       p_interest_handling: params.interestHandling || 'KEEP_PENDING',
       p_interest_only: paymentType === 'PARTIAL_INTEREST' || paymentType === 'RENEW_INTEREST',
-      p_late_fee_delta: 0,
+      p_late_fee_delta: lateFeeDelta,
       p_notes: finalNote,
       p_operator_id: safeUUID(activeUser.id),
       p_payment_type: paymentType === 'FULL' ? 'PAYMENT_FULL' : 'PAYMENT_PARTIAL',
       p_principal_delta: principalDelta,
       p_principal_returned: principalDelta,
       p_profile_id: ownerId,
-      p_profit_generated: profitDelta,
+      p_profit_generated: totalProfitDelta,
       p_source_id: loan.sourceId
-    });
+    };
+
+    if (nextDueDateISO) {
+        rpcParams.p_next_due_date = nextDueDateISO;
+    }
+
+    let { error } = await supabase.rpc('process_payment_atomic', rpcParams);
+
+    // Fallback se o parâmetro p_next_due_date não existir no RPC
+    if (error && (error.message?.includes('parameter "p_next_due_date" does not exist') || error.message?.includes('p_next_due_date'))) {
+        delete rpcParams.p_next_due_date;
+        const retry = await supabase.rpc('process_payment_atomic', rpcParams);
+        error = retry.error;
+        
+        if (!error && nextDueDateISO) {
+            await supabase.from('loans').update({ next_due_date: nextDueDateISO }).eq('id', loan.id);
+        }
+    }
 
     if (error) {
       const msg = error.message || '';
-
-      if (
-        msg.includes('Pagamento excede o saldo da parcela') ||
-        msg.includes('Pagamento duplicado detectado')
-      ) {
+      if (msg.includes('Pagamento excede o saldo da parcela') || msg.includes('Pagamento duplicado detectado')) {
         throw new Error(msg);
       }
-
       throw new Error('Falha na persistência: ' + msg);
+    }
+
+    // Reset de Juros (Daily Free) se necessário
+    if (manualDate && loan.billingCycle === 'DAILY_FREE') {
+        await supabase.from('installments').update({ interest_remaining: 0 }).eq('id', inst.id);
     }
 
     return { amountToPay, paymentType };

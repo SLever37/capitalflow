@@ -18,6 +18,7 @@ import { ProfileContainer } from './containers/ProfileContainer';
 import { LegalContainer } from './containers/LegalContainer';
 import { ModalHostContainer } from './containers/ModalHostContainer';
 import { OperatorSupportChat } from './features/support/OperatorSupportChat';
+import { CalendarView } from './features/calendar/CalendarView';
 import { TeamPage } from './pages/TeamPage';
 import { InvitePage } from './pages/InvitePage';
 import { SetupPasswordPage } from './pages/SetupPasswordPage';
@@ -75,7 +76,7 @@ export const App: React.FC = () => {
     loadError, setLoadError,
     navOrder, hubOrder,
     saveNavConfig,
-  } = useAppState(activeProfileId);
+  } = useAppState(activeProfileId, handleLogout);
 
   const ui = useUiState() as any;
   ui.sortOption = sortOption;
@@ -251,6 +252,31 @@ export const App: React.FC = () => {
 
             {ui.activeModal?.type === 'SUPPORT_CHAT' && (
               <OperatorSupportChat activeUser={activeUser} onClose={ui.closeModal} />
+            )}
+
+            {ui.activeModal?.type === 'AGENDA' && (
+              <CalendarView 
+                activeUser={activeUser}
+                showToast={showToast}
+                onClose={ui.closeModal}
+                onSystemAction={(type, meta) => {
+                  if (type === 'PAYMENT' && meta && ui) {
+                    ui.setPaymentModal({
+                        loan: { id: meta.loanId, debtorName: meta.clientName, debtorPhone: meta.clientPhone, sourceId: meta.sourceId },
+                        inst: { id: meta.installmentId, dueDate: meta.start_time },
+                        calculations: { total: meta.amount, principal: meta.amount, interest: 0, lateFee: 0 }
+                    });
+                    if (ui.openModal) ui.openModal('PAYMENT');
+                  }
+                  if (type === 'OPEN_CHAT' && meta && ui) {
+                    const loan = loans.find((l: any) => l.id === meta.loanId);
+                    if (loan) {
+                        ui.setMessageModalLoan(loan);
+                        ui.openModal('MESSAGE_HUB');
+                    }
+                  }
+                }}
+              />
             )}
 
             <NavHubController ui={ui} setActiveTab={setActiveTab} activeUser={activeUser} hubOrder={hubOrder} />

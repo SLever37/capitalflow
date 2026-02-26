@@ -23,12 +23,14 @@ export const usePaymentController = (
   const inFlightRef = useRef(false);
   const lastSigRef = useRef<{ sig: string; ts: number } | null>(null);
 
-  const handlePayment = async (
+    const handlePayment = async (
       forgivenessMode?: 'NONE' | 'FINE_ONLY' | 'INTEREST_ONLY' | 'BOTH', 
       manualDate?: Date | null, 
       customAmount?: number,
       realDate?: Date | null,
-      interestHandling?: 'CAPITALIZE' | 'KEEP_PENDING'
+      interestHandling?: 'CAPITALIZE' | 'KEEP_PENDING',
+      paymentTypeOverride?: string,
+      avAmountOverride?: string
   ) => {
     if (!activeUser || !ui.paymentModal) return;
 
@@ -45,9 +47,9 @@ export const usePaymentController = (
 
     const loanId = ui.paymentModal?.loan?.id || '';
     const instId = ui.paymentModal?.inst?.id || '';
-    const type = ui.paymentType || '';
+    const type = paymentTypeOverride || ui.paymentType || '';
     const amountRaw =
-      type === 'CUSTOM' ? String(customAmount ?? '') : String(ui.avAmount ?? '');
+      type === 'CUSTOM' ? String(customAmount ?? '') : String(avAmountOverride || ui.avAmount || '');
 
     // Assinatura para evitar duplo clique
     const sig = `${ownerId}|${loanId}|${instId}|${type}|${amountRaw}|${String(forgivenessMode)}|${
@@ -67,7 +69,7 @@ export const usePaymentController = (
         loan: ui.paymentModal.loan,
         inst: ui.paymentModal.inst,
         amountToPay: customAmount || ui.paymentModal.calculations.total,
-        paymentType: ui.paymentType,
+        paymentType: type,
         activeUser,
         loans,
         setLoans,
@@ -81,7 +83,7 @@ export const usePaymentController = (
         loan: ui.paymentModal.loan,
         inst: ui.paymentModal.inst,
         amountPaid: 0,
-        type: ui.paymentType,
+        type: type,
       });
       ui.setIsProcessingPayment(false);
       inFlightRef.current = false;
@@ -93,8 +95,8 @@ export const usePaymentController = (
         loan: ui.paymentModal.loan,
         inst: ui.paymentModal.inst,
         calculations: ui.paymentModal.calculations,
-        paymentType: ui.paymentType,
-        avAmount: ui.avAmount,
+        paymentType: type,
+        avAmount: avAmountOverride || ui.avAmount,
         activeUser: { ...activeUser, id: ownerId },
         sources,
         forgivenessMode,

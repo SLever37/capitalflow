@@ -4,7 +4,6 @@ import { useModal } from '../../../contexts/ModalContext';
 import { Modal } from '../../ui/Modal';
 import { CheckSquare, Square, Table, ArrowRight, AlertTriangle, CheckCircle2, Info, Loader2, ChevronDown } from 'lucide-react';
 import { FIELD_MAPS } from '../../../features/profile/import/domain/importSchema';
-import { AgendaModal } from '../AgendaModal';
 import { CalculatorModal } from '../CalculatorModal';
 import { FlowModal } from '../FlowModal';
 import { MessageHubModal } from '../MessageHubModal';
@@ -28,6 +27,13 @@ export const SystemModalsWrapper = () => {
                 calculations: { total: meta.amount, principal: meta.amount, interest: 0, lateFee: 0 }
             });
             if (ui.openModal) ui.openModal('PAYMENT');
+        }
+        if (type === 'OPEN_CHAT' && meta && ui) {
+            const loan = loans.find(l => l.id === meta.loanId);
+            if (loan) {
+                ui.setMessageModalLoan(loan);
+                ui.openModal('MESSAGE_HUB');
+            }
         }
     };
 
@@ -113,7 +119,6 @@ export const SystemModalsWrapper = () => {
             return <DeleteAccountModal ui={ui} closeModal={closeModal} activeUser={activeUser} onExecute={profileCtrl.handleDeleteAccount} />;
 
         case 'CALC': return <CalculatorModal onClose={closeModal} />;
-        case 'AGENDA': return <AgendaModal onClose={closeModal} activeUser={activeUser} onSystemAction={handleSystemAction} />;
         case 'FLOW': return activeUser ? <FlowModal onClose={closeModal} loans={loans} profit={activeUser.interestBalance} /> : null;
         case 'MESSAGE_HUB': return ui.messageModalLoan ? <MessageHubModal loan={ui.messageModalLoan} client={clients.find((c: any) => c.id === ui.messageModalLoan?.clientId)} onClose={closeModal} /> : null;
         case 'RECEIPT': return ui.showReceipt && activeUser ? <ReceiptModal data={ui.showReceipt} onClose={closeModal} userName={activeUser.businessName || activeUser.name || 'Empresa'} userDoc={activeUser.document} /> : null;
