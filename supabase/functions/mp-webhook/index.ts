@@ -132,55 +132,52 @@ serve(async (req) => {
       const profileId = metadata.profile_id || loan.profile_id;
       const sourceId = metadata.source_id || loan.source_id;
 
-      let remaining = amountPaid;
-      
-      const lateFeeDue = Number(inst.late_fee_accrued) || 0;
-      const lateFeeDelta = Math.max(0, Math.min(remaining, lateFeeDue));
-      remaining -= lateFeeDelta;
+      // VERIFICAÇÃO DE IDEMPOTÊNCIA EXTERNA
+      const idempotencyKey = String(paymentId);
+      const { data: existingTransactions } = await supabase
+        .from("transacoes")
+        .select("id, idempotency_key")
+        .or(`idempotency_key.eq.${idempotencyKey},idempotency_key.eq.${idempotencyKey}_PROFIT`)
+        .limit(1);
 
-      const interestDue = Number(inst.interest_remaining) || 0;
-      const interestDelta = Math.max(0, Math.min(remaining, interestDue));
-      remaining -= interestDelta;
-
-      const principalDue = Number(inst.principal_remaining) || 0;
-      let principalDelta = 0;
-      if (paymentType !== 'RENEW_INTEREST' && paymentType !== 'PARTIAL_INTEREST') {
-          principalDelta = Math.max(0, Math.min(remaining, principalDue));
+      if (existingTransactions && existingTransactions.length > 0) {
+        console.log("[mp-webhook] Transação já processada (idempotência):", idempotencyKey);
+        return json({ ok: true, message: "Transação já processada", idempotent: true });
       }
 
-      const totalProfitDelta = interestDelta + lateFeeDelta;
+      // Cálculo de deltas para a RPC v2 (late_fee → interest → principal)
+      const principalDue = Number(inst.principal_remaining) || 0;
+      const interestDue = Number(inst.interest_remaining) || 0;
+      const lateFeeDue = Number(inst.late_fee_accrued) || 0;
 
-      // IMPORTANTE: cálculo de modalidade deve ser centralizado na RPC no banco
-      // para remover hardcode de +30 dias e garantir consistência.
-      const rpcParams: any = {
-        p_idempotency_key: String(paymentId),
+      let remaining = amountPaid;
+      const lateFeeDelta = Math.max(0, Math.min(remaining, lateFeeDue));
+      remaining -= lateFeeDelta;
+      const interestDelta = Math.max(0, Math.min(remaining, interestDue));
+      remaining -= interestDelta;
+      const principalDelta = Math.max(0, Math.min(remaining, principalDue));
+
+      const rpcParams = {
+        p_idempotency_key: idempotencyKey,
         p_loan_id: loan.id,
         p_installment_id: inst.id,
         p_profile_id: profileId,
         p_operator_id: profileId,
-        p_source_id: sourceId,
-        p_amount_to_pay: amountPaid,
-        p_notes: `Pagamento via PIX Portal (${paymentType === "FULL" ? "Quitação" : "Renovação"})`,
-        p_category: "RECEITA",
-        p_payment_type: paymentType === "FULL" ? "PAYMENT_FULL" : "PAYMENT_PARTIAL",
-        p_profit_generated: totalProfitDelta,
-        p_principal_returned: principalDelta,
-        p_principal_delta: principalDelta,
-        p_interest_delta: interestDelta,
-        p_late_fee_delta: lateFeeDelta,
-        p_new_start_date: inst.start_date,
-        p_new_due_date: inst.due_date, // webhook does not know next due date easily, keep same
-        p_new_principal_remaining: Math.max(0, principalDue - principalDelta),
-        p_new_interest_remaining: Math.max(0, interestDue - interestDelta),
-        p_new_scheduled_principal: Number(inst.scheduled_principal) || 0,
-        p_new_scheduled_interest: Number(inst.scheduled_interest) || 0,
-        p_new_amount: Number(inst.amount) || 0,
+        p_principal_amount: principalDelta,
+        p_interest_amount: interestDelta,
+        p_late_fee_amount: lateFeeDelta,
+        p_payment_date: new Date().toISOString(),
       };
 
-      const { error: rpcError } = await supabase.rpc("process_payment_atomic", rpcParams);
+      const { error: rpcError } = await supabase.rpc("process_payment_atomic_v2", rpcParams);
       if (rpcError) {
         console.error("[mp-webhook] rpc error:", rpcError);
-        return json({ ok: false, error: "Auto-process failed: " + rpcError.message }, 500);
+        // Não falhar se parcela já foi paga (idempotência)
+        if (!String(rpcError.message).includes("Parcela já quitada")) {
+          return json({ ok: false, error: "Auto-process failed: " + rpcError.message }, 500);
+        }
+        // Se foi idempotência, retornar sucesso
+        return json({ ok: true, message: "Idempotência: parcela já quitada" });
       }
 
       // Taxa MP de 1% (se mantiver essa regra de negócio)

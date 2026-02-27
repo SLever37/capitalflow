@@ -148,16 +148,7 @@ export const paymentsService = {
     if (amountToPay <= 0) throw new Error('O valor do pagamento deve ser maior que zero.');
 
     // =========================
-    // 2) Nota (opcional)
-    // =========================
-    const paymentDate = realDate || todayDateOnlyUTC();
-    const formattedDate = paymentDate.toLocaleDateString('pt-BR');
-
-    let finalNote = `${basePaymentNote}. Ref: ${formattedDate}.`;
-    if (forgivenessMode !== 'NONE') finalNote += ` [Perdão aplicado]`;
-
-    // =========================
-    // 3) Cálculo de Deltas para a RPC (Ordem: Late Fee -> Interest -> Principal)
+    // 2) Cálculo de Deltas para a RPC (Ordem: Late Fee -> Interest -> Principal)
     // =========================
     let remaining = amountToPay;
     
@@ -172,66 +163,29 @@ export const paymentsService = {
         principalDelta = Math.max(0, Math.min(remaining, principalDue));
     }
 
-    const totalProfitDelta = interestDelta + lateFeeDelta;
-
     // =========================
-    // 4) RPC ATÔMICA (Consolida tudo no banco)
+    // 3) Chamar RPC UNIFICADA (process_payment_atomic_v2)
     // =========================
-    const nextDueDateISO = manualDate ? manualDate.toISOString().slice(0, 10) : null;
+    const paymentDate = realDate || todayDateOnlyUTC();
 
-    const rpcParams: any = {
+    const { error } = await supabase.rpc('process_payment_atomic_v2', {
       p_idempotency_key: idempotencyKey,
       p_loan_id: loan.id,
       p_installment_id: inst.id,
       p_profile_id: ownerId,
       p_operator_id: safeUUID(activeUser.id),
-      p_source_id: loan.sourceId,
-      p_amount_to_pay: amountToPay,
-      p_notes: finalNote,
-      p_category: 'RECEITA',
-      p_payment_type: paymentType === 'FULL' ? 'PAYMENT_FULL' : 'PAYMENT_PARTIAL',
-      p_profit_generated: totalProfitDelta,
-      p_principal_returned: principalDelta,
-      p_principal_delta: principalDelta,
-      p_interest_delta: interestDelta,
-      p_late_fee_delta: lateFeeDelta,
-      p_new_start_date: inst.startDate,
-      p_new_due_date: nextDueDateISO || inst.dueDate,
-      p_new_principal_remaining: Math.max(0, principalDue - principalDelta),
-      p_new_interest_remaining: Math.max(0, interestDue - interestDelta),
-      p_new_scheduled_principal: Number(inst.scheduledPrincipal) || 0,
-      p_new_scheduled_interest: Number(inst.scheduledInterest) || 0,
-      p_new_amount: Number(inst.amount) || 0,
-    };
-
-    if (nextDueDateISO) {
-        rpcParams.p_next_due_date = nextDueDateISO;
-    }
-
-    let { error } = await supabase.rpc('process_payment_atomic', rpcParams);
-
-    // Fallback se o parâmetro p_next_due_date não existir no RPC
-    if (error && (error.message?.includes('parameter "p_next_due_date" does not exist') || error.message?.includes('p_next_due_date'))) {
-        delete rpcParams.p_next_due_date;
-        const retry = await supabase.rpc('process_payment_atomic', rpcParams);
-        error = retry.error;
-        
-        if (!error && nextDueDateISO) {
-            await supabase.from('loans').update({ next_due_date: nextDueDateISO }).eq('id', loan.id);
-        }
-    }
+      p_principal_amount: principalDelta,
+      p_interest_amount: interestDelta,
+      p_late_fee_amount: lateFeeDelta,
+      p_payment_date: paymentDate.toISOString(),
+    });
 
     if (error) {
       const msg = error.message || '';
-      if (msg.includes('Pagamento excede o saldo da parcela') || msg.includes('Pagamento duplicado detectado')) {
+      if (msg.includes('Parcela já quitada') || msg.includes('Pagamento duplicado detectado')) {
         throw new Error(msg);
       }
       throw new Error('Falha na persistência: ' + msg);
-    }
-
-    // Reset de Juros (Daily Free) se necessário
-    if (manualDate && loan.billingCycle === 'DAILY_FREE') {
-        await supabase.from('installments').update({ interest_remaining: 0 }).eq('id', inst.id);
     }
 
     return { amountToPay, paymentType };

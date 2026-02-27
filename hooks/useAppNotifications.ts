@@ -45,22 +45,38 @@ export const useAppNotifications = ({
         { 
           event: 'INSERT', 
           schema: 'public', 
-          table: 'sinalizacoes_pagamento', 
+          table: 'payment_intents', 
           filter: `profile_id=eq.${activeUser.id}` 
         },
         (payload) => {
-          const newSignal = payload.new;
-          // Alerta Imediato de Pagamento (Dinheiro na mão é prioridade máxima)
-          if (newSignal.status === 'PENDENTE') {
+          const newIntent = payload.new;
+          if (newIntent.status === 'PENDENTE') {
              notificationService.notify(
-                '💰 Pagamento Recebido!',
-                'Um cliente enviou um novo comprovante. Clique para validar.',
+                'Intencao de Pagamento Recebida!',
+                'Um cliente enviou uma intencao de pagamento. Clique para validar.',
                 () => {
                    setActiveTab('DASHBOARD');
-                   setSelectedLoanId(newSignal.loan_id);
+                   setSelectedLoanId(newIntent.loan_id);
                 }
              );
-             showToast('Novo comprovante recebido! Verifique agora.', 'success');
+             showToast('Nova intencao de pagamento recebida! Verifique agora.', 'success');
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'payment_intents', 
+          filter: `profile_id=eq.${activeUser.id}` 
+        },
+        (payload) => {
+          const updatedIntent = payload.new;
+          if (updatedIntent.status === 'APROVADO') {
+             showToast('Intencao de pagamento aprovada!', 'success');
+          } else if (updatedIntent.status === 'RECUSADO') {
+             showToast('Intencao de pagamento recusada.', 'warning');
           }
         }
       )
@@ -99,7 +115,7 @@ export const useAppNotifications = ({
             notifiedDueLoans.current.add(inst.id);
 
             notificationService.notify(
-              '📅 Cobrança do Dia',
+              'Cobranca do Dia',
               `O contrato de ${loan.debtorName} vence hoje. Fique atento!`,
               () => {
                 setActiveTab('DASHBOARD');
@@ -116,11 +132,9 @@ export const useAppNotifications = ({
       if (!source?.id) return;
       const balance = Number(source.balance || 0);
       
-      // Alerta apenas se cair abaixo de 50 reais (Extrema urgência de caixa)
-      if (balance < 50 && balance > -1000) { // > -1000 para não spammar se já estiver muito negativo
-         // Aqui usamos apenas Toast para não poluir as notificações nativas, 
-         // reservando o nativo para interação humana (Chat/Pagamento)
-         // playNotificationSound já é chamado pelo Toast de erro
+      // Alerta apenas se cair abaixo de 50 reais (Extrema urgencia de caixa)
+      if (balance < 50 && balance > -1000) {
+         // Toast para nao poluir notificacoes nativas
       }
     });
   };
@@ -135,8 +149,8 @@ export const useAppNotifications = ({
       permissionAsked.current = false;
     }
 
-    const delay = setTimeout(runScan, 5000); // 5s após carga
-    checkTimer.current = setInterval(runScan, 600000); // A cada 10 min
+    const delay = setTimeout(runScan, 5000);
+    checkTimer.current = setInterval(runScan, 600000);
 
     return () => {
       clearTimeout(delay);

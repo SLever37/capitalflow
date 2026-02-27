@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { CheckCircle2, Copy, Loader2, QrCode, AlertTriangle, Wallet, CreditCard, MessageSquare, Clock, Calendar } from 'lucide-react';
+import { CheckCircle2, Copy, Loader2, QrCode, AlertTriangle, Wallet, CreditCard, MessageSquare, Clock, Calendar, Loader } from 'lucide-react';
 import { formatMoney } from '../../../../utils/formatters';
 import { getPortalDueLabel } from '../../mappers/portalDebtRules';
 
@@ -15,10 +15,12 @@ interface BillingViewProps {
     onCopyPix: () => void;
     onNotify: () => void;
     error: string | null;
+    isInstallmentPaid?: boolean;
+    isProcessing?: boolean;
 }
 
 export const BillingView: React.FC<BillingViewProps> = ({
-    totalToPay, interestOnlyWithFees, dueDateISO, daysLateRaw, pixKey, onCopyPix, onNotify, error
+    totalToPay, interestOnlyWithFees, dueDateISO, daysLateRaw, pixKey, onCopyPix, onNotify, error, isInstallmentPaid = false, isProcessing = false
 }) => {
     // Usa o helper centralizado para determinar a mensagem
     const { label, variant, detail } = getPortalDueLabel(daysLateRaw, dueDateISO);
@@ -96,12 +98,23 @@ export const BillingView: React.FC<BillingViewProps> = ({
             </div>
 
             <div className="space-y-3">
-                <button
-                    onClick={onNotify}
-                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white p-4 rounded-2xl font-black uppercase text-xs shadow-lg shadow-emerald-900/20 transition-all active:scale-95 flex items-center justify-center gap-2"
-                >
-                    <CheckCircle2 size={16} /> Informar Pagamento Realizado
-                </button>
+                {isInstallmentPaid ? (
+                    <div className="w-full bg-slate-800 text-slate-400 p-4 rounded-2xl font-black uppercase text-xs flex items-center justify-center gap-2 cursor-not-allowed">
+                        <CheckCircle2 size={16} className="text-emerald-500" /> Parcela Quitada
+                    </div>
+                ) : (
+                    <button
+                        onClick={onNotify}
+                        disabled={isProcessing}
+                        className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white p-4 rounded-2xl font-black uppercase text-xs shadow-lg shadow-emerald-900/20 transition-all active:scale-95 flex items-center justify-center gap-2"
+                    >
+                        {isProcessing ? (
+                            <><Loader2 size={16} className="animate-spin" /> Processando...</>
+                        ) : (
+                            <><CheckCircle2 size={16} /> Informar Pagamento Realizado</>
+                        )}
+                    </button>
+                )}
             </div>
 
             {error && (
@@ -122,7 +135,7 @@ export const BillingView: React.FC<BillingViewProps> = ({
 // VIEW: NOTIFYING (Loading)
 export const NotifyingView = () => (
     <div className="py-12 flex flex-col items-center justify-center text-center space-y-4">
-        <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />
+        <Loader2 className="w-12 h-12 text-emerald-500 animate-spin" />
         <div>
             <p className="text-white font-bold text-lg">Processando...</p>
             <p className="text-slate-500 text-xs">Enviando notificação ao gestor</p>

@@ -17,6 +17,7 @@ interface PortalPaymentModalProps {
 export const PortalPaymentModal: React.FC<PortalPaymentModalProps> = ({ portalToken, loan, installment, clientData, onClose }) => {
   const [step, setStep] = useState<'BILLING' | 'NOTIFYING' | 'SUCCESS'>('BILLING');
   const [error, setError] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // ✅ Fonte Única de Verdade (Rules)
   const options = useMemo(() => {
@@ -29,6 +30,7 @@ export const PortalPaymentModal: React.FC<PortalPaymentModalProps> = ({ portalTo
   const handleNotifyPayment = async () => {
     setStep('NOTIFYING');
     setError(null);
+    setIsProcessing(true);
     try {
       const comprovanteUrl = null;
       await portalService.submitPaymentIntentByPortalToken(
@@ -40,6 +42,8 @@ export const PortalPaymentModal: React.FC<PortalPaymentModalProps> = ({ portalTo
     } catch (e: any) {
       setError(e.message || "Erro ao notificar operador.");
       setStep('BILLING');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -66,12 +70,14 @@ export const PortalPaymentModal: React.FC<PortalPaymentModalProps> = ({ portalTo
             <BillingView 
                 totalToPay={options.totalToPay}
                 interestOnlyWithFees={options.renewToPay}
-                dueDateISO={options.dueDateISO} // NOVO: Passa data para lógica de label
-                daysLateRaw={options.daysLate}  // NOVO: Passa dias crus
+                dueDateISO={options.dueDateISO}
+                daysLateRaw={options.daysLate}
                 pixKey={pixKey}
                 onCopyPix={copyPixKey}
                 onNotify={handleNotifyPayment}
                 error={error}
+                isInstallmentPaid={installment.status === 'PAID'}
+                isProcessing={isProcessing}
             />
         )}
 

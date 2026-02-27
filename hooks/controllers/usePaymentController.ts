@@ -22,6 +22,7 @@ export const usePaymentController = (
 ) => {
   const inFlightRef = useRef(false);
   const lastSigRef = useRef<{ sig: string; ts: number } | null>(null);
+  const DOUBLE_CLICK_THRESHOLD = 2000; // 2 segundos
 
     const handlePayment = async (
       forgivenessMode?: 'NONE' | 'FINE_ONLY' | 'INTEREST_ONLY' | 'BOTH', 
@@ -52,13 +53,22 @@ export const usePaymentController = (
       type === 'CUSTOM' ? String(customAmount ?? '') : String(avAmountOverride || ui.avAmount || '');
 
     // Assinatura para evitar duplo clique
+    // Verificar se parcela já está PAID
+    if (ui.paymentModal?.inst?.status === 'PAID') {
+      showToast('Esta parcela já foi quitada.', 'error');
+      return;
+    }
+
     const sig = `${ownerId}|${loanId}|${instId}|${type}|${amountRaw}|${String(forgivenessMode)}|${
       manualDate ? manualDate.toISOString() : ''
     }`;
 
     const now = Date.now();
     const last = lastSigRef.current;
-    if (last && last.sig === sig && now - last.ts < 2000) return;
+    if (last && last.sig === sig && now - last.ts < DOUBLE_CLICK_THRESHOLD) {
+      showToast('Aguarde o processamento anterior...', 'error');
+      return;
+    }
     lastSigRef.current = { sig, ts: now };
 
     inFlightRef.current = true;
