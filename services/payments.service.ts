@@ -12,20 +12,18 @@ const isUUID = (v: any) =>
 
 const safeUUID = (v: any) => (isUUID(v) ? v : null);
 
-function isSameDay(d1: Date, d2: Date) {
-  return (
-    d1.getFullYear() === d2.getFullYear() &&
-    d1.getMonth() === d2.getMonth() &&
-    d1.getDate() === d2.getDate()
-  );
-}
-
 export const paymentsService = {
   async processPayment(params: {
     loan: Loan;
     inst: Installment;
     calculations: any;
-    paymentType: 'FULL' | 'RENEW_INTEREST' | 'RENEW_AV' | 'LEND_MORE' | 'CUSTOM' | 'PARTIAL_INTEREST';
+    paymentType:
+      | 'FULL'
+      | 'RENEW_INTEREST'
+      | 'RENEW_AV'
+      | 'LEND_MORE'
+      | 'CUSTOM'
+      | 'PARTIAL_INTEREST';
     avAmount: string;
     activeUser: UserProfile;
     sources: CapitalSource[];
@@ -33,7 +31,6 @@ export const paymentsService = {
     manualDate?: Date | null;
     customAmount?: number;
     realDate?: Date | null;
-    interestHandling?: 'CAPITALIZE' | 'KEEP_PENDING';
   }) {
     const {
       loan,
@@ -45,22 +42,39 @@ export const paymentsService = {
       forgivenessMode = 'NONE',
       customAmount,
       realDate,
-      manualDate,
     } = params;
 
-    // DEMO
+    /* =====================================================
+       BLOQUEIO FRONTEND — Parcela já quitada
+    ===================================================== */
+    if (String(inst.status || '').toUpperCase() === 'PAID') {
+      throw new Error('Parcela já quitada');
+    }
+
+    const principalDue = Number(inst.principalRemaining) || 0;
+    const interestDue = Number(inst.interestRemaining) || 0;
+    const lateFeeDue = Number(inst.lateFeeAccrued) || 0;
+
+    if (principalDue <= 0 && interestDue <= 0 && lateFeeDue <= 0) {
+      throw new Error('Parcela já quitada');
+    }
+
     if (activeUser.id === 'DEMO') {
       return { amountToPay: customAmount || Number(calculations?.total) || 0, paymentType };
     }
 
-    const ownerId = safeUUID(loan.profile_id) || safeUUID((activeUser as any).supervisor_id) || safeUUID(activeUser.id);
+    const ownerId =
+      safeUUID(loan.profile_id) ||
+      safeUUID((activeUser as any).supervisor_id) ||
+      safeUUID(activeUser.id);
+
     if (!ownerId) throw new Error('Perfil inválido. Refaça o login.');
 
     const idempotencyKey = generateUUID();
 
-    // =========================
-    // LEND_MORE mantém RPC própria
-    // =========================
+    /* =====================================================
+       LEND_MORE
+    ===================================================== */
     if (paymentType === 'LEND_MORE') {
       const lendAmount = parseFloat(avAmount) || 0;
       if (lendAmount <= 0) throw new Error('Valor do aporte inválido.');
@@ -74,21 +88,16 @@ export const paymentsService = {
         p_source_id: loan.sourceId,
         p_amount: lendAmount,
         p_notes: `Novo Aporte (+ R$ ${lendAmount.toFixed(2)})`,
-        p_new_total_principal: loan.principal + lendAmount,
-        p_new_total_to_receive: loan.totalToReceive + lendAmount,
-        p_inst_principal_rem: (Number(inst.principalRemaining) || 0) + lendAmount,
-        p_inst_scheduled_princ: (Number(inst.scheduledPrincipal) || 0) + lendAmount,
-        p_inst_amount: (Number(inst.amount) || 0) + lendAmount,
-        p_category: 'INVESTIMENTO',
       });
 
-      if (error) throw new Error('Erro ao processar aporte: ' + error.message);
+      if (error) throw new Error(error.message);
+
       return { amountToPay: lendAmount, paymentType };
     }
 
-    // =========================
-    // Cálculo de multa (com perdão)
-    // =========================
+    /* =====================================================
+       CÁLCULO MULTA
+    ===================================================== */
     const daysLate = Math.max(0, getDaysDiff(inst.dueDate));
     const baseForFine = (calculations?.principal || 0) + (calculations?.interest || 0);
 
@@ -108,64 +117,69 @@ export const paymentsService = {
 
     finalLateFee = Math.round((finalLateFee + Number.EPSILON) * 100) / 100;
 
-    // =========================
-    // 1) Determina valor a pagar
-    // =========================
+    /* =====================================================
+       DEFINIR VALOR A PAGAR
+    ===================================================== */
     const parseMoney = (v: string) => {
       if (!v) return 0;
       const clean = v.replace(/[R$\s]/g, '');
-      if (clean.includes('.') && clean.includes(',')) return parseFloat(clean.replace(/\./g, '').replace(',', '.')) || 0;
+      if (clean.includes('.') && clean.includes(',')) {
+        return parseFloat(clean.replace(/\./g, '').replace(',', '.')) || 0;
+      }
       if (clean.includes(',')) return parseFloat(clean.replace(',', '.')) || 0;
       return parseFloat(clean) || 0;
     };
 
-    const interestDue = Number(inst.interestRemaining) || 0;
-    const lateFeeDue = Number(inst.lateFeeAccrued) || 0;
-    const principalDue = Number(inst.principalRemaining) || 0;
-
     let amountToPay = 0;
-    let basePaymentNote = '';
 
     if (paymentType === 'CUSTOM') {
       amountToPay = customAmount || 0;
-      basePaymentNote = `Recebimento de Diária(s)`;
     } else if (paymentType === 'RENEW_AV') {
       amountToPay = parseMoney(avAmount);
-      basePaymentNote = `Amortização de Capital`;
     } else if (paymentType === 'FULL') {
-      // Quitação usa valores reais + multa calculada (respeitando perdão)
       amountToPay = principalDue + interestDue + finalLateFee;
-      basePaymentNote = 'Quitação Total do Contrato';
     } else if (paymentType === 'PARTIAL_INTEREST') {
       amountToPay = parseMoney(avAmount);
-      basePaymentNote = 'Pagamento Parcial (Juros)';
     } else {
-      // RENEW_INTEREST
       amountToPay = interestDue + finalLateFee;
-      basePaymentNote = 'Pagamento de Juros / Renovação';
     }
 
-    if (amountToPay <= 0) throw new Error('O valor do pagamento deve ser maior que zero.');
+    if (amountToPay <= 0) {
+      throw new Error('O valor do pagamento deve ser maior que zero.');
+    }
 
-    // =========================
-    // 2) Cálculo de Deltas para a RPC (Ordem: Late Fee -> Interest -> Principal)
-    // =========================
+    /* =====================================================
+       CALCULAR DELTAS
+    ===================================================== */
     let remaining = amountToPay;
-    
-    const lateFeeDelta = Math.max(0, Math.min(remaining, lateFeeDue));
+
+    let lateFeeDelta = Math.max(0, Math.min(remaining, lateFeeDue));
     remaining -= lateFeeDelta;
 
-    const interestDelta = Math.max(0, Math.min(remaining, interestDue));
+    let interestDelta = Math.max(0, Math.min(remaining, interestDue));
     remaining -= interestDelta;
 
     let principalDelta = 0;
+
     if (paymentType !== 'RENEW_INTEREST' && paymentType !== 'PARTIAL_INTEREST') {
-        principalDelta = Math.max(0, Math.min(remaining, principalDue));
+      principalDelta = Math.max(0, Math.min(remaining, principalDue));
     }
 
-    // =========================
-    // 3) Chamar RPC UNIFICADA (process_payment_atomic_v2)
-    // =========================
+    const totalDelta = principalDelta + interestDelta + lateFeeDelta;
+
+    if (totalDelta <= 0) {
+      if (paymentType === 'CUSTOM' || paymentType === 'PARTIAL_INTEREST') {
+        interestDelta = amountToPay;
+      } else if (paymentType === 'RENEW_AV') {
+        principalDelta = amountToPay;
+      } else {
+        throw new Error('Nada a pagar nesta parcela.');
+      }
+    }
+
+    /* =====================================================
+       RPC OFICIAL
+    ===================================================== */
     const paymentDate = realDate || todayDateOnlyUTC();
 
     const { error } = await supabase.rpc('process_payment_atomic_v2', {
@@ -181,11 +195,14 @@ export const paymentsService = {
     });
 
     if (error) {
-      const msg = error.message || '';
-      if (msg.includes('Parcela já quitada') || msg.includes('Pagamento duplicado detectado')) {
-        throw new Error(msg);
+      if (
+        error.message.includes('Parcela já quitada') ||
+        error.message.includes('Pagamento duplicado detectado')
+      ) {
+        throw new Error(error.message);
       }
-      throw new Error('Falha na persistência: ' + msg);
+
+      throw new Error('Falha na persistência: ' + error.message);
     }
 
     return { amountToPay, paymentType };

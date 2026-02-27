@@ -172,12 +172,80 @@ serve(async (req) => {
       const { error: rpcError } = await supabase.rpc("process_payment_atomic_v2", rpcParams);
       if (rpcError) {
         console.error("[mp-webhook] rpc error:", rpcError);
-        // Não falhar se parcela já foi paga (idempotência)
-        if (!String(rpcError.message).includes("Parcela já quitada")) {
-          return json({ ok: false, error: "Auto-process failed: " + rpcError.message }, 500);
+        
+        const msg = String(rpcError.message);
+        
+        // Fallback manual caso a RPC não esteja no cache ou não tenha sido criada
+        if (msg.includes('schema cache') || msg.includes('Could not find the function')) {
+          console.warn('[mp-webhook] RPC process_payment_atomic_v2 não encontrada. Executando fallback manual...');
+          
+          // 1. Atualizar parcela
+          const newPaidPrincipal = (Number(inst.paid_principal) || 0) + principalDelta;
+          const newPaidInterest = (Number(inst.paid_interest) || 0) + interestDelta;
+          const newPaidTotal = (Number(inst.paid_total) || 0) + principalDelta + interestDelta + lateFeeDelta;
+          const newPrincRem = Math.max(0, (Number(inst.principal_remaining) || 0) - principalDelta);
+          const newIntRem = Math.max(0, (Number(inst.interest_remaining) || 0) - interestDelta);
+          
+          const newStatus = (newPrincRem <= 0 && newIntRem <= 0) ? 'PAID' : 'PARTIAL';
+
+          await supabase.from('parcelas').update({
+            paid_principal: newPaidPrincipal,
+            paid_interest: newPaidInterest,
+            paid_total: newPaidTotal,
+            principal_remaining: newPrincRem,
+            interest_remaining: newIntRem,
+            status: newStatus,
+            last_payment_date: new Date().toISOString()
+          }).eq('id', inst.id);
+
+          // 2. Inserir transações
+          if (principalDelta > 0) {
+            await supabase.from('transacoes').insert({
+              loan_id: loan.id,
+              installment_id: inst.id,
+              profile_id: profileId,
+              operator_id: profileId,
+              source_id: sourceId,
+              amount: principalDelta,
+              principal_delta: principalDelta,
+              interest_delta: 0,
+              late_fee_delta: 0,
+              category: 'PRINCIPAL_RETURN',
+              type: 'PAYMENT_PRINCIPAL',
+              idempotency_key: idempotencyKey,
+              created_at: new Date().toISOString()
+            });
+          }
+
+          if (interestDelta + lateFeeDelta > 0) {
+            await supabase.from('transacoes').insert({
+              loan_id: loan.id,
+              installment_id: inst.id,
+              profile_id: profileId,
+              operator_id: profileId,
+              source_id: '28646e86-cec9-4d47-b600-3b771a066a05', // Caixa Livre
+              amount: interestDelta + lateFeeDelta,
+              principal_delta: 0,
+              interest_delta: interestDelta,
+              late_fee_delta: lateFeeDelta,
+              category: 'LUCRO_EMPRESTIMO',
+              type: 'PAYMENT_PROFIT',
+              idempotency_key: idempotencyKey + '_PROFIT',
+              created_at: new Date().toISOString()
+            });
+          }
+
+          // 3. Encerrar contrato se necessário
+          const { data: remainingInsts } = await supabase.from('parcelas').select('id').eq('loan_id', loan.id).neq('status', 'PAID');
+          if (!remainingInsts || remainingInsts.length === 0) {
+            await supabase.from('contratos').update({ status: 'ENCERRADO' }).eq('id', loan.id);
+          }
+        } else if (!msg.includes("Parcela já quitada")) {
+          return json({ ok: false, error: "Auto-process failed: " + msg }, 500);
+        } else {
+          // Se foi idempotência, retornar sucesso
+          return json({ ok: true, message: "Idempotência: parcela já quitada" });
         }
-        // Se foi idempotência, retornar sucesso
-        return json({ ok: true, message: "Idempotência: parcela já quitada" });
       }
 
       // Taxa MP de 1% (se mantiver essa regra de negócio)

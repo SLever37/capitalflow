@@ -1,8 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
-import { PiggyBank, ArrowUpRight, ArrowDownCircle, Filter, Calendar, TrendingUp, TrendingDown, DollarSign, Printer } from 'lucide-react';
+import { PiggyBank, ArrowUpRight, ArrowDownCircle, Filter, Calendar, TrendingUp, TrendingDown, DollarSign, Printer, ChevronLeft, ArrowRightLeft } from 'lucide-react';
 import { Loan, LedgerEntry } from '../../types';
-import { Modal } from '../ui/Modal';
 import { openDreReportPrint } from '../../utils/printHelpers';
 
 export const FlowModal = ({ onClose, loans, profit }: { onClose: () => void, loans: Loan[], profit: number }) => {
@@ -80,19 +79,41 @@ export const FlowModal = ({ onClose, loans, profit }: { onClose: () => void, loa
     };
 
     return (
-        <Modal onClose={onClose} title="DRE - Resultado Financeiro">
-            <div className="space-y-6">
-                
-                {/* Seletor de Período */}
-                <div className="flex items-center justify-between bg-slate-950 p-2 rounded-2xl border border-slate-800">
-                    <button onClick={() => handleMonthChange('prev')} className="p-3 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-white transition-colors"><ArrowDownCircle className="rotate-90" size={20}/></button>
-                    <div className="text-center">
-                        <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Período</p>
-                        <p className="text-lg font-black text-white uppercase">{new Date(selectedYear, selectedMonth).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</p>
+        <div className="fixed inset-0 z-[200] bg-slate-950 flex flex-col animate-in fade-in duration-300 font-sans h-[100dvh]">
+            {/* Header */}
+            <div className="h-16 border-b border-slate-800 bg-slate-900 flex items-center justify-between px-4 shrink-0 z-20">
+                <div className="flex items-center gap-3">
+                    <button onClick={onClose} className="p-2 -ml-2 text-slate-400 hover:text-white transition-colors">
+                        <ChevronLeft size={24} />
+                    </button>
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center text-white shrink-0 shadow-lg shadow-emerald-900/20">
+                        <ArrowRightLeft size={20} />
                     </div>
-                    <button onClick={() => handleMonthChange('next')} className="p-3 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-white transition-colors"><ArrowUpRight className="rotate-45" size={20}/></button>
+                    <div>
+                        <h1 className="text-sm font-black text-white uppercase tracking-wider leading-none">Extrato Geral</h1>
+                        <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-widest">
+                            DRE e Resultado Financeiro
+                        </p>
+                    </div>
                 </div>
+            </div>
 
+            {/* Top Bar: Period Selector */}
+            <div className="bg-slate-900 border-b border-slate-800 shrink-0 flex flex-col px-4 py-3">
+                <div className="flex items-center justify-between bg-slate-950 p-1.5 rounded-2xl border border-slate-800">
+                    <button onClick={() => handleMonthChange('prev')} className="p-2 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-white transition-colors"><ChevronLeft size={20}/></button>
+                    <div className="text-center flex-1">
+                        <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Período</p>
+                        <p className="text-sm font-black text-white uppercase">{new Date(selectedYear, selectedMonth).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</p>
+                    </div>
+                    <button onClick={() => handleMonthChange('next')} className="p-2 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-white transition-colors"><ChevronLeft className="rotate-180" size={20}/></button>
+                </div>
+            </div>
+
+            {/* Main Content */}
+            <div className="flex-1 overflow-y-auto bg-slate-950 p-4 sm:p-6 custom-scrollbar">
+                <div className="max-w-3xl mx-auto space-y-6">
+                    
                 {/* Cards DRE */}
                 <div className="grid grid-cols-2 gap-3">
                     <div className="bg-emerald-950/20 border border-emerald-500/20 p-4 rounded-2xl">
@@ -170,7 +191,8 @@ export const FlowModal = ({ onClose, loans, profit }: { onClose: () => void, loa
                         )}
                     </div>
                 </div>
+                </div>
             </div>
-        </Modal>
+        </div>
     );
 };
