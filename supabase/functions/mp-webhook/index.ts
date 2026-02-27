@@ -132,6 +132,24 @@ serve(async (req) => {
       const profileId = metadata.profile_id || loan.profile_id;
       const sourceId = metadata.source_id || loan.source_id;
 
+      let remaining = amountPaid;
+      
+      const lateFeeDue = Number(inst.late_fee_accrued) || 0;
+      const lateFeeDelta = Math.max(0, Math.min(remaining, lateFeeDue));
+      remaining -= lateFeeDelta;
+
+      const interestDue = Number(inst.interest_remaining) || 0;
+      const interestDelta = Math.max(0, Math.min(remaining, interestDue));
+      remaining -= interestDelta;
+
+      const principalDue = Number(inst.principal_remaining) || 0;
+      let principalDelta = 0;
+      if (paymentType !== 'RENEW_INTEREST' && paymentType !== 'PARTIAL_INTEREST') {
+          principalDelta = Math.max(0, Math.min(remaining, principalDue));
+      }
+
+      const totalProfitDelta = interestDelta + lateFeeDelta;
+
       // IMPORTANTE: cálculo de modalidade deve ser centralizado na RPC no banco
       // para remover hardcode de +30 dias e garantir consistência.
       const rpcParams: any = {
@@ -145,7 +163,18 @@ serve(async (req) => {
         p_notes: `Pagamento via PIX Portal (${paymentType === "FULL" ? "Quitação" : "Renovação"})`,
         p_category: "RECEITA",
         p_payment_type: paymentType === "FULL" ? "PAYMENT_FULL" : "PAYMENT_PARTIAL",
-        // Demais campos financeiros devem ser calculados internamente na RPC.
+        p_profit_generated: totalProfitDelta,
+        p_principal_returned: principalDelta,
+        p_principal_delta: principalDelta,
+        p_interest_delta: interestDelta,
+        p_late_fee_delta: lateFeeDelta,
+        p_new_start_date: inst.start_date,
+        p_new_due_date: inst.due_date, // webhook does not know next due date easily, keep same
+        p_new_principal_remaining: Math.max(0, principalDue - principalDelta),
+        p_new_interest_remaining: Math.max(0, interestDue - interestDelta),
+        p_new_scheduled_principal: Number(inst.scheduled_principal) || 0,
+        p_new_scheduled_interest: Number(inst.scheduled_interest) || 0,
+        p_new_amount: Number(inst.amount) || 0,
       };
 
       const { error: rpcError } = await supabase.rpc("process_payment_atomic", rpcParams);

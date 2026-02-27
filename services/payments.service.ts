@@ -190,6 +190,18 @@ export const paymentsService = {
       p_notes: finalNote,
       p_category: 'RECEITA',
       p_payment_type: paymentType === 'FULL' ? 'PAYMENT_FULL' : 'PAYMENT_PARTIAL',
+      p_profit_generated: totalProfitDelta,
+      p_principal_returned: principalDelta,
+      p_principal_delta: principalDelta,
+      p_interest_delta: interestDelta,
+      p_late_fee_delta: lateFeeDelta,
+      p_new_start_date: inst.startDate,
+      p_new_due_date: nextDueDateISO || inst.dueDate,
+      p_new_principal_remaining: Math.max(0, principalDue - principalDelta),
+      p_new_interest_remaining: Math.max(0, interestDue - interestDelta),
+      p_new_scheduled_principal: Number(inst.scheduledPrincipal) || 0,
+      p_new_scheduled_interest: Number(inst.scheduledInterest) || 0,
+      p_new_amount: Number(inst.amount) || 0,
     };
 
     if (nextDueDateISO) {
