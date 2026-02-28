@@ -17,11 +17,19 @@ export type PaymentMethod =
   | 'BANK_TRANSFER'
   | 'OTHER';
 
-export type CapitalSource = 'PROPRIO' | 'TERCEIROS' | 'MISTO';
+export interface CapitalSource {
+  id: string;
+  profile_id: string;
+  name: string;
+  balance: number;
+  type: 'PROPRIO' | 'TERCEIROS' | 'MISTO';
+  description?: string;
+  created_at?: string;
+}
 
-export type SortOption = 'RECENT' | 'NAME' | 'VALUE' | 'STATUS';
+export type SortOption = 'RECENT' | 'NAME' | 'VALUE' | 'STATUS' | 'DUE_DATE_ASC' | 'NAME_ASC' | 'CREATED_DESC' | 'UPDATED_DESC';
 
-export type AppTab = 'DASHBOARD' | 'CLIENTS' | 'LEGAL' | 'SOURCES' | 'PROFILE';
+export type AppTab = 'DASHBOARD' | 'CLIENTS' | 'LEGAL' | 'SOURCES' | 'PROFILE' | 'TEAM' | 'PERSONAL_FINANCE' | 'LEADS' | 'ACQUISITION' | 'SETTINGS';
 
 export type LoanBillingModality =
   | 'MONTHLY'
@@ -59,6 +67,23 @@ export interface UserProfile {
   defaultFinePercent?: number;
   defaultDailyInterestPercent?: number;
   interestBalance?: number;
+  accessLevel?: 'ADMIN' | 'OPERATOR' | 'VIEWER';
+  phone?: string;
+  password?: string; // This should ideally not be part of a client-side type
+  ui_nav_order?: AppTab[];
+  ui_hub_order?: AppTab[];
+  supervisor_id?: string;
+  photo?: string;
+  totalAvailableCapital?: number;
+  addressNumber?: string;
+  neighborhood?: string;
+  brandColor?: string;
+  zipCode?: string;
+  logoUrl?: string;
+  recoveryPhrase?: string;
+  targetCapital?: number;
+  targetProfit?: number;
+  createdAt?: string;
 }
 
 /* =====================================================
@@ -119,7 +144,7 @@ export interface Agreement {
   startDate: string;
   status: AgreementStatus;
   createdAt: string;
-  installments: AgreementInstallment[];
+  installments?: AgreementInstallment[];
 }
 
 /* =====================================================
@@ -223,6 +248,7 @@ export interface Loan {
   fundingFeePercent?: number;
   portalToken?: string;
   portalShortcode?: string;
+  witnesses?: LegalWitness[];
 }
 
 /* =====================================================
@@ -248,24 +274,167 @@ export interface LegalDocumentParams {
   debtorAddress?: string;
   totalDebt?: number;
   originDescription?: string;
-  installments?: number;
+  installments?: AgreementInstallment[];
   city?: string;
+  state?: string;
   witnesses?: LegalWitness[];
   contractDate?: string;
+  agreementDate?: string;
+  timestamp?: string;
 }
 
 export interface LegalDocumentRecord {
   id: string;
   loanId: string;
+  type?: string;
   created_at: string;
   public_access_token?: string;
   hashSHA256?: string;
   agreementId?: string;
+  snapshot?: LegalDocumentParams;
+  status?: 'SIGNED' | 'PENDING';
 }
 
 /* =====================================================
    CALENDAR
 ===================================================== */
+
+/* =====================================================
+   CAMPAIGN & LEADS
+===================================================== */
+
+export interface Campaign {
+  id: string;
+  profile_id: string;
+  name: string;
+  description?: string;
+  public_url?: string;
+  short_code?: string;
+  created_at?: string;
+  is_active?: boolean;
+  status?: 'ACTIVE' | 'INACTIVE';
+  imageUrl?: string;
+  clicks?: number;
+  leads?: number;
+  values: number[];
+  messageTemplate?: string;
+  source?: string; // Assuming 'source' is a string field for campaign origin
+  link?: string;
+  createdAt?: string;
+}
+
+export interface Lead {
+  id: string;
+  profile_id: string;
+  nome: string;
+  whatsapp: string;
+  email?: string;
+  notes?: string;
+  status?: 'NOVO' | 'EM_ATENDIMENTO' | 'CONVERTIDO' | 'REJEITADO';
+  created_at?: string;
+  valor_solicitado: number;
+  origem?: string;
+  utm_source?: string;
+  utm_campaign?: string;
+}
+
+export interface CampaignLead {
+  id: string;
+  campaignId: string;
+  name: string;
+  whatsapp: string;
+  cpf?: string;
+  selectedValue: number;
+  createdAt: string;
+  lgpd?: boolean;
+}
+
+/* =====================================================
+   CALENDAR
+===================================================== */
+
+export type LoanStatusFilter =
+  | 'TODOS'
+  | 'ATRASADOS'
+  | 'EM_DIA'
+  | 'PAGOS'
+  | 'ARQUIVADOS'
+  | 'ATRASO_CRITICO';
+
+export type AccessLevel = 'ADMIN' | 'OPERATOR' | 'VIEWER';
+
+export interface PaymentModalState {
+  loan: Loan;
+  inst: Installment;
+  calculations: {
+    total: number;
+    interestHandling?: any; // TODO: Define a proper type for interestHandling
+  };
+}
+
+export interface UIController {
+  paymentModal: PaymentModalState | null;
+  paymentType: PaymentType;
+  avAmount: string;
+  setIsProcessingPayment: (isProcessing: boolean) => void;
+  closeModal: () => void;
+  setAvAmount: (amount: string) => void;
+  setShowReceipt: (receipt: any) => void; // TODO: Define Receipt type
+  openModal: (modalName: string) => void;
+}
+
+export interface ProfileUIController {
+  resetPasswordInput: string;
+  deleteAccountAgree: boolean;
+  deleteAccountConfirm: string;
+  closeModal: () => void;
+}
+
+export interface SourceUIController {
+  sourceForm: {
+    name: string;
+    type: CapitalSource["type"];
+    balance: string;
+    operador_permitido_id?: string;
+  };
+  isSaving: boolean;
+  activeModal: {
+    payload?: CapitalSource;
+  } | null;
+  addFundsValue: string | null;
+  editingSource: CapitalSource | null;
+  withdrawValue: string | null;
+  withdrawSourceId: string | null;
+  closeModal: () => void;
+  setIsSaving: (isSaving: boolean) => void;
+  setEditingSource: (source: CapitalSource | null) => void;
+}
+
+export type AmortizationType = 'JUROS' | 'PRICE' | 'SAC';
+
+export interface Sheet {
+  name: string;
+  headers: string[];
+  rows: any[][];
+}
+
+export interface ImportCandidate {
+  nome: string;
+  documento: string;
+  whatsapp: string;
+  email?: string;
+  endereco?: string;
+  cidade?: string;
+  uf?: string;
+  valor_base: number;
+  data_referencia?: string;
+  notas?: string;
+  status: 'OK' | 'AVISO' | 'ERRO';
+  mensagens: string[];
+  original_row: any;
+}
+
+export type PaymentType = 'FULL' | 'RENEW_INTEREST' | 'RENEW_AV' | 'LEND_MORE' | 'CUSTOM' | 'PARTIAL_INTEREST';
 
 export type EventStatus =
   | 'PENDING'

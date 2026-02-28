@@ -21,7 +21,7 @@ import {
   Download,
 } from 'lucide-react';
 
-import type { AppTab, Loan, UserProfile } from '../types';
+import type { AppTab, Loan, UserProfile, Client, CapitalSource } from '../types';
 import { maskDocument, maskPhone } from '../utils/formatters';
 
 import { useProfilePageLogic } from '../features/profile/hooks/useProfilePageLogic';
@@ -30,13 +30,12 @@ import { ProfileDangerZone } from '../features/profile/components/ProfileDangerZ
 
 interface ProfilePageProps {
   activeUser: UserProfile;
-  clients: any[];
+  clients: Client[];
   loans: Loan[];
-  sources: any[];
-  ui: any;
-  profileCtrl: any;
+  sources: CapitalSource[];
+
   handleLogout: () => void;
-  showToast: any;
+  showToast: (msg: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
   setDonateModal: (val: boolean) => void;
   setResetDataModal: (val: boolean) => void;
   handleDeleteAccount: () => void;

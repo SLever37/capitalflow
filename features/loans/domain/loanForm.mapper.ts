@@ -1,4 +1,4 @@
-import { Loan, LoanBillingModality, PaymentMethod, LoanDocument, Installment } from '../../../types';
+import { Loan, LoanBillingModality, PaymentMethod, LoanDocument, Installment, LoanStatus } from '../../../types';
 import { generateUUID } from '../../../utils/generators';
 import { modalityRegistry } from '../../../domain/finance/modalities/registry';
 import { parseCurrency } from '../../../utils/formatters';
@@ -48,6 +48,7 @@ function preserveExistingDueDates(
 
 export interface LoanFormState {
   clientId: string;
+  status?: LoanStatus; // Adicionado status para o formulário, pode ser opcional se for definido no backend ou com default
   debtorName: string;
   debtorPhone: string;
   debtorDocument: string;
@@ -164,6 +165,7 @@ export const mapFormToLoan = (
     customDocuments,
 
     isArchived: initialData?.isArchived || false,
-    skipWeekends: form.skipWeekends
+    skipWeekends: form.skipWeekends,
+    status: form.status || LoanStatus.PENDING // Atribuir status, usando o do formulário ou PENDING como default
   };
 };

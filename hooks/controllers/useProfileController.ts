@@ -2,15 +2,15 @@ import React from 'react';
 import { supabase } from '../../lib/supabase';
 import { operatorProfileService } from '../../features/profile/services/operatorProfileService';
 import { readBackupFile } from '../../services/dataService';
-import { UserProfile } from '../../types';
+import { UserProfile, ProfileUIController } from '../../types';
 
 export const useProfileController = (
   activeUser: UserProfile | null,
-  ui: any,
+  ui: ProfileUIController,
   profileEditForm: UserProfile | null,
-  setProfileEditForm: any,
-  setActiveUser: any,
-  setIsLoadingData: any,
+  setProfileEditForm: React.Dispatch<React.SetStateAction<UserProfile | null>>,
+  setActiveUser: React.Dispatch<React.SetStateAction<UserProfile | null>>,
+  setIsLoadingData: React.Dispatch<React.SetStateAction<boolean>>,
   fetchFullData: (id: string) => Promise<void>,
   handleLogout: () => void,
   showToast: (msg: string, type?: 'success' | 'error' | 'info') => void
@@ -104,7 +104,7 @@ export const useProfileController = (
 
   const executeCleanData = async (profileId: string) => {
     // ownerId é o DONO (supervisor) ou o próprio
-    const ownerId = (activeUser as any)?.supervisor_id || profileId;
+    const ownerId = activeUser?.supervisor_id || profileId;
 
     // ✅ Por profile_id (tabelas operacionais e acessórias)
     // Nota: Usamos o ID do dono para garantir que toda a organização seja limpa
@@ -124,7 +124,7 @@ export const useProfileController = (
   const handleResetData = async () => {
     if (!activeUser) return;
 
-    if (activeUser.id !== 'DEMO' && ui.resetPasswordInput !== activeUser.password) {
+    if (activeUser.id !== 'DEMO' && (!activeUser.password || ui.resetPasswordInput !== activeUser.password)) {
       showToast('Senha de autenticação incorreta.', 'error');
       return;
     }
@@ -153,7 +153,7 @@ export const useProfileController = (
     if (!activeUser) return;
     if (activeUser.id === 'DEMO') return;
 
-    if (!ui.deleteAccountAgree || ui.deleteAccountConfirm !== 'DELETAR' || ui.resetPasswordInput !== activeUser.password) {
+    if (!ui.deleteAccountAgree || ui.deleteAccountConfirm !== 'DELETAR' || (!activeUser.password || ui.resetPasswordInput !== activeUser.password)) {
       showToast('Validação de segurança falhou.', 'error');
       return;
     }

@@ -1,5 +1,6 @@
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
-import { CapitalSource, UserProfile } from '../../types';
+import { CapitalSource, UserProfile, SourceUIController } from '../../types';
 import { parseCurrency } from '../../utils/formatters';
 import { personalFinanceService } from '../../features/personal-finance/services/personalFinanceService';
 
@@ -12,14 +13,14 @@ const safeUUID = (v: any) => (isUUID(v) ? v : null);
 
 export const useSourceController = (
   activeUser: UserProfile | null,
-  ui: any,
+  ui: SourceUIController,
   sources: CapitalSource[],
-  setSources: any,
-  setActiveUser: any,
+  setSources: React.Dispatch<React.SetStateAction<CapitalSource[]>>,
+  setActiveUser: React.Dispatch<React.SetStateAction<UserProfile | null>>,
   fetchFullData: (id: string) => Promise<void>,
   showToast: (msg: string, type?: 'success' | 'error') => void
 ) => {
-  const getOwnerId = (u: UserProfile) => safeUUID((u as any).supervisor_id) || safeUUID(u.id);
+  const getOwnerId = (u: UserProfile) => safeUUID(u.supervisor_id) || safeUUID(u.id);
 
   const handleSaveSource = async () => {
     if (!activeUser) return;
@@ -37,8 +38,9 @@ export const useSourceController = (
       const newSource: CapitalSource = {
         id: crypto.randomUUID(),
         name: ui.sourceForm.name,
-        type: ui.sourceForm.type as any,
+        type: ui.sourceForm.type,
         balance: initialBalance,
+        profile_id: activeUser.id,
       };
       setSources([...sources, newSource]);
       showToast('Fonte criada (Demo)', 'success');
@@ -53,7 +55,7 @@ export const useSourceController = (
       const ownerId = getOwnerId(activeUser);
       if (!ownerId) throw new Error('OwnerId inválido. Refaça login.');
 
-      const isStaff = !!(activeUser as any).supervisor_id;
+      const isStaff = !!activeUser.supervisor_id;
 
       // STAFF criando: fonte pertence ao DONO, mas pode restringir pelo operador_permitido_id
       const operadorPermitido = isStaff ? activeUser.id : (ui.sourceForm.operador_permitido_id || null);

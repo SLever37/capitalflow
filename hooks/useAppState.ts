@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import { Loan, Client, CapitalSource, UserProfile, SortOption, AppTab } from '../types';
+import { Loan, Client, CapitalSource, UserProfile, SortOption, AppTab, LoanStatusFilter } from '../types';
 import { maskPhone, maskDocument } from '../utils/formatters';
 import { mapLoanFromDB } from '../services/adapters/dbAdapters';
 import { asString, asNumber } from '../utils/safe';
 
-const DEFAULT_NAV: AppTab[] = ['DASHBOARD', 'CLIENTS', 'TEAM'];
-const DEFAULT_HUB: AppTab[] = ['SOURCES', 'LEGAL', 'PROFILE', 'PERSONAL_FINANCE', 'LEADS', 'ACQUISITION'];
+const DEFAULT_NAV: AppTab[] = ['DASHBOARD', 'CLIENTS', 'TEAM'] as AppTab[];
+const DEFAULT_HUB: AppTab[] = ['SOURCES', 'LEGAL', 'PROFILE', 'PERSONAL_FINANCE', 'LEADS', 'ACQUISITION'] as AppTab[];
 
 const CACHE_KEY = (profileId: string) => `cm_cache_${profileId}`;
 const CACHE_MAX_AGE = 24 * 60 * 60 * 1000; // 24 horas
@@ -46,16 +46,18 @@ const writeCache = (profileId: string, snap: Omit<AppCacheSnapshot, 'ts'>) => {
 
 const DEMO_USER: UserProfile = {
   id: 'DEMO',
+  profile_id: 'DEMO',
   name: 'Gestor Demo',
   fullName: 'Usuário de Demonstração',
   email: 'demo@capitalflow.app',
   businessName: 'Capital Demo',
-  accessLevel: 1,
+  accessLevel: 'ADMIN',
   interestBalance: 1500,
   totalAvailableCapital: 50000,
   ui_nav_order: DEFAULT_NAV,
   ui_hub_order: DEFAULT_HUB,
-  brandColor: '#2563eb'
+  brandColor: '#2563eb',
+  targetCapital: 100000,
 };
 
 const mapProfileFromDB = (data: any): UserProfile => {
@@ -71,6 +73,7 @@ const mapProfileFromDB = (data: any): UserProfile => {
 
   return {
     id: data.id,
+    profile_id: data.id, // Assuming profile_id is the same as id for the active user
     name: asString(data.nome_operador),
     fullName: asString(data.nome_completo),
     email: asString(data.usuario_email || data.email),
@@ -83,23 +86,23 @@ const mapProfileFromDB = (data: any): UserProfile => {
     state: asString(data.state),
     zipCode: asString(data.zip_code),
     businessName: asString(data.nome_empresa),
-    accessLevel: asNumber(data.access_level),
+    accessLevel: asString(data.access_level) as 'ADMIN' | 'OPERATOR' | 'VIEWER',
     interestBalance: asNumber(data.interest_balance),
     totalAvailableCapital: asNumber(data.total_available_capital),
     supervisor_id: data.supervisor_id,
     pixKey: asString(data.pix_key),
     photo: data.avatar_url,
-    brandColor: '#2563eb',
-    logoUrl: data.logo_url,
-    password: data.senha_acesso,
-    recoveryPhrase: data.recovery_phrase,
-    defaultInterestRate: asNumber(data.default_interest_rate),
-    defaultFinePercent: asNumber(data.default_fine_percent),
-    defaultDailyInterestPercent: asNumber(data.default_daily_interest_percent),
-    targetCapital: asNumber(data.target_capital),
-    targetProfit: asNumber(data.target_profit),
-    ui_nav_order: data.ui_nav_order || DEFAULT_NAV,
-    ui_hub_order: hubOrder,
+  brandColor: '#2563eb',
+  logoUrl: data.logo_url,
+  password: data.senha_acesso,
+  recoveryPhrase: data.recovery_phrase,
+  defaultInterestRate: asNumber(data.default_interest_rate),
+  defaultFinePercent: asNumber(data.default_fine_percent),
+  defaultDailyInterestPercent: asNumber(data.default_daily_interest_percent),
+  targetCapital: asNumber(data.target_capital),
+  targetProfit: asNumber(data.target_profit),
+    ui_nav_order: (data.ui_nav_order || DEFAULT_NAV) as AppTab[],
+    ui_hub_order: hubOrder as AppTab[],
     createdAt: data.created_at
   };
 };
@@ -118,10 +121,10 @@ export const useAppState = (activeProfileId: string | null, onProfileNotFound?: 
   // Restore missing states
   const [selectedStaffId, setSelectedStaffId] = useState<string>('ALL');
   const [activeTab, setActiveTab] = useState<AppTab>('DASHBOARD');
-  const [statusFilter, setStatusFilter] = useState<'TODOS' | 'ATRASADOS' | 'EM_DIA' | 'PAGOS' | 'ARQUIVADOS' | 'ATRASO_CRITICO'>('TODOS');
+  const [statusFilter, setStatusFilter] = useState<LoanStatusFilter>('TODOS');
   const [sortOption, setSortOption] = useState<SortOption>('DUE_DATE_ASC');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [clientSearchTerm, setClientSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [clientSearchTerm, setClientSearchTerm] = useState<string>('');
   const [profileEditForm, setProfileEditForm] = useState<UserProfile | null>(null);
 
   const fetchFullData = useCallback(async (profileId: string) => {
@@ -200,8 +203,8 @@ export const useAppState = (activeProfileId: string | null, onProfileNotFound?: 
 
       setActiveUser(u);
       setProfileEditForm(u);
-      setNavOrder(u.ui_nav_order || DEFAULT_NAV);
-      setHubOrder(u.ui_hub_order || DEFAULT_HUB);
+      setNavOrder((u.ui_nav_order || DEFAULT_NAV) as AppTab[]);
+      setHubOrder((u.ui_hub_order || DEFAULT_HUB) as AppTab[]);
       setClients(mappedClients);
       setSources(mappedSources);
       setLoans(mappedLoans);

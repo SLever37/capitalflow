@@ -1,5 +1,5 @@
 import { supabase } from '../../lib/supabase';
-import { UserProfile } from '../../types';
+import { UserProfile, AccessLevel } from '../../types';
 
 /* helpers */
 const isUUID = (v: any) =>
@@ -33,7 +33,7 @@ export const useAdminController = (
   };
 
   const handleToggleAdmin = async (user: any) => {
-    if (!activeUser || activeUser.accessLevel !== 1) return;
+    if (!activeUser || activeUser.accessLevel !== 'ADMIN') return;
 
     try {
       const ownerId = assertSameOwner(user);
@@ -43,19 +43,19 @@ export const useAdminController = (
         return;
       }
 
-      const newLevel = user.access_level === 1 ? 2 : 1;
+      const newLevel = user.accessLevel === 'ADMIN' ? 'OPERATOR' : 'ADMIN';
 
       const ok = window.confirm(
-        newLevel === 1
-          ? `Promover ${user.nome_operador} a ADMIN (Nível 1)?`
-          : `Remover acesso ADMIN de ${user.nome_operador} (Nível 2)?`
+        newLevel === 'ADMIN'
+          ? `Promover ${user.name} a ADMIN?`
+          : `Remover acesso ADMIN de ${user.name}?`
       );
       if (!ok) return;
 
       // ✅ update limitado ao owner
       const { error } = await supabase
         .from('perfis')
-        .update({ access_level: newLevel })
+        .update({ accessLevel: newLevel })
         .eq('id', user.id)
         .or(`id.eq.${ownerId},supervisor_id.eq.${ownerId}`);
 
@@ -75,7 +75,7 @@ export const useAdminController = (
   };
 
   const handleMasterUpdateUser = async (updatedData: any) => {
-    if (!activeUser || activeUser.accessLevel !== 1) return;
+    if (!activeUser || activeUser.accessLevel !== 'ADMIN') return;
 
     const targetUser = updatedData || ui.masterEditUser;
     if (!targetUser) return;
@@ -83,16 +83,16 @@ export const useAdminController = (
     try {
       const ownerId = assertSameOwner(targetUser);
 
-      const updates: any = {
-        nome_operador: targetUser.nome_operador,
-        usuario_email: targetUser.usuario_email,
-        nome_empresa: targetUser.nome_empresa,
-        pix_key: targetUser.pix_key,
-        access_level: targetUser.access_level,
+      const updates: Partial<UserProfile> = {
+        name: targetUser.name,
+        email: targetUser.email,
+        businessName: targetUser.businessName,
+        pixKey: targetUser.pixKey,
+        accessLevel: targetUser.accessLevel,
       };
 
-      if (targetUser.newPassword && targetUser.newPassword.trim().length > 0) {
-        updates.senha_acesso = targetUser.newPassword.trim();
+      if (targetUser.password && targetUser.password.trim().length > 0) {
+        updates.password = targetUser.password.trim();
       }
 
       // ✅ update limitado ao owner

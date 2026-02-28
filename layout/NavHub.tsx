@@ -1,12 +1,12 @@
 
 import React from 'react';
 import { LayoutGrid, X, User, Calendar, Calculator, ArrowRightLeft, Shield, Scale, Wallet, Briefcase, Users, LayoutDashboard, PiggyBank, Settings, MessageCircle, Megaphone } from 'lucide-react';
-import { AppTab } from '../types';
+import { AppTab, UserProfile } from "../types";
 
 interface NavHubProps {
     onClose: () => void;
-    onNavigate: (tab: string, modal?: string) => void;
-    userLevel: number;
+    onNavigate: (tab: AppTab, modal?: string) => void;
+    userLevel: UserProfile["accessLevel"];
     hubOrder: AppTab[];
     unreadCampaignCount?: number;
 }

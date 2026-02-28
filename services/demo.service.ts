@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Loan, CapitalSource, Client, Installment, LoanStatus, UserProfile, LedgerEntry } from '../types';
+import { Loan, CapitalSource, Client, Installment, LoanStatus, UserProfile, LedgerEntry, PaymentType } from '../types';
 import { addDaysUTC, parseDateOnlyUTC, toISODateOnlyUTC, getDaysDiff, todayDateOnlyUTC } from '../utils/dateHelpers';
 import { generateUniqueAccessCode, generateUniqueClientNumber } from '../utils/generators';
 
@@ -104,7 +104,7 @@ export const demoService = {
         loan: Loan, 
         inst: Installment, 
         amountToPay: number, 
-        paymentType: 'FULL' | 'RENEW_INTEREST' | 'RENEW_AV',
+        paymentType: PaymentType,
         activeUser: UserProfile,
         loans: Loan[],
         setLoans: SetState<Loan[]>,

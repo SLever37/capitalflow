@@ -127,7 +127,7 @@ export const contractsService = {
     const loanPayload: any = {
       id: loanId,
       owner_id: ownerId,
-      operador_responsavel_id: activeUser.accessLevel === 1 ? null : safeUUID(activeUser.id),
+      operador_responsavel_id: activeUser.accessLevel === 'ADMIN' ? null : safeUUID(activeUser.id),
       client_id: finalClientId,
       source_id: safeUUID(loan.sourceId),
 

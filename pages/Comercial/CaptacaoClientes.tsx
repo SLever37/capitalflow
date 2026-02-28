@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Megaphone, Link as LinkIcon, Copy, CheckCircle2, ArrowRight, Trash2, Calendar, MousePointer2, Image as ImageIcon, Loader2, MessageCircle, Share2, Plus, Search, User, Send, Paperclip, X } from 'lucide-react';
-import { Campaign } from '../../types';
+import { Campaign, Lead } from "../../types";
 import { campaignService } from '../../services/campaign.service';
 import { useCampaignChat } from '../../hooks/useCampaignChat';
 import { supabase } from '../../lib/supabase';
@@ -42,7 +42,7 @@ export const CustomerAcquisitionPage: React.FC = () => {
     sendAttachment
   } = useCampaignChat();
 
-  const [filteredLeads, setFilteredLeads] = useState<any[]>([]);
+    const [filteredLeads, setFilteredLeads] = useState<Lead[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [inputText, setInputText] = useState('');
   
@@ -74,7 +74,7 @@ export const CustomerAcquisitionPage: React.FC = () => {
     }
   }, [messages]);
 
-  const handleSelectLead = (lead: any) => {
+    const handleSelectLead = (lead: Lead) => {
     selectLead(lead);
   };
 
@@ -116,6 +116,7 @@ export const CustomerAcquisitionPage: React.FC = () => {
     const link = `${window.location.origin}/?campaign_id=${id}`;
 
     const newCampaign: Campaign = {
+      profile_id: activeUser.profile_id,
       id,
       name: form.name,
       description: form.description,

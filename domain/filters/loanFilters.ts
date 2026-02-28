@@ -1,5 +1,5 @@
 
-import { Loan, LoanStatus, SortOption } from '../../types';
+import { Loan, LoanStatus, SortOption, LoanStatusFilter } from '../../types';
 import { onlyDigits } from '../../utils/formatters';
 import { getInstallmentStatusLogic } from '../../domain/finance/calculations';
 import { getDaysDiff, parseDateOnlyUTC } from '../../utils/dateHelpers';
@@ -61,7 +61,7 @@ const sortLoans = (loans: Loan[], sortOption: SortOption): Loan[] => {
 export const filterLoans = (
   loans: Loan[],
   searchTerm: string,
-  statusFilter: 'TODOS' | 'ATRASADOS' | 'EM_DIA' | 'PAGOS' | 'ARQUIVADOS' | 'ATRASO_CRITICO',
+  statusFilter: LoanStatusFilter,
   sortOption: SortOption = 'DUE_DATE_ASC'
 ): Loan[] => {
   let result = loans;

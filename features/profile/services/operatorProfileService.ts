@@ -6,7 +6,36 @@ import { onlyDigits, maskDocument, maskPhone } from '../../../utils/formatters';
 import { asString, asNumber } from '../../../utils/safe';
 import * as XLSX from 'xlsx';
 
-type UpdatableProfileFields = Partial<Omit<UserProfile, 'id' | 'createdAt' | 'totalAvailableCapital' | 'interestBalance'>>;
+type UpdatableProfileFields = Partial<Omit<UserProfile, 'id' | 'profile_id'>>;
+
+interface ProfileUpdatePayload {
+  nome_operador?: string;
+  nome_completo?: string;
+  nome_empresa?: string;
+  document?: string;
+  phone?: string;
+  address?: string;
+  address_number?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
+  zip_code?: string;
+  pix_key?: string;
+  avatar_url?: string;
+  brand_color?: string;
+  logo_url?: string;
+  default_interest_rate?: number;
+  default_fine_percent?: number;
+  default_daily_interest_percent?: number;
+  target_capital?: number;
+  target_profit?: number;
+  ui_nav_order?: string[];
+  ui_hub_order?: string[];
+  last_active_at?: string;
+  senha_acesso?: string;
+  recovery_phrase?: string;
+  access_level?: 'ADMIN' | 'OPERATOR' | 'VIEWER';
+}
 
 export const operatorProfileService = {
     /**
@@ -37,18 +66,18 @@ export const operatorProfileService = {
         const curatedData = this.curateProfileData(data);
 
         // Mapeamento explícito para o banco (snake_case)
-        const updatePayload: any = {
+        const updatePayload: ProfileUpdatePayload = {
             nome_operador: curatedData.name, // Nome Curto
             nome_completo: curatedData.fullName, // Nome Completo
             nome_empresa: curatedData.businessName,
             document: curatedData.document,
             phone: curatedData.phone,
             address: curatedData.address,
-            address_number: (curatedData as any).addressNumber,
-            neighborhood: (curatedData as any).neighborhood,
-            city: (curatedData as any).city,
-            state: (curatedData as any).state,
-            zip_code: (curatedData as any).zipCode,
+            address_number: curatedData.addressNumber,
+            neighborhood: curatedData.neighborhood,
+            city: curatedData.city,
+            state: curatedData.state,
+            zip_code: curatedData.zipCode,
             pix_key: curatedData.pixKey,
             avatar_url: curatedData.photo,
             brand_color: '#2563eb', // Força a cor padrão
@@ -154,13 +183,14 @@ export const operatorProfileService = {
             zipCode: onlyDigits(asString(raw.zipCode)).substring(0, 8),
             password: raw.password,
             recoveryPhrase: raw.recoveryPhrase
-        } as any;
+        };
     },
 
     mapToUserProfile(dbProfile: any): UserProfile {
         if (!dbProfile) throw new Error("Dados de perfil nulos no mapeamento.");
         return {
             id: asString(dbProfile.id),
+            profile_id: asString(dbProfile.id),
             name: asString(dbProfile.nome_operador, 'Operador'),
             fullName: asString(dbProfile.nome_completo),
             email: asString(dbProfile.usuario_email),
@@ -177,7 +207,7 @@ export const operatorProfileService = {
             photo: dbProfile.avatar_url,
             password: dbProfile.senha_acesso,
             recoveryPhrase: dbProfile.recovery_phrase,
-            accessLevel: asNumber(dbProfile.access_level),
+            accessLevel: asString(dbProfile.access_level) as 'ADMIN' | 'OPERATOR' | 'VIEWER',
             totalAvailableCapital: asNumber(dbProfile.total_available_capital),
             interestBalance: asNumber(dbProfile.interest_balance),
             createdAt: asString(dbProfile.created_at),

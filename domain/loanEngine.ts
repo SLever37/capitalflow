@@ -1,4 +1,4 @@
-// src/domain/loanEngine.ts
+// domain/loanEngine.ts
 
 import { Loan, LoanStatus } from "../types";
 import { getInstallmentStatusLogic } from "./finance/calculations";
@@ -14,7 +14,12 @@ export interface LoanBalance {
 }
 
 export const loanEngine = {
+
+  /* =====================================================
+     SALDO TOTAL DO CONTRATO
+  ===================================================== */
   computeRemainingBalance: (loan: Loan): LoanBalance => {
+
     const installments = loan.installments || [];
     const today = new Date();
 
@@ -70,13 +75,18 @@ export const loanEngine = {
     };
   },
 
+  /* =====================================================
+     STATUS COMPUTADO DO CONTRATO
+  ===================================================== */
   computeLoanStatus: (
     loan: Loan
   ): "ACTIVE" | "OVERDUE" | "PAID" | "LEGAL" => {
+
     const balance = loanEngine.computeRemainingBalance(loan);
 
     if (balance.isPaid) return "PAID";
 
+    // Se existir acordo ativo → entra como LEGAL
     if (
       loan.activeAgreement &&
       loan.activeAgreement.status === "ACTIVE"
@@ -93,7 +103,12 @@ export const loanEngine = {
     return "ACTIVE";
   },
 
+  /* =====================================================
+     REGRA DE AMORTIZAÇÃO
+     (ordem: multa → juros → principal)
+  ===================================================== */
   calculateAmortization: (amount: number, loan: Loan) => {
+
     let remaining = amount;
 
     const result = {
@@ -132,7 +147,11 @@ export const loanEngine = {
     return result;
   },
 
+  /* =====================================================
+     ELEGIBILIDADE PARA COBRANÇA JURÍDICA
+  ===================================================== */
   isLegallyActionable: (loan: Loan): boolean => {
+
     const status = loanEngine.computeLoanStatus(loan);
     const balance = loanEngine.computeRemainingBalance(loan);
 
@@ -144,4 +163,5 @@ export const loanEngine = {
 
     return isEligibleStatus && hasDebt;
   },
+
 };

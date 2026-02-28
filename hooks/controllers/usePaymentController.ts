@@ -1,8 +1,8 @@
 // controllers/usePaymentController.ts
-import { useRef } from 'react';
+import React, { useRef } from 'react';
 import { paymentsService } from '../../services/payments.service';
 import { demoService } from '../../services/demo.service';
-import { UserProfile, Loan, CapitalSource } from '../../types';
+import { UserProfile, Loan, CapitalSource, UIController, Installment, PaymentType } from '../../types';
 
 const isUUID = (v: any) =>
   typeof v === 'string' &&
@@ -12,11 +12,11 @@ const safeUUID = (v: any) => (isUUID(v) ? v : null);
 
 export const usePaymentController = (
   activeUser: UserProfile | null,
-  ui: any,
+  ui: UIController,
   sources: CapitalSource[],
   loans: Loan[],
-  setLoans: any,
-  setActiveUser: any,
+  setLoans: React.Dispatch<React.SetStateAction<Loan[]>>,
+  setActiveUser: React.Dispatch<React.SetStateAction<UserProfile | null>>,
   fetchFullData: (id: string) => Promise<void>,
   showToast: (msg: string, type?: 'success' | 'error') => void
 ) => {
@@ -36,7 +36,7 @@ export const usePaymentController = (
     if (!activeUser || !ui.paymentModal) return;
 
     const ownerId =
-      safeUUID((activeUser as any).supervisor_id) ||
+      safeUUID(activeUser.supervisor_id) ||
       safeUUID(activeUser.id);
 
     if (!ownerId) {
@@ -79,13 +79,17 @@ export const usePaymentController = (
         loan: ui.paymentModal.loan,
         inst: ui.paymentModal.inst,
         amountToPay: customAmount || ui.paymentModal.calculations.total,
-        paymentType: type,
+        paymentType: type as PaymentType,
         activeUser,
         loans,
         setLoans,
         setActiveUser,
         showToast,
         forgivePenalty: forgivenessMode === 'BOTH',
+        // Ensure demoService.handlePayment expects the correct types for activeUser
+        // and other parameters, or cast them explicitly if necessary after verifying demoService's signature.
+        // For now, assuming it can handle the UserProfile type directly.
+
       });
       ui.closeModal();
       ui.setAvAmount('');
@@ -105,9 +109,9 @@ export const usePaymentController = (
         loan: ui.paymentModal.loan,
         inst: ui.paymentModal.inst,
         calculations: ui.paymentModal.calculations,
-        paymentType: type,
+        paymentType: type as PaymentType,
         avAmount: avAmountOverride || ui.avAmount,
-        activeUser: { ...activeUser, id: ownerId },
+        activeUser: { ...activeUser, id: ownerId } as UserProfile,
         sources,
         forgivenessMode,
         manualDate,    // Data do próximo vencimento
@@ -132,6 +136,9 @@ export const usePaymentController = (
           inst: ui.paymentModal.inst,
           amountPaid: amountToPay,
           type: typeReturned,
+          // Assuming setShowReceipt expects a specific structure for the receipt object
+          // If not, a dedicated Receipt type should be defined in types.ts
+
         });
         ui.openModal('RECEIPT');
       }

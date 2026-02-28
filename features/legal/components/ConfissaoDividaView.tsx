@@ -13,7 +13,7 @@ interface ConfissaoDividaViewProps {
     loans: Loan[];
     activeUser: UserProfile | null;
     onBack: () => void;
-    showToast: (msg: string, type?: any) => void;
+    showToast: (msg: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
 }
 
 export const ConfissaoDividaView: React.FC<ConfissaoDividaViewProps> = ({ loans, activeUser, onBack, showToast }) => {
@@ -95,6 +95,7 @@ export const ConfissaoDividaView: React.FC<ConfissaoDividaViewProps> = ({ loans,
         try {
             const params: LegalDocumentParams = {
                 loanId: selectedLoan.id,
+                clientName: selectedLoan.debtorName,
                 creditorName: creditorName.toUpperCase(),
                 creditorDoc: creditorDoc,
                 creditorAddress: creditorFullAddress,

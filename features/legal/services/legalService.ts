@@ -10,6 +10,7 @@ export const legalService = {
 
     return {
       loanId: loan.id,
+      clientName: loan.debtorName,
       debtorName: loan.debtorName,
       debtorDoc: loan.debtorDocument,
       debtorPhone: loan.debtorPhone,
@@ -47,13 +48,14 @@ export const legalService = {
 
     return {
       id: row.id,
+      loanId: params.loanId,
       agreementId: row.acordo_id ?? entityId,
       type: 'CONFISSAO',
       snapshot: params,
       hashSHA256: row.hash_sha256,
       status: row.status_assinatura === 'ASSINADO' ? 'SIGNED' : 'PENDING',
       public_access_token: row.view_token,
-      createdAt: row.created_at
+      created_at: row.created_at
     };
   },
 

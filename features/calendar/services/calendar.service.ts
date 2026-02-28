@@ -1,5 +1,5 @@
 import { supabase } from '../../../lib/supabase';
-import { CalendarEvent } from '../types';
+import { CalendarEvent, EventStatus } from '../types';
 
 export const calendarService = {
 
@@ -51,7 +51,7 @@ export const calendarService = {
               !isToday &&
               (due.getTime() - today.getTime() <= 7 * 24 * 60 * 60 * 1000);
 
-            let status: 'OVERDUE' | 'DUE_TODAY' | 'DUE_SOON' | 'UPCOMING' = 'UPCOMING';
+            let status: EventStatus = 'UPCOMING';
 
             if (isLate) status = 'OVERDUE';
             else if (isToday) status = 'DUE_TODAY';
