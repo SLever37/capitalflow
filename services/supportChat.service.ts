@@ -1,4 +1,4 @@
-
+// services/supportChat.service.ts
 import { supabase } from '../lib/supabase';
 import { isDev } from '../utils/isDev';
 
@@ -8,21 +8,16 @@ export interface SupportMessage {
   id: string;
   profile_id: string;
   loan_id: string;
-
   sender: 'CLIENT' | 'OPERATOR'; // legado
   sender_type: 'CLIENT' | 'OPERATOR';
   sender_user_id: string | null;
-
   text: string | null;     // legado
   content: string | null;  // novo
-
   type: SupportMessageType;
-  file_url: string | null; // AGORA: path do storage (ex: loans/<loanId>/...)
+  file_url: string | null; // path do storage (ex: loans/<loanId>/...)
   metadata: any;
-
   read: boolean;
   created_at: string;
-
   operator_id?: string | null;
   read_at?: string | null;
   read_by?: string | null;
@@ -60,34 +55,29 @@ function isHttpUrl(v?: string | null) {
   return /^https?:\/\//i.test(v);
 }
 
-async function getAuthUid(): Promise<string | null> {
-  const { data, error } = await supabase.auth.getUser();
+async function getAuthUid(supabaseClient: any = supabase): Promise<string | null> {
+  const { data, error } = await supabaseClient.auth.getUser();
   if (error) return null;
   return data?.user?.id || null;
 }
 
+// (mantido) helpers caso você use depois
 async function uploadToStorage(params: { loanId: string; file: File }) {
   const { loanId, file } = params;
-
   const now = new Date();
   const yyyy = now.getFullYear();
   const mm = String(now.getMonth() + 1).padStart(2, '0');
   const dd = String(now.getDate()).padStart(2, '0');
-
   const safeName = (file.name || 'upload').replace(/[^\w.\-]+/g, '_');
   const ext = safeName.includes('.') ? safeName.split('.').pop() : extFromMime(file.type);
   const fileName = `${crypto.randomUUID()}.${ext}`;
-
   const path = `loans/${loanId}/${yyyy}-${mm}-${dd}/${fileName}`;
-
   const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, file, {
     cacheControl: '3600',
     upsert: false,
     contentType: file.type || 'application/octet-stream',
   });
-
   if (upErr) throw new Error(`Storage upload falhou: ${upErr.message}`);
-
   return { path };
 }
 
@@ -113,21 +103,27 @@ export const supportChatService = {
       // Gera signed URLs para anexos (quando file_url é PATH e não http)
       const out: SupportMessage[] = [];
       for (const m of msgs) {
-        const hasFile = (m.type === 'audio' || m.type === 'image' || m.type === 'file') && m.file_url;
+        const hasFile =
+          (m.type === 'audio' || m.type === 'image' || m.type === 'file') && m.file_url;
+
         if (hasFile && m.file_url && !isHttpUrl(m.file_url)) {
           try {
-            const { data: signedData, error: signedError } = await supabaseClient.storage.from(BUCKET).createSignedUrl(m.file_url, SIGNED_URL_TTL);
+            const { data: signedData, error: signedError } = await supabaseClient.storage
+              .from(BUCKET)
+              .createSignedUrl(m.file_url, SIGNED_URL_TTL);
+
             if (signedError) throw new Error(`SignedUrl falhou: ${signedError.message}`);
-            const signed = signedData.signedUrl;
-            
+
             out.push({
               ...m,
-              // aqui troco o file_url por signed URL para tocar/abrir direto
-              file_url: signed,
-              metadata: { ...(m.metadata || {}), storage_path: m.file_url, signed_expires_in: SIGNED_URL_TTL },
+              file_url: signedData.signedUrl, // troca por signed URL
+              metadata: {
+                ...(m.metadata || {}),
+                storage_path: m.file_url,
+                signed_expires_in: SIGNED_URL_TTL,
+              },
             });
           } catch {
-            // se falhar, mantém path (e o UI pode mostrar "indisponível")
             out.push(m);
           }
         } else {
@@ -137,7 +133,11 @@ export const supportChatService = {
 
       return out;
     } catch (err: any) {
-      if (err.message === 'TypeError: Failed to fetch' || err.name === 'TypeError' || err.message?.includes('Failed to fetch')) {
+      if (
+        err.message === 'TypeError: Failed to fetch' ||
+        err.name === 'TypeError' ||
+        err.message?.includes('Failed to fetch')
+      ) {
         console.warn('[supportChatService] Failed to fetch messages (Network Error):', err);
         return [];
       }
@@ -146,13 +146,29 @@ export const supportChatService = {
   },
 
   async sendMessage(params: SendMessageParams) {
-    const { profileId, loanId, sender, operatorId, text, type = 'text', file, metadata, supabaseClient = supabase } = params;
+    const {
+      profileId,
+      loanId,
+      sender,
+      operatorId,
+      text,
+      type = 'text',
+      file,
+      metadata,
+      supabaseClient = supabase,
+    } = params;
 
-    let uid = null;
+    // ✅ TRAVA: nunca mais permitir salvar profile_id/loan_id nulos
+    if (!loanId) throw new Error('Chat sem loanId.');
+    if (!profileId) throw new Error('CLIENT sem profileId (client_id). Corrija o context do chat.');
+
+    let uid: string | null = null;
+
     if (sender === 'OPERATOR') {
-      uid = await getAuthUid();
+      uid = await getAuthUid(supabaseClient);
       if (!uid) throw new Error('Sem sessão do Supabase Auth. Faça login novamente.');
     } else {
+      // CLIENT no portal: usa o próprio profileId como sender_user_id (seu modelo atual)
       uid = profileId;
     }
 
@@ -167,8 +183,8 @@ export const supportChatService = {
 
       const safeName = (file.name || 'upload').replace(/[^\w.\-]+/g, '_');
       const ext = safeName.includes('.') ? safeName.split('.').pop() : extFromMime(file.type);
-      const fileName = `${crypto.randomUUID()}.${ext}`;
 
+      const fileName = `${crypto.randomUUID()}.${ext}`;
       const path = `loans/${loanId}/${yyyy}-${mm}-${dd}/${fileName}`;
 
       const { error: upErr } = await supabaseClient.storage.from(BUCKET).upload(path, file, {
@@ -192,8 +208,8 @@ export const supportChatService = {
     }
 
     const payload: any = {
-      profile_id: profileId || null,
-      loan_id: loanId || null,
+      profile_id: profileId, // ✅ nunca null
+      loan_id: loanId,       // ✅ nunca null
 
       // legado + novo
       sender,
@@ -204,7 +220,7 @@ export const supportChatService = {
       content: text ?? null,
 
       type,
-      file_url: filePath, // SALVA O PATH (privado)
+      file_url: filePath, // salva PATH (privado)
       metadata: finalMeta,
 
       operator_id: operatorId || null,
@@ -218,10 +234,14 @@ export const supportChatService = {
     return true;
   },
 
-  async markAsRead(loanId: string, viewer: 'CLIENT' | 'OPERATOR', supabaseClient: any = supabase) {
-    let uid = null;
+  async markAsRead(
+    loanId: string,
+    viewer: 'CLIENT' | 'OPERATOR',
+    supabaseClient: any = supabase
+  ) {
+    let uid: string | null = null;
     if (viewer === 'OPERATOR') {
-      uid = await getAuthUid();
+      uid = await getAuthUid(supabaseClient);
     }
 
     const { error } = await supabaseClient
@@ -247,7 +267,7 @@ export const supportChatService = {
   async deleteChatHistory(loanId: string, supabaseClient: any = supabase) {
     const { error } = await supabaseClient.from('mensagens_suporte').delete().eq('loan_id', loanId);
     if (error) throw error;
-    // Opcional: Apagar ticket também se quiser resetar status
+
     await supabaseClient.from('support_tickets').delete().eq('loan_id', loanId);
   },
 
@@ -258,83 +278,77 @@ export const supportChatService = {
 
   async deleteMultipleChats(loanIds: string[]) {
     if (loanIds.length === 0) return;
+
     const { error } = await supabase.from('mensagens_suporte').delete().in('loan_id', loanIds);
     if (error) throw error;
-    // Opcional: Apagar tickets
+
     await supabase.from('support_tickets').delete().in('loan_id', loanIds);
   },
 
   async getActiveChats(operatorId: string) {
     if (isDev) {
-       console.log('[BUILD-MARK] supportChatService.getActiveChats v6 (Optimized)');
+      console.log('[BUILD-MARK] supportChatService.getActiveChats v6 (Optimized)');
     }
-    
+
     try {
-        // 1. Busca mensagens recentes (apenas colunas essenciais, limite reduzido)
-        const { data: messages, error } = await supabase
-          .from('mensagens_suporte')
-          .select('id, loan_id, content, text, created_at, read, sender_type')
-          .order('created_at', { ascending: false })
-          .limit(100); // Reduzido para 100 para evitar timeout
+      const { data: messages, error } = await supabase
+        .from('mensagens_suporte')
+        .select('id, loan_id, content, text, created_at, read, sender_type')
+        .order('created_at', { ascending: false })
+        .limit(100);
 
-        if (error) throw error;
+      if (error) throw error;
+      if (!messages || messages.length === 0) return [];
 
-        if (!messages || messages.length === 0) return [];
+      const loanIds = Array.from(new Set(messages.map((m: any) => m.loan_id).filter(Boolean)));
+      if (loanIds.length === 0) return [];
 
-        // 2. Extrai IDs únicos de contratos
-        const loanIds = Array.from(new Set(messages.map((m: any) => m.loan_id).filter(Boolean)));
-        
-        if (loanIds.length === 0) return [];
+      const contractsMap = new Map<string, { name: string; clientId: string }>();
 
-        // 3. Busca nomes dos devedores em lote
-        const contractsMap = new Map<string, { name: string; clientId: string }>();
-        
-        // Divide em chunks se houver muitos IDs (embora com limit 100 msg, loanIds será <= 100)
-        const { data: loans, error: loansError } = await supabase
-            .from('contratos')
-            .select('id, debtor_name, client_id')
-            .in('id', loanIds);
-        
-        if (!loansError && loans) {
-            loans.forEach((l: any) => contractsMap.set(l.id, { name: l.debtor_name || 'Cliente', clientId: l.client_id }));
+      const { data: loans, error: loansError } = await supabase
+        .from('contratos')
+        .select('id, debtor_name, client_id')
+        .in('id', loanIds);
+
+      if (!loansError && loans) {
+        loans.forEach((l: any) =>
+          contractsMap.set(l.id, { name: l.debtor_name || 'Cliente', clientId: l.client_id })
+        );
+      }
+
+      const chatsMap = new Map<string, any>();
+
+      for (const m of messages) {
+        const anyMsg = m as any;
+        const loanId = anyMsg.loan_id;
+
+        const contractInfo = contractsMap.get(loanId);
+        if (!contractInfo) continue;
+
+        if (!chatsMap.has(loanId)) {
+          chatsMap.set(loanId, {
+            loanId,
+            clientId: contractInfo.clientId,
+            clientName: contractInfo.name,
+            timestamp: anyMsg.created_at,
+            lastMessage: anyMsg.content || anyMsg.text || 'Mídia enviada',
+            unreadCount: 0,
+            type: 'ACTIVE',
+          });
         }
 
-        const chatsMap = new Map();
-
-        for (const m of messages) {
-            const anyMsg = m as any;
-            const loanId = anyMsg.loan_id;
-            
-            const contractInfo = contractsMap.get(loanId);
-            if (!contractInfo) continue;
-
-            if (!chatsMap.has(loanId)) {
-                chatsMap.set(loanId, {
-                    loanId: loanId,
-                    clientId: contractInfo.clientId,
-                    clientName: contractInfo.name,
-                    timestamp: anyMsg.created_at,
-                    lastMessage: anyMsg.content || anyMsg.text || 'Mídia enviada',
-                    unreadCount: 0,
-                    type: 'ACTIVE'
-                });
-            }
-
-            if (anyMsg.sender_type === 'CLIENT' && !anyMsg.read) {
-                chatsMap.get(loanId).unreadCount += 1;
-            }
+        if (anyMsg.sender_type === 'CLIENT' && !anyMsg.read) {
+          chatsMap.get(loanId).unreadCount += 1;
         }
+      }
 
-        return Array.from(chatsMap.values());
+      return Array.from(chatsMap.values());
     } catch (err: any) {
-        console.warn('[supportChatService] getActiveChats error:', err);
-        return [];
+      console.warn('[supportChatService] getActiveChats error:', err);
+      return [];
     }
   },
 
-  /**
-   * Busca todos os contratos ativos para listar como "Contatos"
-   */
   async getAvailableContracts(ownerId: string) {
     const { data, error } = await supabase
       .from('contratos')
@@ -342,7 +356,7 @@ export const supportChatService = {
       .eq('owner_id', ownerId)
       .neq('is_archived', true)
       .order('debtor_name', { ascending: true })
-      .limit(300); // Limite de segurança
+      .limit(300);
 
     if (error) return [];
 
@@ -353,29 +367,26 @@ export const supportChatService = {
       debtorDocument: c.debtor_document,
       type: 'CLIENT',
       unreadCount: 0,
-      lastMessage: 'Iniciar conversa'
+      lastMessage: 'Iniciar conversa',
     }));
   },
 
-  /**
-   * Busca membros da equipe para chat interno
-   */
   async getTeamMembers(ownerId: string) {
-     const { data, error } = await supabase
-       .from('perfis')
-       .select('id, nome_operador, nome_completo, email, access_level')
-       .or(`id.eq.${ownerId},supervisor_id.eq.${ownerId}`)
-       .order('nome_operador', { ascending: true });
+    const { data, error } = await supabase
+      .from('perfis')
+      .select('id, nome_operador, nome_completo, email, access_level')
+      .or(`id.eq.${ownerId},supervisor_id.eq.${ownerId}`)
+      .order('nome_operador', { ascending: true });
 
-     if (error) return [];
+    if (error) return [];
 
-     return (data || []).map((u: any) => ({
-       profileId: u.id,
-       clientName: u.nome_operador || u.nome_completo || 'Membro',
-       role: u.access_level === 1 ? 'Admin' : 'Operador',
-       type: 'TEAM',
-       unreadCount: 0,
-       lastMessage: 'Chat de equipe'
-     }));
-  }
+    return (data || []).map((u: any) => ({
+      profileId: u.id,
+      clientName: u.nome_operador || u.nome_completo || 'Membro',
+      role: u.access_level === 1 ? 'Admin' : 'Operador',
+      type: 'TEAM',
+      unreadCount: 0,
+      lastMessage: 'Chat de equipe',
+    }));
+  },
 };

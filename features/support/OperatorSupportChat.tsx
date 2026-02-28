@@ -204,7 +204,7 @@ export const OperatorSupportChat = ({ activeUser, onClose }: { activeUser: any; 
             ) : (
               <UnifiedChat
                 adapter={supportAdapter}
-                context={{ loanId: selectedChat.loanId, profileId: activeUser.id, clientName: selectedChat.clientName }}
+                context={{ loanId: selectedChat.loanId, profileId: selectedChat.clientId, clientName: selectedChat.clientName, operatorId: activeUser.id }}
                 role="OPERATOR"
                 userId={activeUser.id}
                 onClose={() => setSelectedChat(null)}

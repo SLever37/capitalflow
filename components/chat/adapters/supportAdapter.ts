@@ -1,6 +1,11 @@
-
 import { SupabaseClient } from '@supabase/supabase-js';
-import { ChatAdapter, ChatMessage, ChatRole, ChatHeaderInfo, ChatFeatures, MessageType } from '../chatAdapter';
+import {
+  ChatAdapter,
+  ChatMessage,
+  ChatRole,
+  ChatHeaderInfo,
+  ChatFeatures
+} from '../chatAdapter';
 import { supabase as defaultSupabase } from '../../../lib/supabase';
 import { supportChatService } from '../../../services/supportChat.service';
 
@@ -8,6 +13,7 @@ export interface SupportContext {
   loanId: string;
   profileId: string;
   clientName: string;
+  operatorId?: string;
 }
 
 const isUuid = (v?: string | null) =>
@@ -16,7 +22,11 @@ const isUuid = (v?: string | null) =>
     String(v).trim()
   );
 
-export const createSupportAdapter = (role: ChatRole, supabaseClient: SupabaseClient = defaultSupabase): ChatAdapter<SupportContext> => ({
+export const createSupportAdapter = (
+  role: ChatRole,
+  supabaseClient: SupabaseClient = defaultSupabase
+): ChatAdapter<SupportContext> => ({
+
   getFeatures(): ChatFeatures {
     return {
       hasTicket: true,
@@ -29,7 +39,8 @@ export const createSupportAdapter = (role: ChatRole, supabaseClient: SupabaseCli
 
   async getHeader(context: SupportContext): Promise<ChatHeaderInfo> {
     const { loanId } = context;
-    if (!isUuid(loanId)) return { title: context.clientName, subtitle: 'Contrato inválido' };
+    if (!isUuid(loanId))
+      return { title: context.clientName, subtitle: 'Contrato inválido' };
 
     try {
       const { data: ticket } = await supabaseClient
@@ -49,8 +60,8 @@ export const createSupportAdapter = (role: ChatRole, supabaseClient: SupabaseCli
         .limit(1)
         .maybeSingle();
 
-      const isOnline = presence?.last_seen_at 
-        ? (Date.now() - new Date(presence.last_seen_at).getTime() < 60000)
+      const isOnline = presence?.last_seen_at
+        ? Date.now() - new Date(presence.last_seen_at).getTime() < 60000
         : false;
 
       return {
@@ -59,82 +70,87 @@ export const createSupportAdapter = (role: ChatRole, supabaseClient: SupabaseCli
         status: (ticket?.status as any) || 'OPEN',
         isOnline
       };
+
     } catch (err: any) {
-      if (err.message === 'TypeError: Failed to fetch' || err.name === 'TypeError' || err.message?.includes('Failed to fetch')) {
-        console.warn('[supportAdapter] Failed to fetch header (Network Error):', err);
-        return {
-          title: context.clientName,
-          subtitle: `Contrato: ${loanId.slice(0, 8)}`,
-          status: 'OPEN',
-          isOnline: false
-        };
-      }
-      throw err;
+      console.warn('[supportAdapter] header error:', err?.message);
+      return {
+        title: context.clientName,
+        subtitle: `Contrato: ${loanId.slice(0, 8)}`,
+        status: 'OPEN',
+        isOnline: false
+      };
     }
   },
 
   async listMessages(context: SupportContext): Promise<ChatMessage[]> {
     if (!isUuid(context.loanId)) return [];
+
     const msgs = await supportChatService.getMessages(context.loanId, supabaseClient);
-    return msgs.map(m => ({
+
+    return msgs.map((m: any) => ({
       ...m,
-      content: m.content || (m as any).text
+      content: m.content || m.text
     })) as any;
   },
 
   subscribeMessages(context: SupportContext, handlers) {
-    const { loanId } = context;
+    const { loanId, profileId } = context;
     if (!isUuid(loanId)) return () => {};
 
     const channel = supabaseClient
-      .channel(`support-unified-${loanId}`)
+      .channel(`support-${loanId}`)
+
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'mensagens_suporte', filter: `loan_id=eq.${loanId}` },
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'mensagens_suporte',
+          filter: `loan_id=eq.${loanId}`
+        },
         (payload) => {
           const newMsg = payload.new as any;
-          handlers.onNewMessage({
+
+          // ✅ evita notificar a si mesmo
+          if (newMsg.profile_id === profileId) return;
+
+          handlers.onNewMessage?.({
             ...newMsg,
             content: newMsg.content || newMsg.text
           } as any);
         }
       )
-      .on(
-        'postgres_changes',
-        { event: 'DELETE', schema: 'public', table: 'mensagens_suporte', filter: `loan_id=eq.${loanId}` },
-        (payload) => {
-          if (payload.old?.id) handlers.onDeleteMessage?.(payload.old.id);
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'support_tickets', filter: `loan_id=eq.${loanId}` },
-        (payload) => {
-          if ((payload.new as any)?.status) handlers.onStatusChange?.((payload.new as any).status);
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'support_presence', filter: `loan_id=eq.${loanId}` },
-        (payload) => {
-          if (payload.new && (payload.new as any).role !== role) {
-            const lastSeen = (payload.new as any).last_seen_at;
-            const online = lastSeen ? (Date.now() - new Date(lastSeen).getTime() < 60000) : false;
-            handlers.onPresenceChange?.(online);
-          }
-        }
-      )
+
       .subscribe();
 
-    // Heartbeat
+    // 🔵 heartbeat presença
     const interval = setInterval(async () => {
-        if (!isUuid(context.profileId) || !isUuid(loanId)) return;
-        await supabaseClient.from('support_presence').upsert({
-            profile_id: context.profileId,
+      try {
+        if (!isUuid(profileId) || !isUuid(loanId)) return;
+
+        const presenceProfileId =
+          role === 'OPERATOR'
+            ? (context.operatorId && isUuid(context.operatorId)
+                ? context.operatorId
+                : profileId)
+            : profileId;
+
+        const { error } = await supabaseClient
+          .from('support_presence')
+          .upsert({
+            profile_id: presenceProfileId,
             loan_id: loanId,
             role,
             last_seen_at: new Date().toISOString(),
-        });
+          });
+
+        if (error) {
+          console.warn('[presence] upsert error:', error.message);
+        }
+
+      } catch (e: any) {
+        console.warn('[presence] heartbeat crash:', e?.message);
+      }
     }, 20000);
 
     return () => {
@@ -145,14 +161,27 @@ export const createSupportAdapter = (role: ChatRole, supabaseClient: SupabaseCli
 
   async sendMessage(context: SupportContext, payload): Promise<void> {
     const { loanId, profileId } = context;
-    if (!isUuid(loanId) || !isUuid(profileId)) throw new Error('Dados inválidos');
+
+    if (!isUuid(loanId) || !isUuid(profileId))
+      throw new Error('Dados inválidos');
+
+    const operatorId =
+      role === 'OPERATOR'
+        ? (context.operatorId && isUuid(context.operatorId)
+            ? context.operatorId
+            : profileId)
+        : undefined;
+
+    const text = String(payload?.content || '').trim();
+    if (!text && !payload?.file)
+      throw new Error('Mensagem vazia');
 
     await supportChatService.sendMessage({
       profileId,
       loanId,
       sender: role as any,
-      operatorId: role === 'OPERATOR' ? payload.userId : undefined,
-      text: payload.content,
+      operatorId,
+      text,
       type: payload.type as any,
       file: payload.file,
       metadata: payload.metadata,
@@ -170,6 +199,7 @@ export const createSupportAdapter = (role: ChatRole, supabaseClient: SupabaseCli
 
   async closeTicket(context): Promise<void> {
     const { loanId, profileId } = context;
+
     await supabaseClient
       .from('support_tickets')
       .update({
@@ -184,10 +214,14 @@ export const createSupportAdapter = (role: ChatRole, supabaseClient: SupabaseCli
 
   async reopenTicket(context): Promise<void> {
     const { loanId, profileId } = context;
-    await supabaseClient.from('support_tickets').insert({
-      loan_id: loanId,
-      status: 'OPEN',
-      profile_id: profileId,
-    });
+
+    await supabaseClient
+      .from('support_tickets')
+      .insert({
+        loan_id: loanId,
+        status: 'OPEN',
+        profile_id: profileId,
+      });
   }
+
 });

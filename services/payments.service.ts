@@ -42,6 +42,7 @@ export const paymentsService = {
       paymentType,
       avAmount,
       activeUser,
+      sources,
       forgivenessMode = 'NONE',
       customAmount,
       realDate,
@@ -132,6 +133,9 @@ export const paymentsService = {
     const paymentDate = realDate || todayDateOnlyUTC();
 
     // Chamada RPC que lida com a separação de Capital vs Lucro
+    const caixaLivre = sources.find(s => s.name.toLowerCase().includes('caixa livre') || s.name.toLowerCase() === 'lucro');
+    const caixaLivreId = caixaLivre ? caixaLivre.id : '28646e86-cec9-4d47-b600-3b771a066a05';
+
     const { error } = await supabase.rpc('process_payment_v3_selective', {
       p_idempotency_key: idempotencyKey,
       p_loan_id: loan.id,
@@ -144,7 +148,7 @@ export const paymentsService = {
       p_payment_date: paymentDate.toISOString(),
       p_capitalize_remaining: capitalizeRemaining, // Se sobra juros, capitaliza ou aguarda
       p_source_id: loan.sourceId, // Para devolver o capital à carteira
-      p_caixa_livre_id: 'CAIXA_LIVRE_ID' // ID fixo ou dinâmico do Caixa Livre para o lucro
+      p_caixa_livre_id: caixaLivreId // ID fixo ou dinâmico do Caixa Livre para o lucro
     });
 
     if (error) throw new Error('Falha na persistência: ' + error.message);
