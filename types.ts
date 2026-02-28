@@ -1,4 +1,3 @@
-
 export enum LoanStatus {
   PENDING = 'PENDING',
   PAID = 'PAID',
@@ -6,13 +5,39 @@ export enum LoanStatus {
   PARTIAL = 'PARTIAL'
 }
 
-export type PaymentMethod = 'PIX' | 'CASH' | 'BANK_TRANSFER' | 'OTHER';
-export type SortOption = 'DUE_DATE_ASC' | 'NAME_ASC' | 'CREATED_DESC' | 'UPDATED_DESC';
-export type LoanBillingModality = 'MONTHLY' | 'DAILY_FREE' | 'DAILY_FIXED_TERM' | 'DAILY' | 'DAILY_30_INTEREST' | 'DAILY_30_CAPITAL' | 'DAILY_FIXED';
+export type PaymentMethod =
+  | 'PIX'
+  | 'CASH'
+  | 'BANK_TRANSFER'
+  | 'OTHER';
 
-export type AppTab = 'DASHBOARD' | 'CLIENTS' | 'TEAM' | 'SOURCES' | 'PROFILE' | 'LEGAL' | 'PERSONAL_FINANCE' | 'SETTINGS' | 'LEADS' | 'ACQUISITION';
+export type SortOption =
+  | 'DUE_DATE_ASC'
+  | 'NAME_ASC'
+  | 'CREATED_DESC'
+  | 'UPDATED_DESC';
 
-// Added missing Client interface to fix "no exported member" errors
+export type LoanBillingModality =
+  | 'MONTHLY'
+  | 'DAILY_FREE'
+  | 'DAILY_FIXED_TERM'
+  | 'DAILY'
+  | 'DAILY_30_INTEREST'
+  | 'DAILY_30_CAPITAL'
+  | 'DAILY_FIXED';
+
+export type AppTab =
+  | 'DASHBOARD'
+  | 'CLIENTS'
+  | 'TEAM'
+  | 'SOURCES'
+  | 'PROFILE'
+  | 'LEGAL'
+  | 'PERSONAL_FINANCE'
+  | 'SETTINGS'
+  | 'LEADS'
+  | 'ACQUISITION';
+
 export interface Lead {
   id: string;
   created_at: string;
@@ -41,15 +66,6 @@ export interface Campaign {
   leads: number;
 }
 
-export interface CampaignLead {
-  id: string;
-  campaignId: string;
-  name: string;
-  whatsapp: string;
-  selectedValue: number;
-  createdAt: string;
-}
-
 export interface Client {
   id: string;
   profile_id: string;
@@ -75,24 +91,11 @@ export interface CapitalSource {
   operador_permitido_id?: string;
 }
 
-export interface LoanDocument {
-  id: string;
-  url: string;
-  name: string;
-  type: 'IMAGE' | 'PDF';
-  visibleToClient: boolean;
-  uploadedAt: string;
-}
-
 export interface LoanPolicy {
   interestRate: number;
   finePercent: number;
   dailyInterestPercent: number;
 }
-
-// Added missing Agreement types and interfaces to fix "no exported member" errors
-export type AgreementStatus = 'ACTIVE' | 'PAID' | 'BROKEN';
-export type AgreementType = 'PARCELADO_COM_JUROS' | 'PARCELADO_SEM_JUROS';
 
 export interface AgreementInstallment {
   id: string;
@@ -105,10 +108,11 @@ export interface AgreementInstallment {
   paidDate?: string;
 }
 
+export type AgreementStatus = 'ACTIVE' | 'PAID' | 'BROKEN';
+
 export interface Agreement {
   id: string;
   loanId: string;
-  type: AgreementType;
   totalDebtAtNegotiation: number;
   negotiatedTotal: number;
   interestRate: number;
@@ -120,92 +124,13 @@ export interface Agreement {
   installments: AgreementInstallment[];
 }
 
-/**
- * Added LegalWitness to fix exported member errors
- */
-export interface LegalWitness {
-    id?: string;
-    profile_id?: string;
-    name: string;
-    document: string;
-}
-
-/**
- * Added LegalDocumentParams to fix exported member errors
- */
-export interface LegalDocumentParams {
-    loanId: string;
-    creditorName: string;
-    creditorDoc: string;
-    creditorAddress: string;
-    debtorName: string;
-    debtorDoc: string;
-    debtorPhone: string;
-    debtorAddress: string;
-    amount: number;
-    totalDebt: number;
-    originDescription: string;
-    city: string;
-    state: string;
-    witnesses: LegalWitness[];
-    contractDate: string;
-    agreementDate: string;
-    installments: { number: number; dueDate: string; amount: number }[];
-    timestamp: string;
-}
-
-/**
- * Added LegalDocumentRecord to fix exported member errors
- */
-export interface LegalDocumentRecord {
-    id: string;
-    agreementId: string;
-    type: string;
-    snapshot: LegalDocumentParams;
-    hashSHA256: string;
-    status: 'SIGNED' | 'PENDING';
-    public_access_token: string;
-    createdAt: string;
-}
-
-export interface UserProfile {
+export interface LoanDocument {
   id: string;
+  url: string;
   name: string;
-  fullName?: string;
-  email: string;
-  businessName?: string;
-  document?: string;
-  phone?: string;
-  address?: string;
-  addressNumber?: string;
-  neighborhood?: string;
-  city?: string;
-  state?: string;
-  zipCode?: string;
-  pixKey?: string;
-  photo?: string;
-  interestBalance: number;
-  accessLevel: number;
-  brandColor?: string;
-  logoUrl?: string;
-  targetCapital?: number;
-  targetProfit?: number;
-  password?: string;
-  recoveryPhrase?: string;
-  supervisor_id?: string;
-  owner_profile_id?: string | null;
-  defaultInterestRate?: number;
-  defaultFinePercent?: number;
-  defaultDailyInterestPercent?: number;
-  // Added missing totalAvailableCapital to fix operatorProfileService.ts error
-  totalAvailableCapital?: number;
-  /**
-   * Added createdAt to fix mapping error in operatorProfileService.ts
-   */
-  createdAt?: string;
-  // Configurações de UI
-  ui_nav_order?: AppTab[];
-  ui_hub_order?: AppTab[];
+  type: 'IMAGE' | 'PDF';
+  visibleToClient: boolean;
+  uploadedAt: string;
 }
 
 export interface Loan {
@@ -214,43 +139,57 @@ export interface Loan {
   profile_id: string;
   owner_id?: string;
   operador_responsavel_id?: string;
+
   debtorName: string;
   debtorPhone: string;
   debtorDocument: string;
-  // Added missing debtorAddress, pixKey, guaranteeDescription to fix useLoanForm.ts and dbAdapters.ts errors
   debtorAddress?: string;
+
   pixKey?: string;
   guaranteeDescription?: string;
+
   sourceId: string;
   preferredPaymentMethod: PaymentMethod;
+
   principal: number;
   interestRate: number;
   finePercent: number;
   dailyInterestPercent: number;
+
   billingCycle: LoanBillingModality;
   startDate: string;
+
   installments: Installment[];
   totalToReceive: number;
   ledger: LedgerEntry[];
+
   notes: string;
+
+  // 🔥 ADICIONADO — ESSENCIAL PARA COMPILAR
+  status: LoanStatus;
+
   isArchived?: boolean;
   skipWeekends?: boolean;
   clientAvatarUrl?: string;
-  // Updated activeAgreement type from any to Agreement to fix typing errors
+
   activeAgreement?: Agreement;
   paymentSignals?: any[];
   customDocuments?: LoanDocument[];
+
   createdAt?: string;
-  // Added missing fields for Loan consistency across the app
+  updatedAt?: string;
+
   attachments?: string[];
   documentPhotos?: string[];
   policiesSnapshot?: LoanPolicy | null;
+
   amortizationType?: 'JUROS' | 'PRICE' | 'SAC';
+
   fundingTotalPayable?: number;
   fundingCost?: number;
   fundingProvider?: string;
   fundingFeePercent?: number;
-  updatedAt?: string;
+
   portalToken?: string;
   portalShortcode?: string;
 }
@@ -259,19 +198,24 @@ export interface Installment {
   id: string;
   dueDate: string;
   amount: number;
+
   principalRemaining: number;
   interestRemaining: number;
   lateFeeAccrued: number;
+
   paidTotal: number;
   status: LoanStatus;
+
   scheduledPrincipal: number;
   scheduledInterest: number;
+
   paidPrincipal: number;
   paidInterest: number;
   paidLateFee: number;
+
   renewalCount?: number;
   paidDate?: string;
-  // Added missing avApplied, paidAmount, number, and logs to fix multiple calculation errors
+
   avApplied?: number;
   paidAmount?: number;
   number?: number;
@@ -283,13 +227,15 @@ export interface LedgerEntry {
   date: string;
   type: string;
   amount: number;
+
   principalDelta: number;
   interestDelta: number;
   lateFeeDelta: number;
+
   sourceId?: string;
   installmentId?: string;
-  // Added missing agreementId for consistency in ledger records
   agreementId?: string;
+
   notes?: string;
   category?: string;
 }

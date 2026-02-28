@@ -1,3 +1,4 @@
+// services/adapters/dbAdapters.ts
 import { Loan, LoanStatus, Agreement, AgreementStatus } from '../../types';
 import { maskPhone } from '../../utils/formatters';
 import { asArray, asNumber, asString, safeDateString } from '../../utils/safe';
@@ -6,27 +7,21 @@ import { asArray, asNumber, asString, safeDateString } from '../../utils/safe';
    ADAPTER JURÍDICO (BANCO -> FRONTEND)
 ===================================================== */
 export const agreementAdapter = (raw: any): Agreement => {
-  if (!raw) throw new Error("Dados do acordo inválidos");
+  if (!raw) throw new Error('Dados do acordo inválidos');
 
   const dbStatus = asString(raw.status, '', 'status').trim().toUpperCase();
 
   let normalizedStatus: AgreementStatus = 'ACTIVE';
-
-  if (['PAGO', 'PAID', 'QUITADO', 'QUITADA'].includes(dbStatus))
-    normalizedStatus = 'PAID';
-  else if (['BROKEN', 'QUEBRADO', 'CANCELADO', 'INATIVO'].includes(dbStatus))
-    normalizedStatus = 'BROKEN';
-  else if (['ATIVO', 'ACTIVE'].includes(dbStatus))
-    normalizedStatus = 'ACTIVE';
+  if (['PAGO', 'PAID', 'QUITADO', 'QUITADA'].includes(dbStatus)) normalizedStatus = 'PAID';
+  else if (['BROKEN', 'QUEBRADO', 'CANCELADO', 'INATIVO'].includes(dbStatus)) normalizedStatus = 'BROKEN';
+  else if (['ATIVO', 'ACTIVE'].includes(dbStatus)) normalizedStatus = 'ACTIVE';
 
   const installments = asArray(raw.acordo_parcelas)
     .map((p: any) => {
       const rawInstStatus = asString(p.status, 'PENDING').trim().toUpperCase();
 
       const normalizedInstallmentStatus =
-        ['PAGO', 'PAID', 'QUITADO', 'QUITADA'].includes(rawInstStatus)
-          ? 'PAID'
-          : rawInstStatus;
+        ['PAGO', 'PAID', 'QUITADO', 'QUITADA'].includes(rawInstStatus) ? 'PAID' : rawInstStatus;
 
       return {
         id: asString(p.id, `tmp-${Math.random()}`),
@@ -59,28 +54,32 @@ export const agreementAdapter = (raw: any): Agreement => {
 
 /* =====================================================
    ADAPTER CONTRATO (BANCO -> FRONTEND)
+   EXPORTA mapLoanFromDB (usado no app)
 ===================================================== */
 export const mapLoanFromDB = (l: any, clientsData: any[] = []): Loan => {
-
   const rawParcelas = asArray(l.parcelas);
   const rawTransacoes = asArray(l.transacoes);
   const rawSinais = asArray(l.payment_intents);
 
   /* =============================
-     NORMALIZAÇÃO DEFINITIVA STATUS
+     NORMALIZAÇÃO DEFINITIVA STATUS (PARCELAS)
   ============================== */
   const installments = rawParcelas.map((p: any) => {
-
     const rawStatus = asString(p.status, 'PENDING').trim().toUpperCase();
 
-    const normalizedInstallmentStatus: LoanStatus =
-      ['PAGO', 'PAID', 'QUITADO', 'QUITADA'].includes(rawStatus)
-        ? 'PAID'
-      : ['PARCIAL', 'PARTIAL'].includes(rawStatus)
-        ? 'PARTIAL'
-      : ['PENDENTE', 'PENDING', 'OPEN', 'ABERTA'].includes(rawStatus)
-        ? 'PENDING'
-      : (rawStatus as LoanStatus);
+    let normalizedInstallmentStatus: LoanStatus;
+
+    if (['PAGO', 'PAID', 'QUITADO', 'QUITADA'].includes(rawStatus)) {
+      normalizedInstallmentStatus = LoanStatus.PAID;
+    } else if (['PARCIAL', 'PARTIAL'].includes(rawStatus)) {
+      normalizedInstallmentStatus = LoanStatus.PARTIAL;
+    } else if (['PENDENTE', 'PENDING', 'OPEN', 'ABERTA'].includes(rawStatus)) {
+      normalizedInstallmentStatus = LoanStatus.PENDING;
+    } else if (rawStatus === 'LATE' || rawStatus === 'ATRASADO') {
+      normalizedInstallmentStatus = LoanStatus.LATE;
+    } else {
+      normalizedInstallmentStatus = LoanStatus.PENDING;
+    }
 
     return {
       id: asString(p.id),
@@ -127,25 +126,19 @@ export const mapLoanFromDB = (l: any, clientsData: any[] = []): Loan => {
     reviewNote: asString(s.review_note)
   }));
 
-  let activeAgreement = undefined;
+  let activeAgreement: Agreement | undefined = undefined;
   const agreementsArr = asArray(l.acordos_inadimplencia);
-
   if (agreementsArr.length > 0) {
-    const rawAgreement = agreementsArr.sort(
-      (a: any, b: any) =>
-        new Date(b.created_at).getTime() -
-        new Date(a.created_at).getTime()
-    )[0];
-
+    const rawAgreement = agreementsArr
+      .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
     try {
       if (rawAgreement) activeAgreement = agreementAdapter(rawAgreement);
     } catch (e) {
-      console.warn("Falha ao mapear acordo", l.id, e);
+      console.warn('Falha ao mapear acordo', l.id, e);
     }
   }
 
   let phone = l.debtor_phone || l.phone || l.telefone || l.celular;
-
   if ((!phone || String(phone).trim() === '') && l.client_id && asArray(clientsData).length > 0) {
     const linkedClient = clientsData.find((c: any) => c.id === l.client_id);
     if (linkedClient) {
@@ -158,6 +151,7 @@ export const mapLoanFromDB = (l: any, clientsData: any[] = []): Loan => {
     clientId: asString(l.client_id),
     profile_id: asString(l.profile_id),
     owner_id: asString(l.owner_id),
+    operador_responsavel_id: asString(l.operador_responsavel_id),
 
     debtorName: asString(l.debtor_name, 'Cliente Desconhecido'),
     debtorPhone: maskPhone(asString(phone, '00000000000')),
@@ -184,8 +178,9 @@ export const mapLoanFromDB = (l: any, clientsData: any[] = []): Loan => {
 
     startDate: safeDateString(l.start_date),
     createdAt: safeDateString(l.created_at),
-    totalToReceive: asNumber(l.total_to_receive),
+    updatedAt: safeDateString(l.updated_at),
 
+    totalToReceive: asNumber(l.total_to_receive),
     notes: asString(l.notes),
     guaranteeDescription: asString(l.guarantee_description),
     policiesSnapshot: l.policies_snapshot || null,
@@ -193,11 +188,15 @@ export const mapLoanFromDB = (l: any, clientsData: any[] = []): Loan => {
     installments,
     ledger,
     paymentSignals: signals,
-
     customDocuments: asArray(l.policies_snapshot?.customDocuments),
     isArchived: !!l.is_archived,
+
     attachments: [],
     documentPhotos: [],
-    activeAgreement
+
+    activeAgreement,
+
+    // Se seu types.ts tiver "status" em Loan, pode descomentar:
+    // status: asString(l.status)
   };
 };
