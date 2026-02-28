@@ -17,6 +17,12 @@ export type PaymentMethod =
   | 'BANK_TRANSFER'
   | 'OTHER';
 
+export type CapitalSource = 'PROPRIO' | 'TERCEIROS' | 'MISTO';
+
+export type SortOption = 'RECENT' | 'NAME' | 'VALUE' | 'STATUS';
+
+export type AppTab = 'DASHBOARD' | 'CLIENTS' | 'LEGAL' | 'SOURCES' | 'PROFILE';
+
 export type LoanBillingModality =
   | 'MONTHLY'
   | 'DAILY_FREE'
@@ -42,6 +48,17 @@ export interface UserProfile {
   name: string;
   email: string;
   role?: string;
+  fullName?: string;
+  businessName?: string;
+  document?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  pixKey?: string;
+  defaultInterestRate?: number;
+  defaultFinePercent?: number;
+  defaultDailyInterestPercent?: number;
+  interestBalance?: number;
 }
 
 /* =====================================================
@@ -222,12 +239,28 @@ export interface LegalDocumentParams {
   loanId: string;
   clientName: string;
   amount: number;
+  creditorName?: string;
+  creditorDoc?: string;
+  creditorAddress?: string;
+  debtorName?: string;
+  debtorDoc?: string;
+  debtorPhone?: string;
+  debtorAddress?: string;
+  totalDebt?: number;
+  originDescription?: string;
+  installments?: number;
+  city?: string;
+  witnesses?: LegalWitness[];
+  contractDate?: string;
 }
 
 export interface LegalDocumentRecord {
   id: string;
   loanId: string;
   created_at: string;
+  public_access_token?: string;
+  hashSHA256?: string;
+  agreementId?: string;
 }
 
 /* =====================================================

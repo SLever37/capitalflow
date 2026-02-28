@@ -153,6 +153,25 @@ export const personalFinanceService = {
     if (error) throw error;
   },
 
+  async transferToLoanWallet(payload: {
+    profileId: string;
+    loanId: string;
+    amount: number;
+    description: string;
+    transferGroupId?: string;
+  }) {
+    const { profileId, loanId, amount, description, transferGroupId } = payload;
+
+    const { error: opErr } = await supabase.rpc("pf_transfer_to_operation", {
+      p_profile_id: profileId,
+      p_loan_id: loanId,
+      p_amount: amount,
+      p_description: description,
+      p_transfer_group_id: transferGroupId || crypto.randomUUID()
+    });
+    if (opErr) throw opErr;
+  },
+
   async deleteTransaction(id: string) {
     const { error } = await supabase
       .from('pf_transacoes')
