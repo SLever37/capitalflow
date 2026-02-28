@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Megaphone, Link as LinkIcon, Copy, CheckCircle2, ArrowRight, Trash2, Calendar, MousePointer2, Image as ImageIcon, Loader2, MessageCircle, Share2, Plus, Search, User, Send, Paperclip, X } from 'lucide-react';
-import { Campaign, Lead } from "../../types";
+import { Campaign, Lead, UserProfile } from "../../types";
 import { campaignService } from '../../services/campaign.service';
 import { useCampaignChat } from '../../hooks/useCampaignChat';
 import { supabase } from '../../lib/supabase';
@@ -10,7 +10,7 @@ import { GoogleGenAI } from "@google/genai";
 const DEFAULT_VALUES = [300, 500, 800, 1000, 1500];
 const DEFAULT_TEMPLATE = "Olá! Me chamo {NOME}. Vim pela campanha {CAMPANHA}. Tenho interesse no valor de R$ {VALOR}. Link: {LINK}";
 
-export const CustomerAcquisitionPage: React.FC = () => {
+export const CustomerAcquisitionPage: React.FC<{ activeUser: UserProfile | null }> = ({ activeUser }) => {
   const [activeMode, setActiveMode] = useState<'CHAT' | 'CAMPAIGNS'>('CHAT');
   
   // --- STATE PARA CAMPANHAS ---
@@ -107,8 +107,8 @@ export const CustomerAcquisitionPage: React.FC = () => {
   };
 
   const handleSave = () => {
-    if (!form.name || !form.source) {
-      alert('Preencha nome e origem.');
+    if (!form.name || !form.source || !activeUser) {
+      alert('Preencha nome, origem e certifique-se de estar logado.');
       return;
     }
 

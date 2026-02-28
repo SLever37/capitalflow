@@ -117,7 +117,7 @@ export const usePaymentController = (
         manualDate,    // Data do próximo vencimento
         customAmount,
         realDate,      // Data real do pagamento (EXTRATO)
-        interestHandling // Regra de sobra de juros
+        capitalizeRemaining: interestHandling === 'CAPITALIZE' // Regra de sobra de juros
       });
 
       let msg = '';

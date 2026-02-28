@@ -253,7 +253,7 @@ export const App: React.FC = () => {
             )}
 
             {activeTab === 'ACQUISITION' && (
-              <CustomerAcquisitionPage />
+              <CustomerAcquisitionPage activeUser={activeUser} />
             )}
 
             {activeTab === 'SETTINGS' && (
