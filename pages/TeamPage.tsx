@@ -209,7 +209,13 @@ export const TeamPage = ({ activeUser, showToast, ui }: any) => {
           <TeamEditorModal isOpen={true} onClose={ui.closeModal} onSave={handleSaveTeam} onDelete={editingTeam ? handleDeleteTeam : undefined} initialName={editingTeam?.name} isEditing={!!editingTeam} />
       )}
       {ui.activeModal?.type === 'MEMBER_EDITOR' && (
-          <MemberEditorModal isOpen={true} onClose={ui.closeModal} member={editingMember} teams={teams} onSave={handleSaveMember} />
+          <MemberEditorModal 
+            isOpen={true} 
+            onClose={ui.closeModal} 
+            member={{...editingMember, team_members: members}} 
+            teams={teams} 
+            onSave={handleSaveMember} 
+          />
       )}
     </div>
   );

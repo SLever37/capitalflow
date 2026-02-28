@@ -21,10 +21,12 @@ interface AppShellProps {
   toggleStealthMode: () => void;
   onOpenSupport?: () => void;
   navOrder: string[]; 
+  onGoBack?: () => void;
+  isInHub?: boolean;
 }
 
 export const AppShell: React.FC<AppShellProps> = ({ 
-  children, toast, activeTab, setActiveTab, activeUser, isLoadingData, onOpenNav, onNewLoan, isStealthMode, toggleStealthMode, onOpenSupport, navOrder
+  children, toast, activeTab, setActiveTab, activeUser, isLoadingData, onOpenNav, onNewLoan, isStealthMode, toggleStealthMode, onOpenSupport, navOrder, onGoBack, isInHub
 }) => {
   const [unreadSupport, setUnreadSupport] = useState(0);
   const { unreadCampaignCount } = useCampaignNotifications(activeUser);
@@ -53,9 +55,7 @@ export const AppShell: React.FC<AppShellProps> = ({
             table: 'mensagens_suporte', 
             filter: `profile_id=eq.${activeUser.id}` 
         }, (payload) => {
-            // Se a mensagem não foi enviada por mim (evitar eco)
             if (payload.new.sender_user_id !== activeUser.id) {
-                // Notificação Nativa de Extrema Importância (Chat)
                 notificationService.notify(
                     "Nova Mensagem de Suporte",
                     payload.new.content || payload.new.text || "Cliente enviou uma mídia.",
@@ -126,6 +126,7 @@ export const AppShell: React.FC<AppShellProps> = ({
         navOrder={navOrder}
         primaryColor={activeUser?.brandColor}
         isStaff={!!activeUser?.supervisor_id}
+        onGoBack={isInHub ? onGoBack : undefined}
       />
     </div>
   );

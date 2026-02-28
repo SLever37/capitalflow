@@ -73,8 +73,15 @@ export const useClientPortalLogic = (initialToken: string) => {
         })
       );
 
-      // Filtra nulos e ordena por status (atrasados primeiro)
-      const validContracts = hydratedContracts.filter(Boolean) as Loan[];
+      // CORREÇÃO: Filtra nulos E contratos encerrados
+      const validContracts = hydratedContracts.filter((contract) => {
+        if (!contract) return false;
+        // Não mostrar contratos com status ENCERRADO ou PAID
+        if (contract.status === 'ENCERRADO' || contract.status === 'PAID') return false;
+        // Não mostrar contratos sem parcelas pendentes (já quitados)
+        const summary = resolveDebtSummary(contract, contract.installments);
+        return summary.pendingCount > 0;
+      }) as Loan[];
       
       // Ordenação Inteligente:
       // 1. Atrasados

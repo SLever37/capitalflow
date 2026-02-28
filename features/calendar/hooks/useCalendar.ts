@@ -1,10 +1,10 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { calendarService } from '../services/calendar.service';
-import { googleCalendarService } from '../services/googleCalendar.service';
 import { CalendarEvent, CalendarViewMode, GoogleIntegration } from '../types';
 import { UserProfile } from '../../../types';
 import { playNotificationSound } from '../../../utils/notificationSound';
+import { notificationService } from '../../../services/notification.service';
 import { supabase } from '../../../lib/supabase';
 
 export const useCalendar = (activeUser: UserProfile | null, showToast: (msg: string, type?: any) => void) => {
@@ -13,9 +13,8 @@ export const useCalendar = (activeUser: UserProfile | null, showToast: (msg: str
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isLoading, setIsLoading] = useState(false);
   const [googleStatus, setGoogleStatus] = useState<GoogleIntegration | null>(null);
-  
-  // Filtros rápidos
   const [urgentCount, setUrgentCount] = useState(0);
+  const notifiedOverdueRef = useRef<Set<string>>(new Set());
 
   // Load Data
   const refreshEvents = useCallback(async (silent = false) => {
@@ -29,17 +28,13 @@ export const useCalendar = (activeUser: UserProfile | null, showToast: (msg: str
       
       const all = [...sysEvents, ...userEvents];
       setEvents(all);
-      setUrgentCount(all.filter(e => e.priority === 'URGENT').length);
-      
-      // Load Google Status (Only once or if needed)
-      // const gStatus = await googleCalendarService.getIntegrationStatus(activeUser.id);
-      // setGoogleStatus(gStatus);
+      setUrgentCount(all.filter(e => e.priority === 'HIGH' || e.priority === 'URGENT').length);
 
     } catch (e) {
       console.error(e);
-      if(!silent) showToast("Erro ao carregar agenda", "error");
+      if (!silent) showToast("Erro ao carregar agenda", "error");
     } finally {
-      if(!silent) setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   }, [activeUser]);
 
@@ -47,25 +42,39 @@ export const useCalendar = (activeUser: UserProfile | null, showToast: (msg: str
     refreshEvents();
   }, [refreshEvents]);
 
-  // --- REALTIME LISTENER ---
+  // --- REALTIME LISTENER (INSERT + UPDATE) ---
   useEffect(() => {
     if (!activeUser) return;
 
     const channel = supabase
-      .channel('calendar-realtime')
+      .channel('calendar-realtime-v3')
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'sinalizacoes_pagamento', filter: `profile_id=eq.${activeUser.id}` },
+        { event: 'INSERT', schema: 'public', table: 'payment_intents', filter: `profile_id=eq.${activeUser.id}` },
         (payload) => {
-          console.log("Realtime: Nova Sinalização", payload);
           playNotificationSound();
-          showToast(`🔔 Nova ação do portal!`, 'info');
-          refreshEvents(true); // Silent refresh
+          showToast('Nova ação do portal!', 'info');
+          refreshEvents(true);
         }
       )
       .on(
         'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'payment_intents', filter: `profile_id=eq.${activeUser.id}` },
+        () => refreshEvents(true)
+      )
+      .on(
+        'postgres_changes',
         { event: '*', schema: 'public', table: 'calendar_events', filter: `profile_id=eq.${activeUser.id}` },
+        () => refreshEvents(true)
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'parcelas' },
+        () => refreshEvents(true)
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'contratos', filter: `profile_id=eq.${activeUser.id}` },
         () => refreshEvents(true)
       )
       .subscribe();
@@ -78,25 +87,25 @@ export const useCalendar = (activeUser: UserProfile | null, showToast: (msg: str
     if (!activeUser) return;
     try {
       await calendarService.createEvent(evt, activeUser.id);
-      showToast("Tarefa criada!", "success");
+      showToast("Lembrete criado!", "success");
       refreshEvents(true);
     } catch (e) { showToast("Erro ao criar", "error"); }
   };
 
   const updateEvent = async (id: string, evt: Partial<CalendarEvent>) => {
     try {
-        await calendarService.updateEvent(id, evt);
-        showToast("Atualizado!", "success");
-        refreshEvents(true);
-    } catch(e) { showToast("Erro ao atualizar", "error"); }
+      await calendarService.updateEvent(id, evt);
+      showToast("Atualizado!", "success");
+      refreshEvents(true);
+    } catch (e) { showToast("Erro ao atualizar", "error"); }
   };
 
   const deleteEvent = async (id: string) => {
-      try {
-          await calendarService.deleteEvent(id);
-          showToast("Removido.", "success");
-          refreshEvents(true);
-      } catch(e) { showToast("Erro ao remover", "error"); }
+    try {
+      await calendarService.deleteEvent(id);
+      showToast("Removido.", "success");
+      refreshEvents(true);
+    } catch (e) { showToast("Erro ao remover", "error"); }
   };
 
   return {

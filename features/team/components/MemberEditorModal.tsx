@@ -8,7 +8,7 @@ interface MemberEditorModalProps {
     onClose: () => void;
     member: any;
     teams: any[];
-    onSave: (memberId: string, updates: { role?: string, team_id?: string }) => Promise<void>;
+    onSave: (memberId: string, updates: { role?: string, team_id?: string, supervisor_id?: string | null }) => Promise<void>;
 }
 
 export const MemberEditorModal: React.FC<MemberEditorModalProps> = ({ 
@@ -16,6 +16,7 @@ export const MemberEditorModal: React.FC<MemberEditorModalProps> = ({
 }) => {
     const [role, setRole] = useState(member?.role || 'MEMBER');
     const [teamId, setTeamId] = useState(member?.team_id || '');
+    const [supervisorId, setSupervisorId] = useState(member?.linked_profile?.supervisor_id || '');
     const [isLoading, setIsLoading] = useState(false);
 
     if (!isOpen || !member) return null;
@@ -23,7 +24,11 @@ export const MemberEditorModal: React.FC<MemberEditorModalProps> = ({
     const handleSave = async () => {
         setIsLoading(true);
         try {
-            await onSave(member.id, { role, team_id: teamId });
+            await onSave(member.id, { 
+                role, 
+                team_id: teamId,
+                supervisor_id: supervisorId || null 
+            });
             onClose();
         } finally {
             setIsLoading(false);
@@ -71,6 +76,23 @@ export const MemberEditorModal: React.FC<MemberEditorModalProps> = ({
                             >
                                 {teams.map(t => (
                                     <option key={t.id} value={t.id}>{t.name}</option>
+                                ))}
+                            </select>
+                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none group-hover:text-blue-500 transition-colors" size={16}/>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="text-[10px] font-black uppercase text-slate-500 ml-1 mb-1 block flex items-center gap-1"><User size={12}/> Definir Supervisor</label>
+                        <div className="relative group">
+                            <select 
+                                value={supervisorId || ''} 
+                                onChange={e => setSupervisorId(e.target.value)}
+                                className="w-full appearance-none bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 pr-10 text-white font-bold text-xs outline-none focus:border-blue-500 cursor-pointer"
+                            >
+                                <option value="">Sem Supervisor (Direto)</option>
+                                {member.team_members?.filter((m: any) => m.profile_id && m.profile_id !== member.profile_id).map((m: any) => (
+                                    <option key={m.profile_id} value={m.profile_id}>{m.full_name}</option>
                                 ))}
                             </select>
                             <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none group-hover:text-blue-500 transition-colors" size={16}/>

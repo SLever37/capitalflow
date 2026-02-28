@@ -1,20 +1,20 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Wallet, CreditCard, TrendingUp, TrendingDown, LayoutGrid, ArrowRightLeft, ShoppingBag, Settings2, Calendar, Banknote, Coins } from 'lucide-react';
+import { Plus, Wallet, CreditCard, TrendingUp, TrendingDown, LayoutGrid, ArrowRightLeft, ShoppingBag, Settings2, Calendar, Banknote, Coins, ChevronLeft, ArrowUpRight, ArrowDownLeft, CheckCircle2, Clock, CreditCard as CardIcon, Layers } from 'lucide-react';
 import { UserProfile } from '../types';
 import { personalFinanceService } from '../features/personal-finance/services/personalFinanceService';
 import { PFTransaction, PFAccount, PFCard, PFCategory } from '../features/personal-finance/types';
-import { PersonalFinanceAI } from '../features/personal-finance/components/PersonalFinanceAI';
-import { ManageAssetsModal } from '../features/personal-finance/components/ManageAssetsModal';
 import { formatMoney } from '../utils/formatters';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { Modal } from '../components/ui/Modal';
 
 interface Props {
     activeUser: UserProfile;
+    setActiveTab?: (tab: string) => void;
+    loans?: any[];
+    goBack?: () => void;
 }
 
-export const PersonalFinancesPage: React.FC<Props> = ({ activeUser }) => {
+export const PersonalFinancesPage: React.FC<Props> = ({ activeUser, setActiveTab, loans = [], goBack }) => {
     const [transactions, setTransactions] = useState<PFTransaction[]>([]);
     const [accounts, setAccounts] = useState<PFAccount[]>([]);
     const [cards, setCards] = useState<PFCard[]>([]);
@@ -26,7 +26,6 @@ export const PersonalFinancesPage: React.FC<Props> = ({ activeUser }) => {
 
     const [isTxModalOpen, setIsTxModalOpen] = useState(false);
     const [isManageModalOpen, setIsManageModalOpen] = useState(false);
-    const [suggestion, setSuggestion] = useState<string | null>(null);
     
     const [newTx, setNewTx] = useState({ 
         descricao: '', 
@@ -36,35 +35,12 @@ export const PersonalFinancesPage: React.FC<Props> = ({ activeUser }) => {
         cartao_id: '', 
         categoria_id: '', 
         data: new Date().toISOString().split('T')[0],
-        fixo: false 
+        data_pagamento: new Date().toISOString().split('T')[0],
+        status: 'CONSOLIDADO' as any,
+        installments: 1,
+        is_operation_transfer: false,
+        operation_source_id: ''
     });
-
-    // Lógica de Sugestão Inteligente (Matching Names)
-    useEffect(() => {
-        if (newTx.tipo === 'DESPESA' && newTx.descricao) {
-            const matchCard = cards.find(c => newTx.descricao.toLowerCase().includes(c.nome.toLowerCase()));
-            if (matchCard) {
-                setSuggestion(`Detectamos "${matchCard.nome}". Registrar como pagamento de fatura?`);
-            } else {
-                setSuggestion(null);
-            }
-        } else {
-            setSuggestion(null);
-        }
-    }, [newTx.descricao, newTx.tipo, cards]);
-
-    const applySuggestion = () => {
-        const matchCard = cards.find(c => newTx.descricao.toLowerCase().includes(c.nome.toLowerCase()));
-        if (matchCard) {
-            setNewTx(prev => ({
-                ...prev,
-                tipo: 'TRANSFERENCIA',
-                cartao_id: matchCard.id,
-                // Mantém a conta origem se já estiver selecionada, ou deixa vazio
-            }));
-            setSuggestion(null);
-        }
-    };
 
     const loadData = async () => {
         setLoading(true);
@@ -90,16 +66,11 @@ export const PersonalFinancesPage: React.FC<Props> = ({ activeUser }) => {
 
     const handleSaveTx = async () => {
         if (!newTx.descricao || !newTx.valor || !newTx.data) return;
-        if (newTx.tipo !== 'TRANSFERENCIA' && !newTx.conta_id && !newTx.cartao_id) {
-            alert("Selecione uma conta ou cartão para registrar o fluxo.");
-            return;
-        }
-
+        
         try {
             await personalFinanceService.addTransaction({
                 ...newTx,
-                valor: parseFloat(newTx.valor.replace(',', '.')),
-                status: 'CONSOLIDADO'
+                valor: parseFloat(newTx.valor.replace(',', '.'))
             }, activeUser.id);
             setIsTxModalOpen(false);
             setNewTx({ 
@@ -110,7 +81,11 @@ export const PersonalFinancesPage: React.FC<Props> = ({ activeUser }) => {
                 cartao_id: '', 
                 categoria_id: '', 
                 data: new Date().toISOString().split('T')[0],
-                fixo: false 
+                data_pagamento: new Date().toISOString().split('T')[0],
+                status: 'CONSOLIDADO',
+                installments: 1,
+                is_operation_transfer: false,
+                operation_source_id: ''
             });
             loadData();
         } catch (e) {
@@ -122,143 +97,170 @@ export const PersonalFinancesPage: React.FC<Props> = ({ activeUser }) => {
         const income = transactions.filter(t => t.tipo === 'RECEITA').reduce((acc, t) => acc + t.valor, 0);
         const expense = transactions.filter(t => t.tipo === 'DESPESA').reduce((acc, t) => acc + t.valor, 0);
         const balance = income - expense;
-        
-        const catMap: any = {};
-        transactions.filter(t => t.tipo === 'DESPESA').forEach(t => {
-            const cat = t.category_name || 'Outros';
-            catMap[cat] = (catMap[cat] || 0) + t.valor;
-        });
-        const pieData = Object.keys(catMap).map(k => ({ name: k, value: catMap[k] }));
-
-        return { income, expense, balance, pieData };
+        return { income, expense, balance };
     }, [transactions]);
 
-    const COLORS = ['#ec4899', '#8b5cf6', '#6366f1', '#3b82f6', '#10b981', '#f59e0b'];
-
     return (
-        <div className="space-y-8 animate-in fade-in pb-20">
+        <div className="space-y-8 animate-in fade-in pb-24 font-sans">
+            {/* Header - Padrão Hub Central */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <h2 className="text-2xl font-black uppercase tracking-tighter text-white flex items-center gap-2">
-                        <Wallet className="text-pink-500" size={28}/> Minhas Finanças
-                    </h2>
-                    <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">Gestão Pessoal Integrada</p>
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => goBack ? goBack() : setActiveTab?.('DASHBOARD')}
+                        className="p-2 -ml-2 text-slate-400 hover:text-white transition-colors"
+                    >
+                        <ChevronLeft size={24} />
+                    </button>
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-600 to-rose-600 flex items-center justify-center text-white shrink-0 shadow-lg shadow-pink-900/20">
+                        <Wallet size={20} />
+                    </div>
+                    <div>
+                        <h1 className="text-sm font-black text-white uppercase tracking-wider leading-none">
+                            Minhas Finanças
+                        </h1>
+                        <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-widest">
+                            Gestão Pessoal Integrada
+                        </p>
+                    </div>
                 </div>
+                
                 <div className="flex items-center gap-2 bg-slate-900 p-1 rounded-xl border border-slate-800">
-                    <button onClick={() => setMonth(m => m === 0 ? 11 : m - 1)} className="p-2 hover:bg-slate-800 rounded-lg text-slate-400"><ArrowRightLeft className="rotate-180" size={16}/></button>
-                    <span className="text-xs font-black text-white w-40 text-center uppercase">
+                    <button onClick={() => setMonth(m => m === 0 ? 11 : m - 1)} className="p-2 hover:bg-slate-800 rounded-lg text-slate-400">
+                        <ChevronLeft size={16}/>
+                    </button>
+                    <span className="text-[10px] font-black text-white w-32 text-center uppercase tracking-widest">
                         {new Date(year, month).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
                     </span>
-                    <button onClick={() => setMonth(m => m === 11 ? 0 : m + 1)} className="p-2 hover:bg-slate-800 rounded-lg text-slate-400"><ArrowRightLeft size={16}/></button>
+                    <button onClick={() => setMonth(m => m === 11 ? 0 : m + 1)} className="p-2 hover:bg-slate-800 rounded-lg text-slate-400">
+                        <ChevronLeft size={16} className="rotate-180"/>
+                    </button>
                 </div>
             </div>
 
+            {/* Cards de Resumo */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl">
-                    <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-2 flex items-center gap-2"><TrendingUp className="text-emerald-500" size={14}/> Receitas</p>
+                <div className="bg-slate-900 border border-slate-800 p-6 rounded-[2rem] shadow-xl">
+                    <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-2 flex items-center gap-2">
+                        <ArrowUpRight className="text-emerald-500" size={14}/> Receitas
+                    </p>
                     <p className="text-2xl font-black text-white">{formatMoney(stats.income)}</p>
                 </div>
-                <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl">
-                    <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-2 flex items-center gap-2"><TrendingDown className="text-rose-500" size={14}/> Despesas</p>
+                <div className="bg-slate-900 border border-slate-800 p-6 rounded-[2rem] shadow-xl">
+                    <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-2 flex items-center gap-2">
+                        <ArrowDownLeft className="text-rose-500" size={14}/> Despesas
+                    </p>
                     <p className="text-2xl font-black text-rose-500">{formatMoney(stats.expense)}</p>
                 </div>
-                <div className="bg-pink-900/10 border border-pink-500/20 p-6 rounded-3xl relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-4 opacity-10"><Wallet size={64} className="text-pink-500"/></div>
-                    <p className="text-[10px] text-pink-300 font-black uppercase tracking-widest mb-2">Balanço do Mês</p>
-                    <p className={`text-2xl font-black ${stats.balance >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatMoney(stats.balance)}</p>
+                <div className="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 p-6 rounded-[2rem] shadow-2xl relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-4 opacity-5"><Wallet size={64} className="text-white"/></div>
+                    <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-2">Balanço Líquido</p>
+                    <p className={`text-2xl font-black ${stats.balance >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        {formatMoney(stats.balance)}
+                    </p>
                 </div>
             </div>
 
+            {/* Seção Principal */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Contas e Cartões */}
                 <div className="space-y-6">
-                    <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-xs font-black text-white uppercase tracking-widest flex items-center gap-2"><CreditCard size={14}/> Contas & Cartões</h3>
-                            <button onClick={() => setIsManageModalOpen(true)} className="text-[10px] text-blue-500 font-bold uppercase hover:text-blue-400 flex items-center gap-1">
-                                <Settings2 size={12}/> Gerenciar
+                    <div className="bg-slate-900 border border-slate-800 p-6 rounded-[2rem] shadow-xl">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-[10px] font-black text-white uppercase tracking-widest flex items-center gap-2">
+                                <CardIcon size={14} className="text-blue-500"/> Contas & Cartões
+                            </h3>
+                            <button onClick={() => setIsManageModalOpen(true)} className="p-2 bg-slate-950 rounded-lg border border-slate-800 text-slate-400 hover:text-white transition-all">
+                                <Settings2 size={14}/>
                             </button>
                         </div>
                         <div className="space-y-3">
                             {accounts.map(acc => (
-                                <div key={acc.id} className="flex justify-between items-center p-3 bg-slate-950 rounded-xl border border-slate-800">
+                                <div key={acc.id} className="flex justify-between items-center p-4 bg-slate-950 rounded-2xl border border-slate-800 hover:border-slate-700 transition-all group">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-slate-400"><Wallet size={14}/></div>
+                                        <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-slate-500 group-hover:text-blue-500 transition-colors">
+                                            <Banknote size={18}/>
+                                        </div>
                                         <div>
-                                            <p className="text-xs font-bold text-white">{acc.nome}</p>
-                                            <p className="text-[9px] text-slate-500 uppercase">{acc.tipo}</p>
+                                            <p className="text-xs font-black text-white uppercase tracking-wider">{acc.nome}</p>
+                                            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">{acc.tipo}</p>
                                         </div>
                                     </div>
-                                    <p className="text-xs font-black text-emerald-400">{formatMoney(acc.saldo)}</p>
+                                    <p className="text-sm font-black text-emerald-400">{formatMoney(acc.saldo)}</p>
                                 </div>
                             ))}
                             {cards.map(card => (
-                                <div key={card.id} className="flex justify-between items-center p-3 bg-slate-950 rounded-xl border border-slate-800">
+                                <div key={card.id} className="flex justify-between items-center p-4 bg-slate-950 rounded-2xl border border-slate-800 hover:border-slate-700 transition-all group">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-slate-400"><CreditCard size={14}/></div>
+                                        <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-slate-500 group-hover:text-pink-500 transition-colors">
+                                            <CreditCard size={18}/>
+                                        </div>
                                         <div>
-                                            <p className="text-xs font-bold text-white">{card.nome}</p>
-                                            <p className="text-[9px] text-slate-500 uppercase">Fecha dia {card.dia_fechamento}</p>
+                                            <p className="text-xs font-black text-white uppercase tracking-wider">{card.nome}</p>
+                                            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Fecha dia {card.dia_fechamento}</p>
                                         </div>
                                     </div>
-                                    <p className="text-xs font-black text-white">Lim: {formatMoney(card.limite)}</p>
+                                    <p className="text-sm font-black text-white">{formatMoney(card.limite)}</p>
                                 </div>
                             ))}
                         </div>
                     </div>
-
-                    <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl">
-                         <h3 className="text-xs font-black text-white uppercase tracking-widest mb-4 flex items-center gap-2"><ShoppingBag size={14}/> Gastos por Categoria</h3>
-                         <div style={{ width: '100%', minHeight: 300 }}>
-                            <ResponsiveContainer width="100%" height={300}>
-                                <PieChart>
-                                    <Pie data={stats.pieData} innerRadius={40} outerRadius={60} paddingAngle={5} dataKey="value">
-                                        {stats.pieData.map((_, index) => (
-                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                        ))}
-                                    </Pie>
-                                    <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '12px', fontSize: '10px' }} itemStyle={{ color: '#fff' }} />
-                                </PieChart>
-                            </ResponsiveContainer>
-                         </div>
-                    </div>
                 </div>
 
+                {/* Últimas Transações */}
                 <div className="lg:col-span-2 space-y-6">
-                    <div className="bg-slate-900 border border-slate-800 p-6 rounded-[2.5rem] min-h-[500px] flex flex-col">
+                    <div className="bg-slate-900 border border-slate-800 p-6 rounded-[2rem] shadow-xl">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2"><LayoutGrid size={16}/> Movimentações</h3>
-                            <button onClick={() => setIsTxModalOpen(true)} className="px-4 py-2 bg-pink-600 hover:bg-pink-500 text-white rounded-xl text-[10px] font-black uppercase flex items-center gap-2 shadow-lg shadow-pink-900/20 transition-all">
-                                <Plus size={14}/> Lançar Fluxo
+                            <h3 className="text-[10px] font-black text-white uppercase tracking-widest flex items-center gap-2">
+                                <LayoutGrid size={14} className="text-amber-500"/> Histórico Financeiro
+                            </h3>
+                            <button 
+                                onClick={() => setIsTxModalOpen(true)}
+                                className="px-4 py-2 bg-white text-slate-950 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all shadow-lg active:scale-95 flex items-center gap-2"
+                            >
+                                <Plus size={14}/> Novo Lançamento
                             </button>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2 pr-1">
+                        <div className="space-y-3">
                             {transactions.length === 0 ? (
-                                <div className="h-full flex flex-col items-center justify-center text-slate-600 opacity-50">
-                                    <LayoutGrid size={48} className="mb-4"/>
-                                    <p className="text-xs font-bold uppercase">Sem registros para o período.</p>
+                                <div className="py-12 text-center">
+                                    <div className="w-16 h-16 bg-slate-950 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-800">
+                                        <Clock size={24} className="text-slate-700" />
+                                    </div>
+                                    <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Nenhuma transação este mês</p>
                                 </div>
                             ) : (
                                 transactions.map(tx => (
-                                    <div key={tx.id} className="flex items-center justify-between p-4 bg-slate-950 border border-slate-800 rounded-2xl hover:border-pink-500/30 transition-colors group">
+                                    <div key={tx.id} className="flex items-center justify-between p-4 bg-slate-950 rounded-2xl border border-slate-800 hover:border-slate-700 transition-all">
                                         <div className="flex items-center gap-4">
-                                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white ${tx.tipo === 'RECEITA' ? 'bg-emerald-500' : tx.tipo === 'DESPESA' ? 'bg-rose-500' : 'bg-blue-500'}`}>
-                                                {tx.tipo === 'RECEITA' ? <TrendingUp size={18}/> : tx.tipo === 'DESPESA' ? <TrendingDown size={18}/> : <ArrowRightLeft size={18}/>}
+                                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                                                tx.tipo === 'RECEITA' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'
+                                            }`}>
+                                                {tx.tipo === 'RECEITA' ? <ArrowUpRight size={18}/> : <ArrowDownLeft size={18}/>}
                                             </div>
                                             <div>
-                                                <p className="text-sm font-bold text-white">{tx.descricao}</p>
-                                                <div className="flex gap-2 text-[10px] text-slate-500 font-bold uppercase mt-0.5">
-                                                    <span>{new Date(tx.data).toLocaleDateString()}</span>
-                                                    <span>•</span>
-                                                    <span className="text-slate-400">{tx.category_name || 'Geral'}</span>
-                                                    <span>•</span>
-                                                    <span className="text-slate-400">{tx.account_name || tx.card_name || 'Externo'}</span>
+                                                <div className="flex items-center gap-2">
+                                                    <p className="text-xs font-black text-white uppercase tracking-wider">{tx.descricao}</p>
+                                                    {tx.is_operation_transfer && (
+                                                        <span className="px-1.5 py-0.5 bg-blue-500/20 text-blue-400 text-[8px] font-black rounded uppercase tracking-tighter">Operação</span>
+                                                    )}
+                                                    {tx.total_installments > 1 && (
+                                                        <span className="px-1.5 py-0.5 bg-slate-800 text-slate-400 text-[8px] font-black rounded uppercase tracking-tighter">{tx.installment_number}/{tx.total_installments}</span>
+                                                    )}
                                                 </div>
+                                                <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">
+                                                    {new Date(tx.data).toLocaleDateString('pt-BR')} • {tx.category_name || 'Geral'}
+                                                </p>
                                             </div>
                                         </div>
-                                        <span className={`text-sm font-black ${tx.tipo === 'RECEITA' ? 'text-emerald-400' : tx.tipo === 'DESPESA' ? 'text-rose-400' : 'text-white'}`}>
-                                            {tx.tipo === 'DESPESA' ? '-' : '+'} {formatMoney(tx.valor)}
-                                        </span>
+                                        <div className="text-right">
+                                            <p className={`text-sm font-black ${tx.tipo === 'RECEITA' ? 'text-emerald-400' : 'text-white'}`}>
+                                                {tx.tipo === 'RECEITA' ? '+' : '-'}{formatMoney(tx.valor)}
+                                            </p>
+                                            <p className="text-[8px] text-slate-600 font-black uppercase tracking-tighter">
+                                                {tx.status === 'CONSOLIDADO' ? 'Liquidado' : 'Pendente'}
+                                            </p>
+                                        </div>
                                     </div>
                                 ))
                             )}
@@ -267,98 +269,119 @@ export const PersonalFinancesPage: React.FC<Props> = ({ activeUser }) => {
                 </div>
             </div>
 
-            <PersonalFinanceAI 
-                transactions={transactions} 
-                accounts={accounts} 
-                cards={cards} 
-                profileId={activeUser.id} 
-                onRefresh={loadData} 
-            />
-
-            {/* Modal de Lançamento Rigoroso */}
+            {/* Modal de Nova Transação - INTEGRADO */}
             {isTxModalOpen && (
-                <Modal onClose={() => setIsTxModalOpen(false)} title="Novo Lançamento Contábil">
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-3 gap-2 bg-slate-950 p-1 rounded-xl border border-slate-800">
-                            {['DESPESA', 'RECEITA', 'TRANSFERENCIA'].map(t => (
-                                <button key={t} onClick={() => setNewTx({...newTx, tipo: t, categoria_id: ''})} className={`py-2 rounded-lg text-[10px] font-black uppercase transition-all ${newTx.tipo === t ? 'bg-pink-600 text-white' : 'text-slate-500 hover:text-white'}`}>{t}</button>
-                            ))}
+                <Modal onClose={() => setIsTxModalOpen(false)} title="Novo Lançamento">
+                    <div className="space-y-6 p-2">
+                        <div className="grid grid-cols-2 gap-2">
+                            <button 
+                                onClick={() => setNewTx(prev => ({ ...prev, tipo: 'RECEITA' }))}
+                                className={`py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${
+                                    newTx.tipo === 'RECEITA' ? 'bg-emerald-600 border-emerald-500 text-white shadow-lg shadow-emerald-900/20' : 'bg-slate-950 border-slate-800 text-slate-500'
+                                }`}
+                            >
+                                Receita
+                            </button>
+                            <button 
+                                onClick={() => setNewTx(prev => ({ ...prev, tipo: 'DESPESA' }))}
+                                className={`py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${
+                                    newTx.tipo === 'DESPESA' ? 'bg-rose-600 border-rose-500 text-white shadow-lg shadow-rose-900/20' : 'bg-slate-950 border-slate-800 text-slate-500'
+                                }`}
+                            >
+                                Despesa
+                            </button>
                         </div>
-                        
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-black uppercase text-slate-500 ml-1">Descrição do Lançamento</label>
-                            <input type="text" placeholder="Ex: Salário Mensal, Renda Fixa..." className="w-full bg-slate-950 p-3 rounded-xl border border-slate-800 text-white text-xs outline-none focus:border-pink-500" value={newTx.descricao} onChange={e => setNewTx({...newTx, descricao: e.target.value})} />
-                            
-                            {/* SUGESTÃO INTELIGENTE */}
-                            {suggestion && (
-                                <button onClick={applySuggestion} className="w-full p-2 bg-blue-600/20 border border-blue-500/30 rounded-lg flex items-center justify-center gap-2 text-[10px] font-bold text-blue-300 hover:bg-blue-600/30 transition-colors animate-in fade-in slide-in-from-top-2 mt-1">
-                                    <ArrowRightLeft size={12}/> {suggestion}
-                                </button>
-                            )}
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-black uppercase text-slate-500 ml-1">Valor</label>
-                                <div className="relative">
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 font-bold text-xs">R$</span>
-                                    <input type="text" placeholder="0,00" className="w-full bg-slate-950 p-3 pl-8 rounded-xl border border-slate-800 text-white text-lg font-black outline-none focus:border-emerald-500" value={newTx.valor} onChange={e => setNewTx({...newTx, valor: e.target.value})} />
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-1 block">Descrição</label>
+                                <input 
+                                    value={newTx.descricao}
+                                    onChange={e => setNewTx(prev => ({ ...prev, descricao: e.target.value }))}
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-4 px-5 text-sm font-black text-white outline-none focus:border-blue-500 transition-all"
+                                    placeholder="Ex: Salário Mensal"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-1 block">Valor (R$)</label>
+                                    <input 
+                                        value={newTx.valor}
+                                        onChange={e => setNewTx(prev => ({ ...prev, valor: e.target.value }))}
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-4 px-5 text-sm font-black text-white outline-none focus:border-blue-500 transition-all"
+                                        placeholder="0,00"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-1 block">Parcelas</label>
+                                    <input 
+                                        type="number"
+                                        value={newTx.installments}
+                                        onChange={e => setNewTx(prev => ({ ...prev, installments: Number(e.target.value) }))}
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-4 px-5 text-sm font-black text-white outline-none focus:border-blue-500 transition-all"
+                                    />
                                 </div>
                             </div>
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-black uppercase text-slate-500 ml-1 flex items-center gap-1"><Calendar size={10}/> Data de Entrada</label>
-                                <input type="date" className="w-full bg-slate-950 p-3 rounded-xl border border-slate-800 text-white text-xs outline-none focus:border-blue-500" value={newTx.data} onChange={e => setNewTx({...newTx, data: e.target.value})} />
-                            </div>
-                        </div>
 
-                        <div className="space-y-4 pt-2 border-t border-slate-800">
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-black uppercase text-slate-500 ml-1">Fonte / Categoria de Renda</label>
-                                <select 
-                                    className="w-full bg-slate-950 p-3 rounded-xl border border-slate-800 text-white text-xs outline-none focus:border-pink-500" 
-                                    value={newTx.categoria_id} 
-                                    onChange={e => setNewTx({...newTx, categoria_id: e.target.value})}
-                                >
-                                    <option value="">-- Selecionar --</option>
-                                    {categories.filter(c => c.tipo === newTx.tipo).map(c => (
-                                        <option key={c.id} value={c.id}>{c.nome}</option>
-                                    ))}
-                                    {/* Categorias fixas sugeridas se não houver no banco */}
-                                    {newTx.tipo === 'RECEITA' && (
-                                        <>
-                                            <option value="sys_salario">Salário Fixo</option>
-                                            <option value="sys_variante">Renda Variável / Freelance</option>
-                                            <option value="sys_dividendos">Dividendos / Juros</option>
-                                        </>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-1 block">Data Competência</label>
+                                    <input 
+                                        type="date"
+                                        value={newTx.data}
+                                        onChange={e => setNewTx(prev => ({ ...prev, data: e.target.value }))}
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-4 px-5 text-xs font-black text-white outline-none focus:border-blue-500 transition-all"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-1 block">Data Pagamento</label>
+                                    <input 
+                                        type="date"
+                                        value={newTx.data_pagamento}
+                                        onChange={e => setNewTx(prev => ({ ...prev, data_pagamento: e.target.value }))}
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-4 px-5 text-xs font-black text-white outline-none focus:border-blue-500 transition-all"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Integração com Operação */}
+                            {newTx.tipo === 'RECEITA' && (
+                                <div className="p-4 bg-blue-900/10 border border-blue-500/20 rounded-2xl space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-[10px] font-black text-blue-400 uppercase tracking-widest flex items-center gap-2">
+                                            <ArrowRightLeft size={14}/> Transferir para Operação?
+                                        </label>
+                                        <input 
+                                            type="checkbox"
+                                            checked={newTx.is_operation_transfer}
+                                            onChange={e => setNewTx(prev => ({ ...prev, is_operation_transfer: e.target.checked }))}
+                                            className="w-5 h-5 rounded-lg accent-blue-500"
+                                        />
+                                    </div>
+                                    {newTx.is_operation_transfer && (
+                                        <select 
+                                            value={newTx.operation_source_id}
+                                            onChange={e => setNewTx(prev => ({ ...prev, operation_source_id: e.target.value }))}
+                                            className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-[10px] font-black text-white uppercase tracking-widest outline-none focus:border-blue-500"
+                                        >
+                                            <option value="">Selecione o Destino</option>
+                                            <option value="CAIXA_LIVRE">Caixa Livre (Capital Próprio)</option>
+                                            <option value="FONTE_EXTERNA">Fonte Externa (Investidores)</option>
+                                        </select>
                                     )}
-                                </select>
-                            </div>
+                                </div>
+                            )}
 
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-black uppercase text-slate-500 ml-1">Conta Destino (Onde o dinheiro entrou?)</label>
-                                <select className="w-full bg-slate-950 p-3 rounded-xl border border-slate-800 text-white text-xs outline-none focus:border-pink-500" value={newTx.conta_id} onChange={e => setNewTx({...newTx, conta_id: e.target.value, cartao_id: ''})}>
-                                    <option value="">-- Escolher Conta --</option>
-                                    {accounts.map(a => <option key={a.id} value={a.id}>{a.nome} (Saldo: {formatMoney(a.saldo)})</option>)}
-                                </select>
-                            </div>
+                            <button 
+                                onClick={handleSaveTx}
+                                className="w-full py-5 bg-white text-slate-950 rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2"
+                            >
+                                <CheckCircle2 size={18}/> Confirmar Lançamento
+                            </button>
                         </div>
-
-                        <button onClick={handleSaveTx} className="w-full py-4 bg-pink-600 hover:bg-pink-500 text-white rounded-xl font-black uppercase text-xs shadow-lg mt-2 transition-all">
-                            Confirmar Lançamento
-                        </button>
-                        <p className="text-[8px] text-center text-slate-500 uppercase font-bold">A auditoria registrará esta entrada no banco de dados permanentemente.</p>
                     </div>
                 </Modal>
-            )}
-
-            {isManageModalOpen && (
-                <ManageAssetsModal 
-                    onClose={() => setIsManageModalOpen(false)} 
-                    profileId={activeUser.id} 
-                    accounts={accounts} 
-                    cards={cards} 
-                    onRefresh={loadData} 
-                />
             )}
         </div>
     );

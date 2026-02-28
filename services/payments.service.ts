@@ -1,7 +1,9 @@
+
 import { supabase } from '../lib/supabase';
 import type { Loan, Installment, UserProfile, CapitalSource } from '../types';
 import { todayDateOnlyUTC, getDaysDiff } from '../utils/dateHelpers';
 import { generateUUID } from '../utils/generators';
+import { loanEngine } from '../domain/loanEngine';
 
 /* =========================
    Helpers
@@ -31,6 +33,7 @@ export const paymentsService = {
     manualDate?: Date | null;
     customAmount?: number;
     realDate?: Date | null;
+    capitalizeRemaining?: boolean; // NOVO: Se deve capitalizar juros não pagos
   }) {
     const {
       loan,
@@ -42,20 +45,13 @@ export const paymentsService = {
       forgivenessMode = 'NONE',
       customAmount,
       realDate,
+      capitalizeRemaining = false
     } = params;
 
     /* =====================================================
        BLOQUEIO FRONTEND — Parcela já quitada
     ===================================================== */
     if (String(inst.status || '').toUpperCase() === 'PAID') {
-      throw new Error('Parcela já quitada');
-    }
-
-    const principalDue = Number(inst.principalRemaining) || 0;
-    const interestDue = Number(inst.interestRemaining) || 0;
-    const lateFeeDue = Number(inst.lateFeeAccrued) || 0;
-
-    if (principalDue <= 0 && interestDue <= 0 && lateFeeDue <= 0) {
       throw new Error('Parcela já quitada');
     }
 
@@ -73,7 +69,7 @@ export const paymentsService = {
     const idempotencyKey = generateUUID();
 
     /* =====================================================
-       LEND_MORE
+       LEND_MORE (Aporte)
     ===================================================== */
     if (paymentType === 'LEND_MORE') {
       const lendAmount = parseFloat(avAmount) || 0;
@@ -91,31 +87,8 @@ export const paymentsService = {
       });
 
       if (error) throw new Error(error.message);
-
       return { amountToPay: lendAmount, paymentType };
     }
-
-    /* =====================================================
-       CÁLCULO MULTA
-    ===================================================== */
-    const daysLate = Math.max(0, getDaysDiff(inst.dueDate));
-    const baseForFine = (calculations?.principal || 0) + (calculations?.interest || 0);
-
-    let fineFixed = 0;
-    let fineDaily = 0;
-
-    if (daysLate > 0) {
-      fineFixed = baseForFine * (loan.finePercent / 100);
-      fineDaily = baseForFine * (loan.dailyInterestPercent / 100) * daysLate;
-    }
-
-    let finalLateFee = fineFixed + fineDaily;
-
-    if (forgivenessMode === 'FINE_ONLY') finalLateFee -= fineFixed;
-    else if (forgivenessMode === 'INTEREST_ONLY') finalLateFee -= fineDaily;
-    else if (forgivenessMode === 'BOTH') finalLateFee = 0;
-
-    finalLateFee = Math.round((finalLateFee + Number.EPSILON) * 100) / 100;
 
     /* =====================================================
        DEFINIR VALOR A PAGAR
@@ -131,80 +104,51 @@ export const paymentsService = {
     };
 
     let amountToPay = 0;
-
     if (paymentType === 'CUSTOM') {
       amountToPay = customAmount || 0;
     } else if (paymentType === 'RENEW_AV') {
       amountToPay = parseMoney(avAmount);
     } else if (paymentType === 'FULL') {
-      amountToPay = principalDue + interestDue + finalLateFee;
+      const balance = loanEngine.computeRemainingBalance(loan);
+      amountToPay = balance.totalRemaining;
     } else if (paymentType === 'PARTIAL_INTEREST') {
       amountToPay = parseMoney(avAmount);
     } else {
-      amountToPay = interestDue + finalLateFee;
+      // RENEW_INTEREST
+      const balance = loanEngine.computeRemainingBalance(loan);
+      amountToPay = balance.interestRemaining + balance.lateFeeRemaining;
     }
 
-    if (amountToPay <= 0) {
-      throw new Error('O valor do pagamento deve ser maior que zero.');
-    }
+    if (amountToPay <= 0) throw new Error('O valor do pagamento deve ser maior que zero.');
 
     /* =====================================================
-       CALCULAR DELTAS
+       AMORTIZAÇÃO SELETIVA (ENGINE)
     ===================================================== */
-    let remaining = amountToPay;
-
-    let lateFeeDelta = Math.max(0, Math.min(remaining, lateFeeDue));
-    remaining -= lateFeeDelta;
-
-    let interestDelta = Math.max(0, Math.min(remaining, interestDue));
-    remaining -= interestDelta;
-
-    let principalDelta = 0;
-
-    if (paymentType !== 'RENEW_INTEREST' && paymentType !== 'PARTIAL_INTEREST') {
-      principalDelta = Math.max(0, Math.min(remaining, principalDue));
-    }
-
-    const totalDelta = principalDelta + interestDelta + lateFeeDelta;
-
-    if (totalDelta <= 0) {
-      if (paymentType === 'CUSTOM' || paymentType === 'PARTIAL_INTEREST') {
-        interestDelta = amountToPay;
-      } else if (paymentType === 'RENEW_AV') {
-        principalDelta = amountToPay;
-      } else {
-        throw new Error('Nada a pagar nesta parcela.');
-      }
-    }
+    const amortization = loanEngine.calculateAmortization(amountToPay, loan);
 
     /* =====================================================
-       RPC OFICIAL
+       RPC OFICIAL V3 (Amortização + Fluxo de Caixa)
     ===================================================== */
     const paymentDate = realDate || todayDateOnlyUTC();
 
-    const { error } = await supabase.rpc('process_payment_atomic_v2', {
+    // Chamada RPC que lida com a separação de Capital vs Lucro
+    const { error } = await supabase.rpc('process_payment_v3_selective', {
       p_idempotency_key: idempotencyKey,
       p_loan_id: loan.id,
       p_installment_id: inst.id,
       p_profile_id: ownerId,
       p_operator_id: safeUUID(activeUser.id),
-      p_principal_amount: principalDelta,
-      p_interest_amount: interestDelta,
-      p_late_fee_amount: lateFeeDelta,
+      p_principal_paid: amortization.paidPrincipal,
+      p_interest_paid: amortization.paidInterest,
+      p_late_fee_paid: amortization.paidLateFee,
       p_payment_date: paymentDate.toISOString(),
+      p_capitalize_remaining: capitalizeRemaining, // Se sobra juros, capitaliza ou aguarda
+      p_source_id: loan.sourceId, // Para devolver o capital à carteira
+      p_caixa_livre_id: 'CAIXA_LIVRE_ID' // ID fixo ou dinâmico do Caixa Livre para o lucro
     });
 
-    if (error) {
-      if (
-        error.message.includes('Parcela já quitada') ||
-        error.message.includes('Pagamento duplicado detectado')
-      ) {
-        throw new Error(error.message);
-      }
+    if (error) throw new Error('Falha na persistência: ' + error.message);
 
-      throw new Error('Falha na persistência: ' + error.message);
-    }
-
-    return { amountToPay, paymentType };
+    return { amountToPay, paymentType, amortization };
   },
 };

@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LayoutDashboard, Users, Wallet, LayoutGrid, Plus, Briefcase, PiggyBank } from 'lucide-react';
+import { LayoutDashboard, Users, Wallet, LayoutGrid, Plus, Briefcase, PiggyBank, ChevronLeft } from 'lucide-react';
 import { Tooltip } from '../components/ui/Tooltip';
 
 interface BottomNavProps {
@@ -11,10 +11,11 @@ interface BottomNavProps {
   navOrder: string[];
   primaryColor?: string;
   isStaff?: boolean;
+  onGoBack?: () => void;
 }
 
-export const BottomNav: React.FC<BottomNavProps & { isStaff?: boolean }> = ({ 
-  activeTab, setActiveTab, onOpenNav, onNewLoan, navOrder, primaryColor = '#2563eb', isStaff 
+export const BottomNav: React.FC<BottomNavProps> = ({ 
+  activeTab, setActiveTab, onOpenNav, onNewLoan, navOrder, primaryColor = '#2563eb', isStaff, onGoBack
 }) => {
   const getTabIcon = (tab: string) => {
     switch (tab) {
@@ -80,14 +81,24 @@ export const BottomNav: React.FC<BottomNavProps & { isStaff?: boolean }> = ({
            </button>
        ))}
 
-       {/* MENU HUB (Slot 4) - SEMPRE PRESENTE NO MOBILE */}
-       <button 
-          onClick={onOpenNav} 
-          className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${activeTab === 'PROFILE' || activeTab === 'LEGAL' ? 'text-blue-500' : 'text-slate-500'}`}
-       >
-           <LayoutGrid size={20}/>
-           <span className="text-[9px] font-bold uppercase">Menu</span>
-       </button>
+       {/* BOTAO VOLTAR (quando em aba do Hub) ou MENU HUB */}
+       {onGoBack ? (
+         <button 
+            onClick={onGoBack} 
+            className="flex flex-col items-center gap-1 p-2 rounded-xl transition-all text-slate-400 hover:text-white active:scale-95"
+         >
+             <ChevronLeft size={20}/>
+             <span className="text-[9px] font-bold uppercase">Voltar</span>
+         </button>
+       ) : (
+         <button 
+            onClick={onOpenNav} 
+            className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${activeTab === 'PROFILE' || activeTab === 'LEGAL' ? 'text-blue-500' : 'text-slate-500'}`}
+         >
+             <LayoutGrid size={20}/>
+             <span className="text-[9px] font-bold uppercase">Menu</span>
+         </button>
+       )}
     </div>
   );
 };

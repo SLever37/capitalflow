@@ -22,7 +22,7 @@ export const NavHubController: React.FC<NavHubControllerProps> = ({ ui, setActiv
       setActiveTab(tab as any);
       ui.setShowNavHub(false);
       if (modal === 'AGENDA') ui.openModal('AGENDA');
-      if (modal === 'CALC') ui.openModal('CALC');
+      if (modal === 'CALC') ui.openModal('SIMULATOR');
       if (modal === 'FLOW') ui.openModal('FLOW');
   };
 

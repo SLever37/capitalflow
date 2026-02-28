@@ -2,6 +2,7 @@
 import { useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { Loan, LoanStatus, CapitalSource } from '../types';
+import { loanEngine } from '../domain/loanEngine';
 import { getDaysDiff } from '../utils/dateHelpers';
 import { notificationService } from '../services/notification.service';
 import { getInstallmentStatusLogic } from '../domain/finance/calculations';
@@ -29,10 +30,12 @@ export const useAppNotifications = ({
   const checkTimer = useRef<any>(null);
   const permissionAsked = useRef(false);
   const notifiedDueLoans = useRef<Set<string>>(new Set());
+  const notifiedUnsignedLegal = useRef<Set<string>>(new Set());
   const lastUserId = useRef<string | null>(null);
 
   const resetNotifiedCaches = () => {
     notifiedDueLoans.current = new Set();
+    notifiedUnsignedLegal.current = new Set();
   };
 
   // 1. Monitoramento em Tempo Real (Eventos Críticos de Negócio)
@@ -40,46 +43,40 @@ export const useAppNotifications = ({
     if (!activeUser || disabled) return;
 
     const channel = supabase.channel('global-urgent-alerts')
-      .on(
-        'postgres_changes',
-        { 
-          event: 'INSERT', 
-          schema: 'public', 
-          table: 'payment_intents', 
-          filter: `profile_id=eq.${activeUser.id}` 
-        },
-        (payload) => {
-          const newIntent = payload.new;
-          if (newIntent.status === 'PENDENTE') {
-             notificationService.notify(
-                'Intencao de Pagamento Recebida!',
-                'Um cliente enviou uma intencao de pagamento. Clique para validar.',
-                () => {
-                   setActiveTab('DASHBOARD');
-                   setSelectedLoanId(newIntent.loan_id);
-                }
-             );
-             showToast('Nova intencao de pagamento recebida! Verifique agora.', 'success');
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'payment_intents', filter: `profile_id=eq.${activeUser.id}` }, (payload) => {
+          if (payload.new.status === 'PENDENTE') {
+             notificationService.notify('Intencao de Pagamento Recebida!', 'Um cliente enviou uma intencao de pagamento.', () => {
+                setActiveTab('DASHBOARD');
+                setSelectedLoanId(payload.new.loan_id);
+             });
+             showToast('Nova intencao de pagamento recebida!', 'success');
           }
-        }
-      )
-      .on(
-        'postgres_changes',
-        { 
-          event: 'UPDATE', 
-          schema: 'public', 
-          table: 'payment_intents', 
-          filter: `profile_id=eq.${activeUser.id}` 
-        },
-        (payload) => {
-          const updatedIntent = payload.new;
-          if (updatedIntent.status === 'APROVADO') {
-             showToast('Intencao de pagamento aprovada!', 'success');
-          } else if (updatedIntent.status === 'RECUSADO') {
-             showToast('Intencao de pagamento recusada.', 'warning');
+      })
+      // EVENTO REALTIME: Mudança em parcelas (vencimento/atraso)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'parcelas', filter: `profile_id=eq.${activeUser.id}` }, (payload) => {
+          const loan = loans.find(l => l.id === payload.new.loan_id);
+          if (loan && loanEngine.computeLoanStatus(loan) === 'OVERDUE' && !loan.activeAgreement) {
+              notificationService.notify('Ação Jurídica Necessária', `Contrato de ${loan.debtorName} está VENCIDO e sem assinatura.`, () => {
+                  setActiveTab('LEGAL');
+                  setSelectedLoanId(loan.id);
+              });
           }
-        }
-      )
+      })
+      // EVENTO REALTIME: Novo Lead de Captação
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'leads', filter: `profile_id=eq.${activeUser.id}` }, (payload) => {
+          notificationService.notify('Novo Lead de Captação!', `O cliente ${payload.new.nome} iniciou uma simulação.`, () => {
+              setActiveTab('LEADS');
+          });
+          showToast(`Novo lead: ${payload.new.nome}`, 'success');
+      })
+      // EVENTO REALTIME: Nova Mensagem no Chat de Captação
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'campaign_chat_messages', filter: `profile_id=eq.${activeUser.id}` }, (payload) => {
+          if (payload.new.sender === 'LEAD') {
+              notificationService.notify('Nova Mensagem de Lead', `Mensagem recebida no chat de captação.`, () => {
+                  setActiveTab('LEADS');
+              });
+          }
+      })
       .subscribe();
 
     return () => {
@@ -127,7 +124,24 @@ export const useAppNotifications = ({
       });
     }
 
-    // B) Saldo Crítico (Risco Operacional)
+    // B) Jurídico: Vencidos sem assinatura (Notificação de Cobrança)
+    if (loans?.length) {
+      loans.forEach((loan) => {
+        if (loanEngine.isLegallyActionable(loan) && !loan.activeAgreement && !notifiedUnsignedLegal.current.has(loan.id)) {
+          notifiedUnsignedLegal.current.add(loan.id);
+          notificationService.notify(
+            'Ação Jurídica Necessária',
+            `Contrato de ${loan.debtorName} está VENCIDO e sem confissão de dívida assinada.`,
+            () => {
+              setActiveTab('LEGAL');
+              setSelectedLoanId(loan.id);
+            }
+          );
+        }
+      });
+    }
+
+    // C) Saldo Crítico (Risco Operacional)
     (sources || []).forEach((source: any) => {
       if (!source?.id) return;
       const balance = Number(source.balance || 0);

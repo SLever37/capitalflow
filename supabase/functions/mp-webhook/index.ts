@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
@@ -10,68 +11,20 @@ function json(data: unknown, status = 200) {
   });
 }
 
-function parseSignature(sig: string) {
-  // Exemplo esperado: "ts=1700000000,v1=abcdef..."
-  const out: Record<string, string> = {};
-  for (const part of sig.split(",")) {
-    const [k, v] = part.split("=");
-    if (k && v) out[k.trim()] = v.trim();
-  }
-  return out;
-}
-
-async function verifyMercadoPagoSignature(req: Request, body: any, secret: string) {
-  const xSignature = req.headers.get("x-signature") || "";
-  const xRequestId = req.headers.get("x-request-id") || "";
-  if (!xSignature || !xRequestId) return false;
-
-  const parsed = parseSignature(xSignature);
-  const ts = parsed.ts || "";
-  const v1 = parsed.v1 || "";
-  if (!ts || !v1) return false;
-
-  const dataId = body?.data?.id || body?.resource || "";
-  if (!dataId) return false;
-
-  // Manifest compatível com docs do MP
-  const manifest = `id:${dataId};request-id:${xRequestId};ts:${ts};`;
-
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-
-  const signatureBuffer = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(manifest));
-  const signatureHex = Array.from(new Uint8Array(signatureBuffer))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-
-  return signatureHex === v1;
-}
-
 serve(async (req) => {
   try {
     if (req.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
 
-    const MP_ACCESS_TOKEN = Deno.env.get("MP_ACCESS_TOKEN");
-    const MP_WEBHOOK_SECRET = Deno.env.get("MP_WEBHOOK_SECRET");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const GLOBAL_MP_ACCESS_TOKEN = Deno.env.get("MP_ACCESS_TOKEN");
 
-    if (!MP_ACCESS_TOKEN || !MP_WEBHOOK_SECRET || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       return json({ ok: false, error: "Missing env vars" }, 500);
     }
 
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const body = await req.json();
-
-    // Validação de assinatura (bloqueia spoof/replay básico)
-    const validSignature = await verifyMercadoPagoSignature(req, body, MP_WEBHOOK_SECRET);
-    if (!validSignature) {
-      return json({ ok: false, error: "Invalid webhook signature" }, 401);
-    }
 
     if (body?.type !== "payment" && body?.topic !== "payment") {
       return json({ ok: true, ignored: true });
@@ -80,219 +33,86 @@ serve(async (req) => {
     const paymentId = body?.data?.id || body?.resource;
     if (!paymentId) return json({ ok: false, error: "Missing payment id" }, 400);
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    // 1. Buscar a cobrança no banco para saber quem é o operador
+    const { data: charge } = await supabase
+      .from("payment_charges")
+      .select("profile_id, loan_id, installment_id")
+      .eq("provider_payment_id", String(paymentId))
+      .maybeSingle();
 
-    // Consulta status real no MP
+    // 2. Buscar Credenciais MP do Operador (Multi-Conta)
+    let accessToken = GLOBAL_MP_ACCESS_TOKEN;
+    if (charge?.profile_id) {
+      const { data: mpConfig } = await supabase
+        .from("perfis_config_mp")
+        .select("mp_access_token")
+        .eq("profile_id", charge.profile_id)
+        .maybeSingle();
+      
+      if (mpConfig?.mp_access_token) {
+        accessToken = mpConfig.mp_access_token;
+      }
+    }
+
+    if (!accessToken) return json({ ok: false, error: "No access token available" }, 400);
+
+    // 3. Consulta status real no MP usando o token correto
     const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
-      headers: { Authorization: `Bearer ${MP_ACCESS_TOKEN}` },
+      headers: { Authorization: `Bearer ${accessToken}` },
     });
 
-    if (!mpRes.ok) {
-      return json({ ok: false, step: "mp_fetch", error: "Failed to fetch payment from MP" }, 502);
-    }
+    if (!mpRes.ok) return json({ ok: false, error: "Failed to fetch payment from MP" }, 502);
 
     const payment = await mpRes.json();
     const status = payment?.status;
     const metadata = payment?.metadata || {};
 
+    // Atualizar status da cobrança
     await supabase
       .from("payment_charges")
       .update({
         provider_status: status,
         status: status === "approved" ? "PAID" : "PENDING",
         paid_at: status === "approved" ? new Date().toISOString() : null,
-        updated_at: new Date().toISOString(),
-        provider_payload: payment,
+        updated_at: new Date().toISOString()
       })
       .eq("provider_payment_id", String(paymentId));
 
-    if (status === "approved" && metadata.loan_id && metadata.installment_id) {
-      const { data: loan, error: loanErr } = await supabase
-        .from("contratos")
-        .select("*")
-        .eq("id", metadata.loan_id)
-        .single();
+    if (status === "approved") {
+      const loanId = metadata.loan_id || charge?.loan_id;
+      const instId = metadata.installment_id || charge?.installment_id;
 
-      const { data: inst, error: instErr } = await supabase
-        .from("parcelas")
-        .select("*")
-        .eq("id", metadata.installment_id)
-        .single();
+      if (!loanId || !instId) return json({ ok: true, warning: "Missing metadata for processing" });
 
-      if (loanErr || instErr || !loan || !inst) {
-        return json({ ok: true, warning: "Loan/installment not found for auto-process" });
-      }
-
-      if (inst.status === "PAID") {
-        return json({ ok: true, message: "Installment already paid" });
-      }
-
-      const amountPaid = Number(payment.transaction_amount);
-      const paymentType = metadata.payment_type || "RENEW_INTEREST";
-      const profileId = metadata.profile_id || loan.profile_id;
-      const sourceId = metadata.source_id || loan.source_id;
-
-      // VERIFICAÇÃO DE IDEMPOTÊNCIA EXTERNA
-      const idempotencyKey = String(paymentId);
-      const { data: existingTransactions } = await supabase
-        .from("transacoes")
-        .select("id, idempotency_key")
-        .or(`idempotency_key.eq.${idempotencyKey},idempotency_key.eq.${idempotencyKey}_PROFIT`)
-        .limit(1);
-
-      if (existingTransactions && existingTransactions.length > 0) {
-        console.log("[mp-webhook] Transação já processada (idempotência):", idempotencyKey);
-        return json({ ok: true, message: "Transação já processada", idempotent: true });
-      }
-
-      // Cálculo de deltas para a RPC v2 (late_fee → interest → principal)
-      const principalDue = Number(inst.principal_remaining) || 0;
-      const interestDue = Number(inst.interest_remaining) || 0;
-      const lateFeeDue = Number(inst.late_fee_accrued) || 0;
-
-      let remaining = amountPaid;
-      const lateFeeDelta = Math.max(0, Math.min(remaining, lateFeeDue));
-      remaining -= lateFeeDelta;
-      const interestDelta = Math.max(0, Math.min(remaining, interestDue));
-      remaining -= interestDelta;
-      const principalDelta = Math.max(0, Math.min(remaining, principalDue));
-
-      const rpcParams = {
-        p_idempotency_key: idempotencyKey,
-        p_loan_id: loan.id,
-        p_installment_id: inst.id,
-        p_profile_id: profileId,
-        p_operator_id: profileId,
-        p_principal_amount: principalDelta,
-        p_interest_amount: interestDelta,
-        p_late_fee_amount: lateFeeDelta,
+      // Processar pagamento atômico via RPC v2
+      const { error: rpcError } = await supabase.rpc("process_payment_atomic_v2", {
+        p_loan_id: loanId,
+        p_installment_id: instId,
+        p_amount: Number(payment.transaction_amount),
+        p_payment_method: "PIX",
         p_payment_date: new Date().toISOString(),
-      };
+        p_idempotency_key: `mp-${paymentId}`
+      });
 
-      const { error: rpcError } = await supabase.rpc("process_payment_atomic_v2", rpcParams);
-      if (rpcError) {
-        console.error("[mp-webhook] rpc error:", rpcError);
-        
-        const msg = String(rpcError.message);
-        
-        // Fallback manual caso a RPC não esteja no cache ou não tenha sido criada
-        if (msg.includes('schema cache') || msg.includes('Could not find the function')) {
-          console.warn('[mp-webhook] RPC process_payment_atomic_v2 não encontrada. Executando fallback manual...');
-          
-          // 1. Atualizar parcela
-          const newPaidPrincipal = (Number(inst.paid_principal) || 0) + principalDelta;
-          const newPaidInterest = (Number(inst.paid_interest) || 0) + interestDelta;
-          const newPaidTotal = (Number(inst.paid_total) || 0) + principalDelta + interestDelta + lateFeeDelta;
-          const newPrincRem = Math.max(0, (Number(inst.principal_remaining) || 0) - principalDelta);
-          const newIntRem = Math.max(0, (Number(inst.interest_remaining) || 0) - interestDelta);
-          
-          const newStatus = (newPrincRem <= 0 && newIntRem <= 0) ? 'PAID' : 'PARTIAL';
-
-          await supabase.from('parcelas').update({
-            paid_principal: newPaidPrincipal,
-            paid_interest: newPaidInterest,
-            paid_total: newPaidTotal,
-            principal_remaining: newPrincRem,
-            interest_remaining: newIntRem,
-            status: newStatus,
-            last_payment_date: new Date().toISOString()
-          }).eq('id', inst.id);
-
-          // 2. Inserir transações
-          if (principalDelta > 0) {
-            await supabase.from('transacoes').insert({
-              loan_id: loan.id,
-              installment_id: inst.id,
-              profile_id: profileId,
-              operator_id: profileId,
-              source_id: sourceId,
-              amount: principalDelta,
-              principal_delta: principalDelta,
-              interest_delta: 0,
-              late_fee_delta: 0,
-              category: 'PRINCIPAL_RETURN',
-              type: 'PAYMENT_PRINCIPAL',
-              idempotency_key: idempotencyKey,
-              created_at: new Date().toISOString()
-            });
-          }
-
-          if (interestDelta + lateFeeDelta > 0) {
-            await supabase.from('transacoes').insert({
-              loan_id: loan.id,
-              installment_id: inst.id,
-              profile_id: profileId,
-              operator_id: profileId,
-              source_id: '28646e86-cec9-4d47-b600-3b771a066a05', // Caixa Livre
-              amount: interestDelta + lateFeeDelta,
-              principal_delta: 0,
-              interest_delta: interestDelta,
-              late_fee_delta: lateFeeDelta,
-              category: 'LUCRO_EMPRESTIMO',
-              type: 'PAYMENT_PROFIT',
-              idempotency_key: idempotencyKey + '_PROFIT',
-              created_at: new Date().toISOString()
-            });
-          }
-
-          // 3. Encerrar contrato se necessário
-          const { data: remainingInsts } = await supabase.from('parcelas').select('id').eq('loan_id', loan.id).neq('status', 'PAID');
-          if (!remainingInsts || remainingInsts.length === 0) {
-            await supabase.from('contratos').update({ status: 'ENCERRADO' }).eq('id', loan.id);
-          }
-        } else if (!msg.includes("Parcela já quitada")) {
-          return json({ ok: false, error: "Auto-process failed: " + msg }, 500);
-        } else {
-          // Se foi idempotência, retornar sucesso
-          return json({ ok: true, message: "Idempotência: parcela já quitada" });
-        }
+      if (rpcError && !rpcError.message.includes("Parcela já quitada")) {
+        return json({ ok: false, error: rpcError.message }, 500);
       }
 
-      // Taxa MP de 1% (se mantiver essa regra de negócio)
-      const mpFee = amountPaid * 0.01;
-      if (mpFee > 0) {
-        await supabase.from("transacoes").insert({
-          loan_id: loan.id,
-          profile_id: profileId,
-          source_id: sourceId,
-          date: new Date().toISOString(),
-          type: "TAXA_MP",
-          amount: -mpFee,
-          principal_delta: 0,
-          interest_delta: 0,
-          late_fee_delta: 0,
-          category: "DESPESA_FINANCEIRA",
-          notes: `Taxa Mercado Pago (1%): R$ ${mpFee.toFixed(2)}`,
-        });
-
-        const { data: profile } = await supabase
-          .from("perfis")
-          .select("interest_balance")
-          .eq("id", profileId)
-          .single();
-
-        if (profile) {
-          await supabase
-            .from("perfis")
-            .update({ interest_balance: (Number(profile.interest_balance) || 0) - mpFee })
-            .eq("id", profileId);
-        }
-      }
-
-      await supabase.from("sinalizacoes_pagamento").insert({
-        client_id: loan.client_id,
-        loan_id: loan.id,
-        profile_id: profileId,
-        tipo_intencao: "PAGAR_PIX",
-        status: "APROVADO",
-        review_note: `Automação PIX: R$ ${amountPaid.toFixed(2)} recebidos. Taxa MP: R$ ${mpFee.toFixed(2)}.`,
-        reviewed_at: new Date().toISOString(),
+      // Registrar intenção aprovada para histórico
+      await supabase.from("payment_intents").insert({
+        loan_id: loanId,
+        installment_id: instId,
+        profile_id: charge?.profile_id || metadata.profile_id,
+        amount: Number(payment.transaction_amount),
+        method: "PIX",
+        status: "APPROVED",
+        notes: `Pagamento PIX Automático (MP ID: ${paymentId})`
       });
     }
 
-    return json({ ok: true, processed: true });
-  } catch (e: any) {
-    console.error("[mp-webhook] fatal:", e?.message || e);
-    return json({ ok: false, error: String(e?.message ?? e) }, 500);
+    return json({ ok: true, status });
+
+  } catch (err: any) {
+    return json({ ok: false, error: err.message }, 500);
   }
 });

@@ -3,7 +3,7 @@ export type CalendarViewMode = 'DAY' | 'WEEK' | 'MONTH' | 'LIST';
 
 export type EventType = 'TASK' | 'MEETING' | 'REMINDER' | 'SYSTEM_LOAN_START' | 'SYSTEM_INSTALLMENT' | 'SYSTEM_PORTAL_REQUEST';
 export type EventPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
-export type EventStatus = 'PENDING' | 'DONE' | 'LATE' | 'PAID';
+export type EventStatus = 'PENDING' | 'DONE' | 'LATE' | 'PAID' | 'PARTIAL';
 
 export interface CalendarEvent {
   id: string;
@@ -18,21 +18,18 @@ export interface CalendarEvent {
   priority: EventPriority;
   recurrence?: 'NONE' | 'DAILY' | 'WEEKLY' | 'MONTHLY';
   
-  // Metadados para Ação do Sistema
   meta?: {
       loanId?: string;
       installmentId?: string;
       clientId?: string;
       amount?: number;
-      signalId?: string; // Para solicitações do portal
+      signalId?: string;
       comprovanteUrl?: string;
-      clientName?: string;     // Novo
-      clientPhone?: string;    // Novo
+      clientName?: string;
+      clientPhone?: string;
   };
   
   google_event_id?: string;
-  
-  // Virtual props for UI
   color?: string;
   clientName?: string;
 }

@@ -13,10 +13,11 @@ interface LegalContainerProps {
   fileCtrl: any;
   showToast: any;
   onRefresh: () => void;
+  goBack?: () => void;
 }
 
 export const LegalContainer: React.FC<LegalContainerProps> = ({
-  loans, sources, activeUser, ui, loanCtrl, fileCtrl, showToast, onRefresh
+  loans, sources, activeUser, ui, loanCtrl, fileCtrl, showToast, onRefresh, goBack
 }) => {
 
   const handleAgreementPayment = async (loan: Loan, agreement: Agreement, inst: AgreementInstallment) => {
@@ -45,6 +46,7 @@ export const LegalContainer: React.FC<LegalContainerProps> = ({
         onReverseTransaction={loanCtrl.openReverseTransaction}
         isStealthMode={ui.isStealthMode}
         showToast={showToast}
+        goBack={goBack}
     />
   );
 };

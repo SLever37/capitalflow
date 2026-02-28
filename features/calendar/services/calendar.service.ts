@@ -6,106 +6,84 @@ export const calendarService = {
   async fetchSystemEvents(profileId: string): Promise<CalendarEvent[]> {
     const events: CalendarEvent[] = [];
 
-    // A) Buscar Contratos e Parcelas (Incluindo telefone e nome)
+    // 1) Buscar Contratos Ativos e suas Parcelas (Fonte de Verdade)
+    // Filtro: Somente contratos que não estão ENCERRADO ou PAID
     const { data: loans } = await supabase
       .from('contratos')
-      .select('id, debtor_name, debtor_phone, client_id, start_date, parcelas(id, data_vencimento, status, amount, principal_remaining, interest_remaining, late_fee_accrued, numero_parcela)')
+      .select(`
+        id, 
+        debtor_name, 
+        debtor_phone, 
+        client_id, 
+        status,
+        parcelas (
+          id, 
+          data_vencimento, 
+          status, 
+          amount, 
+          principal_remaining, 
+          interest_remaining, 
+          late_fee_accrued, 
+          numero_parcela
+        )
+      `)
       .eq('profile_id', profileId)
+      .not('status', 'in', '("ENCERRADO","PAID")')
       .eq('is_archived', false);
 
     if (loans) {
       loans.forEach((loan: any) => {
-        // [FIX] Validação de Integridade Financeira:
-        // Verifica se o contrato realmente tem saldo devedor.
-        // Se a soma de Principal + Juros restantes for zero (ou residual < 0.10), 
-        // o contrato é considerado FINALIZADO e não gera eventos na agenda.
-        const totalLoanDebt = (loan.parcelas || []).reduce((acc: number, item: any) => {
-            return acc + (Number(item.principal_remaining) || 0) + (Number(item.interest_remaining) || 0);
-        }, 0);
-
-        if (totalLoanDebt < 0.10) {
-            return; // Pula contrato finalizado
-        }
-
-        // A.2) Parcelas (Ação de Cobrança/Pagamento)
         loan.parcelas?.forEach((p: any) => {
-          // [FIX] Verifica também se a parcela específica tem valor a receber (> 5 centavos)
-          const installmentTotal = (Number(p.principal_remaining) || 0) + (Number(p.interest_remaining) || 0) + (Number(p.late_fee_accrued) || 0);
+          // Somente parcelas não pagas
+          if (p.status !== 'PAID') {
+            const dueDate = p.data_vencimento;
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const due = new Date(dueDate);
+            due.setHours(0, 0, 0, 0);
+            
+            const isLate = due.getTime() < today.getTime();
+            const isToday = due.getTime() === today.getTime();
+            const isSoon = !isLate && !isToday && (due.getTime() - today.getTime() <= 7 * 24 * 60 * 60 * 1000);
+            
+            let label: 'OVERDUE' | 'DUE_TODAY' | 'DUE_SOON' | 'UPCOMING' = 'UPCOMING';
+            if (isLate) label = 'OVERDUE';
+            else if (isToday) label = 'DUE_TODAY';
+            else if (isSoon) label = 'DUE_SOON';
 
-          if (p.status !== 'PAID' && installmentTotal > 0.05) {
-              const dueDate = p.data_vencimento;
-              // Ajuste de fuso horário simples para comparação de data (apenas dia)
-              const today = new Date();
-              today.setHours(0,0,0,0);
-              const due = new Date(dueDate);
-              due.setHours(0,0,0,0);
-              
-              const isLate = due.getTime() < today.getTime();
-              
-              const safeAmount = Number(p.amount) || 0;
+            const installmentTotal = (Number(p.principal_remaining) || 0) + (Number(p.interest_remaining) || 0) + (Number(p.late_fee_accrued) || 0);
 
-              events.push({
-                  id: `inst-${p.id}`,
-                  title: `${loan.debtor_name}`,
-                  description: `Parcela ${p.numero_parcela || 'Única'} • R$ ${safeAmount.toFixed(2)}`,
-                  start_time: dueDate,
-                  end_time: dueDate,
-                  is_all_day: true,
-                  type: 'SYSTEM_INSTALLMENT',
-                  status: isLate ? 'LATE' : 'PENDING',
-                  priority: isLate ? 'HIGH' : 'MEDIUM',
-                  meta: { 
-                      loanId: loan.id, 
-                      installmentId: p.id, 
-                      clientId: loan.client_id, 
-                      amount: installmentTotal, // Usa o total real devido (incluindo multas) para o evento
-                      clientName: loan.debtor_name,
-                      clientPhone: loan.debtor_phone
-                  },
-                  color: isLate ? '#f43f5e' : '#f59e0b' 
-              });
+            events.push({
+              id: `inst-${p.id}`,
+              title: loan.debtor_name,
+              description: `Parcela ${p.numero_parcela || 'Única'} • R$ ${Number(p.amount).toFixed(2)}`,
+              start_time: dueDate,
+              end_time: dueDate,
+              is_all_day: true,
+              type: 'SYSTEM_INSTALLMENT',
+              status: label,
+              priority: isLate ? 'HIGH' : (isToday ? 'MEDIUM' : 'LOW'),
+              meta: { 
+                loanId: loan.id, 
+                installmentId: p.id, 
+                clientId: loan.client_id, 
+                amount: installmentTotal,
+                clientName: loan.debtor_name,
+                clientPhone: loan.debtor_phone,
+                label
+              },
+              color: isLate ? '#f43f5e' : (isToday ? '#f59e0b' : '#3b82f6')
+            });
           }
         });
       });
     }
 
-    // B) Buscar Solicitações do Portal (URGENTE)
-    const { data: signals } = await supabase
-        .from('sinalizacoes_pagamento')
-        .select(`
-            *,
-            contratos (debtor_name, debtor_phone)
-        `)
-        .eq('profile_id', profileId)
-        .eq('status', 'PENDENTE');
-
-    if (signals) {
-        signals.forEach((s: any) => {
-            const clientName = s.contratos?.debtor_name || 'Cliente';
-            events.push({
-                id: `signal-${s.id}`,
-                title: `SINALIZAÇÃO: ${clientName}`,
-                description: s.tipo_intencao === 'PAGAR_PIX' ? 'Enviou comprovante PIX' : 'Solicitou link de pagamento',
-                start_time: s.created_at,
-                end_time: s.created_at,
-                is_all_day: false,
-                type: 'SYSTEM_PORTAL_REQUEST',
-                status: 'PENDING',
-                priority: 'URGENT',
-                meta: { 
-                    loanId: s.loan_id, 
-                    clientId: s.client_id, 
-                    signalId: s.id, 
-                    comprovanteUrl: s.comprovante_url,
-                    clientName: clientName,
-                    clientPhone: s.contratos?.debtor_phone
-                },
-                color: '#10b981'
-            });
-        });
-    }
 
     return events;
+
+    // TODO: Implementar uma função separada para buscar e exibir payment_intents como sinalização visual, se necessário.
+
   },
 
   async listUserEvents(profileId: string): Promise<CalendarEvent[]> {

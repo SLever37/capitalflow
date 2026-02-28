@@ -1,98 +1,86 @@
 import { supabase } from '../lib/supabase';
-import { GoogleGenAI } from "@google/genai";
 
-export type AIPersona = 'OPERATOR_CRO' | 'TEAM_LEADER' | 'CLIENT_MENTOR' | 'PERSONAL_CFO';
+export type AIPersona =
+  | 'OPERATOR_CRO'
+  | 'TEAM_LEADER'
+  | 'CLIENT_MENTOR'
+  | 'PERSONAL_CFO';
 
 export interface AIResponse {
+  ok?: boolean;
   intent: string;
   feedback: string;
   analysis?: string;
   data?: any;
   suggestions?: string[];
-  riskScore?: number; // 0-100
+  riskScore?: number;
 }
 
-export const processNaturalLanguageCommand = async (text: string, context: any): Promise<AIResponse> => {
-  // 1. Tenta via Edge Function (Segurança)
+function resolvePersona(context: any): AIPersona {
+  if (context?.type === 'PORTAL_CLIENT') return 'CLIENT_MENTOR';
+  if (context?.type === 'TEAM_PAGE') return 'TEAM_LEADER';
+  if (context?.type === 'PERSONAL_FINANCE') return 'PERSONAL_CFO';
+  return 'OPERATOR_CRO';
+}
+
+export const processNaturalLanguageCommand = async (
+  text: string,
+  context: any
+): Promise<AIResponse> => {
   try {
+    const persona = resolvePersona(context);
+
     const { data, error } = await supabase.functions.invoke('ai-assistant', {
-      body: { text, context },
+      body: { text, context, persona },
     });
-    if (!error && data) return data;
-  } catch (e) {
-    console.warn("[IA] Falha na Edge Function, usando fallback local...");
-  }
 
-  // 2. Fallback via SDK Local (Se configurado)
-  const apiKey = process.env.API_KEY;
-  if (!apiKey || apiKey === 'PLACEHOLDER_API_KEY') {
-    return { 
-      intent: 'ERROR', 
-      feedback: 'Assistente offline. Configure sua chave de API.' 
-    };
-  }
+    // Erro de transporte (rede / 4xx/5xx)
+    if (error) {
+      // Tenta extrair payload útil
+      const providerStatus =
+        (error as any)?.context?.provider_status ||
+        (data as any)?.data?.provider_status;
 
-  try {
-    const ai = new GoogleGenAI({ apiKey });
-    const isDemo = context?.isDemo || false;
-    
-    // Define a Persona baseada no contexto enviado
-    const persona: AIPersona = context?.type === 'PORTAL_CLIENT' ? 'CLIENT_MENTOR' : 
-                            context?.type === 'TEAM_PAGE' ? 'TEAM_LEADER' :
-                            context?.type === 'PERSONAL_FINANCE' ? 'PERSONAL_CFO' : 'OPERATOR_CRO';
+      if (providerStatus === 429) {
+        return {
+          intent: 'ERROR',
+          feedback:
+            'IA temporariamente indisponível (limite atingido). Tente novamente em alguns instantes.',
+        };
+      }
 
-    let systemInstruction = "";
-
-    switch (persona) {
-      case 'OPERATOR_CRO':
-        systemInstruction = `Você é o Chief Risk Officer (CRO) da CapitalFlow. Analise a carteira de empréstimos com foco em liquidez, inadimplência e preservação de capital. Seja técnico e direto. ${isDemo ? "Nota: Este é um ambiente de DEMONSTRAÇÃO com dados simulados." : ""}`;
-        break;
-      case 'TEAM_LEADER':
-        systemInstruction = `Você é um Gestor de Performance de Equipe. Sua missão é analisar a atividade dos operadores, identificar gargalos de produtividade e sugerir metas. Foco em engajamento e volume operado.`;
-        break;
-      case 'CLIENT_MENTOR':
-        systemInstruction = `Você é um Mentor de Prosperidade Financeira. Ajude o cliente a entender sua dívida não como um peso, mas como um degrau. Sugira planos de economia doméstica com empatia e motivação.`;
-        break;
-      case 'PERSONAL_CFO':
-        systemInstruction = `Você é um CFO Pessoal de elite. Analise gastos, categorias de consumo e saldos para sugerir investimentos ou cortes estratégicos. Seja transformador.`;
-        break;
+      return {
+        intent: 'ERROR',
+        feedback: 'Erro ao comunicar com a IA.',
+      };
     }
 
-    const model = 'gemini-3-flash-preview';
-    const prompt = `
-      CONTEXTO DO SISTEMA: ${JSON.stringify(context)}
-      COMANDO OU DADOS DO USUÁRIO: "${text}"
-      
-      RETORNE APENAS JSON NO FORMATO:
-      {
-        "intent": "string",
-        "feedback": "string",
-        "analysis": "string (análise densa e estratégica)",
-        "suggestions": ["sugestão 1", "sugestão 2"],
-        "riskScore": number (0 a 100, se aplicável),
-        "data": {}
+    // Caso a Edge devolva ok:false (ex: quota)
+    if (data?.ok === false) {
+      if (data?.data?.provider_status === 429) {
+        return {
+          intent: 'ERROR',
+          feedback:
+            'IA temporariamente indisponível (limite atingido). Tente novamente em alguns instantes.',
+        };
       }
-    `;
 
-    const response = await ai.models.generateContent({
-      model,
-      contents: prompt,
-      config: {
-        systemInstruction,
-        responseMimeType: "application/json",
-        temperature: 0.5
-      }
-    });
+      return {
+        intent: data?.intent || 'ERROR',
+        feedback: data?.feedback || 'Falha ao processar IA.',
+        analysis: data?.analysis,
+        suggestions: data?.suggestions,
+        riskScore: data?.riskScore,
+        data: data?.data,
+      };
+    }
 
-    const textOutput = response.text;
-    if (!textOutput) throw new Error("Resposta vazia da IA.");
-    
-    return JSON.parse(textOutput.replace(/```json|```/g, '').trim());
+    // Sucesso
+    return data as AIResponse;
   } catch (e) {
-    console.error("[IA] Erro Crítico:", e);
-    return { 
-      intent: 'ERROR', 
-      feedback: 'Tive uma falha no processamento neural. Tente novamente em instantes.' 
+    return {
+      intent: 'ERROR',
+      feedback: 'Falha inesperada ao processar IA.',
     };
   }
 };

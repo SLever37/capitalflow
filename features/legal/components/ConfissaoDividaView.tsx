@@ -62,14 +62,8 @@ export const ConfissaoDividaView: React.FC<ConfissaoDividaViewProps> = ({ loans,
             try {
                 const doc = await legalService.getDocumentByLoanId(selectedLoan.id);
                 if (doc) {
-                    const token = doc.public_access_token || doc.view_token;
-                    let baseUrl = '';
-                    if (token) {
-                        baseUrl = `${window.location.origin}/?legal_sign=${token}`;
-                    } else {
-                        const portalLink = await getOrCreatePortalLink(selectedLoan.id);
-                        baseUrl = `${portalLink}&legal_sign=true`;
-                    }
+                    const token = doc.view_token;
+                    const baseUrl = `${window.location.origin}/?legal_sign=${token}`;
                     setSigningLinks({
                         debtor: `${baseUrl}&role=DEBTOR`,
                         creditor: `${baseUrl}&role=CREDITOR`,
@@ -130,16 +124,9 @@ export const ConfissaoDividaView: React.FC<ConfissaoDividaViewProps> = ({ loans,
                 activeUser.id
             );
 
-            const html = DocumentTemplates.confissaoDivida(params);
-            const win = window.open('', '_blank');
-            if (win) {
-                win.document.write(html);
-                win.document.close();
-                showToast("Documento registrado e aberto para impressão!", "success");
-                setTimeout(() => win.print(), 800);
-            }
+            showToast("Documento registrado com sucesso!", "success");
             
-            // Gera links automaticamente após criar
+            // Gera links automaticamente após criar usando o token real do banco
             const token = docRecord.public_access_token;
             const baseUrl = `${window.location.origin}/?legal_sign=${token}`;
             setSigningLinks({

@@ -3,6 +3,7 @@ import { Loan, Installment } from '../../../types';
 import { calculateTotalDue } from '../../../domain/finance/calculations';
 import { normalizeLoanForCalc, normalizeInstallmentForCalc } from './portalAdapters';
 import { getDaysDiff } from '../../../utils/dateHelpers';
+import { loanEngine } from '../../../domain/loanEngine';
 import { isDev } from '../../../utils/isDev';
 
 // Tipos de Retorno
@@ -84,34 +85,26 @@ export const getPortalDueLabel = (daysLate: number, dueDateISO: string) => {
 export const resolveDebtSummary = (loan: Loan, installments: Installment[]): PortalDebtSummary => {
     if (!loan || !installments) return { totalDue: 0, nextDueDate: null, pendingCount: 0, hasLateInstallments: false, maxDaysLate: 0 };
 
-    const pending = installments.filter(i => i.status !== 'PAID');
+    const balance = loanEngine.computeRemainingBalance(loan);
+    const pending = installments.filter(i => {
+        const isPaidByStatus = i.status === 'PAID';
+        const isPaidByBalance = (Number(i.principalRemaining) || 0) === 0 && (Number(i.interestRemaining) || 0) === 0;
+        return !isPaidByStatus && !isPaidByBalance;
+    });
+
     const loanCalc = normalizeLoanForCalc(loan);
-
-    let totalDue = 0;
-    let hasLate = false;
     let maxDaysLate = 0;
-
-    // Soma inteligente: Usa o motor financeiro para cada parcela
     pending.forEach(inst => {
         const instCalc = normalizeInstallmentForCalc(inst);
         const debt = calculateTotalDue(loanCalc, instCalc);
-        totalDue += debt.total; // total já inclui multa/mora se houver atraso
-        
-        if (debt.daysLate > 0) {
-            hasLate = true;
-            if (debt.daysLate > maxDaysLate) maxDaysLate = debt.daysLate;
-        }
+        if (debt.daysLate > maxDaysLate) maxDaysLate = debt.daysLate;
     });
 
-    const nextDueDate = pending.length > 0 
-        ? new Date(pending[0].dueDate) // Assume ordenação por data vinda do service
-        : null;
-
     return {
-        totalDue,
-        nextDueDate,
+        totalDue: balance.totalRemaining,
+        nextDueDate: pending.length > 0 ? new Date(pending[0].dueDate) : null,
         pendingCount: pending.length,
-        hasLateInstallments: hasLate,
+        hasLateInstallments: maxDaysLate > 0,
         maxDaysLate
     };
 };
@@ -124,14 +117,19 @@ export const resolveInstallmentDebt = (loan: Loan, inst: Installment): Installme
     const instCalc = normalizeInstallmentForCalc(inst);
     const debt = calculateTotalDue(loanCalc, instCalc);
 
+    // CORREÇÃO: Verificar se parcela está realmente quitada (status OU saldo zerado)
+    const isPaidByStatus = inst.status === 'PAID';
+    const isPaidByBalance = (Number(inst.principalRemaining) || 0) === 0 && (Number(inst.interestRemaining) || 0) === 0;
+    const isPaidOff = isPaidByStatus || isPaidByBalance;
+
     const isLate = debt.daysLate > 0;
     const dueInfo = getPortalDueLabel(debt.daysLate, inst.dueDate);
 
     let statusLabel = dueInfo.label;
     let statusColor = 'text-slate-500';
 
-    if (inst.status === 'PAID') {
-        statusLabel = 'Pago';
+    if (isPaidOff) {
+        statusLabel = 'Quitada';
         statusColor = 'text-emerald-500';
     } else if (dueInfo.variant === 'OVERDUE') {
         statusColor = 'text-rose-500 font-bold';

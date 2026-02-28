@@ -175,12 +175,31 @@ export const useTeamData = (activeUserId: string | null | undefined) => {
     await loadData();
   };
 
-  const updateMember = async (memberId: string, updates: { role?: string; team_id?: string; profile_id?: string | null }) => {
-    const { error } = await supabase
+  const updateMember = async (memberId: string, updates: { role?: string; team_id?: string; profile_id?: string | null, supervisor_id?: string | null }) => {
+    // 1. Atualiza dados na tabela team_members
+    const { error: tmError } = await supabase
       .from('team_members')
-      .update(updates)
+      .update({
+        role: updates.role,
+        team_id: updates.team_id
+      })
       .eq('id', memberId);
-    if (error) throw error;
+    
+    if (tmError) throw tmError;
+
+    // 2. Se houver profile_id e supervisor_id, atualiza na tabela perfis
+    const member = members.find(m => m.id === memberId);
+    const profileId = updates.profile_id || member?.profile_id;
+    
+    if (profileId && updates.hasOwnProperty('supervisor_id')) {
+      const { error: pError } = await supabase
+        .from('perfis')
+        .update({ supervisor_id: updates.supervisor_id })
+        .eq('id', profileId);
+      
+      if (pError) throw pError;
+    }
+
     await loadData();
   };
 

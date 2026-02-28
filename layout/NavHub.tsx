@@ -29,48 +29,60 @@ export const NavHub: React.FC<NavHubProps> = ({ onClose, onNavigate, userLevel, 
     };
 
     return (
-        <div className="fixed inset-0 z-[60] bg-slate-950/40 backdrop-blur-xl flex items-center justify-center p-4 animate-in fade-in zoom-in-95 duration-200">
-            <div className="w-full max-w-sm relative">
-                <button onClick={onClose} className="absolute -top-12 right-0 p-3 bg-slate-900 rounded-full text-slate-400 hover:text-white"><X/></button>
-                <div className="flex justify-center items-center mb-8">
-                    <h2 className="text-2xl font-black text-white uppercase tracking-tighter flex items-center gap-2"><LayoutGrid className="text-blue-500"/> Hub Central</h2>
+        <div className="fixed inset-0 z-[60] bg-slate-950/40 backdrop-blur-xl flex flex-col items-center justify-start md:justify-center p-4 pt-6 animate-in fade-in zoom-in-95 duration-200">
+            {/* Container com scroll */}
+            <div className="w-full max-w-sm relative flex flex-col max-h-[90dvh]">
+                {/* Header fixo com botão fechar */}
+                <div className="flex justify-between items-center mb-6 shrink-0 px-1">
+                    <h2 className="text-2xl font-black text-white uppercase tracking-tighter flex items-center gap-2">
+                        <LayoutGrid className="text-blue-500"/> Hub Central
+                    </h2>
+                    <button 
+                        onClick={onClose} 
+                        className="p-3 bg-slate-900 border border-slate-800 rounded-2xl text-slate-400 hover:text-white hover:border-slate-600 transition-all active:scale-95"
+                    >
+                        <X size={20}/>
+                    </button>
                 </div>
                 
-                <div className="grid grid-cols-2 gap-4">
-                    {hubOrder.map(tab => {
-                        const meta = getTabMeta(tab);
-                        return (
-                            <button key={tab} onClick={() => onNavigate(tab)} className={`p-6 bg-slate-900 border border-slate-800 rounded-3xl transition-all group flex flex-col items-center justify-center gap-3 relative ${meta.hover}`}>
-                                <div className={`p-4 bg-slate-800 rounded-2xl ${meta.color} group-hover:scale-110 transition-transform`}>{meta.icon}</div>
-                                <span className="font-bold text-white uppercase text-xs tracking-widest text-center">{meta.label}</span>
-                                {tab === 'ACQUISITION' && unreadCampaignCount > 0 && (
-                                    <span className="absolute top-4 right-4 bg-rose-500 text-white text-[10px] font-black w-6 h-6 flex items-center justify-center rounded-full ring-4 ring-slate-900 animate-bounce shadow-lg shadow-rose-500/50">
-                                        {unreadCampaignCount > 99 ? '99+' : unreadCampaignCount}
-                                    </span>
-                                )}
-                            </button>
-                        );
-                    })}
-                    
-                    {/* Atalhos fixos de utilitários - Agora com o mesmo estilo dos botões de navegação */}
-                    <button onClick={() => onNavigate('DASHBOARD', 'AGENDA')} className="p-6 bg-slate-900 border border-slate-800 rounded-3xl transition-all group flex flex-col items-center justify-center gap-3 hover:border-purple-600">
-                        <div className="p-4 bg-slate-800 rounded-2xl text-purple-500 group-hover:scale-110 transition-transform">
-                            <Calendar size={32}/>
-                        </div>
-                        <span className="font-bold text-white uppercase text-xs tracking-widest text-center">Agenda</span>
-                    </button>
-                    <button onClick={() => onNavigate('DASHBOARD', 'CALC')} className="p-6 bg-slate-900 border border-slate-800 rounded-3xl transition-all group flex flex-col items-center justify-center gap-3 hover:border-blue-400">
-                        <div className="p-4 bg-slate-800 rounded-2xl text-blue-400 group-hover:scale-110 transition-transform">
-                            <Calculator size={32}/>
-                        </div>
-                        <span className="font-bold text-white uppercase text-xs tracking-widest text-center">Simulador</span>
-                    </button>
-                    <button onClick={() => onNavigate('DASHBOARD', 'FLOW')} className="p-6 bg-slate-900 border border-slate-800 rounded-3xl transition-all group flex flex-col items-center justify-center gap-3 hover:border-emerald-400">
-                        <div className="p-4 bg-slate-800 rounded-2xl text-emerald-400 group-hover:scale-110 transition-transform">
-                            <ArrowRightLeft size={32}/>
-                        </div>
-                        <span className="font-bold text-white uppercase text-xs tracking-widest text-center">Extrato Geral</span>
-                    </button>
+                {/* Grid com scroll */}
+                <div className="flex-1 overflow-y-auto overscroll-contain pb-6" style={{ WebkitOverflowScrolling: 'touch' }}>
+                    <div className="grid grid-cols-2 gap-4">
+                        {hubOrder.map(tab => {
+                            const meta = getTabMeta(tab);
+                            return (
+                                <button key={tab} onClick={() => onNavigate(tab)} className={`p-6 bg-slate-900 border border-slate-800 rounded-3xl transition-all group flex flex-col items-center justify-center gap-3 relative active:scale-95 ${meta.hover}`}>
+                                    <div className={`p-4 bg-slate-800 rounded-2xl ${meta.color} group-hover:scale-110 transition-transform`}>{meta.icon}</div>
+                                    <span className="font-bold text-white uppercase text-xs tracking-widest text-center">{meta.label}</span>
+                                    {tab === 'ACQUISITION' && unreadCampaignCount > 0 && (
+                                        <span className="absolute top-4 right-4 bg-rose-500 text-white text-[10px] font-black w-6 h-6 flex items-center justify-center rounded-full ring-4 ring-slate-900 animate-bounce shadow-lg shadow-rose-500/50">
+                                            {unreadCampaignCount > 99 ? '99+' : unreadCampaignCount}
+                                        </span>
+                                    )}
+                                </button>
+                            );
+                        })}
+                        
+                        {/* Atalhos fixos de utilitários */}
+                        <button onClick={() => onNavigate('DASHBOARD', 'AGENDA')} className="p-6 bg-slate-900 border border-slate-800 rounded-3xl transition-all group flex flex-col items-center justify-center gap-3 hover:border-purple-600 active:scale-95">
+                            <div className="p-4 bg-slate-800 rounded-2xl text-purple-500 group-hover:scale-110 transition-transform">
+                                <Calendar size={32}/>
+                            </div>
+                            <span className="font-bold text-white uppercase text-xs tracking-widest text-center">Agenda</span>
+                        </button>
+                        <button onClick={() => onNavigate('DASHBOARD', 'CALC')} className="p-6 bg-slate-900 border border-slate-800 rounded-3xl transition-all group flex flex-col items-center justify-center gap-3 hover:border-blue-400 active:scale-95">
+                            <div className="p-4 bg-slate-800 rounded-2xl text-blue-400 group-hover:scale-110 transition-transform">
+                                <Calculator size={32}/>
+                            </div>
+                            <span className="font-bold text-white uppercase text-xs tracking-widest text-center">Simulador</span>
+                        </button>
+                        <button onClick={() => onNavigate('DASHBOARD', 'FLOW')} className="p-6 bg-slate-900 border border-slate-800 rounded-3xl transition-all group flex flex-col items-center justify-center gap-3 hover:border-emerald-400 active:scale-95">
+                            <div className="p-4 bg-slate-800 rounded-2xl text-emerald-400 group-hover:scale-110 transition-transform">
+                                <ArrowRightLeft size={32}/>
+                            </div>
+                            <span className="font-bold text-white uppercase text-xs tracking-widest text-center">Extrato Geral</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

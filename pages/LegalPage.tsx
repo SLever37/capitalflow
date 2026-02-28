@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
-import { Scale, CheckCircle2, History, TrendingUp, HandCoins, FileText, Scroll, MessageCircle, ShieldCheck, Printer, User } from 'lucide-react';
+import { Scale, CheckCircle2, History, TrendingUp, HandCoins, FileText, Scroll, MessageCircle, ShieldCheck, Printer, User, ChevronLeft } from 'lucide-react';
 import { Loan, CapitalSource, UserProfile, Agreement, AgreementInstallment, LedgerEntry } from '../types';
+import { loanEngine } from '../domain/loanEngine';
 import { LoanCard } from '../components/cards/LoanCard';
 import { formatMoney } from '../utils/formatters';
 
@@ -25,6 +26,8 @@ interface LegalPageProps {
   onReverseTransaction: (transaction: LedgerEntry, loan: Loan) => void;
   isStealthMode: boolean;
   showToast: (msg: string, type?: 'error'|'success') => void;
+  setActiveTab?: (tab: string) => void;
+  goBack?: () => void;
 }
 
 type LegalSubView = 'OVERVIEW' | 'CONFISSAO' | 'PROMISSORIA' | 'NOTIFICACAO' | 'QUITACAO' | 'PROFILE';
@@ -32,8 +35,8 @@ type LegalSubView = 'OVERVIEW' | 'CONFISSAO' | 'PROMISSORIA' | 'NOTIFICACAO' | '
 export const LegalPage: React.FC<LegalPageProps> = (props) => {
   const [subView, setSubView] = useState<LegalSubView>('OVERVIEW');
 
-  // Filtra apenas contratos que possuem acordos ativos
-  const legalLoans = props.loans.filter(l => l.activeAgreement && l.activeAgreement.status === 'ACTIVE');
+  // FILTRO DEFINITIVO: Usa Engine de Domínio Central
+  const legalLoans = props.loans.filter(l => loanEngine.isLegallyActionable(l));
   
   // Estatísticas Rápidas do Setor
   const totalAgreements = legalLoans.length;
@@ -54,11 +57,20 @@ export const LegalPage: React.FC<LegalPageProps> = (props) => {
     <div className="space-y-8 animate-in fade-in duration-500">
         {/* HEADER */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-                <h2 className="text-2xl font-black uppercase tracking-tighter text-white flex items-center gap-2">
-                    <Scale className="text-indigo-500" size={28}/> Departamento Jurídico
-                </h2>
-                <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">Gestão de Acordos e Recuperação de Crédito</p>
+            <div className="flex items-center gap-3">
+                <button
+                    onClick={() => props.goBack ? props.goBack() : props.setActiveTab?.('DASHBOARD')}
+                    className="p-2 -ml-2 text-slate-400 hover:text-white transition-colors"
+                    title="Voltar ao Hub Central"
+                >
+                    <ChevronLeft size={24} />
+                </button>
+                <div>
+                    <h2 className="text-2xl font-black uppercase tracking-tighter text-white flex items-center gap-2">
+                        <Scale className="text-indigo-500" size={28}/> Departamento Jurídico
+                    </h2>
+                    <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">Gestão de Acordos e Recuperação de Crédito</p>
+                </div>
             </div>
             <button 
                 onClick={() => setSubView('PROFILE')}

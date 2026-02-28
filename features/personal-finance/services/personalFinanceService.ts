@@ -3,97 +3,163 @@ import { generateUUID } from '../../../utils/generators';
 import { PFTransaction, PFAccount, PFCard, PFCategory } from '../types';
 
 export const personalFinanceService = {
-    async getAccounts(profileId: string): Promise<PFAccount[]> {
-        const { data } = await supabase.from('pf_contas').select('*').eq('profile_id', profileId);
-        return data || [];
-    },
 
-    async getCards(profileId: string): Promise<PFCard[]> {
-        const { data } = await supabase.from('pf_cartoes').select('*').eq('profile_id', profileId);
-        return data || [];
-    },
+  async getAccounts(profileId: string): Promise<PFAccount[]> {
+    const { data, error } = await supabase
+      .from('pf_contas')
+      .select('*')
+      .eq('profile_id', profileId);
 
-    async getCategories(profileId: string): Promise<PFCategory[]> {
-        const { data } = await supabase.from('pf_categorias').select('*').eq('profile_id', profileId);
-        return data || [];
-    },
+    if (error) throw error;
+    return data || [];
+  },
 
-    async getTransactions(profileId: string, month: number, year: number): Promise<PFTransaction[]> {
-        const startDate = new Date(year, month, 1).toISOString();
-        const endDate = new Date(year, month + 1, 0).toISOString();
+  async getCards(profileId: string): Promise<PFCard[]> {
+    const { data, error } = await supabase
+      .from('pf_cartoes')
+      .select('*')
+      .eq('profile_id', profileId);
 
-        const { data } = await supabase
-            .from('pf_transacoes')
-            .select(`
-                *,
-                pf_categorias(nome),
-                pf_contas(nome),
-                pf_cartoes(nome)
-            `)
-            .eq('profile_id', profileId)
-            .gte('data', startDate)
-            .lte('data', endDate)
-            .order('data', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  },
 
-        return (data || []).map((t: any) => ({
-            ...t,
-            category_name: t.pf_categorias?.nome,
-            account_name: t.pf_contas?.nome,
-            card_name: t.pf_cartoes?.nome
-        }));
-    },
+  async getCategories(profileId: string): Promise<PFCategory[]> {
+    const { data, error } = await supabase
+      .from('pf_categorias')
+      .select('*')
+      .eq('profile_id', profileId);
 
-    async addTransaction(tx: Partial<PFTransaction>, profileId: string) {
-        const payload = {
-            id: generateUUID(),
-            profile_id: profileId,
-            descricao: tx.descricao,
-            valor: Number(tx.valor),
-            tipo: tx.tipo,
-            data: tx.data || new Date().toISOString(),
-            categoria_id: tx.categoria_id || null,
-            conta_id: tx.conta_id || null,
-            cartao_id: tx.cartao_id || null,
-            fixo: !!tx.fixo,
-            status: tx.status || 'CONSOLIDADO',
-            created_at: new Date().toISOString()
-        };
+    if (error) throw error;
+    return data || [];
+  },
 
-        const { error } = await supabase.from('pf_transacoes').insert(payload);
-        if (error) throw error;
-        
-        // Rigor Contábil: Atualiza o saldo da conta destino na hora
-        if (payload.conta_id && payload.status === 'CONSOLIDADO' && !payload.cartao_id) {
-            const delta = payload.tipo === 'RECEITA' ? payload.valor : -payload.valor;
-            const { error: rpcErr } = await supabase.rpc('pf_adjust_account_balance', { 
-                p_account_id: payload.conta_id, 
-                p_delta: delta 
-            });
-            if (rpcErr) console.error("Erro ao atualizar saldo da conta:", rpcErr);
-        }
-    },
+  async getTransactions(profileId: string, month: number, year: number): Promise<PFTransaction[]> {
+    const startDate = new Date(year, month, 1).toISOString();
+    const endDate = new Date(year, month + 1, 0).toISOString();
 
-    async addAccount(acc: Partial<PFAccount>, profileId: string) {
-        await supabase.from('pf_contas').insert({ id: generateUUID(), profile_id: profileId, ...acc });
-    },
+    const { data, error } = await supabase
+      .from('pf_transacoes')
+      .select(`
+        *,
+        pf_categorias(nome),
+        pf_contas(nome),
+        pf_cartoes(nome)
+      `)
+      .eq('profile_id', profileId)
+      .gte('data', startDate)
+      .lte('data', endDate)
+      .order('data', { ascending: false });
 
-    async deleteAccount(id: string) {
-        await supabase.from('pf_contas').delete().eq('id', id);
-    },
+    if (error) throw error;
 
-    async addCard(card: Partial<PFCard>, profileId: string) {
-        await supabase.from('pf_cartoes').insert({ id: generateUUID(), profile_id: profileId, ...card });
-    },
+    return (data || []).map((t: any) => ({
+      ...t,
+      category_name: t.pf_categorias?.nome,
+      account_name: t.pf_contas?.nome,
+      card_name: t.pf_cartoes?.nome
+    }));
+  },
 
-    async deleteCard(id: string) {
-        await supabase.from('pf_cartoes').delete().eq('id', id);
-    },
+  /**
+   * Criação Atômica de Transação Financeira
+   * Tudo acontece dentro da RPC:
+   * - Insere pf_transacoes
+   * - Ajusta saldo da conta
+   * - Injeta na operação se necessário
+   */
+  async addTransaction(tx: any, profileId: string) {
 
-    async addCategory(cat: Partial<PFCategory>, profileId: string) {
-        await supabase.from('pf_categorias').insert({ id: generateUUID(), profile_id: profileId, ...cat });
-    },
+    if (!profileId) throw new Error('profileId obrigatório');
+    if (!tx.valor || Number(tx.valor) <= 0) throw new Error('Valor inválido');
 
-    async deleteTransaction(id: string) {
-        await supabase.from('pf_transacoes').delete().eq('id', id);
-    }
+    const idempotencyKey = crypto.randomUUID();
+
+    const { error } = await supabase.rpc(
+      'pf_create_transaction_atomic',
+      {
+        p_profile_id: profileId,
+        p_valor: Number(tx.valor),
+        p_tipo: tx.tipo,
+        p_descricao: tx.descricao,
+        p_data: tx.data,
+        p_status: tx.status || 'CONSOLIDADO',
+        p_categoria_id: tx.categoria_id || null,
+        p_conta_id: tx.conta_id || null,
+        p_cartao_id: tx.cartao_id || null,
+        p_is_operation_transfer: !!tx.is_operation_transfer,
+        p_operation_loan_id: tx.operation_loan_id || null,
+        p_operation_source_id: tx.operation_source_id || null,
+        p_idempotency_key: idempotencyKey
+      }
+    );
+
+    if (error) throw error;
+
+    return { success: true };
+  },
+
+  async addAccount(acc: Partial<PFAccount>, profileId: string) {
+    const { error } = await supabase
+      .from('pf_contas')
+      .insert({
+        id: generateUUID(),
+        profile_id: profileId,
+        ...acc
+      });
+
+    if (error) throw error;
+  },
+
+  async deleteAccount(id: string) {
+    const { error } = await supabase
+      .from('pf_contas')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+  },
+
+  async addCard(card: Partial<PFCard>, profileId: string) {
+    const { error } = await supabase
+      .from('pf_cartoes')
+      .insert({
+        id: generateUUID(),
+        profile_id: profileId,
+        ...card
+      });
+
+    if (error) throw error;
+  },
+
+  async deleteCard(id: string) {
+    const { error } = await supabase
+      .from('pf_cartoes')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+  },
+
+  async addCategory(cat: Partial<PFCategory>, profileId: string) {
+    const { error } = await supabase
+      .from('pf_categorias')
+      .insert({
+        id: generateUUID(),
+        profile_id: profileId,
+        ...cat
+      });
+
+    if (error) throw error;
+  },
+
+  async deleteTransaction(id: string) {
+    const { error } = await supabase
+      .from('pf_transacoes')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+  }
+
 };

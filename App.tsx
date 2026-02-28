@@ -11,6 +11,7 @@ import { usePersistedTab } from './hooks/usePersistedTab';
 import { useControllers } from './hooks/useControllers';
 import { useAppNotifications } from './hooks/useAppNotifications';
 import { useExitGuard } from './hooks/useExitGuard';
+import { useNavigationStack } from './hooks/useNavigationStack';
 import { DashboardContainer } from './containers/DashboardContainer';
 import { ClientsContainer } from './containers/ClientsContainer';
 import { SourcesContainer } from './containers/SourcesContainer';
@@ -19,6 +20,7 @@ import { LegalContainer } from './containers/LegalContainer';
 import { ModalHostContainer } from './containers/ModalHostContainer';
 import { OperatorSupportChat } from './features/support/OperatorSupportChat';
 import { CalendarView } from './features/calendar/CalendarView';
+import { SimulatorPanel } from './features/simulator/SimulatorPanel';
 import { TeamPage } from './pages/TeamPage';
 import { InvitePage } from './pages/InvitePage';
 import { SetupPasswordPage } from './pages/SetupPasswordPage';
@@ -30,6 +32,7 @@ import { CustomerAcquisitionPage } from './pages/Comercial/CaptacaoClientes';
 import { SettingsPage } from './pages/SettingsPage';
 import { isDev } from './utils/isDev';
 import { PublicCampaignPage } from './pages/Public/PublicCampaignPage';
+import { PublicSignaturePage } from './pages/Public/PublicSignaturePage';
 
 export const App: React.FC = () => {
   // ROTA PÚBLICA DE CAMPANHA (Landing Page)
@@ -40,7 +43,12 @@ export const App: React.FC = () => {
       return <PublicCampaignPage />;
   }
 
-  const { portalToken, legalSignToken } = usePortalRouting();
+  const legalSignToken = urlParams.get('legal_sign');
+  if (legalSignToken) {
+      return <PublicSignaturePage />;
+  }
+
+  const { portalToken } = usePortalRouting();
   const { toast, showToast } = useToast();
   
   const {
@@ -82,6 +90,13 @@ export const App: React.FC = () => {
   ui.sortOption = sortOption;
   ui.setSortOption = setSortOption;
   ui.staffMembers = staffMembers;
+
+  // NAVIGATION STACK - controle central de navegação
+  const { goBack, isInHub } = useNavigationStack(
+    activeTab,
+    setActiveTab,
+    () => ui.setShowNavHub(true)
+  );
 
   const isPublicView = !!portalToken || !!legalSignToken;
   const isInvitePath = window.location.pathname === '/invite' || window.location.pathname === '/setup-password';
@@ -178,6 +193,8 @@ export const App: React.FC = () => {
             toggleStealthMode={() => ui.setIsStealthMode(!ui.isStealthMode)}
             onOpenSupport={() => ui.openModal('SUPPORT_CHAT')}
             navOrder={navOrder}
+            onGoBack={goBack}
+            isInHub={isInHub}
           >
             {activeTab === 'DASHBOARD' && (
               <DashboardContainer
@@ -223,11 +240,12 @@ export const App: React.FC = () => {
                 loans={loans} sources={sources} activeUser={activeUser}
                 ui={ui} loanCtrl={loanCtrl} fileCtrl={fileCtrl}
                 showToast={showToast} onRefresh={() => fetchFullData(activeUser?.id || '')}
+                goBack={goBack}
               />
             )}
 
             {activeTab === 'PERSONAL_FINANCE' && activeUser && (
-              <PersonalFinancesPage activeUser={activeUser} />
+              <PersonalFinancesPage activeUser={activeUser} goBack={goBack} />
             )}
 
             {activeTab === 'LEADS' && activeUser && (
@@ -252,6 +270,10 @@ export const App: React.FC = () => {
 
             {ui.activeModal?.type === 'SUPPORT_CHAT' && (
               <OperatorSupportChat activeUser={activeUser} onClose={ui.closeModal} />
+            )}
+
+            {ui.activeModal?.type === 'SIMULATOR' && (
+              <SimulatorPanel onClose={ui.closeModal} />
             )}
 
             {ui.activeModal?.type === 'AGENDA' && (
