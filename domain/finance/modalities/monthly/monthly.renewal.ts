@@ -55,6 +55,12 @@ export const renewMonthly = (
             monthsPaid = 1; 
         }
 
+        // ✅ Regra crítica: se quitou o juro pendente do ciclo atual, deve ao menos virar 1 ciclo
+        // Isso evita cenário de "juros pagos" sem renovação da data quando havia juro residual.
+        if (monthsPaid === 0 && currentInterest > 0 && interestPaid >= Math.max(0, currentInterest - 1)) {
+            monthsPaid = 1;
+        }
+
         if (monthsPaid > 0) {
             // Avança a data em blocos de 30 dias
             newDueDate = addDaysUTC(currentDueDate, monthsPaid * 30);

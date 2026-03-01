@@ -1,7 +1,7 @@
-// services/paymentsService.ts
+// services/payments.service.ts
 import { supabase } from '../lib/supabase';
 import type { Loan, Installment, UserProfile, CapitalSource } from '../types';
-import { todayDateOnlyUTC, toISODateOnlyUTC } from '../utils/dateHelpers';
+import { todayDateOnlyUTC } from '../utils/dateHelpers';
 import { generateUUID } from '../utils/generators';
 import { loanEngine } from '../domain/loanEngine';
 
@@ -14,12 +14,73 @@ const isUUID = (v: any) =>
 
 const safeUUID = (v: any) => (isUUID(v) ? v : null);
 
+const clamp0 = (v: number) => (v < 0 ? 0 : v);
+
 const num = (v: any) => {
   const n = typeof v === 'number' ? v : parseFloat(String(v ?? '').replace(',', '.'));
   return Number.isFinite(n) ? n : 0;
 };
 
-const clamp0 = (v: number) => (v < 0 ? 0 : v);
+const normalize = (s: string) =>
+  String(s || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+
+function resolveCaixaLivreId(sources: CapitalSource[]): string | null {
+  if (!Array.isArray(sources) || sources.length === 0) return null;
+
+  const byFlag = (sources as any[]).find(
+    (s) => s?.is_caixa_livre === true || s?.isCaixaLivre === true || s?.is_profit_box === true
+  );
+  if (byFlag?.id && isUUID(byFlag.id)) return byFlag.id;
+
+  const byName = sources.find((s) => {
+    const n = normalize((s as any)?.name);
+    return n.includes('caixa livre') || n === 'lucro' || n.includes('lucro');
+  });
+
+  if (byName?.id && isUUID(byName.id)) return byName.id;
+
+  return null;
+}
+
+async function ensureCaixaLivreId(ownerId: string, sources: CapitalSource[]): Promise<string> {
+  const mem = resolveCaixaLivreId(sources);
+  if (mem) return mem;
+
+  const { data: rows, error: findErr } = await supabase
+    .from('fontes')
+    .select('id,name')
+    .eq('profile_id', ownerId)
+    .limit(200);
+
+  if (!findErr && Array.isArray(rows) && rows.length) {
+    const hit = (rows as any[]).find((r) => {
+      const n = normalize(r?.name);
+      return n.includes('caixa livre') || n === 'lucro' || n.includes('lucro');
+    });
+
+    const hitId = safeUUID(hit?.id);
+    if (hitId) return hitId;
+  }
+
+  const newId = generateUUID();
+  const { error: insErr } = await supabase.from('fontes').insert([
+    {
+      id: newId,
+      profile_id: ownerId,
+      name: 'Caixa Livre',
+      type: 'CAIXA',
+      balance: 0,
+    } as any,
+  ]);
+
+  if (insErr) throw new Error('Não foi possível criar a fonte Caixa Livre automaticamente: ' + insErr.message);
+
+  return newId;
+}
 
 const parseMoney = (v: string | number | null | undefined): number => {
   if (v == null) return 0;
@@ -128,9 +189,15 @@ export const paymentsService = {
 
     if (paymentType === 'CUSTOM') {
       amountToPay = num(customAmount) || num(calculations?.total);
-    } else if (paymentType === 'RENEW_AV' || paymentType === 'PARTIAL_INTEREST') {
+    } else if (paymentType === 'RENEW_AV') {
       amountToPay = parseMoney(avAmount);
       if (amountToPay <= 0) amountToPay = num(calculations?.total);
+    } else if (paymentType === 'PARTIAL_INTEREST') {
+      amountToPay = parseMoney(avAmount);
+      // NÃO pode cair para total para não amortizar principal sem intenção do operador
+      if (amountToPay <= 0) {
+        throw new Error('Informe o valor de juros a pagar.');
+      }
     } else if (paymentType === 'FULL') {
       const balance = loanEngine.computeRemainingBalance(loan);
       amountToPay = num(balance?.totalRemaining);
@@ -202,18 +269,40 @@ export const paymentsService = {
     }
 
     /* =====================================================
-       RPC V3
+       RPC PRINCIPAL (atomic_v2)
+       - fecha contrato automaticamente quando todas parcelas ficam PAID
+       - reduz risco de incompatibilidade de tipos no v3
     ===================================================== */
     const paymentDate = realDate || todayDateOnlyUTC();
 
-    const caixaLivre =
-      sources.find(
-        (s) =>
-          String((s as any).name || '').toLowerCase().includes('caixa livre') ||
-          String((s as any).name || '').toLowerCase() === 'lucro'
-      ) || null;
+    const caixaLivreId = await ensureCaixaLivreId(ownerId, sources);
 
-    const caixaLivreId = safeUUID((caixaLivre as any)?.id) || safeUUID('28646e86-cec9-4d47-b600-3b771a066a05');
+    const payloadV2 = {
+      p_idempotency_key: idempotencyKey,
+      p_loan_id: safeUUID(loan.id),
+      p_installment_id: safeUUID(inst.id),
+      p_profile_id: ownerId,
+      p_operator_id: safeUUID(activeUser.id),
+      p_principal_amount: finalPrincipal,
+      p_interest_amount: finalInterest,
+      p_late_fee_amount: finalLateFee,
+      p_payment_date: paymentDate.toISOString(),
+    };
+
+    const { error: v2Error } = await supabase.rpc('process_payment_atomic_v2', payloadV2);
+
+    // Compatibilidade para ambientes sem v2 publicada
+    if (!v2Error) {
+      return {
+        amountToPay,
+        paymentType,
+        amortization: {
+          paidPrincipal: finalPrincipal,
+          paidInterest: finalInterest,
+          paidLateFee: finalLateFee,
+        },
+      };
+    }
 
     const { error } = await supabase.rpc('process_payment_v3_selective', {
       p_idempotency_key: idempotencyKey,
@@ -224,7 +313,7 @@ export const paymentsService = {
       p_principal_paid: finalPrincipal,
       p_interest_paid: finalInterest,
       p_late_fee_paid: finalLateFee,
-      p_payment_date: toISODateOnlyUTC(paymentDate),
+      p_payment_date: paymentDate.toISOString(),
       p_capitalize_remaining: capitalizeRemaining,
       p_source_id: safeUUID((loan as any).sourceId),
       p_caixa_livre_id: caixaLivreId,
