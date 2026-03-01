@@ -1,28 +1,53 @@
 import { createClient } from '@supabase/supabase-js';
 
 /**
- * Helper para acesso seguro ao ambiente.
- * Previne "TypeError: Cannot read properties of undefined" ao acessar import.meta.env
+ * CapitalFlow — conexão ÚNICA com o Supabase
+ *
+ * ⚠️ Removido fallback hardcoded.
+ * Motivo: fallback “silencioso” é a causa clássica de você operar no projeto errado
+ * (e aí acontece exatamente o que você descreveu: contrato pago no app, mas “aberto”
+ * no banco que você está debugando, ou vice-versa).
+ *
+ * Variáveis obrigatórias (Vite/Cloudflare Pages):
+ * - VITE_SUPABASE_URL
+ * - VITE_SUPABASE_ANON_KEY
  */
-const safeEnv = (() => {
+
+type EnvLike = Record<string, any>;
+
+function readEnv(): EnvLike {
   try {
-    const meta = (import.meta as any);
-    if (meta && meta.env) return meta.env;
-    if (typeof process !== 'undefined' && process.env) return process.env;
-    return {};
+    const meta = import.meta as any;
+    if (meta?.env) return meta.env as EnvLike;
   } catch {
-    return {};
+    // ignore
   }
-})();
 
-// Configurações baseadas no ambiente ou fallback estático
-const SUPABASE_URL =
-  safeEnv.VITE_SUPABASE_URL ||
-  'https://hzchchbxkhryextaymkn.supabase.co';
+  // Fallback apenas para ambientes que injetam process.env (não é o padrão do Vite no browser)
+  try {
+    // @ts-ignore
+    if (typeof process !== 'undefined' && (process as any)?.env) return (process as any).env as EnvLike;
+  } catch {
+    // ignore
+  }
 
-const SUPABASE_ANON_KEY =
-  safeEnv.VITE_SUPABASE_ANON_KEY ||
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh6Y2hjaGJ4a2hyeWV4dGF5bWtuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3NTk2ODcsImV4cCI6MjA4MzMzNTY4N30.kX6FlTuPkl7XfycwVuZN2mI6e3ed8NaDUoyAHy9L3nc';
+  return {};
+}
+
+function requireEnv(key: string): string {
+  const env = readEnv();
+  const val = String(env?.[key] ?? '').trim();
+  if (!val) {
+    throw new Error(
+      `[ENV] Variável obrigatória ausente: ${key}. ` +
+        `Configure em Cloudflare Pages (Environment Variables) e no .env.local (dev).`
+    );
+  }
+  return val;
+}
+
+const SUPABASE_URL = requireEnv('VITE_SUPABASE_URL');
+const SUPABASE_ANON_KEY = requireEnv('VITE_SUPABASE_ANON_KEY');
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
@@ -30,8 +55,5 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     autoRefreshToken: true,
     detectSessionInUrl: true,
     storageKey: 'cm_supabase_auth',
-    lock: async (name, acquireTimeout, fn) => {
-      return await fn();
-    }
   },
 });
