@@ -63,7 +63,7 @@ export const useUiState = () => {
 
   // Payment Logic State
   const [paymentModal, setPaymentModal] = useState<PaymentState | null>(null);
-  const [paymentType, setPaymentType] = useState<'FULL' | 'RENEW_INTEREST' | 'RENEW_AV' | 'LEND_MORE' | 'CUSTOM'>('FULL');
+  const [paymentType, setPaymentType] = useState<'FULL' | 'RENEW_INTEREST' | 'RENEW_AV' | 'LEND_MORE' | 'CUSTOM' | 'PARTIAL_INTEREST'>('FULL');
   const [avAmount, setAvAmount] = useState('');
   const [showReceipt, setShowReceipt] = useState<{
     loan: Loan;

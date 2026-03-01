@@ -281,6 +281,13 @@ export const paymentsService = {
       }
     }
 
+    // Em pagamentos de juros parciais, nunca amortiza principal por regra de negócio.
+    if (paymentType === 'PARTIAL_INTEREST') {
+      const lf = clamp0(Math.min(amountToPay, safeCalc.lateFeeRemaining));
+      const it = clamp0(amountToPay - lf);
+      amortization = { paidPrincipal: 0, paidInterest: it, paidLateFee: lf };
+    }
+
     const finalPrincipal = num(amortization?.paidPrincipal);
     const finalInterest = num(amortization?.paidInterest);
     const finalLateFee = num(amortization?.paidLateFee);
