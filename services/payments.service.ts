@@ -82,6 +82,21 @@ async function ensureCaixaLivreId(ownerId: string, sources: CapitalSource[]): Pr
   return newId;
 }
 
+const shouldFallbackToV3 = (error: any) => {
+  if (!error) return false;
+  const code = String(error?.code || '').toUpperCase();
+  const message = String(error?.message || '').toLowerCase();
+  const details = String(error?.details || '').toLowerCase();
+
+  return (
+    code === '42883' ||
+    code === 'PGRST202' ||
+    message.includes('process_payment_atomic_v2') ||
+    message.includes('function') && message.includes('does not exist') ||
+    details.includes('process_payment_atomic_v2')
+  );
+};
+
 const parseMoney = (v: string | number | null | undefined): number => {
   if (v == null) return 0;
   if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
@@ -160,6 +175,14 @@ export const paymentsService = {
 
     const idempotencyKey = generateUUID();
 
+    const loanId = safeUUID(loan.id);
+    const installmentId = safeUUID(inst.id);
+    const operatorId = safeUUID(activeUser.id);
+
+    if (!loanId || !installmentId || !operatorId) {
+      throw new Error('Falha na persistência: IDs inválidos para processar pagamento.');
+    }
+
     /* =====================================================
        LEND_MORE (Aporte)
     ===================================================== */
@@ -169,10 +192,10 @@ export const paymentsService = {
 
       const { error } = await supabase.rpc('process_lend_more_atomic', {
         p_idempotency_key: idempotencyKey,
-        p_loan_id: safeUUID(loan.id),
-        p_installment_id: safeUUID(inst.id),
+        p_loan_id: loanId,
+        p_installment_id: installmentId,
         p_profile_id: ownerId,
-        p_operator_id: safeUUID(activeUser.id),
+        p_operator_id: operatorId,
         p_source_id: safeUUID((loan as any).sourceId),
         p_amount: lendAmount,
         p_notes: `Novo Aporte (+ R$ ${lendAmount.toFixed(2)})`,
@@ -279,10 +302,10 @@ export const paymentsService = {
 
     const payloadV2 = {
       p_idempotency_key: idempotencyKey,
-      p_loan_id: safeUUID(loan.id),
-      p_installment_id: safeUUID(inst.id),
+      p_loan_id: loanId,
+      p_installment_id: installmentId,
       p_profile_id: ownerId,
-      p_operator_id: safeUUID(activeUser.id),
+      p_operator_id: operatorId,
       p_principal_amount: finalPrincipal,
       p_interest_amount: finalInterest,
       p_late_fee_amount: finalLateFee,
@@ -291,7 +314,6 @@ export const paymentsService = {
 
     const { error: v2Error } = await supabase.rpc('process_payment_atomic_v2', payloadV2);
 
-    // Compatibilidade para ambientes sem v2 publicada
     if (!v2Error) {
       return {
         amountToPay,
@@ -304,12 +326,17 @@ export const paymentsService = {
       };
     }
 
+    // Compatibilidade apenas para ambientes sem v2 publicada.
+    if (!shouldFallbackToV3(v2Error)) {
+      throw new Error('Falha na persistência: ' + v2Error.message);
+    }
+
     const { error } = await supabase.rpc('process_payment_v3_selective', {
       p_idempotency_key: idempotencyKey,
-      p_loan_id: safeUUID(loan.id),
-      p_installment_id: safeUUID(inst.id),
+      p_loan_id: loanId,
+      p_installment_id: installmentId,
       p_profile_id: ownerId,
-      p_operator_id: safeUUID(activeUser.id),
+      p_operator_id: operatorId,
       p_principal_paid: finalPrincipal,
       p_interest_paid: finalInterest,
       p_late_fee_paid: finalLateFee,
