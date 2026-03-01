@@ -13,7 +13,7 @@ export const useMasterController = (
   const [searchTerm, setSearchTerm] = useState('');
 
   const handleToggleAdminStatus = async (targetUser: any) => {
-    if (!activeUser || activeUser.accessLevel !== 1) return;
+    if (!activeUser || activeUser.accessLevel !== 'ADMIN') return;
     
     if (targetUser.id === activeUser.id) { 
         showToast("Segurança: Você não pode alterar seu próprio nível de acesso.", "error"); 
@@ -49,7 +49,7 @@ export const useMasterController = (
   };
 
   const handleSaveUserChanges = async (updatedData: any) => {
-      if (!activeUser || activeUser.accessLevel !== 1) return;
+      if (!activeUser || activeUser.accessLevel !== 'ADMIN') return;
       
       const updates: any = { 
           nome_operador: updatedData.nome_operador, 
