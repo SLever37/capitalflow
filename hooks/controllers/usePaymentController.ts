@@ -1,4 +1,4 @@
-// controllers/usePaymentController.ts
+// hooks/controllers/usePaymentController.ts
 import React, { useRef } from 'react';
 import { paymentsService } from '../../services/payments.service';
 import { demoService } from '../../services/demo.service';
@@ -10,16 +10,6 @@ const isUUID = (v: any) =>
 
 const safeUUID = (v: any) => (isUUID(v) ? v : null);
 
-// ✅ NOVO: evita spinner infinito quando RPC ou refresh ficam pendurados
-const withTimeout = async <T,>(p: Promise<T>, ms: number, label: string): Promise<T> => {
-  return await Promise.race([
-    p,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error(`${label}: tempo excedido (${ms}ms)`)), ms)
-    ),
-  ]);
-};
-
 export const usePaymentController = (
   activeUser: UserProfile | null,
   ui: UIController,
@@ -30,9 +20,7 @@ export const usePaymentController = (
   fetchFullData: (id: string) => Promise<void>,
   showToast: (msg: string, type?: 'success' | 'error') => void
 ) => {
-  const inFlightRef = useRef(false);
-  const lastSigRef = useRef<{ sig: string; ts: number } | null>(null);
-  const DOUBLE_CLICK_THRESHOLD = 2000; // 2 segundos
+  const lockRef = useRef(false);
 
   const handlePayment = async (
     forgivenessMode?: 'NONE' | 'FINE_ONLY' | 'INTEREST_ONLY' | 'BOTH',
@@ -45,118 +33,62 @@ export const usePaymentController = (
   ) => {
     if (!activeUser || !ui.paymentModal) return;
 
-    const ownerId = safeUUID(activeUser.supervisor_id) || safeUUID(activeUser.id);
-    if (!ownerId) {
-      showToast('Perfil inválido. Refaça o login.', 'error');
-      return;
-    }
-
-    if (inFlightRef.current) return;
-
-    const loanId = ui.paymentModal?.loan?.id || '';
-    const instId = ui.paymentModal?.inst?.id || '';
-    const type = paymentTypeOverride || ui.paymentType || '';
-    const amountRaw =
-      type === 'CUSTOM' ? String(customAmount ?? '') : String(avAmountOverride || ui.avAmount || '');
-
-    // Verificar se parcela já está PAID
-    if (ui.paymentModal?.inst?.status === 'PAID') {
-      showToast('Esta parcela já foi quitada.', 'error');
-      return;
-    }
-
-    // Assinatura para evitar duplo clique
-    const sig = `${ownerId}|${loanId}|${instId}|${type}|${amountRaw}|${String(forgivenessMode)}|${
-      manualDate ? manualDate.toISOString() : ''
-    }`;
-
-    const now = Date.now();
-    const last = lastSigRef.current;
-    if (last && last.sig === sig && now - last.ts < DOUBLE_CLICK_THRESHOLD) {
-      showToast('Aguarde o processamento anterior...', 'error');
-      return;
-    }
-
-    lastSigRef.current = { sig, ts: now };
-    inFlightRef.current = true;
+    // 🔐 BLOQUEIO ABSOLUTO
+    if (lockRef.current) return;
+    lockRef.current = true;
     ui.setIsProcessingPayment(true);
 
-    if (activeUser.id === 'DEMO') {
-      demoService.handlePayment({
-        loan: ui.paymentModal.loan,
-        inst: ui.paymentModal.inst,
-        amountToPay: customAmount || ui.paymentModal.calculations.total,
-        paymentType: type as PaymentType,
-        activeUser,
-        loans,
-        setLoans,
-        setActiveUser,
-        showToast,
-        forgivePenalty: forgivenessMode === 'BOTH',
-      });
-
-      ui.closeModal();
-      ui.setAvAmount('');
-      ui.setShowReceipt({
-        loan: ui.paymentModal.loan,
-        inst: ui.paymentModal.inst,
-        amountPaid: 0,
-        type: type,
-      });
-
-      ui.setIsProcessingPayment(false);
-      inFlightRef.current = false;
-      return;
-    }
-
     try {
-      const { amountToPay, paymentType: typeReturned } = await withTimeout(
-        paymentsService.processPayment({
+      const ownerId = safeUUID(activeUser.supervisor_id) || safeUUID(activeUser.id);
+      if (!ownerId) {
+        showToast('Perfil inválido.', 'error');
+        return;
+      }
+
+      // 🔒 Bloqueio extra — se parcela já paga
+      if (ui.paymentModal.inst?.status === 'PAID') {
+        showToast('Esta parcela já foi quitada.', 'error');
+        return;
+      }
+
+      const { amountToPay, paymentType } =
+        await paymentsService.processPayment({
           loan: ui.paymentModal.loan,
           inst: ui.paymentModal.inst,
           calculations: ui.paymentModal.calculations,
-          paymentType: type as PaymentType,
+          paymentType: (paymentTypeOverride || ui.paymentType) as PaymentType,
           avAmount: avAmountOverride || ui.avAmount,
-          activeUser: { ...activeUser, id: ownerId } as UserProfile,
+          activeUser: activeUser,
           sources,
           forgivenessMode,
-          manualDate, // Data do próximo vencimento
+          manualDate,
           customAmount,
-          realDate, // Data real do pagamento (EXTRATO)
+          realDate,
           capitalizeRemaining: interestHandling === 'CAPITALIZE',
-        }),
-        20000,
-        'Pagamento (RPC)'
-      );
+        });
 
-      let msg = '';
-      if (typeReturned === 'LEND_MORE') msg = 'Novo aporte realizado com sucesso!';
-      else if (typeReturned === 'FULL') msg = 'Quitado com sucesso!';
-      else msg = 'Renovado com sucesso!';
-
-      showToast(msg, 'success');
+      showToast('Pagamento realizado com sucesso!', 'success');
 
       ui.closeModal();
       ui.setAvAmount('');
 
-      if (typeReturned !== 'LEND_MORE') {
-        ui.setShowReceipt({
-          loan: ui.paymentModal.loan,
-          inst: ui.paymentModal.inst,
-          amountPaid: amountToPay,
-          type: typeReturned,
-        });
-        ui.openModal('RECEIPT');
-      }
+      // 🔥 FORÇA SINCRONIZAÇÃO REAL
+      await fetchFullData(ownerId);
 
-      // ✅ também com timeout, para não travar o spinner
-      await withTimeout(fetchFullData(ownerId), 20000, 'Atualização pós-pagamento');
+      ui.setShowReceipt({
+        loan: ui.paymentModal.loan,
+        inst: ui.paymentModal.inst,
+        amountPaid: amountToPay,
+        type: paymentType,
+      });
+
+      ui.openModal('RECEIPT');
     } catch (error: any) {
       console.error(error);
-      showToast(error?.message || 'Erro ao processar ação.', 'error');
+      showToast(error?.message || 'Erro ao processar pagamento.', 'error');
     } finally {
       ui.setIsProcessingPayment(false);
-      inFlightRef.current = false;
+      lockRef.current = false;
     }
   };
 

@@ -1,4 +1,6 @@
-import React, { useEffect, useState } from 'react';
+// src/App.tsx
+import React, { useEffect } from 'react';
+
 import { AppShell } from './layout/AppShell';
 import { NavHubController } from './layout/NavHubController';
 import { AppGate } from './components/AppGate';
@@ -12,49 +14,49 @@ import { useControllers } from './hooks/useControllers';
 import { useAppNotifications } from './hooks/useAppNotifications';
 import { useExitGuard } from './hooks/useExitGuard';
 import { useNavigationStack } from './hooks/useNavigationStack';
+
 import { DashboardContainer } from './containers/DashboardContainer';
 import { ClientsContainer } from './containers/ClientsContainer';
 import { SourcesContainer } from './containers/SourcesContainer';
 import { ProfileContainer } from './containers/ProfileContainer';
 import { LegalContainer } from './containers/LegalContainer';
 import { ModalHostContainer } from './containers/ModalHostContainer';
+
 import { OperatorSupportChat } from './features/support/OperatorSupportChat';
 import { CalendarView } from './features/calendar/CalendarView';
 import { SimulatorPanel } from './features/simulator/SimulatorPanel';
+
 import { TeamPage } from './pages/TeamPage';
 import { InvitePage } from './pages/InvitePage';
 import { SetupPasswordPage } from './pages/SetupPasswordPage';
-import { notificationService } from './services/notification.service';
-import { LoadingScreen } from './components/ui/LoadingScreen';
 import { PersonalFinancesPage } from './pages/PersonalFinancesPage';
 import { LeadsPage } from './pages/LeadsPage';
 import { CustomerAcquisitionPage } from './pages/Comercial/CaptacaoClientes';
 import { SettingsPage } from './pages/SettingsPage';
+
+import { notificationService } from './services/notification.service';
+import { LoadingScreen } from './components/ui/LoadingScreen';
 import { isDev } from './utils/isDev';
+
 import { PublicCampaignPage } from './pages/Public/PublicCampaignPage';
 import { PublicSignaturePage } from './pages/Public/PublicSignaturePage';
 
 export const App: React.FC = () => {
-  // ROTA PÚBLICA DE CAMPANHA (Landing Page)
+  // ✅ SEMPRE calcular params, mas NÃO dar return antes dos hooks
   const urlParams = new URLSearchParams(window.location.search);
   const campaignId = urlParams.get('campaign_id');
+  const legalSignTokenParam = urlParams.get('legal_sign');
 
-  if (campaignId) {
-      return <PublicCampaignPage />;
-  }
-
-  const legalSignToken = urlParams.get('legal_sign');
-  if (legalSignToken) {
-      return <PublicSignaturePage />;
-  }
-
+  // ✅ Hooks SEMPRE no topo (regra do React)
   const { portalToken } = usePortalRouting();
   const { toast, showToast } = useToast();
-  
+
   const {
     activeProfileId,
-    loginUser, setLoginUser,
-    loginPassword, setLoginPassword,
+    loginUser,
+    setLoginUser,
+    loginPassword,
+    setLoginPassword,
     savedProfiles,
     submitLogin,
     submitTeamLogin,
@@ -67,22 +69,37 @@ export const App: React.FC = () => {
   } = useAuth();
 
   const {
-    loans, setLoans,
-    clients, setClients,
-    sources, setSources,
-    activeUser, setActiveUser,
-    staffMembers, systemUsers,
-    selectedStaffId, setSelectedStaffId,
-    isLoadingData, setIsLoadingData,
+    loans,
+    setLoans,
+    clients,
+    setClients,
+    sources,
+    setSources,
+    activeUser,
+    setActiveUser,
+    staffMembers,
+    systemUsers,
+    selectedStaffId,
+    setSelectedStaffId,
+    isLoadingData,
+    setIsLoadingData,
     fetchFullData,
-    activeTab, setActiveTab,
-    statusFilter, setStatusFilter,
-    sortOption, setSortOption,
-    searchTerm, setSearchTerm,
-    clientSearchTerm, setClientSearchTerm,
-    profileEditForm, setProfileEditForm,
-    loadError, setLoadError,
-    navOrder, hubOrder,
+    activeTab,
+    setActiveTab,
+    statusFilter,
+    setStatusFilter,
+    sortOption,
+    setSortOption,
+    searchTerm,
+    setSearchTerm,
+    clientSearchTerm,
+    setClientSearchTerm,
+    profileEditForm,
+    setProfileEditForm,
+    loadError,
+    setLoadError,
+    navOrder,
+    hubOrder,
     saveNavConfig,
   } = useAppState(activeProfileId, handleLogout);
 
@@ -91,29 +108,47 @@ export const App: React.FC = () => {
   ui.setSortOption = setSortOption;
   ui.staffMembers = staffMembers;
 
-  // NAVIGATION STACK - controle central de navegação
-  const { goBack, isInHub } = useNavigationStack(
-    activeTab,
-    setActiveTab,
-    () => ui.setShowNavHub(true)
-  );
+  const { goBack, isInHub } = useNavigationStack(activeTab, setActiveTab, () => ui.setShowNavHub(true));
 
-  const isPublicView = !!portalToken || !!legalSignToken;
-  const isInvitePath = window.location.pathname === '/invite' || window.location.pathname === '/setup-password';
+  const isInvitePath =
+    window.location.pathname === '/invite' || window.location.pathname === '/setup-password';
+
+  // ✅ token público de assinatura vem ou do hook (portal) ou do querystring
+  const legalSignToken = legalSignTokenParam || null;
+
+  // ✅ view pública: portalToken OU rota pública de campanha OU assinatura pública
+  const isPublicView = !!portalToken || !!campaignId || !!legalSignToken;
 
   usePersistedTab(activeTab, setActiveTab);
 
   const controllers = useControllers(
-    activeUser, ui, loans, setLoans, clients, setClients,
-    sources, setSources, setActiveUser, setIsLoadingData,
-    fetchFullData, () => Promise.resolve(), handleLogout,
-    showToast, profileEditForm, setProfileEditForm
+    activeUser,
+    ui,
+    loans,
+    setLoans,
+    clients,
+    setClients,
+    sources,
+    setSources,
+    setActiveUser,
+    setIsLoadingData,
+    fetchFullData,
+    () => Promise.resolve(),
+    handleLogout,
+    showToast,
+    profileEditForm,
+    setProfileEditForm
   );
 
-  const { loanCtrl, clientCtrl, sourceCtrl, profileCtrl, paymentCtrl, fileCtrl, aiCtrl, adminCtrl } = controllers;
+  const { loanCtrl, clientCtrl, sourceCtrl, profileCtrl, paymentCtrl, fileCtrl, aiCtrl, adminCtrl } =
+    controllers;
 
   useAppNotifications({
-    loans, sources, activeUser, showToast, setActiveTab,
+    loans,
+    sources,
+    activeUser,
+    showToast,
+    setActiveTab,
     setSelectedLoanId: ui.setSelectedLoanId,
     disabled: isPublicView,
   });
@@ -122,7 +157,7 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     if (activeUser && !isPublicView) {
-        notificationService.requestPermission();
+      notificationService.requestPermission();
     }
   }, [activeUser, isPublicView]);
 
@@ -131,18 +166,22 @@ export const App: React.FC = () => {
     if (activeProfileId && !activeUser && bootFinished && !loadError) {
       const timer = setTimeout(() => {
         if (!activeUser && !loadError) {
-          setLoadError("Tempo limite de sincronização excedido. Verifique sua conexão ou tente reconectar.");
-          if (isDev) console.error("[BOOT] Timeout atingido tentando carregar perfil:", activeProfileId);
+          setLoadError('Tempo limite de sincronização excedido. Verifique sua conexão ou tente reconectar.');
+          if (isDev) console.error('[BOOT] Timeout atingido tentando carregar perfil:', activeProfileId);
         }
       }, 10000);
       return () => clearTimeout(timer);
     }
   }, [activeProfileId, activeUser, bootFinished, loadError, setLoadError]);
 
-  const effectiveSelectedStaffId = activeUser && activeUser.accessLevel === 2 ? activeUser.id : selectedStaffId;
+  const effectiveSelectedStaffId =
+    activeUser && activeUser.accessLevel === 2 ? activeUser.id : selectedStaffId;
 
-  // Condição de Inicialização: ou está no boot inicial, ou tem perfil mas o user ainda não carregou nem deu erro
   const isInitializing = !bootFinished || (!!activeProfileId && !activeUser && !loadError);
+
+  // ✅ Agora SIM pode retornar rotas públicas (depois dos hooks)
+  if (campaignId) return <PublicCampaignPage />;
+  if (legalSignTokenParam) return <PublicSignaturePage />;
 
   if (isInitializing && !isPublicView && !isInvitePath) {
     return <LoadingScreen />;
@@ -168,7 +207,7 @@ export const App: React.FC = () => {
           loginPassword={loginPassword}
           setLoginPassword={setLoginPassword}
           submitLogin={() => submitLogin(showToast)}
-          submitTeamLogin={(params, toast) => submitTeamLogin(params, toast)}
+          submitTeamLogin={(params, toastArg) => submitTeamLogin(params, toastArg)}
           savedProfiles={savedProfiles}
           handleSelectSavedProfile={handleSelectSavedProfile}
           handleRemoveSavedProfile={handleRemoveSavedProfile}
@@ -188,7 +227,10 @@ export const App: React.FC = () => {
             activeUser={activeUser}
             isLoadingData={isLoadingData}
             onOpenNav={() => ui.setShowNavHub(true)}
-            onNewLoan={() => { ui.setEditingLoan(null); ui.openModal('LOAN_FORM'); }}
+            onNewLoan={() => {
+              ui.setEditingLoan(null);
+              ui.openModal('LOAN_FORM');
+            }}
             isStealthMode={ui.isStealthMode}
             toggleStealthMode={() => ui.setIsStealthMode(!ui.isStealthMode)}
             onOpenSupport={() => ui.openModal('SUPPORT_CHAT')}
@@ -198,28 +240,45 @@ export const App: React.FC = () => {
           >
             {activeTab === 'DASHBOARD' && (
               <DashboardContainer
-                loans={loans} sources={sources} activeUser={activeUser}
-                staffMembers={staffMembers} selectedStaffId={effectiveSelectedStaffId}
+                loans={loans}
+                sources={sources}
+                activeUser={activeUser}
+                staffMembers={staffMembers}
+                selectedStaffId={effectiveSelectedStaffId}
                 setSelectedStaffId={setSelectedStaffId}
-                mobileDashboardTab={ui.mobileDashboardTab} setMobileDashboardTab={ui.setMobileDashboardTab}
-                statusFilter={statusFilter} setStatusFilter={setStatusFilter}
-                searchTerm={searchTerm} setSearchTerm={setSearchTerm}
-                ui={ui} loanCtrl={loanCtrl} fileCtrl={fileCtrl}
-                showToast={showToast} onRefresh={() => fetchFullData(activeUser?.id || '')}
+                mobileDashboardTab={ui.mobileDashboardTab}
+                setMobileDashboardTab={ui.setMobileDashboardTab}
+                statusFilter={statusFilter}
+                setStatusFilter={setStatusFilter}
+                searchTerm={searchTerm}
+                setSearchTerm={setSearchTerm}
+                ui={ui}
+                loanCtrl={loanCtrl}
+                fileCtrl={fileCtrl}
+                showToast={showToast}
+                onRefresh={() => fetchFullData(activeUser?.id || '')}
               />
             )}
 
             {activeTab === 'CLIENTS' && (
               <ClientsContainer
-                clients={clients} clientSearchTerm={clientSearchTerm}
+                clients={clients}
+                clientSearchTerm={clientSearchTerm}
                 setClientSearchTerm={setClientSearchTerm}
-                clientCtrl={clientCtrl} loanCtrl={loanCtrl}
-                showToast={showToast} ui={ui}
+                clientCtrl={clientCtrl}
+                loanCtrl={loanCtrl}
+                showToast={showToast}
+                ui={ui}
               />
             )}
 
             {activeTab === 'TEAM' && !activeUser?.supervisor_id && (
-              <TeamPage activeUser={activeUser} showToast={showToast} onRefresh={() => fetchFullData(activeUser?.id || '')} ui={ui} />
+              <TeamPage
+                activeUser={activeUser}
+                showToast={showToast}
+                onRefresh={() => fetchFullData(activeUser?.id || '')}
+                ui={ui}
+              />
             )}
 
             {activeTab === 'SOURCES' && (
@@ -228,18 +287,33 @@ export const App: React.FC = () => {
 
             {activeTab === 'PROFILE' && activeUser && (
               <ProfileContainer
-                activeUser={activeUser} clients={clients} loans={loans} sources={sources}
-                ui={ui} profileCtrl={profileCtrl} handleLogout={handleLogout} showToast={showToast}
-                profileEditForm={profileEditForm} setProfileEditForm={setProfileEditForm}
-                fileCtrl={fileCtrl} navOrder={navOrder} hubOrder={hubOrder} saveNavConfig={saveNavConfig}
+                activeUser={activeUser}
+                clients={clients}
+                loans={loans}
+                sources={sources}
+                ui={ui}
+                profileCtrl={profileCtrl}
+                handleLogout={handleLogout}
+                showToast={showToast}
+                profileEditForm={profileEditForm}
+                setProfileEditForm={setProfileEditForm}
+                fileCtrl={fileCtrl}
+                navOrder={navOrder}
+                hubOrder={hubOrder}
+                saveNavConfig={saveNavConfig}
               />
             )}
 
             {activeTab === 'LEGAL' && (
               <LegalContainer
-                loans={loans} sources={sources} activeUser={activeUser}
-                ui={ui} loanCtrl={loanCtrl} fileCtrl={fileCtrl}
-                showToast={showToast} onRefresh={() => fetchFullData(activeUser?.id || '')}
+                loans={loans}
+                sources={sources}
+                activeUser={activeUser}
+                ui={ui}
+                loanCtrl={loanCtrl}
+                fileCtrl={fileCtrl}
+                showToast={showToast}
+                onRefresh={() => fetchFullData(activeUser?.id || '')}
                 goBack={goBack}
               />
             )}
@@ -248,53 +322,62 @@ export const App: React.FC = () => {
               <PersonalFinancesPage activeUser={activeUser} goBack={goBack} />
             )}
 
-            {activeTab === 'LEADS' && activeUser && (
-              <LeadsPage activeUser={activeUser} />
-            )}
+            {activeTab === 'LEADS' && activeUser && <LeadsPage activeUser={activeUser} />}
 
-            {activeTab === 'ACQUISITION' && (
-              <CustomerAcquisitionPage activeUser={activeUser} />
-            )}
+            {activeTab === 'ACQUISITION' && <CustomerAcquisitionPage activeUser={activeUser} />}
 
-            {activeTab === 'SETTINGS' && (
-              <SettingsPage />
-            )}
+            {activeTab === 'SETTINGS' && <SettingsPage />}
 
             <ModalHostContainer
-              ui={ui} activeUser={activeUser} clients={clients} sources={sources} loans={loans}
-              isLoadingData={isLoadingData} loanCtrl={loanCtrl} clientCtrl={clientCtrl}
-              sourceCtrl={sourceCtrl} paymentCtrl={paymentCtrl} profileCtrl={profileCtrl}
-              adminCtrl={adminCtrl} fileCtrl={fileCtrl} aiCtrl={aiCtrl}
-              showToast={showToast} fetchFullData={fetchFullData} handleLogout={handleLogout}
+              ui={ui}
+              activeUser={activeUser}
+              clients={clients}
+              sources={sources}
+              loans={loans}
+              isLoadingData={isLoadingData}
+              loanCtrl={loanCtrl}
+              clientCtrl={clientCtrl}
+              sourceCtrl={sourceCtrl}
+              paymentCtrl={paymentCtrl}
+              profileCtrl={profileCtrl}
+              adminCtrl={adminCtrl}
+              fileCtrl={fileCtrl}
+              aiCtrl={aiCtrl}
+              showToast={showToast}
+              fetchFullData={fetchFullData}
+              handleLogout={handleLogout}
             />
 
             {ui.activeModal?.type === 'SUPPORT_CHAT' && (
               <OperatorSupportChat activeUser={activeUser} onClose={ui.closeModal} />
             )}
 
-            {ui.activeModal?.type === 'SIMULATOR' && (
-              <SimulatorPanel onClose={ui.closeModal} />
-            )}
+            {ui.activeModal?.type === 'SIMULATOR' && <SimulatorPanel onClose={ui.closeModal} />}
 
             {ui.activeModal?.type === 'AGENDA' && (
-              <CalendarView 
+              <CalendarView
                 activeUser={activeUser}
                 showToast={showToast}
                 onClose={ui.closeModal}
                 onSystemAction={(type, meta) => {
                   if (type === 'PAYMENT' && meta && ui) {
                     ui.setPaymentModal({
-                        loan: { id: meta.loanId, debtorName: meta.clientName, debtorPhone: meta.clientPhone, sourceId: meta.sourceId },
-                        inst: { id: meta.installmentId, dueDate: meta.start_time },
-                        calculations: { total: meta.amount, principal: meta.amount, interest: 0, lateFee: 0 }
+                      loan: {
+                        id: meta.loanId,
+                        debtorName: meta.clientName,
+                        debtorPhone: meta.clientPhone,
+                        sourceId: meta.sourceId,
+                      },
+                      inst: { id: meta.installmentId, dueDate: meta.start_time },
+                      calculations: { total: meta.amount, principal: meta.amount, interest: 0, lateFee: 0 },
                     });
                     if (ui.openModal) ui.openModal('PAYMENT');
                   }
                   if (type === 'OPEN_CHAT' && meta && ui) {
                     const loan = loans.find((l: any) => l.id === meta.loanId);
                     if (loan) {
-                        ui.setMessageModalLoan(loan);
-                        ui.openModal('MESSAGE_HUB');
+                      ui.setMessageModalLoan(loan);
+                      ui.openModal('MESSAGE_HUB');
                     }
                   }
                 }}

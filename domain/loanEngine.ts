@@ -1,96 +1,41 @@
-// domain/loanEngine.ts
-
-import { Loan, LoanStatus } from "../types";
-import { getInstallmentStatusLogic } from "./finance/calculations";
-
-export interface LoanBalance {
-  principalRemaining: number;
-  interestRemaining: number;
-  lateFeeRemaining: number;
-  totalRemaining: number;
-  isPaid: boolean;
-  isCyclePaid: boolean;
-  daysInCycle: number;
-}
+import { Loan, LoanStatus } from '../types';
+import { getInstallmentStatusLogic } from './finance/calculations';
 
 export const loanEngine = {
 
-  /* =====================================================
-     SALDO TOTAL DO CONTRATO
-  ===================================================== */
-  computeRemainingBalance: (loan: Loan): LoanBalance => {
+  computeRemainingBalance(loan: Loan) {
+    if (!loan?.installments?.length) {
+      return {
+        totalRemaining: 0,
+        principalRemaining: 0,
+        interestRemaining: 0,
+        lateFeeRemaining: 0,
+      };
+    }
 
-    const installments = loan.installments || [];
-    const today = new Date();
+    let principal = 0;
+    let interest = 0;
+    let late = 0;
 
-    const principal = installments.reduce(
-      (acc, i) => acc + (Number(i.principalRemaining) || 0),
-      0
-    );
-
-    const interest = installments.reduce(
-      (acc, i) => acc + (Number(i.interestRemaining) || 0),
-      0
-    );
-
-    const lateFee = installments.reduce(
-      (acc, i) => acc + (Number(i.lateFeeAccrued) || 0),
-      0
-    );
-
-    const total = principal + interest + lateFee;
-
-    const activeInstallment = installments
-      .filter(i => i.status !== LoanStatus.PAID)
-      .sort(
-        (a, b) =>
-          new Date(a.dueDate).getTime() -
-          new Date(b.dueDate).getTime()
-      )[0];
-
-    let daysInCycle = 0;
-    let isCyclePaid = false;
-
-    if (activeInstallment) {
-      const dueDate = new Date(activeInstallment.dueDate);
-      const diffTime = today.getTime() - dueDate.getTime();
-
-      daysInCycle = Math.floor(
-        diffTime / (1000 * 60 * 60 * 24)
-      );
-
-      isCyclePaid =
-        (Number(activeInstallment.interestRemaining) || 0) <= 0 &&
-        (Number(activeInstallment.lateFeeAccrued) || 0) <= 0;
+    for (const inst of loan.installments) {
+      principal += Math.max(0, Number(inst.principalRemaining || 0));
+      interest += Math.max(0, Number(inst.interestRemaining || 0));
+      late += Math.max(0, Number(inst.lateFeeAccrued || 0));
     }
 
     return {
-      principalRemaining: Math.max(0, principal),
-      interestRemaining: Math.max(0, interest),
-      lateFeeRemaining: Math.max(0, lateFee),
-      totalRemaining: Math.max(0, total),
-      isPaid: total <= 0.05,
-      isCyclePaid,
-      daysInCycle,
+      principalRemaining: principal,
+      interestRemaining: interest,
+      lateFeeRemaining: late,
+      totalRemaining: principal + interest + late,
     };
   },
 
-  /* =====================================================
-     STATUS COMPUTADO DO CONTRATO
-  ===================================================== */
-  computeLoanStatus: (
-    loan: Loan
-  ): "ACTIVE" | "OVERDUE" | "PAID" | "LEGAL" => {
+  computeLoanStatus(loan: Loan): "ACTIVE" | "OVERDUE" | "PAID" | "LEGAL" {
+    const balance = this.computeRemainingBalance(loan);
+    if (balance.totalRemaining <= 0.05) return "PAID";
 
-    const balance = loanEngine.computeRemainingBalance(loan);
-
-    if (balance.isPaid) return "PAID";
-
-    // Se existir acordo ativo → entra como LEGAL
-    if (
-      loan.activeAgreement &&
-      loan.activeAgreement.status === "ACTIVE"
-    ) {
+    if (loan.activeAgreement && loan.activeAgreement.status === "ACTIVE") {
       return "LEGAL";
     }
 
@@ -103,65 +48,43 @@ export const loanEngine = {
     return "ACTIVE";
   },
 
-  /* =====================================================
-     REGRA DE AMORTIZAÇÃO
-     (ordem: multa → juros → principal)
-  ===================================================== */
-  calculateAmortization: (amount: number, loan: Loan) => {
+  isLegallyActionable(loan: Loan): boolean {
+    const status = this.computeLoanStatus(loan);
+    const balance = this.computeRemainingBalance(loan);
 
-    let remaining = amount;
-
-    const result = {
-      paidLateFee: 0,
-      paidInterest: 0,
-      paidPrincipal: 0,
-      profit: 0,
-      capital: 0,
-    };
-
-    const balance = loanEngine.computeRemainingBalance(loan);
-
-    result.paidLateFee = Math.min(
-      remaining,
-      balance.lateFeeRemaining
-    );
-    remaining -= result.paidLateFee;
-
-    result.paidInterest = Math.min(
-      remaining,
-      balance.interestRemaining
-    );
-    remaining -= result.paidInterest;
-
-    result.paidPrincipal = Math.min(
-      remaining,
-      balance.principalRemaining
-    );
-    remaining -= result.paidPrincipal;
-
-    result.profit =
-      result.paidLateFee + result.paidInterest;
-
-    result.capital = result.paidPrincipal;
-
-    return result;
-  },
-
-  /* =====================================================
-     ELEGIBILIDADE PARA COBRANÇA JURÍDICA
-  ===================================================== */
-  isLegallyActionable: (loan: Loan): boolean => {
-
-    const status = loanEngine.computeLoanStatus(loan);
-    const balance = loanEngine.computeRemainingBalance(loan);
-
-    const isEligibleStatus =
-      status === "OVERDUE" || status === "LEGAL";
-
-    const hasDebt =
-      balance.totalRemaining > 0.05;
+    const isEligibleStatus = status === "OVERDUE" || status === "LEGAL";
+    const hasDebt = balance.totalRemaining > 0.05;
 
     return isEligibleStatus && hasDebt;
   },
 
+  calculateAmortization(amount: number, loan: Loan) {
+    const balance = this.computeRemainingBalance(loan);
+    let remaining = amount;
+
+    const paidInterest = Math.min(remaining, balance.interestRemaining);
+    remaining -= paidInterest;
+
+    const paidLateFee = Math.min(remaining, balance.lateFeeRemaining);
+    remaining -= paidLateFee;
+
+    const paidPrincipal = Math.min(remaining, balance.principalRemaining);
+
+    return {
+      paidPrincipal: Math.max(0, paidPrincipal),
+      paidInterest: Math.max(0, paidInterest),
+      paidLateFee: Math.max(0, paidLateFee),
+    };
+  },
+
+  // 🔵 NOVA FUNÇÃO — RENOVAÇÃO PURA
+  calculateRenewal(loan: Loan) {
+    const balance = this.computeRemainingBalance(loan);
+
+    return {
+      paidPrincipal: 0,
+      paidInterest: balance.interestRemaining,
+      paidLateFee: balance.lateFeeRemaining,
+    };
+  },
 };
