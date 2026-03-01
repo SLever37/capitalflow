@@ -35,8 +35,10 @@ export const personalFinanceService = {
   },
 
   async getTransactions(profileId: string, month: number, year: number): Promise<PFTransaction[]> {
-    const startDate = new Date(year, month, 1).toISOString();
-    const endDate = new Date(year, month + 1, 0).toISOString();
+    // Faixa mensal em UTC: [início_do_mês, início_do_próximo_mês)
+    // Evita perder transações do último dia por comparar com 00:00:00.
+    const startDate = new Date(Date.UTC(year, month, 1, 0, 0, 0)).toISOString();
+    const nextMonthStart = new Date(Date.UTC(year, month + 1, 1, 0, 0, 0)).toISOString();
 
     const { data, error } = await supabase
       .from('pf_transacoes')
@@ -48,7 +50,7 @@ export const personalFinanceService = {
       `)
       .eq('profile_id', profileId)
       .gte('data', startDate)
-      .lte('data', endDate)
+      .lt('data', nextMonthStart)
       .order('data', { ascending: false });
 
     if (error) throw error;
