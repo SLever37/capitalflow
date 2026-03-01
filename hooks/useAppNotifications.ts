@@ -1,8 +1,7 @@
-
 import { useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { Loan, LoanStatus, CapitalSource } from '../types';
-import { loanEngine } from '../domain/loanEngine';
+import { loanEngine, isLegallyActionable } from '../domain/loanEngine';
 import { getDaysDiff } from '../utils/dateHelpers';
 import { notificationService } from '../services/notification.service';
 import { getInstallmentStatusLogic } from '../domain/finance/calculations';
@@ -42,47 +41,104 @@ export const useAppNotifications = ({
   useEffect(() => {
     if (!activeUser || disabled) return;
 
-    const channel = supabase.channel('global-urgent-alerts')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'payment_intents', filter: `profile_id=eq.${activeUser.id}` }, (payload) => {
+    const channel = supabase
+      .channel('global-urgent-alerts')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'payment_intents',
+          filter: `profile_id=eq.${activeUser.id}`,
+        },
+        (payload) => {
           if (payload.new.status === 'PENDENTE') {
-             notificationService.notify('Intencao de Pagamento Recebida!', 'Um cliente enviou uma intencao de pagamento.', () => {
+            notificationService.notify(
+              'Intencao de Pagamento Recebida!',
+              'Um cliente enviou uma intencao de pagamento.',
+              () => {
                 setActiveTab('DASHBOARD');
                 setSelectedLoanId(payload.new.loan_id);
-             });
-             showToast('Nova intencao de pagamento recebida!', 'success');
+              }
+            );
+            showToast('Nova intencao de pagamento recebida!', 'success');
           }
-      })
+        }
+      )
       // EVENTO REALTIME: Mudança em parcelas (vencimento/atraso)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'parcelas', filter: `profile_id=eq.${activeUser.id}` }, (payload) => {
-          const loan = loans.find(l => l.id === payload.new.loan_id);
-          if (loan && loanEngine.computeLoanStatus(loan) === 'OVERDUE' && !loan.activeAgreement) {
-              notificationService.notify('Ação Jurídica Necessária', `Contrato de ${loan.debtorName} está VENCIDO e sem assinatura.`, () => {
-                  setActiveTab('LEGAL');
-                  setSelectedLoanId(loan.id);
-              });
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'parcelas',
+          filter: `profile_id=eq.${activeUser.id}`,
+        },
+        (payload) => {
+          const loan = loans.find((l) => l.id === payload.new.loan_id);
+          if (
+            loan &&
+            loanEngine.computeLoanStatus(loan) === 'OVERDUE' &&
+            !loan.activeAgreement
+          ) {
+            notificationService.notify(
+              'Ação Jurídica Necessária',
+              `Contrato de ${loan.debtorName} está VENCIDO e sem assinatura.`,
+              () => {
+                setActiveTab('LEGAL');
+                setSelectedLoanId(loan.id);
+              }
+            );
           }
-      })
+        }
+      )
       // EVENTO REALTIME: Novo Lead de Captação
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'leads', filter: `profile_id=eq.${activeUser.id}` }, (payload) => {
-          notificationService.notify('Novo Lead de Captação!', `O cliente ${payload.new.nome} iniciou uma simulação.`, () => {
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'leads',
+          filter: `profile_id=eq.${activeUser.id}`,
+        },
+        (payload) => {
+          notificationService.notify(
+            'Novo Lead de Captação!',
+            `O cliente ${payload.new.nome} iniciou uma simulação.`,
+            () => {
               setActiveTab('LEADS');
-          });
+            }
+          );
           showToast(`Novo lead: ${payload.new.nome}`, 'success');
-      })
+        }
+      )
       // EVENTO REALTIME: Nova Mensagem no Chat de Captação
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'campaign_chat_messages', filter: `profile_id=eq.${activeUser.id}` }, (payload) => {
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'campaign_chat_messages',
+          filter: `profile_id=eq.${activeUser.id}`,
+        },
+        (payload) => {
           if (payload.new.sender === 'LEAD') {
-              notificationService.notify('Nova Mensagem de Lead', `Mensagem recebida no chat de captação.`, () => {
-                  setActiveTab('LEADS');
-              });
+            notificationService.notify(
+              'Nova Mensagem de Lead',
+              `Mensagem recebida no chat de captação.`,
+              () => {
+                setActiveTab('LEADS');
+              }
+            );
           }
-      })
+        }
+      )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [activeUser, disabled, setActiveTab, setSelectedLoanId, showToast]);
+  }, [activeUser, disabled, setActiveTab, setSelectedLoanId, showToast, loans]);
 
   // 2. Monitoramento Periódico (Vencimentos e Saldo)
   const runScan = async () => {
@@ -96,7 +152,7 @@ export const useAppNotifications = ({
     // A) Contratos vencendo HOJE (Alerta Matinal)
     if (loans?.length) {
       loans.forEach((loan) => {
-        if (!loan || loan.isArchived) return;
+        if (!loan || (loan as any).isArchived) return;
 
         const installments = (loan as any).installments || [];
         installments.forEach((inst: any) => {
@@ -127,7 +183,12 @@ export const useAppNotifications = ({
     // B) Jurídico: Vencidos sem assinatura (Notificação de Cobrança)
     if (loans?.length) {
       loans.forEach((loan) => {
-        if (loanEngine.isLegallyActionable(loan) && !loan.activeAgreement && !notifiedUnsignedLegal.current.has(loan.id)) {
+        // HARDENING: usa função isolada para evitar erro de HMR
+        if (
+          isLegallyActionable(loan) &&
+          !(loan as any).activeAgreement &&
+          !notifiedUnsignedLegal.current.has(loan.id)
+        ) {
           notifiedUnsignedLegal.current.add(loan.id);
           notificationService.notify(
             'Ação Jurídica Necessária',
@@ -145,10 +206,10 @@ export const useAppNotifications = ({
     (sources || []).forEach((source: any) => {
       if (!source?.id) return;
       const balance = Number(source.balance || 0);
-      
+
       // Alerta apenas se cair abaixo de 50 reais (Extrema urgencia de caixa)
       if (balance < 50 && balance > -1000) {
-         // Toast para nao poluir notificacoes nativas
+        // Toast para nao poluir notificacoes nativas
       }
     });
   };

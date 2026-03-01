@@ -1,10 +1,75 @@
-import { Loan, LoanStatus } from '../types';
-import { getInstallmentStatusLogic } from './finance/calculations';
+// domain/loanEngine.ts
+import { Loan } from '../types';
 
-export const loanEngine = {
+/**
+ * HARDENING (HMR/imports):
+ * Alguns ambientes (Vite/HMR + importações inconsistentes) podem deixar este módulo
+ * em estado “parcial” durante hot-reload, gerando erros do tipo:
+ *   "loanEngine.isLegallyActionable is not a function"
+ *
+ * Para blindar:
+ * 1) Mantemos export named (`loanEngine`) e default.
+ * 2) Exportamos `isLegallyActionable` também como função isolada.
+ */
 
-  computeRemainingBalance(loan: Loan) {
-    if (!loan?.installments?.length) {
+type RemainingBalance = {
+  totalRemaining: number;
+  principalRemaining: number;
+  interestRemaining: number;
+  lateFeeRemaining: number;
+};
+
+type Amortization = {
+  paidPrincipal: number;
+  paidInterest: number;
+  paidLateFee: number;
+};
+
+const n = (v: any) => {
+  const x = Number(v);
+  return Number.isFinite(x) ? x : 0;
+};
+
+const getInstallments = (loan: any): any[] =>
+  Array.isArray(loan?.installments) ? loan.installments : [];
+
+const getDueDate = (inst: any): Date | null => {
+  const raw = inst?.due_date ?? inst?.dueDate ?? inst?.data_vencimento;
+  if (!raw) return null;
+  const d = new Date(raw);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+
+const engine = {
+  /**
+   * Status do contrato para UI:
+   * - PAID: saldo total ~ 0
+   * - OVERDUE: existe parcela vencida não paga
+   * - ACTIVE: caso contrário
+   */
+  computeLoanStatus(loan: Loan): 'PAID' | 'ACTIVE' | 'OVERDUE' {
+    const bal = engine.computeRemainingBalance(loan);
+    if (n(bal.totalRemaining) <= 0.05) return 'PAID';
+
+    const today = new Date();
+    const overdue = getInstallments(loan).some((inst) => {
+      const status = String(inst?.status || '').toUpperCase();
+      if (status === 'PAID') return false;
+      const due = getDueDate(inst);
+      if (!due) return false;
+      return due.getTime() < today.getTime();
+    });
+
+    return overdue ? 'OVERDUE' : 'ACTIVE';
+  },
+
+  /**
+   * Soma tudo o que ainda falta receber no contrato.
+   */
+  computeRemainingBalance(loan: Loan): RemainingBalance {
+    const installments = getInstallments(loan);
+
+    if (!installments.length) {
       return {
         totalRemaining: 0,
         principalRemaining: 0,
@@ -17,10 +82,10 @@ export const loanEngine = {
     let interest = 0;
     let late = 0;
 
-    for (const inst of loan.installments) {
-      principal += Math.max(0, Number(inst.principalRemaining || 0));
-      interest += Math.max(0, Number(inst.interestRemaining || 0));
-      late += Math.max(0, Number(inst.lateFeeAccrued || 0));
+    for (const inst of installments) {
+      principal += Math.max(0, n(inst?.principal_remaining ?? inst?.principalRemaining));
+      interest += Math.max(0, n(inst?.interest_remaining ?? inst?.interestRemaining));
+      late += Math.max(0, n(inst?.late_fee_accrued ?? inst?.lateFeeAccrued));
     }
 
     return {
@@ -31,36 +96,17 @@ export const loanEngine = {
     };
   },
 
-  computeLoanStatus(loan: Loan): "ACTIVE" | "OVERDUE" | "PAID" | "LEGAL" {
-    const balance = this.computeRemainingBalance(loan);
-    if (balance.totalRemaining <= 0.05) return "PAID";
+  /**
+   * Amortização seletiva (mantém sua regra atual):
+   * juros -> multa -> principal
+   */
+  calculateAmortization(amount: number, loan: Loan): Amortization {
+    const balance = engine.computeRemainingBalance(loan);
 
-    if (loan.activeAgreement && loan.activeAgreement.status === "ACTIVE") {
-      return "LEGAL";
+    let remaining = n(amount);
+    if (remaining <= 0) {
+      return { paidPrincipal: 0, paidInterest: 0, paidLateFee: 0 };
     }
-
-    const hasLate = (loan.installments || []).some(
-      i => getInstallmentStatusLogic(i) === LoanStatus.LATE
-    );
-
-    if (hasLate) return "OVERDUE";
-
-    return "ACTIVE";
-  },
-
-  isLegallyActionable(loan: Loan): boolean {
-    const status = this.computeLoanStatus(loan);
-    const balance = this.computeRemainingBalance(loan);
-
-    const isEligibleStatus = status === "OVERDUE" || status === "LEGAL";
-    const hasDebt = balance.totalRemaining > 0.05;
-
-    return isEligibleStatus && hasDebt;
-  },
-
-  calculateAmortization(amount: number, loan: Loan) {
-    const balance = this.computeRemainingBalance(loan);
-    let remaining = amount;
 
     const paidInterest = Math.min(remaining, balance.interestRemaining);
     remaining -= paidInterest;
@@ -70,21 +116,56 @@ export const loanEngine = {
 
     const paidPrincipal = Math.min(remaining, balance.principalRemaining);
 
-    return {
-      paidPrincipal: Math.max(0, paidPrincipal),
-      paidInterest: Math.max(0, paidInterest),
-      paidLateFee: Math.max(0, paidLateFee),
-    };
+    return { paidPrincipal, paidInterest, paidLateFee };
   },
 
-  // 🔵 NOVA FUNÇÃO — RENOVAÇÃO PURA
-  calculateRenewal(loan: Loan) {
-    const balance = this.computeRemainingBalance(loan);
-
+  /**
+   * Renovação: paga apenas juros + multa
+   */
+  calculateRenewal(loan: Loan): Amortization {
+    const balance = engine.computeRemainingBalance(loan);
     return {
       paidPrincipal: 0,
       paidInterest: balance.interestRemaining,
       paidLateFee: balance.lateFeeRemaining,
     };
   },
+
+  // Compat: mantém no objeto
+  isLegallyActionable(loan: Loan): boolean {
+    return isLegallyActionable(loan);
+  },
 };
+
+/**
+ * Regra de acionamento jurídico (isolada):
+ * - true se ainda existe saldo > 0
+ * - OU se existe parcela vencida há mais de 30 dias com principal em aberto
+ */
+export function isLegallyActionable(loan: Loan): boolean {
+  if (!loan) return false;
+
+  const bal = engine.computeRemainingBalance(loan);
+  if (n(bal.totalRemaining) > 0.05) return true;
+
+  const today = new Date();
+
+  for (const inst of getInstallments(loan)) {
+    const status = String(inst?.status || '').toUpperCase();
+    if (status === 'PAID') continue;
+
+    const due = getDueDate(inst);
+    if (!due) continue;
+
+    const overdueDays = (today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24);
+    const principalOpen = n(inst?.principal_remaining ?? inst?.principalRemaining);
+
+    if (overdueDays > 30 && principalOpen > 0) return true;
+  }
+
+  return false;
+}
+
+// 🔥 EXPORT DUPLO (garante compatibilidade)
+export const loanEngine = engine;
+export default engine;

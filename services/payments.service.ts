@@ -1,7 +1,7 @@
-// services/payments.service.ts
+// services/paymentsService.ts
 import { supabase } from '../lib/supabase';
 import type { Loan, Installment, UserProfile, CapitalSource } from '../types';
-import { todayDateOnlyUTC } from '../utils/dateHelpers';
+import { todayDateOnlyUTC, toISODateOnlyUTC } from '../utils/dateHelpers';
 import { generateUUID } from '../utils/generators';
 import { loanEngine } from '../domain/loanEngine';
 
@@ -14,98 +14,35 @@ const isUUID = (v: any) =>
 
 const safeUUID = (v: any) => (isUUID(v) ? v : null);
 
-const parseMoney = (v: string) => {
-  if (!v) return 0;
-  const clean = String(v).replace(/[R$\s]/g, '');
-  // "1.234,56" -> "1234.56"
-  if (clean.includes('.') && clean.includes(',')) {
-    return parseFloat(clean.replace(/\./g, '').replace(',', '.')) || 0;
-  }
-  // "1234,56" -> "1234.56"
-  if (clean.includes(',')) return parseFloat(clean.replace(',', '.')) || 0;
-  // "1234.56"
-  return parseFloat(clean) || 0;
+const num = (v: any) => {
+  const n = typeof v === 'number' ? v : parseFloat(String(v ?? '').replace(',', '.'));
+  return Number.isFinite(n) ? n : 0;
 };
 
-function resolveCaixaLivreId(sources: CapitalSource[]): string | null {
-  if (!Array.isArray(sources) || sources.length === 0) return null;
+const clamp0 = (v: number) => (v < 0 ? 0 : v);
 
-  // 1) Preferência por flags se existirem (você pode ter campos extras no tipo)
-  const byFlag = (sources as any[]).find(
-    (s) => s?.is_caixa_livre === true || s?.isCaixaLivre === true || s?.is_profit_box === true
-  );
-  if (byFlag?.id && isUUID(byFlag.id)) return byFlag.id;
+const parseMoney = (v: string | number | null | undefined): number => {
+  if (v == null) return 0;
+  if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
 
-  // 2) Por nome (normalizado)
-  const normalize = (s: string) =>
-    String(s || '')
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .trim();
+  let s = String(v).trim();
+  if (!s) return 0;
 
-  const caixaLivre = sources.find((s) => {
-    const n = normalize((s as any)?.name);
-    // cobre "Caixa Livre", "Caixa-livre", "Lucro", etc.
-    return n.includes('caixa livre') || n === 'lucro' || n.includes('lucro');
-  });
+  s = s.replace(/[^\d.,-]/g, '');
+  if (!s || s === '-' || s === ',' || s === '.') return 0;
 
-  if (caixaLivre?.id && isUUID(caixaLivre.id)) return caixaLivre.id;
+  const hasComma = s.includes(',');
+  const hasDot = s.includes('.');
 
-  return null;
-}
-
-/**
- * Garante uma fonte "Caixa Livre" válida para receber JUROS/MULTAS.
- * Se não existir no estado atual, tenta buscar no banco; se ainda não existir, cria.
- */
-async function ensureCaixaLivreId(ownerId: string, sources: CapitalSource[]): Promise<string> {
-  // 1) estado atual
-  const mem = resolveCaixaLivreId(sources);
-  if (mem) return mem;
-
-  // 2) banco (sem depender de created_at)
-  const { data: rows, error: findErr } = await supabase
-    .from('fontes')
-    .select('id,name')
-    .eq('profile_id', ownerId)
-    .limit(100);
-
-  if (!findErr && Array.isArray(rows) && rows.length) {
-    const normalize = (s: string) =>
-      String(s || '')
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .trim();
-
-    const hit = (rows as any[]).find((r) => {
-      const n = normalize(r?.name);
-      return n.includes('caixa livre') || n === 'lucro' || n.includes('lucro');
-    });
-
-    const hitId = safeUUID(hit?.id);
-    if (hitId) return hitId;
+  if (hasComma && hasDot) {
+    s = s.replace(/\./g, '').replace(',', '.');
+  } else if (hasComma && !hasDot) {
+    s = s.replace(',', '.');
   }
 
-  // 3) cria automaticamente
-  const newId = generateUUID();
-  const { error: insErr } = await supabase.from('fontes').insert([
-    {
-      id: newId,
-      profile_id: ownerId,
-      name: 'Caixa Livre',
-      type: 'CAIXA',
-      balance: 0,
-    } as any,
-  ]);
-
-  if (insErr) {
-    throw new Error('Não foi possível criar a fonte Caixa Livre automaticamente: ' + insErr.message);
-  }
-
-  return newId;
-}
+  const n = parseFloat(s);
+  return Number.isFinite(n) ? n : 0;
+};
 
 export const paymentsService = {
   async processPayment(params: {
@@ -141,19 +78,16 @@ export const paymentsService = {
       capitalizeRemaining = false,
     } = params;
 
-    /* =====================================================
-       BLOQUEIO FRONTEND — Parcela já quitada
-    ===================================================== */
-    if (String((inst as any)?.status || '').toUpperCase() === 'PAID') {
+    // Parcela já quitada
+    if (String((inst as any).status || '').toUpperCase() === 'PAID') {
       throw new Error('Parcela já quitada');
     }
 
-    if (!activeUser?.id) {
-      throw new Error('Usuário não autenticado. Refaça o login.');
-    }
-
+    // Demo
     if (activeUser.id === 'DEMO') {
-      return { amountToPay: customAmount || Number(calculations?.total) || 0, paymentType };
+      const demoValue = num(customAmount) || num(calculations?.total);
+      if (demoValue <= 0) throw new Error('O valor do pagamento deve ser maior que zero.');
+      return { amountToPay: demoValue, paymentType };
     }
 
     const ownerId =
@@ -172,16 +106,13 @@ export const paymentsService = {
       const lendAmount = parseMoney(avAmount);
       if (lendAmount <= 0) throw new Error('Valor do aporte inválido.');
 
-      const sourceId = safeUUID((loan as any).sourceId);
-      if (!sourceId) throw new Error('Fonte do contrato inválida (sourceId).');
-
       const { error } = await supabase.rpc('process_lend_more_atomic', {
         p_idempotency_key: idempotencyKey,
-        p_loan_id: loan.id,
-        p_installment_id: inst.id,
+        p_loan_id: safeUUID(loan.id),
+        p_installment_id: safeUUID(inst.id),
         p_profile_id: ownerId,
         p_operator_id: safeUUID(activeUser.id),
-        p_source_id: sourceId,
+        p_source_id: safeUUID((loan as any).sourceId),
         p_amount: lendAmount,
         p_notes: `Novo Aporte (+ R$ ${lendAmount.toFixed(2)})`,
       });
@@ -191,72 +122,116 @@ export const paymentsService = {
     }
 
     /* =====================================================
-       DEFINIR VALOR A PAGAR
+       DEFINIR VALOR A PAGAR (COM FALLBACK)
     ===================================================== */
     let amountToPay = 0;
 
     if (paymentType === 'CUSTOM') {
-      amountToPay = Number(customAmount || 0);
-    } else if (paymentType === 'RENEW_AV') {
+      amountToPay = num(customAmount) || num(calculations?.total);
+    } else if (paymentType === 'RENEW_AV' || paymentType === 'PARTIAL_INTEREST') {
       amountToPay = parseMoney(avAmount);
+      if (amountToPay <= 0) amountToPay = num(calculations?.total);
     } else if (paymentType === 'FULL') {
       const balance = loanEngine.computeRemainingBalance(loan);
-      amountToPay = Number(balance.totalRemaining || 0);
-    } else if (paymentType === 'PARTIAL_INTEREST') {
-      amountToPay = parseMoney(avAmount);
+      amountToPay = num(balance?.totalRemaining);
+      if (amountToPay <= 0) amountToPay = num(calculations?.total);
     } else {
       // RENEW_INTEREST
       const balance = loanEngine.computeRemainingBalance(loan);
-      amountToPay = Number((balance.interestRemaining || 0) + (balance.lateFeeRemaining || 0));
+      amountToPay = num(balance?.interestRemaining) + num(balance?.lateFeeRemaining);
+      if (amountToPay <= 0) amountToPay = num(calculations?.total);
     }
 
-    // Hardening: evita "0" por parse/float/strings vazias
-    if (!Number.isFinite(amountToPay)) amountToPay = 0;
-    if (amountToPay <= 0) throw new Error('O valor do pagamento deve ser maior que zero.');
-
-    /* =====================================================
-       AMORTIZAÇÃO SELETIVA (ENGINE)
-    ===================================================== */
-    const amortization = loanEngine.calculateAmortization(amountToPay, loan);
-
-    // Hardening final: evita RPC com tudo zerado
-    const principalPaid = Number(amortization.paidPrincipal || 0);
-    const interestPaid = Number(amortization.paidInterest || 0);
-    const lateFeePaid = Number(amortization.paidLateFee || 0);
-    const totalPaid = principalPaid + interestPaid + lateFeePaid;
-
-    if (totalPaid <= 0) {
+    if (amountToPay <= 0) {
       throw new Error('O valor do pagamento deve ser maior que zero.');
     }
 
     /* =====================================================
-       RPC OFICIAL V3 (Amortização + Fluxo de Caixa)
+       AMORTIZAÇÃO (HARDENED)
+       - garante que principal/juros/multa somem > 0
+    ===================================================== */
+    const safeCalc = {
+      principalRemaining: num((loan as any).principalRemaining ?? (inst as any).principal_remaining ?? (inst as any).principalRemaining),
+      interestRemaining: num((loan as any).interestRemaining ?? (inst as any).interest_remaining ?? (inst as any).interestRemaining),
+      lateFeeRemaining: num((loan as any).lateFeeRemaining ?? (inst as any).late_fee_accrued ?? (inst as any).lateFeeAccrued),
+    };
+
+    let amortization = loanEngine.calculateAmortization(amountToPay, loan) as any;
+
+    const aPrincipal = num(amortization?.paidPrincipal);
+    const aInterest = num(amortization?.paidInterest);
+    const aLateFee = num(amortization?.paidLateFee);
+    const aTotal = aPrincipal + aInterest + aLateFee;
+
+    // Se engine devolver 0/NaN, faz split determinístico aqui
+    if (aTotal <= 0) {
+      let remaining = amountToPay;
+
+      // regra: sempre paga multa -> juros -> principal
+      const payLate = clamp0(Math.min(remaining, safeCalc.lateFeeRemaining));
+      remaining -= payLate;
+
+      const payInterest = clamp0(Math.min(remaining, safeCalc.interestRemaining));
+      remaining -= payInterest;
+
+      const payPrincipal = clamp0(remaining); // o resto
+
+      amortization = {
+        paidPrincipal: payPrincipal,
+        paidInterest: payInterest,
+        paidLateFee: payLate,
+      };
+
+      // Para pagamentos exclusivamente de juros (parcial/renovação), força principal=0
+      if (paymentType === 'PARTIAL_INTEREST' || paymentType === 'RENEW_INTEREST') {
+        const onlyInterest = amountToPay;
+        const lf = clamp0(Math.min(onlyInterest, safeCalc.lateFeeRemaining));
+        const it = clamp0(onlyInterest - lf);
+        amortization = { paidPrincipal: 0, paidInterest: it, paidLateFee: lf };
+      }
+    }
+
+    const finalPrincipal = num(amortization?.paidPrincipal);
+    const finalInterest = num(amortization?.paidInterest);
+    const finalLateFee = num(amortization?.paidLateFee);
+    const finalTotal = finalPrincipal + finalInterest + finalLateFee;
+
+    if (finalTotal <= 0) {
+      // blindagem final: nunca chama RPC com total 0
+      throw new Error('Pagamento inválido: amortização zerada. Verifique o valor informado.');
+    }
+
+    /* =====================================================
+       RPC V3
     ===================================================== */
     const paymentDate = realDate || todayDateOnlyUTC();
 
-    const sourceId = safeUUID((loan as any).sourceId);
-    if (!sourceId) throw new Error('Fonte do contrato inválida (sourceId).');
+    const caixaLivre =
+      sources.find(
+        (s) =>
+          String((s as any).name || '').toLowerCase().includes('caixa livre') ||
+          String((s as any).name || '').toLowerCase() === 'lucro'
+      ) || null;
 
-    const caixaLivreId = await ensureCaixaLivreId(ownerId, sources);
+    const caixaLivreId = safeUUID((caixaLivre as any)?.id) || safeUUID('28646e86-cec9-4d47-b600-3b771a066a05');
 
     const { error } = await supabase.rpc('process_payment_v3_selective', {
       p_idempotency_key: idempotencyKey,
-      p_loan_id: loan.id,
-      p_installment_id: inst.id,
+      p_loan_id: safeUUID(loan.id),
+      p_installment_id: safeUUID(inst.id),
       p_profile_id: ownerId,
       p_operator_id: safeUUID(activeUser.id),
-      p_principal_paid: principalPaid,
-      p_interest_paid: interestPaid,
-      p_late_fee_paid: lateFeePaid,
-      // IMPORTANTÍSSIMO: timestamptz em ISO (não date-only)
-      p_payment_date: paymentDate.toISOString(),
-      p_capitalize_remaining: !!capitalizeRemaining,
-      p_source_id: sourceId,
+      p_principal_paid: finalPrincipal,
+      p_interest_paid: finalInterest,
+      p_late_fee_paid: finalLateFee,
+      p_payment_date: toISODateOnlyUTC(paymentDate),
+      p_capitalize_remaining: capitalizeRemaining,
+      p_source_id: safeUUID((loan as any).sourceId),
       p_caixa_livre_id: caixaLivreId,
     });
 
     if (error) throw new Error('Falha na persistência: ' + error.message);
 
-    return { amountToPay, paymentType, amortization };
+    return { amountToPay, paymentType, amortization: { paidPrincipal: finalPrincipal, paidInterest: finalInterest, paidLateFee: finalLateFee } };
   },
 };
