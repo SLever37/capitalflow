@@ -1,9 +1,12 @@
 import { supabase } from '../../../lib/supabase';
 import { CalendarEvent, EventStatus } from '../types';
+import { safeUUID } from '../../../utils/uuid';
 
 export const calendarService = {
 
   async fetchSystemEvents(profileId: string): Promise<CalendarEvent[]> {
+    const safeProfileId = safeUUID(profileId);
+    if (!safeProfileId) return [];
 
     const events: CalendarEvent[] = [];
 
@@ -26,7 +29,7 @@ export const calendarService = {
           numero_parcela
         )
       `)
-      .eq('profile_id', profileId)
+      .eq('profile_id', safeProfileId)
       .not('status', 'in', '("ENCERRADO","PAID")')
       .eq('is_archived', false);
 
@@ -97,7 +100,7 @@ export const calendarService = {
         *,
         contratos (debtor_name, debtor_phone)
       `)
-      .eq('profile_id', profileId)
+      .eq('profile_id', safeProfileId)
       .in('status', ['CREATED', 'PENDENTE', 'PENDING']);
 
     if (intents) {
@@ -130,10 +133,13 @@ export const calendarService = {
   },
 
   async listUserEvents(profileId: string): Promise<CalendarEvent[]> {
+    const safeProfileId = safeUUID(profileId);
+    if (!safeProfileId) return [];
+
     const { data, error } = await supabase
       .from('calendar_events')
       .select('*')
-      .eq('profile_id', profileId);
+      .eq('profile_id', safeProfileId);
 
     if (error) throw error;
     return data || [];
@@ -151,19 +157,25 @@ export const calendarService = {
   },
 
   async updateEvent(id: string, updates: Partial<CalendarEvent>) {
+    const safeId = safeUUID(id);
+    if (!safeId) return;
+
     const { error } = await supabase
       .from('calendar_events')
       .update(updates)
-      .eq('id', id);
+      .eq('id', safeId);
 
     if (error) throw error;
   },
 
   async deleteEvent(id: string) {
+    const safeId = safeUUID(id);
+    if (!safeId) return;
+
     const { error } = await supabase
       .from('calendar_events')
       .delete()
-      .eq('id', id);
+      .eq('id', safeId);
 
     if (error) throw error;
   }

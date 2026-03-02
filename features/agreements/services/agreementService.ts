@@ -2,6 +2,7 @@
 import { supabase } from "../../../lib/supabase";
 import { Agreement, AgreementInstallment, UserProfile } from "../../../types";
 import { generateUUID } from "../../../utils/generators";
+import { isUUID, safeUUID } from "../../../utils/uuid";
 
 export const agreementService = {
   async createAgreement(
@@ -110,7 +111,7 @@ export const agreementService = {
 
     // 4) Atualizar saldo da fonte
     const { error: balErr } = await supabase.rpc("adjust_source_balance", {
-      p_source_id: sourceId,
+      p_source_id: safeUUID(sourceId),
       p_delta: amount,
     });
     if (balErr) throw balErr;

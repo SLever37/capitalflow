@@ -4,49 +4,38 @@ import type { Loan, Installment, UserProfile, CapitalSource } from '../types';
 import { todayDateOnlyUTC } from '../utils/dateHelpers';
 import { generateUUID } from '../utils/generators';
 import { loanEngine } from '../domain/loanEngine';
+import { isUUID, safeUUID } from '../utils/uuid';
 
 /* =========================
    Helpers
 ========================= */
-const isUUID = (v: any) =>
-  typeof v === 'string' &&
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
-
-const safeUUID = (v: any) => (isUUID(v) ? v : null);
-
 const parseMoney = (v: string) => {
   if (!v) return 0;
   const clean = String(v).replace(/[R$\s]/g, '');
-  // "1.234,56" -> "1234.56"
   if (clean.includes('.') && clean.includes(',')) {
     return parseFloat(clean.replace(/\./g, '').replace(',', '.')) || 0;
   }
-  // "1234,56" -> "1234.56"
   if (clean.includes(',')) return parseFloat(clean.replace(',', '.')) || 0;
-  // "1234.56"
   return parseFloat(clean) || 0;
 };
 
-function resolveCaixaLivreId(sources: CapitalSource[]): string | null {
+const normalize = (s: string) =>
+  String(s || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+
+function resolveCaixaLivreIdFromMemory(sources: CapitalSource[]): string | null {
   if (!Array.isArray(sources) || sources.length === 0) return null;
 
-  // 1) Preferência por flags se existirem (você pode ter campos extras no tipo)
   const byFlag = (sources as any[]).find(
     (s) => s?.is_caixa_livre === true || s?.isCaixaLivre === true || s?.is_profit_box === true
   );
   if (byFlag?.id && isUUID(byFlag.id)) return byFlag.id;
 
-  // 2) Por nome (normalizado)
-  const normalize = (s: string) =>
-    String(s || '')
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .trim();
-
   const caixaLivre = sources.find((s) => {
     const n = normalize((s as any)?.name);
-    // cobre "Caixa Livre", "Caixa-livre", "Lucro", etc.
     return n.includes('caixa livre') || n === 'lucro' || n.includes('lucro');
   });
 
@@ -55,56 +44,36 @@ function resolveCaixaLivreId(sources: CapitalSource[]): string | null {
   return null;
 }
 
-/**
- * Garante uma fonte "Caixa Livre" válida para receber JUROS/MULTAS.
- * Se não existir no estado atual, tenta buscar no banco; se ainda não existir, cria.
- */
-async function ensureCaixaLivreId(ownerId: string, sources: CapitalSource[]): Promise<string> {
-  // 1) estado atual
-  const mem = resolveCaixaLivreId(sources);
-  if (mem) return mem;
-
-  // 2) banco (sem depender de created_at)
-  const { data: rows, error: findErr } = await supabase
+async function resolveCaixaLivreIdFromDB(ownerId: string): Promise<string | null> {
+  // tenta achar em public.fontes (nome “Caixa Livre” / “Lucro”), do profile_id do owner
+  const { data, error } = await supabase
     .from('fontes')
-    .select('id,name')
+    .select('id,nome')
     .eq('profile_id', ownerId)
-    .limit(100);
+    .limit(50);
 
-  if (!findErr && Array.isArray(rows) && rows.length) {
-    const normalize = (s: string) =>
-      String(s || '')
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .trim();
+  if (error || !data) return null;
 
-    const hit = (rows as any[]).find((r) => {
-      const n = normalize(r?.name);
-      return n.includes('caixa livre') || n === 'lucro' || n.includes('lucro');
-    });
+  const found = data.find((f: any) => {
+    const n = normalize(f?.nome);
+    return n.includes('caixa livre') || n === 'lucro' || n.includes('lucro');
+  });
 
-    const hitId = safeUUID(hit?.id);
-    if (hitId) return hitId;
-  }
+  return found?.id && isUUID(found.id) ? found.id : null;
+}
 
-  // 3) cria automaticamente
-  const newId = generateUUID();
-  const { error: insErr } = await supabase.from('fontes').insert([
-    {
-      id: newId,
-      profile_id: ownerId,
-      name: 'Caixa Livre',
-      type: 'CAIXA',
-      balance: 0,
-    } as any,
-  ]);
+async function revalidateInstallment(instId: string) {
+  const safeId = safeUUID(instId);
+  if (!safeId) return null;
 
-  if (insErr) {
-    throw new Error('Não foi possível criar a fonte Caixa Livre automaticamente: ' + insErr.message);
-  }
+  const { data, error } = await supabase
+    .from('parcelas')
+    .select('id,status,principal_remaining,interest_remaining,late_fee_accrued,loan_id')
+    .eq('id', safeId)
+    .single();
 
-  return newId;
+  if (error) throw new Error('Falha ao revalidar parcela no banco: ' + error.message);
+  return data as any;
 }
 
 export const paymentsService = {
@@ -141,13 +110,7 @@ export const paymentsService = {
       capitalizeRemaining = false,
     } = params;
 
-    /* =====================================================
-       BLOQUEIO FRONTEND — Parcela já quitada
-    ===================================================== */
-    if (String((inst as any)?.status || '').toUpperCase() === 'PAID') {
-      throw new Error('Parcela já quitada');
-    }
-
+    // 0) Autenticação mínima
     if (!activeUser?.id) {
       throw new Error('Usuário não autenticado. Refaça o login.');
     }
@@ -156,6 +119,7 @@ export const paymentsService = {
       return { amountToPay: customAmount || Number(calculations?.total) || 0, paymentType };
     }
 
+    // 1) OwnerId
     const ownerId =
       safeUUID((loan as any).profile_id) ||
       safeUUID((activeUser as any).supervisor_id) ||
@@ -163,6 +127,20 @@ export const paymentsService = {
 
     if (!ownerId) throw new Error('Perfil inválido. Refaça o login.');
 
+    // 2) Revalidação no banco (mata estado stale)
+    const instDb = await revalidateInstallment(inst.id);
+
+    const statusDb = String(instDb?.status || '').toUpperCase();
+    const remainingDb =
+      Number(instDb?.principal_remaining || 0) +
+      Number(instDb?.interest_remaining || 0) +
+      Number(instDb?.late_fee_accrued || 0);
+
+    if (statusDb === 'PAID' || remainingDb <= 0.05) {
+      throw new Error('Parcela já quitada (revalidado no banco). Atualize a tela.');
+    }
+
+    // 3) Idempotência
     const idempotencyKey = generateUUID();
 
     /* =====================================================
@@ -176,12 +154,12 @@ export const paymentsService = {
       if (!sourceId) throw new Error('Fonte do contrato inválida (sourceId).');
 
       const { error } = await supabase.rpc('process_lend_more_atomic', {
-        p_idempotency_key: idempotencyKey,
-        p_loan_id: loan.id,
-        p_installment_id: inst.id,
-        p_profile_id: ownerId,
+        p_idempotency_key: safeUUID(idempotencyKey) || idempotencyKey,
+        p_loan_id: safeUUID(loan.id),
+        p_installment_id: safeUUID(inst.id),
+        p_profile_id: safeUUID(ownerId),
         p_operator_id: safeUUID(activeUser.id),
-        p_source_id: sourceId,
+        p_source_id: safeUUID(sourceId),
         p_amount: lendAmount,
         p_notes: `Novo Aporte (+ R$ ${lendAmount.toFixed(2)})`,
       });
@@ -210,23 +188,24 @@ export const paymentsService = {
       amountToPay = Number((balance.interestRemaining || 0) + (balance.lateFeeRemaining || 0));
     }
 
-    // Hardening: evita "0" por parse/float/strings vazias
     if (!Number.isFinite(amountToPay)) amountToPay = 0;
-    if (amountToPay <= 0) throw new Error('O valor do pagamento deve ser maior que zero.');
+    if (amountToPay <= 0) {
+      // Aqui é o caso clássico “já está pago / não tem saldo”, mas UI deixou clicar
+      throw new Error('O valor do pagamento deve ser maior que zero. (Sem saldo a pagar / tela desatualizada)');
+    }
 
     /* =====================================================
        AMORTIZAÇÃO SELETIVA (ENGINE)
     ===================================================== */
     const amortization = loanEngine.calculateAmortization(amountToPay, loan);
 
-    // Hardening final: evita RPC com tudo zerado
     const principalPaid = Number(amortization.paidPrincipal || 0);
     const interestPaid = Number(amortization.paidInterest || 0);
     const lateFeePaid = Number(amortization.paidLateFee || 0);
     const totalPaid = principalPaid + interestPaid + lateFeePaid;
 
-    if (totalPaid <= 0) {
-      throw new Error('O valor do pagamento deve ser maior que zero.');
+    if (!Number.isFinite(totalPaid) || totalPaid <= 0) {
+      throw new Error('O valor do pagamento deve ser maior que zero. (Amortização zerada / contrato sem saldo)');
     }
 
     /* =====================================================
@@ -237,22 +216,28 @@ export const paymentsService = {
     const sourceId = safeUUID((loan as any).sourceId);
     if (!sourceId) throw new Error('Fonte do contrato inválida (sourceId).');
 
-    const caixaLivreId = await ensureCaixaLivreId(ownerId, sources);
+    // Caixa Livre: tenta primeiro do estado, depois do banco
+    let caixaLivreId = resolveCaixaLivreIdFromMemory(sources);
+    if (!caixaLivreId) {
+      caixaLivreId = await resolveCaixaLivreIdFromDB(ownerId);
+    }
+    if (!caixaLivreId) {
+      throw new Error('Caixa Livre (p_caixa_livre_id) não encontrada. Crie uma fonte "Caixa Livre" ou "Lucro" para este perfil.');
+    }
 
     const { error } = await supabase.rpc('process_payment_v3_selective', {
-      p_idempotency_key: idempotencyKey,
-      p_loan_id: loan.id,
-      p_installment_id: inst.id,
-      p_profile_id: ownerId,
+      p_idempotency_key: idempotencyKey, 
+      p_loan_id: safeUUID(loan.id),
+      p_installment_id: safeUUID(inst.id),
+      p_profile_id: safeUUID(ownerId),
       p_operator_id: safeUUID(activeUser.id),
       p_principal_paid: principalPaid,
       p_interest_paid: interestPaid,
       p_late_fee_paid: lateFeePaid,
-      // IMPORTANTÍSSIMO: timestamptz em ISO (não date-only)
-      p_payment_date: paymentDate.toISOString(),
+      p_payment_date: paymentDate.toISOString().split('T')[0], // YYYY-MM-DD
       p_capitalize_remaining: !!capitalizeRemaining,
-      p_source_id: sourceId,
-      p_caixa_livre_id: caixaLivreId,
+      p_source_id: safeUUID(sourceId),
+      p_caixa_livre_id: safeUUID(caixaLivreId),
     });
 
     if (error) throw new Error('Falha na persistência: ' + error.message);

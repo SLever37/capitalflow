@@ -6,6 +6,7 @@ import { asString } from '../../utils/safe';
 import { playNotificationSound } from '../../utils/notificationSound';
 import { onlyDigits } from '../../utils/formatters';
 import { isDev } from '../../utils/isDev';
+import { isUUID, safeUUID } from '../../utils/uuid';
 
 type SavedProfile = {
   id: string;
@@ -86,9 +87,10 @@ export const useAuth = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   const trackAccess = async (profileId: string) => {
-    if (!profileId || profileId === 'DEMO') return;
+    const safeId = safeUUID(profileId);
+    if (!safeId || safeId === 'DEMO') return;
     try {
-      await supabase.rpc('increment_profile_access', { p_profile_id: profileId });
+      await supabase.rpc('increment_profile_access', { p_profile_id: safeId });
     } catch (e) {
       if (isDev) console.warn('[AUTH] Falha ao registrar acesso', e);
     }

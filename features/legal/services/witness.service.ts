@@ -1,18 +1,20 @@
 
 import { supabase } from '../../../lib/supabase';
 import { LegalWitness } from '../../../types';
+import { safeUUID } from '../../../utils/uuid';
 
 export const witnessService = {
     /**
      * Lista testemunhas diretamente do banco de dados.
      */
     async list(profileId: string): Promise<LegalWitness[]> {
-        if (!profileId || profileId === 'DEMO') return [];
+        const safeProfileId = safeUUID(profileId);
+        if (!safeProfileId || profileId === 'DEMO') return [];
 
         const { data, error } = await supabase
             .from('testemunhas')
             .select('*')
-            .eq('profile_id', profileId)
+            .eq('profile_id', safeProfileId)
             .order('nome', { ascending: true });
 
         if (error) {
@@ -32,22 +34,26 @@ export const witnessService = {
      * Salva ou atualiza uma testemunha na base de dados.
      */
     async save(witness: LegalWitness, profileId: string) {
-        if (!profileId || profileId === 'DEMO') {
+        const safeProfileId = safeUUID(profileId);
+        if (!safeProfileId || profileId === 'DEMO') {
             throw new Error("ID do perfil inválido ou em modo demonstração. Faça login real.");
         }
 
         const payload = {
             nome: witness.name.toUpperCase().trim(),
             documento: witness.document,
-            profile_id: profileId
+            profile_id: safeProfileId
         };
 
         if (witness.id) {
+            const safeId = safeUUID(witness.id);
+            if (!safeId) throw new Error("ID da testemunha inválido");
+
             const { error } = await supabase
                 .from('testemunhas')
                 .update(payload)
-                .eq('id', witness.id)
-                .eq('profile_id', profileId);
+                .eq('id', safeId)
+                .eq('profile_id', safeProfileId);
             
             if (error) {
                 throw new Error(`Falha ao atualizar banco: ${error.message}`);
@@ -71,13 +77,15 @@ export const witnessService = {
      * Remove permanentemente do banco de dados.
      */
     async delete(id: string, profileId: string) {
-        if (!id || !profileId || profileId === 'DEMO') return;
+        const safeId = safeUUID(id);
+        const safeProfileId = safeUUID(profileId);
+        if (!safeId || !safeProfileId || profileId === 'DEMO') return;
 
         const { error } = await supabase
             .from('testemunhas')
             .delete()
-            .eq('id', id)
-            .eq('profile_id', profileId);
+            .eq('id', safeId)
+            .eq('profile_id', safeProfileId);
 
         if (error) {
             console.error("Erro ao excluir testemunha do banco:", error);

@@ -1,5 +1,6 @@
 
 import { supabasePortal } from '../lib/supabasePortal';
+import { safeUUID } from '../utils/uuid';
 
 export const portalService = {
   /**
@@ -23,8 +24,11 @@ export const portalService = {
    * Busca dados básicos do cliente pelo ID (para preencher o header do portal)
    */
   async fetchClientById(clientId: string) {
+    const safeClientId = safeUUID(clientId);
+    if (!safeClientId) return null;
+
     const { data, error } = await supabasePortal
-        .rpc('portal_get_client', { p_client_id: clientId })
+        .rpc('portal_get_client', { p_client_id: safeClientId })
         .single();
     
     if (error) return null;
@@ -36,8 +40,11 @@ export const portalService = {
    * CORREÇÃO: Incluído client_id e code na seleção para validação de segurança no frontend.
    */
   async fetchClientContracts(clientId: string) {
+    const safeClientId = safeUUID(clientId);
+    if (!safeClientId) return [];
+
     const { data, error } = await supabasePortal
-      .rpc('portal_list_contracts', { p_client_id: clientId });
+      .rpc('portal_list_contracts', { p_client_id: safeClientId });
 
     if (error) throw new Error('Falha ao listar contratos.');
     return data || [];
@@ -47,15 +54,18 @@ export const portalService = {
    * Carrega dados completos do contrato (parcelas, sinais, etc).
    */
   async fetchLoanDetails(loanId: string) {
+    const safeLoanId = safeUUID(loanId);
+    if (!safeLoanId) throw new Error('ID do contrato inválido.');
+
     const { data: installments, error: instErr } = await supabasePortal
-      .rpc('portal_get_parcels', { p_loan_id: loanId });
+      .rpc('portal_get_parcels', { p_loan_id: safeLoanId });
 
     if (instErr) throw new Error('Erro ao carregar parcelas.');
 
     let signals: any[] = [];
     try {
       const { data: sig } = await supabasePortal
-        .rpc('portal_get_signals', { p_loan_id: loanId });
+        .rpc('portal_get_signals', { p_loan_id: safeLoanId });
       if (sig) signals = sig;
     } catch {}
 
@@ -67,9 +77,12 @@ export const portalService = {
    * Substitui a chamada direta ao supabase no hook.
    */
   async fetchFullLoanById(loanId: string) {
+    const safeLoanId = safeUUID(loanId);
+    if (!safeLoanId) return null;
+
     // RPC retorna JSON completo
     const { data: fullLoanData, error } = await supabasePortal
-      .rpc('portal_get_full_loan', { p_loan_id: loanId });
+      .rpc('portal_get_full_loan', { p_loan_id: safeLoanId });
 
     if (error) return null;
     return fullLoanData;
@@ -79,11 +92,19 @@ export const portalService = {
    * Registra intenção de pagamento
    */
   async submitPaymentIntent(clientId: string, loanId: string, profileId: string, tipo: string) {
+    const safeClientId = safeUUID(clientId);
+    const safeLoanId = safeUUID(loanId);
+    const safeProfileId = safeUUID(profileId);
+
+    if (!safeClientId || !safeLoanId || !safeProfileId) {
+      throw new Error('IDs inválidos para registrar intenção.');
+    }
+
     try {
       const { data, error } = await supabasePortal.rpc('portal_submit_payment_intent', {
-        p_client_id: clientId,
-        p_loan_id: loanId,
-        p_profile_id: profileId,
+        p_client_id: safeClientId,
+        p_loan_id: safeLoanId,
+        p_profile_id: safeProfileId,
         p_tipo: tipo,
       });
       if (error) throw error;
@@ -92,9 +113,9 @@ export const portalService = {
       const { data, error } = await supabasePortal
         .from('sinalizacoes_pagamento')
         .insert({
-          client_id: clientId,
-          loan_id: loanId,
-          profile_id: profileId,
+          client_id: safeClientId,
+          loan_id: safeLoanId,
+          profile_id: safeProfileId,
           tipo_intencao: tipo,
           status: 'PENDENTE',
           created_at: new Date().toISOString(),
@@ -138,8 +159,11 @@ export const portalService = {
    * Busca o conteúdo HTML de um documento específico
    */
   async fetchDocument(token: string, docId: string) {
+    const safeDocId = safeUUID(docId);
+    if (!safeDocId) throw new Error('ID do documento inválido.');
+
     const { data, error } = await supabasePortal
-      .rpc('portal_get_doc', { p_token: token, p_doc_id: docId })
+      .rpc('portal_get_doc', { p_token: token, p_doc_id: safeDocId })
       .single();
 
     if (error) throw new Error('Falha ao carregar documento.');
@@ -150,8 +174,11 @@ export const portalService = {
    * Verifica campos faltantes para assinatura
    */
   async docMissingFields(docId: string) {
+    const safeDocId = safeUUID(docId);
+    if (!safeDocId) throw new Error('ID do documento inválido.');
+
     const { data, error } = await supabasePortal
-      .rpc('rpc_doc_missing_fields', { p_documento_id: docId })
+      .rpc('rpc_doc_missing_fields', { p_documento_id: safeDocId })
       .single();
 
     if (error) throw new Error('Erro ao verificar campos.');
@@ -162,12 +189,15 @@ export const portalService = {
    * Atualiza campos faltantes no snapshot do documento
    */
   async updateDocumentSnapshotFields(docId: string, patch: any) {
+    const safeDocId = safeUUID(docId);
+    if (!safeDocId) throw new Error('ID do documento inválido.');
+
     // Se não houver RPC específica, tentamos atualizar via tabela direta se permitido, 
     // ou assumimos que existe uma RPC para isso.
     // Vou usar uma RPC hipotética ou update direto se a RLS permitir.
     // Dado o contexto "portal", melhor usar RPC.
     const { data, error } = await supabasePortal
-      .rpc('portal_update_doc_fields', { p_doc_id: docId, p_fields: patch });
+      .rpc('portal_update_doc_fields', { p_doc_id: safeDocId, p_fields: patch });
     
     // Fallback se RPC não existir (tentativa direta, provavelmente falhará se RLS for estrito)
     if (error && error.message.includes('function') && error.message.includes('does not exist')) {
@@ -185,10 +215,13 @@ export const portalService = {
    * Assina o documento
    */
   async signDocument(token: string, docId: string, role: string, name: string, cpf: string, ip: string, userAgent: string) {
+    const safeDocId = safeUUID(docId);
+    if (!safeDocId) throw new Error('ID do documento inválido.');
+
     const { data, error } = await supabasePortal
       .rpc('portal_sign_document', {
         p_token: token,
-        p_doc_id: docId,
+        p_doc_id: safeDocId,
         p_role: role,
         p_name: name,
         p_cpf: cpf,

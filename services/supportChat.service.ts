@@ -1,6 +1,7 @@
 // services/supportChat.service.ts
 import { supabase } from '../lib/supabase';
 import { isDev } from '../utils/isDev';
+import { isUUID, safeUUID } from '../utils/uuid';
 
 export type SupportMessageType = 'text' | 'image' | 'audio' | 'file' | 'location';
 
@@ -90,10 +91,13 @@ async function signPath(path: string) {
 export const supportChatService = {
   async getMessages(loanId: string, supabaseClient: any = supabase) {
     try {
+      const safeLoanId = safeUUID(loanId);
+      if (!safeLoanId) return [];
+
       const { data, error } = await supabaseClient
         .from('mensagens_suporte')
         .select('*')
-        .eq('loan_id', loanId)
+        .eq('loan_id', safeLoanId)
         .order('created_at', { ascending: true });
 
       if (error) throw new Error(error.message);
@@ -239,6 +243,9 @@ export const supportChatService = {
     viewer: 'CLIENT' | 'OPERATOR',
     supabaseClient: any = supabase
   ) {
+    const safeLoanId = safeUUID(loanId);
+    if (!safeLoanId) return true;
+
     let uid: string | null = null;
     if (viewer === 'OPERATOR') {
       uid = await getAuthUid(supabaseClient);
@@ -251,7 +258,7 @@ export const supportChatService = {
         read_at: new Date().toISOString(),
         read_by: uid,
       })
-      .eq('loan_id', loanId)
+      .eq('loan_id', safeLoanId)
       .neq('sender_type', viewer)
       .eq('read', false);
 
@@ -260,29 +267,37 @@ export const supportChatService = {
   },
 
   async deleteMessage(messageId: string, supabaseClient: any = supabase) {
-    const { error } = await supabaseClient.from('mensagens_suporte').delete().eq('id', messageId);
+    const safeMessageId = safeUUID(messageId);
+    if (!safeMessageId) return;
+    const { error } = await supabaseClient.from('mensagens_suporte').delete().eq('id', safeMessageId);
     if (error) throw error;
   },
 
   async deleteChatHistory(loanId: string, supabaseClient: any = supabase) {
-    const { error } = await supabaseClient.from('mensagens_suporte').delete().eq('loan_id', loanId);
+    const safeLoanId = safeUUID(loanId);
+    if (!safeLoanId) return;
+    const { error } = await supabaseClient.from('mensagens_suporte').delete().eq('loan_id', safeLoanId);
     if (error) throw error;
 
-    await supabaseClient.from('support_tickets').delete().eq('loan_id', loanId);
+    await supabaseClient.from('support_tickets').delete().eq('loan_id', safeLoanId);
   },
 
   async deleteCampaignChatHistory(sessionToken: string, supabaseClient: any = supabase) {
-    const { error } = await supabaseClient.from('campaign_messages').delete().eq('session_token', sessionToken);
+    const safeSessionToken = safeUUID(sessionToken);
+    if (!safeSessionToken) return;
+    const { error } = await supabaseClient.from('campaign_messages').delete().eq('session_token', safeSessionToken);
     if (error) throw error;
   },
 
   async deleteMultipleChats(loanIds: string[]) {
     if (loanIds.length === 0) return;
+    const safeIds = loanIds.map(id => safeUUID(id)).filter(Boolean) as string[];
+    if (safeIds.length === 0) return;
 
-    const { error } = await supabase.from('mensagens_suporte').delete().in('loan_id', loanIds);
+    const { error } = await supabase.from('mensagens_suporte').delete().in('loan_id', safeIds);
     if (error) throw error;
 
-    await supabase.from('support_tickets').delete().in('loan_id', loanIds);
+    await supabase.from('support_tickets').delete().in('loan_id', safeIds);
   },
 
   async getActiveChats(operatorId: string) {
@@ -300,7 +315,7 @@ export const supportChatService = {
       if (error) throw error;
       if (!messages || messages.length === 0) return [];
 
-      const loanIds = Array.from(new Set(messages.map((m: any) => m.loan_id).filter(Boolean)));
+      const loanIds = Array.from(new Set(messages.map((m: any) => m.loan_id).filter(isUUID)));
       if (loanIds.length === 0) return [];
 
       const contractsMap = new Map<string, { name: string; clientId: string }>();
@@ -350,10 +365,13 @@ export const supportChatService = {
   },
 
   async getAvailableContracts(ownerId: string) {
+    const safeOwnerId = safeUUID(ownerId);
+    if (!safeOwnerId) return [];
+
     const { data, error } = await supabase
       .from('contratos')
       .select('id, debtor_name, debtor_document, debtor_phone, client_id')
-      .eq('owner_id', ownerId)
+      .eq('owner_id', safeOwnerId)
       .neq('is_archived', true)
       .order('debtor_name', { ascending: true })
       .limit(300);
@@ -372,10 +390,13 @@ export const supportChatService = {
   },
 
   async getTeamMembers(ownerId: string) {
+    const safeOwnerId = safeUUID(ownerId);
+    if (!safeOwnerId) return [];
+
     const { data, error } = await supabase
       .from('perfis')
       .select('id, nome_operador, nome_completo, email, access_level')
-      .or(`id.eq.${ownerId},supervisor_id.eq.${ownerId}`)
+      .or(`id.eq.${safeOwnerId},supervisor_id.eq.${safeOwnerId}`)
       .order('nome_operador', { ascending: true });
 
     if (error) return [];

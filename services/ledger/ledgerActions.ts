@@ -4,6 +4,7 @@ import { Loan, UserProfile, CapitalSource } from '../../types';
 import { generateUUID } from '../../utils/generators';
 import { getOwnerId, toNumber } from './ledgerHelpers';
 import { logArchive, logRestore } from './ledgerAudit';
+import { isUUID, safeUUID } from '../../utils/uuid';
 
 export async function executeLedgerAction(params: {
   type: 'DELETE' | 'ARCHIVE' | 'RESTORE' | 'DELETE_CLIENT' | 'DELETE_SOURCE';
@@ -15,8 +16,10 @@ export async function executeLedgerAction(params: {
 }) {
   const { type, targetId, loan, activeUser, sources, refundChecked } = params;
   if (!activeUser?.id) throw new Error('Usuário não autenticado');
+  if (activeUser.id === 'DEMO') return 'Ação realizada (Demo)';
 
   const ownerId = getOwnerId(activeUser);
+  if (!isUUID(ownerId)) return 'Ação realizada (Demo/Inválido)';
 
   // 1) Reembolso de capital na fonte (opcional)
   if (refundChecked && loan && loan.sourceId && (type === 'DELETE' || type === 'ARCHIVE')) {
@@ -31,8 +34,8 @@ export async function executeLedgerAction(params: {
         const { error: refundError } = await supabase
           .from('fontes')
           .update({ balance: toNumber(source.balance) + remainingPrincipal })
-          .eq('id', source.id)
-          .eq('profile_id', ownerId);
+          .eq('id', safeUUID(source.id))
+          .eq('profile_id', safeUUID(ownerId));
 
         if (refundError) throw refundError;
 
@@ -64,13 +67,13 @@ export async function executeLedgerAction(params: {
   // 2) Ações
   if (type === 'DELETE') {
     // ✅ contratos pertencem ao DONO (coluna: owner_id)
-    const { error } = await supabase.from('contratos').delete().eq('id', targetId).eq('owner_id', ownerId);
+    const { error } = await supabase.from('contratos').delete().eq('id', safeUUID(targetId)).eq('owner_id', safeUUID(ownerId));
     if (error) throw error;
     return 'Contrato Excluído permanentemente.';
   }
 
   if (type === 'ARCHIVE') {
-    const { error } = await supabase.from('contratos').update({ is_archived: true }).eq('id', targetId).eq('owner_id', ownerId);
+    const { error } = await supabase.from('contratos').update({ is_archived: true }).eq('id', safeUUID(targetId)).eq('owner_id', safeUUID(ownerId));
     if (error) throw error;
 
     await logArchive(ownerId, targetId, loan?.sourceId);
@@ -78,7 +81,7 @@ export async function executeLedgerAction(params: {
   }
 
   if (type === 'RESTORE') {
-    const { error } = await supabase.from('contratos').update({ is_archived: false }).eq('id', targetId).eq('owner_id', ownerId);
+    const { error } = await supabase.from('contratos').update({ is_archived: false }).eq('id', safeUUID(targetId)).eq('owner_id', safeUUID(ownerId));
     if (error) throw error;
 
     await logRestore(ownerId, targetId, loan?.sourceId);
@@ -92,8 +95,8 @@ export async function executeLedgerAction(params: {
     const { data: loanIdsData, error: loanIdsErr } = await supabase
       .from('contratos')
       .select('id')
-      .eq('owner_id', ownerId)
-      .eq('client_id', targetId);
+      .eq('owner_id', safeUUID(ownerId))
+      .eq('client_id', safeUUID(targetId));
 
     if (loanIdsErr) throw loanIdsErr;
 
@@ -102,12 +105,12 @@ export async function executeLedgerAction(params: {
     if (loanIds.length > 0) {
       // 2) apagar dependências por loan_id (tabelas que você citou no schema)
       const deletes = [
-        supabase.from('sinalizacoes_pagamento').delete().in('loan_id', loanIds).eq('profile_id', ownerId),
-        supabase.from('transacoes').delete().in('loan_id', loanIds).eq('profile_id', ownerId),
-        supabase.from('parcelas').delete().in('loan_id', loanIds).eq('profile_id', ownerId),
+        supabase.from('sinalizacoes_pagamento').delete().in('loan_id', loanIds).eq('profile_id', safeUUID(ownerId)),
+        supabase.from('transacoes').delete().in('loan_id', loanIds).eq('profile_id', safeUUID(ownerId)),
+        supabase.from('parcelas').delete().in('loan_id', loanIds).eq('profile_id', safeUUID(ownerId)),
         // acordos: depende do seu schema, mas normalmente tem loan_id
-        supabase.from('acordo_parcelas').delete().in('loan_id', loanIds).eq('profile_id', ownerId),
-        supabase.from('acordos_inadimplencia').delete().in('loan_id', loanIds).eq('profile_id', ownerId),
+        supabase.from('acordo_parcelas').delete().in('loan_id', loanIds).eq('profile_id', safeUUID(ownerId)),
+        supabase.from('acordos_inadimplencia').delete().in('loan_id', loanIds).eq('profile_id', safeUUID(ownerId)),
       ];
 
       const results = await Promise.allSettled(deletes);
@@ -125,7 +128,7 @@ export async function executeLedgerAction(params: {
         .from('contratos')
         .delete()
         .in('id', loanIds)
-        .eq('owner_id', ownerId);
+        .eq('owner_id', safeUUID(ownerId));
 
       if (delLoansErr) throw delLoansErr;
     }
@@ -134,8 +137,8 @@ export async function executeLedgerAction(params: {
     const { error: delClientErr } = await supabase
       .from('clientes')
       .delete()
-      .eq('id', targetId)
-      .eq('owner_id', ownerId);
+      .eq('id', safeUUID(targetId))
+      .eq('owner_id', safeUUID(ownerId));
 
     if (delClientErr) throw delClientErr;
 
@@ -143,7 +146,7 @@ export async function executeLedgerAction(params: {
   }
 
   if (type === 'DELETE_SOURCE') {
-    const { error } = await supabase.from('fontes').delete().eq('id', targetId).eq('profile_id', ownerId);
+    const { error } = await supabase.from('fontes').delete().eq('id', safeUUID(targetId)).eq('profile_id', safeUUID(ownerId));
     if (error) throw error;
     return 'Fonte removida.';
   }

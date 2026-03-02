@@ -1,5 +1,6 @@
 // services/ledger/ledgerHelpers.ts
 import { LedgerEntry, UserProfile } from '../../types';
+import { safeUUID } from '../../utils/uuid';
 
 export type NormalizedTransaction = {
   id: string;
@@ -48,8 +49,8 @@ export function normalizeTransaction(transaction: LedgerEntry): NormalizedTransa
     id,
     type,
     amount,
-    sourceId: sourceId ? String(sourceId) : null,
-    installmentId: installmentId ? String(installmentId) : null,
+    sourceId: safeUUID(sourceId),
+    installmentId: safeUUID(installmentId),
     principalDelta,
     interestDelta,
     lateFeeDelta,

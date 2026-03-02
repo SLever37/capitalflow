@@ -2,14 +2,15 @@
 // services/ledger/ledgerAudit.ts
 import { supabase } from '../../lib/supabase';
 import { generateUUID } from '../../utils/generators';
+import { safeUUID } from '../../utils/uuid';
 
 export async function logArchive(ownerId: string, loanId: string, sourceId?: string | null) {
   const { error } = await supabase.from('transacoes').insert([
     {
       id: generateUUID(),
-      loan_id: loanId,
-      profile_id: ownerId,
-      source_id: sourceId || null,
+      loan_id: safeUUID(loanId),
+      profile_id: safeUUID(ownerId),
+      source_id: safeUUID(sourceId),
       date: new Date().toISOString(),
       type: 'ARCHIVE',
       amount: 0,
@@ -27,9 +28,9 @@ export async function logRestore(ownerId: string, loanId: string, sourceId?: str
   const { error } = await supabase.from('transacoes').insert([
     {
       id: generateUUID(),
-      loan_id: loanId,
-      profile_id: ownerId,
-      source_id: sourceId || null,
+      loan_id: safeUUID(loanId),
+      profile_id: safeUUID(ownerId),
+      source_id: safeUUID(sourceId),
       date: new Date().toISOString(),
       type: 'RESTORE',
       amount: 0,
@@ -64,10 +65,10 @@ export async function logReversalAudit(params: {
 
   const { error } = await supabase.from('transacoes').insert({
     id: generateUUID(),
-    loan_id: loanId,
-    profile_id: ownerId,
-    source_id: sourceId,
-    installment_id: installmentId,
+    loan_id: safeUUID(loanId),
+    profile_id: safeUUID(ownerId),
+    source_id: safeUUID(sourceId),
+    installment_id: safeUUID(installmentId),
     date: new Date().toISOString(),
     type: 'ESTORNO',
     amount: amount, // Valor negativo para anular a soma

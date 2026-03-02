@@ -112,10 +112,10 @@ export const FlowModal = ({ onClose, loans, profit }: { onClose: () => void, loa
 
             {/* Main Content */}
             <div className="flex-1 overflow-y-auto bg-slate-950 p-4 sm:p-6 custom-scrollbar">
-                <div className="max-w-3xl mx-auto space-y-6">
+                <div className="max-w-3xl mx-auto space-y-6 flex flex-col h-full">
                     
                 {/* Cards DRE */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-3 shrink-0">
                     <div className="bg-emerald-950/20 border border-emerald-500/20 p-4 rounded-2xl">
                         <div className="flex items-center gap-2 mb-2">
                             <div className="p-1.5 bg-emerald-500/20 rounded-lg text-emerald-500"><TrendingUp size={14}/></div>
@@ -154,8 +154,8 @@ export const FlowModal = ({ onClose, loans, profit }: { onClose: () => void, loa
                 </div>
 
                 {/* Lista Detalhada */}
-                <div className="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden flex flex-col h-[350px]">
-                    <div className="p-3 border-b border-slate-800 bg-slate-900/50 flex justify-between items-center">
+                <div className="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden flex flex-col flex-1 min-h-[350px]">
+                    <div className="p-3 border-b border-slate-800 bg-slate-900/50 flex justify-between items-center shrink-0">
                         <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Detalhamento das Operações</p>
                         <button onClick={handlePrintReport} className="text-[9px] font-bold uppercase bg-slate-800 text-white px-3 py-1.5 rounded-lg flex items-center gap-1 hover:bg-blue-600 transition-colors">
                             <Printer size={12}/> Imprimir Relatório

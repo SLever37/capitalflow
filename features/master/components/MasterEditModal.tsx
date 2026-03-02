@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from '../../../components/ui/Modal';
 import { Shield, KeyRound, User, Briefcase, Mail, Loader2, Save, CreditCard } from 'lucide-react';
+import { capitalizeName } from '../../../utils/formatters';
 
 interface MasterEditModalProps {
     user: any;
@@ -69,6 +70,7 @@ export const MasterEditModal: React.FC<MasterEditModalProps> = ({ user, onClose,
                             className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm font-bold outline-none focus:border-blue-500 transition-colors"
                             value={formData.nome_operador}
                             onChange={e => setFormData({...formData, nome_operador: e.target.value})}
+                            onBlur={e => setFormData({...formData, nome_operador: capitalizeName(e.target.value)})}
                         />
                     </div>
                     <div className="space-y-1">
@@ -78,6 +80,7 @@ export const MasterEditModal: React.FC<MasterEditModalProps> = ({ user, onClose,
                             className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white text-sm font-bold outline-none focus:border-blue-500 transition-colors"
                             value={formData.nome_empresa}
                             onChange={e => setFormData({...formData, nome_empresa: e.target.value})}
+                            onBlur={e => setFormData({...formData, nome_empresa: capitalizeName(e.target.value)})}
                         />
                     </div>
                 </div>

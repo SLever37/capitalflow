@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { Lead } from '../types';
+import { safeUUID } from '../utils/uuid';
 
 export const leadsService = {
   async insertLead(lead: Partial<Lead>) {
@@ -14,14 +15,16 @@ export const leadsService = {
   },
 
   async listLeads(ownerId?: string) {
+    const safeOwnerId = ownerId ? safeUUID(ownerId) : null;
+
     let query = supabase
       .from('leads_emprestimo')
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (ownerId) {
+    if (safeOwnerId) {
       // Se tiver owner_id, filtra. Se não, traz tudo (ou depende da RLS)
-      query = query.eq('owner_id', ownerId);
+      query = query.eq('owner_id', safeOwnerId);
     }
 
     const { data, error } = await query;
@@ -30,10 +33,13 @@ export const leadsService = {
   },
 
   async updateLeadStatus(id: string, status: Lead['status']) {
+    const safeId = safeUUID(id);
+    if (!safeId) throw new Error('ID do lead inválido');
+
     const { data, error } = await supabase
       .from('leads_emprestimo')
       .update({ status })
-      .eq('id', id)
+      .eq('id', safeId)
       .select()
       .single();
 

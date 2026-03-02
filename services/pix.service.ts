@@ -1,6 +1,7 @@
 
 // services/pix.service.ts
 import { supabase } from "../lib/supabase";
+import { safeUUID } from "../utils/uuid";
 
 export type PixChargeCreateInput = {
   amount: number;
@@ -41,10 +42,13 @@ export async function createPixCharge(input: PixChargeCreateInput): Promise<PixC
 }
 
 export async function fetchChargeById(chargeId: string) {
+  const safeId = safeUUID(chargeId);
+  if (!safeId) return { data: null, error: new Error('ID da cobrança inválido') };
+
   // OBS: isso depende de policy SELECT no payment_charges
   return supabase
     .from("payment_charges")
     .select("id,status,provider_status,paid_at,updated_at,provider_payment_id,qr_code,qr_code_base64,amount")
-    .eq("id", chargeId)
+    .eq("id", safeId)
     .single();
 }

@@ -2,6 +2,7 @@
 import { supabase } from '../../../lib/supabase';
 import { LegalDocumentParams } from '../../../types';
 import { legalValidityService } from './legalValidity.service';
+import { safeUUID } from '../../../utils/uuid';
 
 export const legalPublicService = {
   /**
@@ -9,8 +10,11 @@ export const legalPublicService = {
    * ⚠️ NÃO acessa tabela direto — usa RPC
    */
   async generateSigningLink(documentId: string): Promise<string> {
+    const safeDocId = safeUUID(documentId);
+    if (!safeDocId) throw new Error('ID do documento inválido');
+
     const { data, error } = await supabase
-      .rpc('get_documento_juridico_by_id', { p_document_id: documentId });
+      .rpc('get_documento_juridico_by_id', { p_document_id: safeDocId });
 
     if (error || !data || data.length === 0) {
       throw new Error('Documento não encontrado.');
@@ -56,11 +60,13 @@ export const legalPublicService = {
     }
 
     const docId = data[0].id;
+    const safeDocId = safeUUID(docId);
+    if (!safeDocId) return { signatures: [] };
 
     const { data: signatures } = await supabase
       .from('assinaturas_documento')
       .select('*')
-      .eq('document_id', docId);
+      .eq('document_id', safeDocId);
 
     return { signatures: signatures || [] };
   },
@@ -85,6 +91,8 @@ export const legalPublicService = {
     }
 
     const doc = data[0];
+    const safeDocId = safeUUID(doc.id);
+    if (!safeDocId) throw new Error('ID do documento inválido');
 
     if (doc.status_assinatura === 'ASSINADO') {
       throw new Error('Documento já assinado.');
@@ -97,7 +105,7 @@ export const legalPublicService = {
     const { error: insertError } = await supabase
       .from('assinaturas_documento')
       .insert({
-        document_id: doc.id,
+        document_id: safeDocId,
         profile_id: doc.profile_id,
         signer_name: signerInfo.name.toUpperCase(),
         signer_document: signerInfo.doc,
@@ -118,7 +126,7 @@ export const legalPublicService = {
         status_assinatura: 'ASSINADO',
         updated_at: timestamp,
       })
-      .eq('id', doc.id);
+      .eq('id', safeDocId);
 
     return true;
   },

@@ -275,7 +275,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto bg-slate-950 p-4">
+      <div className="flex-1 overflow-y-auto bg-slate-950 p-4 custom-scrollbar">
         {viewMode === 'RAIO_X' ? (
           <div className="space-y-6 animate-in zoom-in duration-300">
             <div className="grid grid-cols-2 gap-4">
@@ -349,9 +349,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             </div>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-6 flex flex-col h-full">
             {/* Filters */}
-            <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+            <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar shrink-0">
               {(['HOJE', 'SEMANA', 'MES', 'TODOS'] as FilterType[]).map((f) => (
                 <button
                   key={f}
@@ -368,7 +368,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             </div>
 
             {/* Search */}
-            <div className="relative">
+            <div className="relative shrink-0">
               <Search
                 className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500"
                 size={16}
@@ -383,7 +383,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             </div>
 
             {/* Agenda List */}
-            <div className="space-y-8">
+            <div className="space-y-8 flex-1 overflow-y-auto custom-scrollbar pb-6">
               {groupedItems.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20 text-slate-600">
                   <CalIcon size={48} className="mb-4 opacity-20" />

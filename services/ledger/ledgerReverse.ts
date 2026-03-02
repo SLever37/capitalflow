@@ -14,6 +14,7 @@ import {
   toNumber,
 } from './ledgerHelpers';
 import { logReversalAudit } from './ledgerAudit';
+import { isUUID, safeUUID } from '../../utils/uuid';
 
 /**
  * Estorno (reversão) com regras:
@@ -28,8 +29,11 @@ export async function reverseTransaction(
   loan: Loan
 ) {
   if (!activeUser?.id) throw new Error('Usuário não autenticado');
+  if (activeUser.id === 'DEMO') return 'Estorno realizado (Demo)';
 
   const ownerId = getOwnerId(activeUser);
+  if (!isUUID(ownerId)) return 'Estorno realizado (Demo/Inválido)';
+
   const tx = normalizeTransaction(transaction);
 
   const isPayment = isPaymentTx(tx.type);
@@ -48,12 +52,12 @@ export async function reverseTransaction(
    */
   const balanceDelta = calcSourceBalanceDelta(tx);
 
-  if (tx.sourceId && balanceDelta !== 0) {
+  if (tx.sourceId && balanceDelta !== 0 && isUUID(tx.sourceId)) {
     const { error: balanceError } = await supabase.rpc('adjust_source_balance', {
       p_source_id: tx.sourceId,
       p_delta: balanceDelta,
     });
-    if (balanceError) throw new Error('Erro ao reverter saldo da fonte.');
+    if (balanceError) throw new Error('Erro ao reverter saldo da fonte: ' + balanceError.message);
   }
 
   /**
@@ -96,7 +100,7 @@ export async function reverseTransaction(
     );
 
     // --- 3A) Reversão de PAGAMENTO ---
-    if (isPayment && instFromLoan) {
+    if (isPayment && instFromLoan && isUUID(tx.installmentId)) {
       const restoredPrincipalRemaining =
         toNumber(instFromLoan.principalRemaining) + toNumber(tx.principalDelta);
       const restoredInterestRemaining =
@@ -132,7 +136,7 @@ export async function reverseTransaction(
     }
 
     // --- 3B) Reversão de NOVO_APORTE ---
-    if (isAporte) {
+    if (isAporte && isUUID(tx.installmentId)) {
       const deltaPrincipal = toNumber(tx.principalDelta || tx.amount);
       const deltaAmount = toNumber(tx.amount);
 
@@ -176,7 +180,7 @@ export async function reverseTransaction(
         p_delta: -deltaAmount,
       });
 
-      if (adjErr) throw adjErr;
+      if (adjErr) throw new Error('Erro ao ajustar principal do contrato: ' + adjErr.message);
     }
   } else if (isLendMore) {
     // ✅ Estorno de LEND_MORE sem parcela: reduz principal total do contrato
@@ -185,7 +189,7 @@ export async function reverseTransaction(
       p_delta: -toNumber(tx.amount),
     });
 
-    if (adjErr) throw adjErr;
+    if (adjErr) throw new Error('Erro ao ajustar principal do contrato: ' + adjErr.message);
   }
 
   /**

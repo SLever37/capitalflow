@@ -121,3 +121,19 @@ export const normalizeName = (name: string | undefined | null): string => {
     .replace(/[^\w\s]/gi, '') // Remove pontuação
     .replace(/\s+/g, ' '); // Remove múltiplos espaços
 };
+
+export const capitalizeName = (name: string | undefined | null): string => {
+  if (!name) return '';
+  const particles = ['de', 'da', 'do', 'dos', 'das', 'e'];
+  return name
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .map((word, index) => {
+      if (index > 0 && particles.includes(word)) {
+        return word;
+      }
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    })
+    .join(' ');
+};

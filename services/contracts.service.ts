@@ -2,15 +2,11 @@
 import { supabase } from '../lib/supabase';
 import { UserProfile, Loan, CapitalSource } from '../types';
 import { generateUUID } from '../utils/generators';
+import { isUUID, safeUUID } from '../utils/uuid';
 
 /* =========================
    Helpers de Sanitização
 ========================= */
-const isUUID = (v: any) =>
-  typeof v === 'string' &&
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
-
-const safeUUID = (v: any) => (isUUID(v) ? v : null);
 const ensureUUID = (v: any) => (isUUID(v) ? v : generateUUID());
 
 const onlyDigits = (v: any) => String(v ?? '').replace(/\D/g, '');
@@ -45,7 +41,7 @@ export const contractsService = {
         const { data: existingByDoc, error: e1 } = await supabase
           .from('clientes')
           .select('id, document')
-          .eq('owner_id', ownerId)
+          .eq('owner_id', safeUUID(ownerId))
           // ✅ importante: compara no padrão do BD (somente dígitos)
           .eq('document', cleanDoc)
           .limit(1)
@@ -65,7 +61,7 @@ export const contractsService = {
         const { data: existingByPhone, error: ePhone } = await supabase
           .from('clientes')
           .select('id, phone')
-          .eq('owner_id', ownerId)
+          .eq('owner_id', safeUUID(ownerId))
           .eq('phone', cleanPhone)
           .limit(1)
           .maybeSingle();
@@ -84,7 +80,7 @@ export const contractsService = {
         const { data: existingByName, error: e2 } = await supabase
           .from('clientes')
           .select('id')
-          .eq('owner_id', ownerId)
+          .eq('owner_id', safeUUID(ownerId))
           .ilike('name', cleanName)
           .limit(1)
           .maybeSingle();
@@ -163,7 +159,7 @@ export const contractsService = {
     };
 
     if (editingLoan) {
-      const { error } = await supabase.from('contratos').update(loanPayload).eq('id', loanId);
+      const { error } = await supabase.from('contratos').update(loanPayload).eq('id', safeUUID(loanId));
       if (error) throw new Error(error.message);
 
       // ✅ parcelas = profile_id (conforme seu schema)
@@ -222,14 +218,15 @@ export const contractsService = {
       }
 
       // Saída de Caixa (novo contrato)
-      if (safeUUID(loan.sourceId)) {
-        await supabase.rpc('adjust_source_balance', { p_source_id: loan.sourceId, p_delta: -principal });
+      const safeSourceId = safeUUID(loan.sourceId);
+      if (safeSourceId) {
+        await supabase.rpc('adjust_source_balance', { p_source_id: safeSourceId, p_delta: -principal });
 
         await supabase.from('transacoes').insert({
           id: generateUUID(),
-          loan_id: loanId,
-          profile_id: ownerId,
-          source_id: loan.sourceId,
+          loan_id: safeUUID(loanId),
+          profile_id: safeUUID(ownerId),
+          source_id: safeSourceId,
           date: new Date().toISOString(),
           type: 'LEND_MORE',
           amount: principal,
@@ -246,8 +243,9 @@ export const contractsService = {
   },
 
   async saveNote(loanId: string, note: string) {
-    if (!isUUID(loanId)) throw new Error('ID inválido.');
-    const { error } = await supabase.from('contratos').update({ notes: note }).eq('id', loanId);
+    const safeId = safeUUID(loanId);
+    if (!safeId) throw new Error('ID inválido.');
+    const { error } = await supabase.from('contratos').update({ notes: note }).eq('id', safeId);
     if (error) throw error;
     return true;
   },
@@ -270,8 +268,8 @@ export const contractsService = {
 
     // ✅ aqui é isso mesmo: p_profile_id = ownerId
     const { error } = await supabase.rpc('apply_new_aporte_atomic', {
-      p_loan_id: loanId,
-      p_profile_id: ownerId,
+      p_loan_id: safeUUID(loanId),
+      p_profile_id: safeUUID(ownerId),
       p_amount: safeAmount,
       p_source_id: safeUUID(sourceId),
       p_installment_id: safeUUID(installmentId),

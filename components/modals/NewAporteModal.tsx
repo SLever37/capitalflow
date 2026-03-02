@@ -102,8 +102,8 @@ export const NewAporteModal: React.FC<Props> = ({
     <div className="fixed inset-0 z-[9999] flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60" onClick={loading ? undefined : onClose} />
 
-      <div className="relative w-[92vw] max-w-xl rounded-3xl border border-slate-800 bg-slate-950 p-5 shadow-2xl">
-        <div className="flex items-center justify-between mb-4">
+      <div className="relative w-[92vw] max-w-xl max-h-[90vh] flex flex-col rounded-3xl border border-slate-800 bg-slate-950 shadow-2xl overflow-hidden">
+        <div className="flex items-center justify-between p-5 border-b border-slate-800 shrink-0">
           <div>
             <p className="text-xs font-black uppercase tracking-widest text-slate-400">Contrato</p>
             <p className="text-white font-black text-lg flex items-center gap-2">
@@ -115,7 +115,7 @@ export const NewAporteModal: React.FC<Props> = ({
           </div>
 
           <button
-            className="p-2 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800"
+            className="p-2 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 self-start"
             onClick={loading ? undefined : onClose}
             aria-label="Fechar"
           >
@@ -123,7 +123,7 @@ export const NewAporteModal: React.FC<Props> = ({
           </button>
         </div>
 
-        <div className="space-y-3">
+        <div className="p-5 overflow-y-auto custom-scrollbar space-y-4">
           {/* Valor */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3">
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Valor do Aporte</p>
@@ -204,7 +204,7 @@ export const NewAporteModal: React.FC<Props> = ({
           ) : null}
         </div>
 
-        <div className="mt-4 flex gap-2">
+        <div className="p-5 border-t border-slate-800 flex gap-2 shrink-0 bg-slate-950">
           <button
             onClick={onClose}
             disabled={loading}

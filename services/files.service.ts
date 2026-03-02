@@ -4,6 +4,7 @@ import { importService } from '../features/profile/import/services/importService
 import { supabase } from '../lib/supabase';
 import { generateUUID } from '../utils/generators';
 import { generateBackup, downloadFile } from './dataService';
+import { safeUUID } from '../utils/uuid';
 
 export const filesService = {
   // Added handleExportBackup to allow users to export their data as JSON
@@ -20,17 +21,18 @@ export const filesService = {
 
   // Added handlePromissoriaUpload to attach signed promissory notes to loans
   async handlePromissoriaUpload(file: File | undefined, activeUser: any, loanId: string, showToast: any, fetchFullData: any) {
-    if (!file || !activeUser || !loanId || loanId === 'null') return;
+    const safeLoanId = safeUUID(loanId);
+    if (!file || !activeUser || !safeLoanId || loanId === 'null') return;
     try {
       const ext = file.name.split('.').pop() || 'bin';
-      const path = `${activeUser.id}/promissoria_${loanId}_${Date.now()}.${ext}`;
+      const path = `${activeUser.id}/promissoria_${safeLoanId}_${Date.now()}.${ext}`;
       const { error: uploadError } = await supabase.storage.from('documentos').upload(path, file);
       if (uploadError) throw uploadError;
       
       const { data: publicData } = supabase.storage.from('documentos').getPublicUrl(path);
       const url = publicData.publicUrl;
       
-      const { data: loan, error: loanFetchError } = await supabase.from('contratos').select('policies_snapshot').eq('id', loanId).single();
+      const { data: loan, error: loanFetchError } = await supabase.from('contratos').select('policies_snapshot').eq('id', safeLoanId).single();
       if (loanFetchError) throw loanFetchError;
       
       const snapshot = loan.policies_snapshot || {};
@@ -49,7 +51,7 @@ export const filesService = {
           ...snapshot,
           customDocuments: [...existingDocs, newDoc]
         }
-      }).eq('id', loanId);
+      }).eq('id', safeLoanId);
       
       if (updateError) throw updateError;
 
@@ -62,17 +64,18 @@ export const filesService = {
 
   // Added handleExtraDocUpload to attach generic legal documents (like confessions of debt) to loans
   async handleExtraDocUpload(file: File | undefined, activeUser: any, loanId: string, kind: string, showToast: any, fetchFullData: any) {
-    if (!file || !activeUser || !loanId || loanId === 'null') return;
+    const safeLoanId = safeUUID(loanId);
+    if (!file || !activeUser || !safeLoanId || loanId === 'null') return;
     try {
       const ext = file.name.split('.').pop() || 'bin';
-      const path = `${activeUser.id}/doc_${loanId}_${Date.now()}.${ext}`;
+      const path = `${activeUser.id}/doc_${safeLoanId}_${Date.now()}.${ext}`;
       const { error: uploadError } = await supabase.storage.from('documentos').upload(path, file);
       if (uploadError) throw uploadError;
       
       const { data: publicData } = supabase.storage.from('documentos').getPublicUrl(path);
       const url = publicData.publicUrl;
       
-      const { data: loan, error: loanFetchError } = await supabase.from('contratos').select('policies_snapshot').eq('id', loanId).single();
+      const { data: loan, error: loanFetchError } = await supabase.from('contratos').select('policies_snapshot').eq('id', safeLoanId).single();
       if (loanFetchError) throw loanFetchError;
       
       const snapshot = loan.policies_snapshot || {};
@@ -91,7 +94,7 @@ export const filesService = {
           ...snapshot,
           customDocuments: [...existingDocs, newDoc]
         }
-      }).eq('id', loanId);
+      }).eq('id', safeLoanId);
 
       if (updateError) throw updateError;
 

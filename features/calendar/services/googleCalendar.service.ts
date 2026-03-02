@@ -1,5 +1,6 @@
 
 import { supabase } from '../../../lib/supabase';
+import { safeUUID } from '../../../utils/uuid';
 
 // Helper para carregar o script do Google Identity Services
 export const loadGoogleScript = () => {
@@ -29,9 +30,12 @@ export const googleCalendarService = {
   },
 
   async saveToken(profileId: string, token: string, expiry: number) {
+    const safeProfileId = safeUUID(profileId);
+    if (!safeProfileId) return;
+
     // Salva token no banco (Cuidado: Idealmente criptografado no backend)
     await supabase.from('user_integrations').upsert({
-      profile_id: profileId,
+      profile_id: safeProfileId,
       google_access_token: token,
       google_token_expiry: Date.now() + (expiry * 1000),
       sync_enabled: true,
@@ -40,11 +44,15 @@ export const googleCalendarService = {
   },
 
   async disconnect(profileId: string) {
-    await supabase.from('user_integrations').delete().eq('profile_id', profileId);
+    const safeProfileId = safeUUID(profileId);
+    if (!safeProfileId) return;
+    await supabase.from('user_integrations').delete().eq('profile_id', safeProfileId);
   },
 
   async getIntegrationStatus(profileId: string) {
-    const { data } = await supabase.from('user_integrations').select('*').eq('profile_id', profileId).single();
+    const safeProfileId = safeUUID(profileId);
+    if (!safeProfileId) return null;
+    const { data } = await supabase.from('user_integrations').select('*').eq('profile_id', safeProfileId).single();
     return data;
   },
 

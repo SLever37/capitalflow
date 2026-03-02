@@ -3,13 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { CapitalSource, UserProfile, SourceUIController } from '../../types';
 import { parseCurrency } from '../../utils/formatters';
 import { personalFinanceService } from '../../features/personal-finance/services/personalFinanceService';
-
-/* helpers */
-const isUUID = (v: any) =>
-  typeof v === 'string' &&
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
-
-const safeUUID = (v: any) => (isUUID(v) ? v : null);
+import { isUUID, safeUUID } from '../../utils/uuid';
 
 export const useSourceController = (
   activeUser: UserProfile | null,
@@ -110,7 +104,7 @@ export const useSourceController = (
     }
 
     const { error } = await supabase.rpc('adjust_source_balance', {
-      p_source_id: ui.activeModal.payload.id,
+      p_source_id: safeUUID(ui.activeModal.payload.id),
       p_delta: amount,
     });
 
@@ -229,8 +223,8 @@ export const useSourceController = (
 
     const { error } = await supabase.rpc('profit_withdrawal_atomic', {
       p_amount: amount,
-      p_profile_id: ownerId, // ✅ CRÍTICO: lucro pertence ao DONO
-      p_target_source_id: targetSourceId,
+      p_profile_id: safeUUID(ownerId), // ✅ CRÍTICO: lucro pertence ao DONO
+      p_target_source_id: safeUUID(targetSourceId),
     });
 
     if (error) {

@@ -1,6 +1,7 @@
 
 import { supabase } from '../../../lib/supabase';
 import { generateUUID } from '../../../utils/generators';
+import { isUUID, safeUUID } from '../../../utils/uuid';
 
 // Tipagem estrita para o serviço
 interface LegalContext {
@@ -84,10 +85,13 @@ export const legalValidityService = {
     const snapshotStr = this.prepareLegalSnapshot(currentSnapshot);
     const calculatedHash = await this.calculateHash(snapshotStr);
 
+    const safeDocId = safeUUID(documentId);
+    if (!safeDocId) throw new Error('ID do documento inválido');
+
     const { data: docDB, error: fetchError } = await supabase
       .from('documentos_juridicos')
       .select('hash_sha256, status_assinatura')
-      .eq('id', documentId)
+      .eq('id', safeDocId)
       .single();
 
     if (fetchError || !docDB) throw new Error('Documento original não encontrado para assinatura.');
@@ -111,7 +115,7 @@ export const legalValidityService = {
     // 1. Registra a assinatura na tabela de assinaturas
     const { error: signError } = await supabase.from('assinaturas_documento').insert({
       id: generateUUID(),
-      document_id: documentId,
+      document_id: safeDocId,
       profile_id: (await supabase.auth.getUser()).data.user?.id, // Captura ID do usuário autenticado
       signer_name: signer.name,
       signer_document: signer.document,
@@ -135,12 +139,12 @@ export const legalValidityService = {
       ip_origem: context.ip, // IP de quem finalizou
       user_agent: context.userAgent,
       signed_at: signatureTimestamp
-    }).eq('id', documentId);
+    }).eq('id', safeDocId);
 
     if (updateError) throw new Error(`Erro ao finalizar documento: ${updateError.message}`);
 
     // 3. Log de Auditoria Jurídica (Via RPC Seguro)
-    await this.appendLegalLog(documentId, 'SIGN', context.actorRole, `Assinado por ${signer.name} (Hash: ${signatureHash.substring(0,8)}...)`, context);
+    await this.appendLegalLog(safeDocId, 'SIGN', context.actorRole, `Assinado por ${signer.name} (Hash: ${signatureHash.substring(0,8)}...)`, context);
   },
 
   /**
@@ -148,10 +152,13 @@ export const legalValidityService = {
    * Verifica se o documento no banco de dados sofreu alguma mutação indevida.
    */
   async validateLegalIntegrity(documentId: string): Promise<{ isValid: boolean; message: string }> {
+    const safeDocId = safeUUID(documentId);
+    if (!safeDocId) return { isValid: false, message: 'ID do documento inválido.' };
+
     const { data: doc, error } = await supabase
       .from('documentos_juridicos')
       .select('snapshot, hash_sha256, status_assinatura')
-      .eq('id', documentId)
+      .eq('id', safeDocId)
       .single();
 
     if (error || !doc) return { isValid: false, message: 'Documento não encontrado.' };
@@ -178,8 +185,11 @@ export const legalValidityService = {
     context: LegalContext
   ) {
     try {
+      const safeDocId = safeUUID(documentId);
+      if (!safeDocId) return;
+
       await supabase.rpc('registrar_log_juridico', {
-        p_documento_id: documentId,
+        p_documento_id: safeDocId,
         p_action: `${action} - ${details}`,
         p_actor_role: role,
         p_ip: context.ip || 'N/A',

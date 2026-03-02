@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { safeUUID } from '../utils/uuid';
 
 export interface ExtratoItem {
   id: string;
@@ -36,10 +37,13 @@ export const extratoService = {
       offset = 0,
     } = filters;
 
+    const safeProfileId = safeUUID(profile_id);
+    if (!safeProfileId) return [];
+
     let query = supabase
       .from('vw_extrato_geral')
       .select('*')
-      .eq('profile_id', profile_id)
+      .eq('profile_id', safeProfileId)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -73,12 +77,14 @@ export const extratoService = {
 
     // Filtro por fonte
     if (source_id) {
-      query = query.eq('source_id', source_id);
+      const safeSourceId = safeUUID(source_id);
+      if (safeSourceId) query = query.eq('source_id', safeSourceId);
     }
 
     // Filtro por empréstimo
     if (loan_id) {
-      query = query.eq('loan_id', loan_id);
+      const safeLoanId = safeUUID(loan_id);
+      if (safeLoanId) query = query.eq('loan_id', safeLoanId);
     }
 
     const { data, error } = await query;
@@ -125,15 +131,18 @@ export const extratoService = {
 
   // Validar consistência: somatório em transacoes vs pf_transacoes
   async validateConsistency(profile_id: string) {
+    const safeProfileId = safeUUID(profile_id);
+    if (!safeProfileId) return { total_credito: 0, total_financeiro: 0, saldo_total: 0, is_consistent: true };
+
     const { data: creditoSum } = await supabase
       .from('transacoes')
       .select('amount')
-      .eq('profile_id', profile_id);
+      .eq('profile_id', safeProfileId);
 
     const { data: financeiroSum } = await supabase
       .from('pf_transacoes')
       .select('amount')
-      .eq('profile_id', profile_id);
+      .eq('profile_id', safeProfileId);
 
     const totalCredito = (creditoSum || []).reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
     const totalFinanceiro = (financeiroSum || []).reduce((sum, t) => sum + (Number(t.amount) || 0), 0);

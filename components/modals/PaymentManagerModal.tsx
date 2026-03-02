@@ -116,7 +116,7 @@ export const PaymentManagerModal: React.FC<PaymentManagerModalProps> = ({
             <div className="flex-1 flex flex-col md:flex-row overflow-y-auto md:overflow-hidden">
                 
                 {/* COLUNA ESQUERDA: RESUMO E DETALHES (SIDEBAR) */}
-                <div className="w-full md:w-[380px] lg:w-[420px] bg-slate-900/50 border-b md:border-b-0 md:border-r border-slate-800 flex flex-col md:overflow-y-auto custom-scrollbar p-6 shrink-0">
+                <div className="w-full md:w-[380px] lg:w-[420px] bg-slate-900/50 border-b md:border-b-0 md:border-r border-slate-800 flex flex-col md:overflow-y-auto custom-scrollbar p-4 sm:p-6 shrink-0">
                     
                     {/* CARD PRINCIPAL DE VALOR */}
                     <div className="bg-slate-950 p-6 rounded-[2rem] border border-slate-800 text-center relative overflow-hidden shadow-2xl mb-6">
@@ -198,8 +198,8 @@ export const PaymentManagerModal: React.FC<PaymentManagerModalProps> = ({
                 </div>
 
                 {/* COLUNA DIREITA: ÁREA DE AÇÃO (MAIN) */}
-                <div className="flex-1 bg-slate-950 md:overflow-y-auto custom-scrollbar p-6">
-                    <div className="max-w-2xl mx-auto space-y-8">
+                <div className="flex-1 bg-slate-950 flex flex-col md:overflow-y-auto custom-scrollbar">
+                    <div className="p-4 sm:p-6 max-w-2xl mx-auto space-y-8 w-full">
                         
                         {/* Seletor de Data Real (GLOBAL PARA TODOS OS TIPOS) */}
                         <div className="bg-slate-900/50 p-4 rounded-2xl border border-slate-800 flex items-center justify-between group focus-within:border-blue-500 transition-colors">
@@ -432,21 +432,21 @@ export const PaymentManagerModal: React.FC<PaymentManagerModalProps> = ({
                             </div>
                         )}
                     </div>
-
-                    {/* FOOTER DE AÇÃO */}
-                    <div className="mt-8 pt-6 border-t border-slate-800 flex gap-4 sticky bottom-0 bg-slate-950 pb-2">
-                        <button onClick={() => { onOpenMessage(loan); }} disabled={isProcessing} className="p-4 bg-slate-900 border border-slate-800 rounded-2xl text-slate-400 hover:text-emerald-500 hover:border-emerald-500/30 transition-all">
-                            <MessageSquare size={20}/>
-                        </button>
-                        <button 
-                            onClick={() => handleConfirmWrapper(false)} 
-                            disabled={isProcessing || (isDailyFree && paymentType !== 'FULL' && !customAmount) || ((paymentType === 'RENEW_AV' || paymentType === 'PARTIAL_INTEREST') && !avAmount)} 
-                            className={`flex-1 py-4 text-white rounded-2xl font-black uppercase text-sm shadow-xl transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed bg-emerald-600 hover:bg-emerald-500 hover:shadow-emerald-600/20`}
-                        >
-                            {isProcessing ? <Loader2 className="animate-spin" size={20}/> : <><CheckCircle2 size={20}/> Confirmar Recebimento</>}
-                        </button>
-                    </div>
                 </div>
+            </div>
+
+            {/* FOOTER DE AÇÃO */}
+            <div className="p-4 sm:p-6 border-t border-slate-800 flex gap-4 bg-slate-950 shrink-0 mt-auto z-10">
+                <button onClick={() => { onOpenMessage(loan); }} disabled={isProcessing} className="p-4 bg-slate-900 border border-slate-800 rounded-2xl text-slate-400 hover:text-emerald-500 hover:border-emerald-500/30 transition-all shrink-0">
+                    <MessageSquare size={20}/>
+                </button>
+                <button 
+                    onClick={() => handleConfirmWrapper(false)} 
+                    disabled={isProcessing || (isDailyFree && paymentType !== 'FULL' && !customAmount) || ((paymentType === 'RENEW_AV' || paymentType === 'PARTIAL_INTEREST') && !avAmount)} 
+                    className={`flex-1 py-4 text-white rounded-2xl font-black uppercase text-sm shadow-xl transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed bg-emerald-600 hover:bg-emerald-500 hover:shadow-emerald-600/20`}
+                >
+                    {isProcessing ? <Loader2 className="animate-spin" size={20}/> : <><CheckCircle2 size={20}/> Confirmar Recebimento</>}
+                </button>
             </div>
         </div>
     );

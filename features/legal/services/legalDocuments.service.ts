@@ -9,6 +9,7 @@ import {
   LegalLog 
 } from '../types/legal';
 import { generateUUID } from '../../../utils/generators';
+import { safeUUID } from '../../../utils/uuid';
 
 export const legalDocumentsService = {
   
@@ -92,11 +93,14 @@ export const legalDocumentsService = {
     signerInfo: { name: string; document: string },
     deviceInfo: { ip: string; userAgent: string }
   ): Promise<LegalSignature> {
+    const safeDocId = safeUUID(documentId);
+    if (!safeDocId) throw new Error('ID do documento inválido');
+
     // 1. Busca documento atual para validação
     const { data: doc, error: fetchError } = await supabase
       .from('documentos_juridicos')
       .select('*')
-      .eq('id', documentId)
+      .eq('id', safeDocId)
       .single();
 
     if (fetchError || !doc) throw new Error("Documento não encontrado.");
@@ -123,7 +127,7 @@ export const legalDocumentsService = {
 
     const signaturePayload = {
       id: signatureId,
-      document_id: documentId,
+      document_id: safeDocId,
       profile_id: profileId,
       signer_name: signerInfo.name,
       signer_document: signerInfo.document,
@@ -154,7 +158,7 @@ export const legalDocumentsService = {
         status: LegalDocumentStatus.ASSINADO,
         updated_at: now
       })
-      .eq('id', documentId);
+      .eq('id', safeDocId);
 
     if (updateError) {
       // Rollback manual (raro, mas boa prática se não usar RPC)
@@ -162,7 +166,7 @@ export const legalDocumentsService = {
       throw new Error(`Erro ao atualizar status do documento: ${updateError.message}`);
     }
 
-    await this.logAction(documentId, profileId, 'SIGN', `Assinado por ${signerInfo.name} (IP: ${deviceInfo.ip})`);
+    await this.logAction(safeDocId, profileId, 'SIGN', `Assinado por ${signerInfo.name} (IP: ${deviceInfo.ip})`);
 
     return sigData as LegalSignature;
   },
@@ -197,10 +201,13 @@ export const legalDocumentsService = {
    * Busca um documento pelo ID e verifica sua integridade atual.
    */
   async getDocumentWithIntegrityCheck(documentId: string): Promise<{ document: LegalDocument, isValid: boolean }> {
+    const safeDocId = safeUUID(documentId);
+    if (!safeDocId) throw new Error('ID do documento inválido');
+
     const { data, error } = await supabase
       .from('documentos_juridicos')
       .select('*')
-      .eq('id', documentId)
+      .eq('id', safeDocId)
       .single();
 
     if (error || !data) throw new Error("Documento não encontrado.");

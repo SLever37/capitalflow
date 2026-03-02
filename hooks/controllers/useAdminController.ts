@@ -1,12 +1,6 @@
 import { supabase } from '../../lib/supabase';
 import { UserProfile, AccessLevel } from '../../types';
-
-/* helpers */
-const isUUID = (v: any) =>
-  typeof v === 'string' &&
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
-
-const safeUUID = (v: any) => (isUUID(v) ? v : null);
+import { isUUID, safeUUID } from '../../utils/uuid';
 
 export const useAdminController = (
   activeUser: UserProfile | null,

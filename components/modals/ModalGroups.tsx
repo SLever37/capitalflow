@@ -10,7 +10,7 @@ import { MessageHubModal } from './MessageHubModal';
 import { AIAssistantModal } from './AIAssistantModal';
 import { NoteWrapper } from './ModalWrappers'; 
 import { Copy, KeyRound, User, Camera, ShieldCheck, MapPin, Mail, Hash } from 'lucide-react';
-import { maskPhone, maskDocument } from '../../utils/formatters';
+import { maskPhone, maskDocument, capitalizeName } from '../../utils/formatters';
 
 export const ClientModals = () => {
     const { activeModal, closeModal, ui, clientCtrl } = useModal();
@@ -55,7 +55,14 @@ export const ClientModals = () => {
                <div className="grid grid-cols-12 gap-4">
                     <div className="col-span-12">
                         <label className="text-[10px] uppercase text-slate-500 font-bold ml-1 mb-1 block">Nome Completo</label>
-                        <input type="text" className="w-full bg-slate-950 p-3 rounded-xl border border-slate-800 text-white outline-none text-sm focus:border-blue-500 transition-colors" value={clientForm.name || ''} onChange={e => ui.setClientForm({...clientForm, name: e.target.value})} placeholder="Ex: João da Silva"/>
+                        <input 
+                            type="text" 
+                            className="w-full bg-slate-950 p-3 rounded-xl border border-slate-800 text-white outline-none text-sm focus:border-blue-500 transition-colors" 
+                            value={clientForm.name || ''} 
+                            onChange={e => ui.setClientForm({...clientForm, name: e.target.value})} 
+                            onBlur={e => ui.setClientForm({...clientForm, name: capitalizeName(e.target.value)})}
+                            placeholder="Ex: João da Silva"
+                        />
                     </div>
                     
                     <div className="col-span-6">
