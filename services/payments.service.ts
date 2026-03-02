@@ -1,4 +1,4 @@
-// services/payments.service.ts
+// src/services/payments.service.ts
 import { supabase } from '../lib/supabase';
 import type { Loan, Installment, UserProfile, CapitalSource } from '../types';
 import { todayDateOnlyUTC } from '../utils/dateHelpers';
@@ -34,27 +34,25 @@ function resolveCaixaLivreIdFromMemory(sources: CapitalSource[]): string | null 
   );
   if (byFlag?.id && isUUID(byFlag.id)) return byFlag.id;
 
-  const caixaLivre = sources.find((s) => {
-    const n = normalize((s as any)?.name);
+  const caixaLivre = sources.find((s: any) => {
+    const n = normalize(s?.name ?? s?.nome);
     return n.includes('caixa livre') || n === 'lucro' || n.includes('lucro');
   });
-
-  if (caixaLivre?.id && isUUID(caixaLivre.id)) return caixaLivre.id;
+  if ((caixaLivre as any)?.id && isUUID((caixaLivre as any).id)) return (caixaLivre as any).id;
 
   return null;
 }
 
 async function resolveCaixaLivreIdFromDB(ownerId: string): Promise<string | null> {
-  // tenta achar em public.fontes (nome “Caixa Livre” / “Lucro”), do profile_id do owner
   const { data, error } = await supabase
     .from('fontes')
     .select('id,nome')
     .eq('profile_id', ownerId)
-    .limit(50);
+    .limit(200);
 
   if (error || !data) return null;
 
-  const found = data.find((f: any) => {
+  const found = (data as any[]).find((f) => {
     const n = normalize(f?.nome);
     return n.includes('caixa livre') || n === 'lucro' || n.includes('lucro');
   });
@@ -110,16 +108,13 @@ export const paymentsService = {
       capitalizeRemaining = false,
     } = params;
 
-    // 0) Autenticação mínima
-    if (!activeUser?.id) {
-      throw new Error('Usuário não autenticado. Refaça o login.');
-    }
-
+    // 0) Auth mínima
+    if (!activeUser?.id) throw new Error('Usuário não autenticado. Refaça o login.');
     if (activeUser.id === 'DEMO') {
       return { amountToPay: customAmount || Number(calculations?.total) || 0, paymentType };
     }
 
-    // 1) OwnerId
+    // 1) ownerId
     const ownerId =
       safeUUID((loan as any).profile_id) ||
       safeUUID((activeUser as any).supervisor_id) ||
@@ -127,9 +122,8 @@ export const paymentsService = {
 
     if (!ownerId) throw new Error('Perfil inválido. Refaça o login.');
 
-    // 2) Revalidação no banco (mata estado stale)
+    // 2) Revalida parcela no banco (evita estado stale)
     const instDb = await revalidateInstallment(inst.id);
-
     const statusDb = String(instDb?.status || '').toUpperCase();
     const remainingDb =
       Number(instDb?.principal_remaining || 0) +
@@ -144,7 +138,7 @@ export const paymentsService = {
     const idempotencyKey = generateUUID();
 
     /* =====================================================
-       LEND_MORE (Aporte)
+       LEND_MORE
     ===================================================== */
     if (paymentType === 'LEND_MORE') {
       const lendAmount = parseMoney(avAmount);
@@ -154,7 +148,7 @@ export const paymentsService = {
       if (!sourceId) throw new Error('Fonte do contrato inválida (sourceId).');
 
       const { error } = await supabase.rpc('process_lend_more_atomic', {
-        p_idempotency_key: safeUUID(idempotencyKey) || idempotencyKey,
+        p_idempotency_key: idempotencyKey, // aqui é TEXT no seu banco? ok. se for UUID, ajusta depois.
         p_loan_id: safeUUID(loan.id),
         p_installment_id: safeUUID(inst.id),
         p_profile_id: safeUUID(ownerId),
@@ -169,7 +163,8 @@ export const paymentsService = {
     }
 
     /* =====================================================
-       DEFINIR VALOR A PAGAR
+       DEFINIR amountToPay (sem depender do computeRemainingBalance
+       para modalidades de renovação/juros)
     ===================================================== */
     let amountToPay = 0;
 
@@ -177,56 +172,66 @@ export const paymentsService = {
       amountToPay = Number(customAmount || 0);
     } else if (paymentType === 'RENEW_AV') {
       amountToPay = parseMoney(avAmount);
+    } else if (paymentType === 'PARTIAL_INTEREST') {
+      // “pagar parte do juros” → vem do input
+      amountToPay = parseMoney(avAmount);
+    } else if (paymentType === 'RENEW_INTEREST') {
+      // 🔥 regra do seu sistema: pagou juros → renova
+      // então o valor precisa vir do input (avAmount) ou do calculations.total
+      amountToPay = parseMoney(avAmount) || Number(calculations?.total || 0);
     } else if (paymentType === 'FULL') {
       const balance = loanEngine.computeRemainingBalance(loan);
       amountToPay = Number(balance.totalRemaining || 0);
-    } else if (paymentType === 'PARTIAL_INTEREST') {
-      amountToPay = parseMoney(avAmount);
-    } else {
-      // RENEW_INTEREST
-      const balance = loanEngine.computeRemainingBalance(loan);
-      amountToPay = Number((balance.interestRemaining || 0) + (balance.lateFeeRemaining || 0));
     }
 
     if (!Number.isFinite(amountToPay)) amountToPay = 0;
     if (amountToPay <= 0) {
-      // Aqui é o caso clássico “já está pago / não tem saldo”, mas UI deixou clicar
-      throw new Error('O valor do pagamento deve ser maior que zero. (Sem saldo a pagar / tela desatualizada)');
+      throw new Error('O valor do pagamento deve ser maior que zero.');
     }
 
     /* =====================================================
-       AMORTIZAÇÃO SELETIVA (ENGINE)
+       AMORTIZAÇÃO / divisão do pagamento
+       - RENEW_INTEREST e PARTIAL_INTEREST: tudo vai para JUROS
+       - Demais: usa loanEngine
     ===================================================== */
-    const amortization = loanEngine.calculateAmortization(amountToPay, loan);
+    let principalPaid = 0;
+    let interestPaid = 0;
+    let lateFeePaid = 0;
 
-    const principalPaid = Number(amortization.paidPrincipal || 0);
-    const interestPaid = Number(amortization.paidInterest || 0);
-    const lateFeePaid = Number(amortization.paidLateFee || 0);
+    if (paymentType === 'RENEW_INTEREST' || paymentType === 'PARTIAL_INTEREST') {
+      // ✅ garante que a função entre na regra de renovação (principal = 0 e juros > 0)
+      principalPaid = 0;
+      lateFeePaid = 0;
+      interestPaid = amountToPay;
+    } else {
+      const amortization = loanEngine.calculateAmortization(amountToPay, loan);
+      principalPaid = Number(amortization.paidPrincipal || 0);
+      interestPaid = Number(amortization.paidInterest || 0);
+      lateFeePaid = Number(amortization.paidLateFee || 0);
+    }
+
     const totalPaid = principalPaid + interestPaid + lateFeePaid;
-
     if (!Number.isFinite(totalPaid) || totalPaid <= 0) {
-      throw new Error('O valor do pagamento deve ser maior que zero. (Amortização zerada / contrato sem saldo)');
+      throw new Error('O valor do pagamento deve ser maior que zero.');
     }
 
     /* =====================================================
-       RPC OFICIAL V3 (Amortização + Fluxo de Caixa)
+       RPC (assinatura atual do banco exige TIMESTAMPTZ)
     ===================================================== */
     const paymentDate = realDate || todayDateOnlyUTC();
 
     const sourceId = safeUUID((loan as any).sourceId);
     if (!sourceId) throw new Error('Fonte do contrato inválida (sourceId).');
 
-    // Caixa Livre: tenta primeiro do estado, depois do banco
     let caixaLivreId = resolveCaixaLivreIdFromMemory(sources);
+    if (!caixaLivreId) caixaLivreId = await resolveCaixaLivreIdFromDB(ownerId);
+
     if (!caixaLivreId) {
-      caixaLivreId = await resolveCaixaLivreIdFromDB(ownerId);
-    }
-    if (!caixaLivreId) {
-      throw new Error('Caixa Livre (p_caixa_livre_id) não encontrada. Crie uma fonte "Caixa Livre" ou "Lucro" para este perfil.');
+      throw new Error('Caixa Livre (p_caixa_livre_id) não encontrada. Crie uma fonte "Caixa Livre" ou "Lucro".');
     }
 
     const { error } = await supabase.rpc('process_payment_v3_selective', {
-      p_idempotency_key: safeUUID(idempotencyKey) || idempotencyKey, 
+      p_idempotency_key: idempotencyKey, // TEXT (como o banco mostrou)
       p_loan_id: safeUUID(loan.id),
       p_installment_id: safeUUID(inst.id),
       p_profile_id: safeUUID(ownerId),
@@ -234,7 +239,7 @@ export const paymentsService = {
       p_principal_paid: principalPaid,
       p_interest_paid: interestPaid,
       p_late_fee_paid: lateFeePaid,
-      p_payment_date: paymentDate.toISOString().split('T')[0], // YYYY-MM-DD
+      p_payment_date: paymentDate.toISOString(), // ✅ TIMESTAMPTZ
       p_capitalize_remaining: !!capitalizeRemaining,
       p_source_id: safeUUID(sourceId),
       p_caixa_livre_id: safeUUID(caixaLivreId),
@@ -242,6 +247,10 @@ export const paymentsService = {
 
     if (error) throw new Error('Falha na persistência: ' + error.message);
 
-    return { amountToPay, paymentType, amortization };
+    return {
+      amountToPay,
+      paymentType,
+      amortization: { paidPrincipal: principalPaid, paidInterest: interestPaid, paidLateFee: lateFeePaid },
+    };
   },
 };
