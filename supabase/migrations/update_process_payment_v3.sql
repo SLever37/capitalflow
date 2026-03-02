@@ -1,8 +1,12 @@
--- Script para corrigir a divisão de pagamentos e auditoria de lucros
--- Execute este script no SQL Editor do Supabase
+-- 1. Apagar todas as versões possíveis da função para evitar conflitos de sobrecarga
+DROP FUNCTION IF EXISTS process_payment_v3_selective(text, uuid, uuid, uuid, uuid, numeric, numeric, numeric, timestamp with time zone, boolean, uuid, uuid);
+DROP FUNCTION IF EXISTS process_payment_v3_selective(uuid, uuid, uuid, uuid, uuid, numeric, numeric, numeric, timestamp with time zone, boolean, uuid, uuid);
+DROP FUNCTION IF EXISTS process_payment_v3_selective(uuid, uuid, uuid, uuid, uuid, numeric, numeric, numeric, date, boolean, uuid, uuid);
+DROP FUNCTION IF EXISTS process_payment_v3_selective(text, uuid, uuid, uuid, uuid, numeric, numeric, numeric, date, boolean, uuid, uuid);
 
+-- 2. Recriar a versão correta e definitiva
 CREATE OR REPLACE FUNCTION process_payment_v3_selective(
-  p_idempotency_key TEXT,
+  p_idempotency_key UUID,
   p_loan_id UUID,
   p_installment_id UUID,
   p_profile_id UUID,
@@ -85,9 +89,9 @@ BEGIN
 
     -- Registrar transação do capital
     INSERT INTO transacoes (
-      id, profile_id, loan_id, source_id, type, amount, status, date, description, idempotency_key
+      id, profile_id, loan_id, source_id, type, amount, principal_delta, interest_delta, late_fee_delta, date, notes, category, idempotency_key
     ) VALUES (
-      gen_random_uuid(), p_profile_id, p_loan_id, p_source_id, 'PAYMENT', p_principal_paid, 'COMPLETED', p_payment_date, 'Retorno de Capital (Principal)', p_idempotency_key
+      gen_random_uuid(), p_profile_id, p_loan_id, p_source_id, 'PAYMENT', p_principal_paid, p_principal_paid, 0, 0, p_payment_date, 'Retorno de Capital (Principal)', 'PAGAMENTO', p_idempotency_key
     );
   END IF;
 
@@ -101,18 +105,18 @@ BEGIN
     -- Registrar transação do lucro (Juros)
     IF p_interest_paid > 0 THEN
       INSERT INTO transacoes (
-        id, profile_id, loan_id, source_id, type, amount, status, date, description, idempotency_key
+        id, profile_id, loan_id, source_id, type, amount, principal_delta, interest_delta, late_fee_delta, date, notes, category, idempotency_key
       ) VALUES (
-        gen_random_uuid(), p_profile_id, p_loan_id, p_caixa_livre_id, 'PAYMENT', p_interest_paid, 'COMPLETED', p_payment_date, 'Lucro Recebido (Juros)', gen_random_uuid()::text
+        gen_random_uuid(), p_profile_id, p_loan_id, p_caixa_livre_id, 'PAYMENT', p_interest_paid, 0, p_interest_paid, 0, p_payment_date, 'Lucro Recebido (Juros)', 'LUCRO', gen_random_uuid()
       );
     END IF;
 
     -- Registrar transação do lucro (Multa/Mora)
     IF p_late_fee_paid > 0 THEN
       INSERT INTO transacoes (
-        id, profile_id, loan_id, source_id, type, amount, status, date, description, idempotency_key
+        id, profile_id, loan_id, source_id, type, amount, principal_delta, interest_delta, late_fee_delta, date, notes, category, idempotency_key
       ) VALUES (
-        gen_random_uuid(), p_profile_id, p_loan_id, p_caixa_livre_id, 'PAYMENT', p_late_fee_paid, 'COMPLETED', p_payment_date, 'Lucro Recebido (Multa/Mora)', gen_random_uuid()::text
+        gen_random_uuid(), p_profile_id, p_loan_id, p_caixa_livre_id, 'PAYMENT', p_late_fee_paid, 0, 0, p_late_fee_paid, p_payment_date, 'Lucro Recebido (Multa/Mora)', 'LUCRO', gen_random_uuid()
       );
     END IF;
   END IF;

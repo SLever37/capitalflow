@@ -226,7 +226,7 @@ export const paymentsService = {
     }
 
     const { error } = await supabase.rpc('process_payment_v3_selective', {
-      p_idempotency_key: idempotencyKey, 
+      p_idempotency_key: safeUUID(idempotencyKey) || idempotencyKey, 
       p_loan_id: safeUUID(loan.id),
       p_installment_id: safeUUID(inst.id),
       p_profile_id: safeUUID(ownerId),
