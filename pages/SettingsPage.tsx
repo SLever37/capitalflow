@@ -1,17 +1,28 @@
 
 import React from 'react';
-import { Settings, FileText, Cpu, Layers, Code, ShieldCheck, Zap } from 'lucide-react';
+import { Settings, FileText, Cpu, Layers, Code, ShieldCheck, Zap, ChevronLeft } from 'lucide-react';
 
-export const SettingsPage: React.FC = () => {
+export const SettingsPage: React.FC<{ goBack?: () => void }> = ({ goBack }) => {
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
             {/* HEADER */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <h2 className="text-2xl font-black uppercase tracking-tighter text-white flex items-center gap-2">
-                        <Settings className="text-slate-400" size={28}/> Ajustes & Sistema
-                    </h2>
-                    <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">Documentação Técnica e Configurações</p>
+                <div className="flex items-center gap-3">
+                    {goBack && (
+                        <button
+                            onClick={goBack}
+                            className="w-10 h-10 flex items-center justify-center bg-slate-900 border border-slate-800 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all active:scale-95"
+                            title="Voltar"
+                        >
+                            <ChevronLeft size={20} />
+                        </button>
+                    )}
+                    <div>
+                        <h2 className="text-2xl font-black uppercase tracking-tighter text-white flex items-center gap-2">
+                            <Settings className="text-slate-400" size={28}/> Ajustes & Sistema
+                        </h2>
+                        <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">Documentação Técnica e Configurações</p>
+                    </div>
                 </div>
             </div>
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Search, Edit, Trash2, CheckSquare, Square, XCircle, MapPin, Phone } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, CheckSquare, Square, XCircle, MapPin, Phone, ChevronLeft } from 'lucide-react';
 import { Client } from '../types';
 import { startDictation } from '../utils/speech';
 
@@ -17,18 +17,30 @@ interface ClientsPageProps {
   toggleClientSelection: (id: string) => void;
   executeBulkDelete: () => void;
   onDeleteClient: (id: string) => void; // NOVO PROP
+  goBack?: () => void;
 }
 
 export const ClientsPage: React.FC<ClientsPageProps> = ({ 
   filteredClients, clientSearchTerm, setClientSearchTerm, 
   openClientModal, openConfirmation, showToast,
   isBulkDeleteMode, toggleBulkDeleteMode, selectedClientsToDelete, toggleClientSelection, executeBulkDelete,
-  onDeleteClient
+  onDeleteClient, goBack
 }) => {
   return (
     <div className="space-y-6">
         <div className="flex justify-between items-center flex-wrap gap-2">
-            <h2 className="text-xl font-black uppercase tracking-tighter text-white">Carteira de Clientes</h2>
+            <div className="flex items-center gap-3">
+                {goBack && (
+                    <button
+                        onClick={goBack}
+                        className="w-10 h-10 flex items-center justify-center bg-slate-900 border border-slate-800 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all active:scale-95"
+                        title="Voltar"
+                    >
+                        <ChevronLeft size={20} />
+                    </button>
+                )}
+                <h2 className="text-xl font-black uppercase tracking-tighter text-white">Carteira de Clientes</h2>
+            </div>
             <div className="flex gap-2">
                 {isBulkDeleteMode ? (
                     <div className="flex gap-2 animate-in fade-in slide-in-from-right">

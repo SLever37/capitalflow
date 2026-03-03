@@ -7,7 +7,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   FileSignature,
-  ArrowLeft,
+  ChevronLeft,
 } from 'lucide-react';
 import { maskDocument } from '../../utils/formatters';
 
@@ -138,8 +138,12 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
       {/* Header */}
       <div className="flex justify-between items-center p-4 border-b border-slate-800 bg-slate-900">
         <div className="flex items-center gap-3">
-          <button onClick={onBack} className="text-slate-400">
-            <ArrowLeft />
+          <button
+            onClick={onBack}
+            className="w-10 h-10 flex items-center justify-center bg-slate-950 border border-slate-800 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all active:scale-95"
+            title="Voltar"
+          >
+            <ChevronLeft size={20} />
           </button>
           <div>
             <h2 className="text-white font-bold text-sm uppercase">

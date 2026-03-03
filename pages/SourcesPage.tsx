@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import PixDepositModal from "../components/modals/PixDepositModal";
 import { CapitalSource } from "../types";
-import { Plus } from 'lucide-react';
+import { Plus, ChevronLeft } from 'lucide-react';
 import { Modal } from '../components/ui/Modal';
 import { SourceCard } from '../components/cards/SourceCard';
 
@@ -16,6 +16,7 @@ interface SourcesPageProps {
 
   // ✅ NOVO: abre o modal PIX (fica no Container)
   onOpenPixDeposit: (source: CapitalSource) => void;
+  goBack?: () => void;
 }
 
 export const SourcesPage: React.FC<SourcesPageProps> = ({
@@ -24,7 +25,8 @@ export const SourcesPage: React.FC<SourcesPageProps> = ({
   handleUpdateSourceBalance,
   isStealthMode,
   ui,
-  onOpenPixDeposit
+  onOpenPixDeposit,
+  goBack
 }) => {
 
   // ✅ "Adicionar saldo" agora chama PIX
@@ -39,9 +41,20 @@ export const SourcesPage: React.FC<SourcesPageProps> = ({
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-black uppercase tracking-tighter text-white">
-          Fontes de Capital
-        </h2>
+        <div className="flex items-center gap-3">
+          {goBack && (
+            <button
+              onClick={goBack}
+              className="w-10 h-10 flex items-center justify-center bg-slate-900 border border-slate-800 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all active:scale-95"
+              title="Voltar"
+            >
+              <ChevronLeft size={20} />
+            </button>
+          )}
+          <h2 className="text-xl font-black uppercase tracking-tighter text-white">
+            Fontes de Capital
+          </h2>
+        </div>
 
         <button
           onClick={() => ui.openModal('SOURCE_FORM')}

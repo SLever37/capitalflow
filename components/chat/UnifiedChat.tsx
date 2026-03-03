@@ -63,9 +63,10 @@ export function UnifiedChat<TContext>({
           {onClose && (
             <button 
               onClick={onClose} 
-              className="md:hidden p-2 -ml-2 text-slate-400 hover:text-white transition-colors"
+              className="md:hidden w-10 h-10 flex items-center justify-center bg-slate-950 border border-slate-800 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all active:scale-95"
+              title="Voltar"
             >
-              <ChevronLeft size={24} />
+              <ChevronLeft size={20} />
             </button>
           )}
           <div className="relative">

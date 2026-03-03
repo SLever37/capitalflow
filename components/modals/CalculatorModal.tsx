@@ -136,8 +136,12 @@ export const CalculatorModal = ({ onClose }: { onClose: () => void }) => {
             {/* Header */}
             <div className="h-16 border-b border-slate-800 bg-slate-900 flex items-center justify-between px-4 shrink-0 z-20">
                 <div className="flex items-center gap-3">
-                    <button onClick={onClose} className="p-2 -ml-2 text-slate-400 hover:text-white transition-colors">
-                        <ChevronLeft size={24} />
+                    <button
+                        onClick={onClose}
+                        className="w-10 h-10 flex items-center justify-center bg-slate-950 border border-slate-800 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all active:scale-95"
+                        title="Voltar"
+                    >
+                        <ChevronLeft size={20} />
                     </button>
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center text-white shrink-0 shadow-lg shadow-blue-900/20">
                         <Calculator size={20} />

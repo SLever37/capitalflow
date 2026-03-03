@@ -23,10 +23,11 @@ interface AppShellProps {
   navOrder: string[]; 
   onGoBack?: () => void;
   isInHub?: boolean;
+  hideNav?: boolean;
 }
 
 export const AppShell: React.FC<AppShellProps> = ({ 
-  children, toast, activeTab, setActiveTab, activeUser, isLoadingData, onOpenNav, onNewLoan, isStealthMode, toggleStealthMode, onOpenSupport, navOrder, onGoBack, isInHub
+  children, toast, activeTab, setActiveTab, activeUser, isLoadingData, onOpenNav, onNewLoan, isStealthMode, toggleStealthMode, onOpenSupport, navOrder, onGoBack, isInHub, hideNav
 }) => {
   const [unreadSupport, setUnreadSupport] = useState(0);
   const { unreadCampaignCount } = useCampaignNotifications(activeUser);
@@ -79,7 +80,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   }, [activeUser?.id]);
 
   return (
-    <div className="min-h-screen bg-slate-950 pb-28 md:pb-12 text-slate-100 font-sans selection:bg-blue-600/30 relative">
+    <div className={`min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-blue-600/30 relative ${!hideNav ? 'pb-28 md:pb-12' : ''}`}>
       {toast && (
         <div className={`fixed z-[150] px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-top-4 fade-in duration-300 left-4 right-4 top-4 md:left-auto md:right-4 md:w-auto ${toast.type === 'error' ? 'bg-rose-600 text-white' : toast.type === 'warning' ? 'bg-amber-500 text-black' : 'bg-emerald-600 text-white'}`}>
             {toast.type === 'error' ? <AlertCircle size={24}/> : toast.type === 'warning' ? <AlertTriangle size={24}/> : <CheckCircle2 size={24}/>}
@@ -87,32 +88,36 @@ export const AppShell: React.FC<AppShellProps> = ({
         </div>
       )}
 
-      <HeaderBar 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
-        activeUser={activeUser} 
-        isLoadingData={isLoadingData} 
-        onOpenNav={onOpenNav} 
-        onNewLoan={onNewLoan}
-        isStealthMode={isStealthMode}
-        toggleStealthMode={toggleStealthMode}
-        navOrder={navOrder}
-      />
+      {!hideNav && (
+        <HeaderBar 
+          activeTab={activeTab} 
+          setActiveTab={setActiveTab} 
+          activeUser={activeUser} 
+          isLoadingData={isLoadingData} 
+          onOpenNav={onOpenNav} 
+          onNewLoan={onNewLoan}
+          isStealthMode={isStealthMode}
+          toggleStealthMode={toggleStealthMode}
+          navOrder={navOrder}
+        />
+      )}
 
       <main className="w-full max-w-[1920px] mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
         {children}
       </main>
 
       {/* FAB for New Loan (Mobile) */}
-      <button 
-        onClick={onNewLoan}
-        className="md:hidden fixed bottom-24 right-6 z-40 w-14 h-14 rounded-full flex items-center justify-center text-white shadow-xl active:scale-95 transition-all"
-        style={{ backgroundColor: activeUser?.brandColor || '#2563eb', boxShadow: `0 10px 25px -5px ${activeUser?.brandColor || '#2563eb'}66` }}
-      >
-        <Plus size={24}/>
-      </button>
+      {!hideNav && (
+        <button 
+          onClick={onNewLoan}
+          className="md:hidden fixed bottom-24 right-6 z-40 w-14 h-14 rounded-full flex items-center justify-center text-white shadow-xl active:scale-95 transition-all"
+          style={{ backgroundColor: activeUser?.brandColor || '#2563eb', boxShadow: `0 10px 25px -5px ${activeUser?.brandColor || '#2563eb'}66` }}
+        >
+          <Plus size={24}/>
+        </button>
+      )}
 
-      {activeUser && (
+      {activeUser && !hideNav && (
           <button 
             onClick={onOpenSupport}
             className="fixed bottom-40 md:bottom-8 right-6 z-40 p-4 bg-blue-600 text-white rounded-full shadow-2xl shadow-blue-600/40 hover:scale-110 transition-all active:scale-95 group"
@@ -127,16 +132,18 @@ export const AppShell: React.FC<AppShellProps> = ({
           </button>
       )}
 
-      <BottomNav 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
-        onOpenNav={onOpenNav} 
-        onNewLoan={onNewLoan}
-        navOrder={navOrder}
-        primaryColor={activeUser?.brandColor}
-        isStaff={!!activeUser?.supervisor_id}
-        onGoBack={isInHub ? onGoBack : undefined}
-      />
+      {!hideNav && (
+        <BottomNav 
+          activeTab={activeTab} 
+          setActiveTab={setActiveTab} 
+          onOpenNav={onOpenNav} 
+          onNewLoan={onNewLoan}
+          navOrder={navOrder}
+          primaryColor={activeUser?.brandColor}
+          isStaff={!!activeUser?.supervisor_id}
+          onGoBack={isInHub ? onGoBack : undefined}
+        />
+      )}
     </div>
   );
 };

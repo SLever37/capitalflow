@@ -19,6 +19,9 @@ import {
   Shield,
   User,
   Download,
+  ChevronLeft,
+  Bell,
+  Smartphone,
 } from 'lucide-react';
 
 import type { AppTab, Loan, UserProfile, Client, CapitalSource } from '../types';
@@ -27,6 +30,7 @@ import { maskDocument, maskPhone } from '../utils/formatters';
 import { useProfilePageLogic } from '../features/profile/hooks/useProfilePageLogic';
 import { ProfileAuditLog } from '../features/profile/components/ProfileAuditLog';
 import { ProfileDangerZone } from '../features/profile/components/ProfileDangerZone';
+import { notificationService } from '../services/notification.service';
 
 interface ProfilePageProps {
   activeUser: UserProfile;
@@ -51,6 +55,7 @@ interface ProfilePageProps {
   navOrder: AppTab[];
   hubOrder: AppTab[];
   saveNavConfig: (nav: AppTab[], hub: AppTab[]) => void;
+  goBack?: () => void;
 }
 
 export const ProfilePage: React.FC<ProfilePageProps> = ({
@@ -69,11 +74,13 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   navOrder,
   hubOrder,
   saveNavConfig,
+  goBack,
+  showToast
 }) => {
   const { backupRestoreRef, auditLogs } = useProfilePageLogic(loans);
 
   const [activeSection, setActiveSection] = useState<
-    'GENERAL' | 'FINANCE' | 'DATA' | 'INTERFACE' | 'SECURITY' | 'DANGER'
+    'GENERAL' | 'FINANCE' | 'DATA' | 'INTERFACE' | 'SECURITY' | 'DANGER' | 'NOTIFICATIONS'
   >('GENERAL');
 
   const getTabLabel = (tab: AppTab) => {
@@ -136,7 +143,20 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   if (!profileEditForm) return null;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+    <div className="space-y-6">
+      {goBack && (
+        <div className="flex items-center gap-3">
+          <button
+            onClick={goBack}
+            className="w-10 h-10 flex items-center justify-center bg-slate-900 border border-slate-800 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all active:scale-95"
+            title="Voltar"
+          >
+            <ChevronLeft size={20} />
+          </button>
+          <h2 className="text-xl font-black uppercase tracking-tighter text-white">Meu Perfil</h2>
+        </div>
+      )}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
       {/* SIDEBAR */}
       <div className="lg:col-span-4 space-y-6">
         <div className="bg-slate-900 border border-slate-800 p-6 rounded-[2.5rem] relative overflow-hidden">
@@ -227,6 +247,18 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
             >
               <FileSpreadsheet size={18} />{' '}
               <span className="font-bold text-xs uppercase">Dados & Backup</span>
+            </button>
+
+            <button
+              onClick={() => setActiveSection('NOTIFICATIONS')}
+              className={`w-full p-4 rounded-xl flex items-center gap-3 transition-all ${
+                activeSection === 'NOTIFICATIONS'
+                  ? 'bg-blue-600 text-white shadow-lg'
+                  : 'bg-slate-950 text-slate-400 hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              <Bell size={18} />{' '}
+              <span className="font-bold text-xs uppercase">Notificações</span>
             </button>
 
             <button
@@ -757,8 +789,67 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
             </div>
           )}
 
-          {/* SECURITY */}
-          {activeSection === 'SECURITY' && (
+          {/* NOTIFICATIONS */}
+          {activeSection === 'NOTIFICATIONS' && (
+          <div className="bg-slate-900 border border-slate-800 p-8 rounded-[2.5rem] space-y-8 animate-in slide-in-from-right-4 duration-300">
+            <div className="flex items-center gap-3 pb-6 border-b border-slate-800">
+              <div className="p-3 bg-blue-600/10 text-blue-500 rounded-2xl">
+                <Bell size={24} />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-white uppercase">Notificações Push</h3>
+                <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Alertas Financeiros e Lembretes</p>
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-slate-900 rounded-xl flex items-center justify-center text-slate-500">
+                    <Smartphone size={24} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-black text-white uppercase tracking-wider">Notificações no Navegador</p>
+                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Receba alertas de novos leads e pagamentos</p>
+                  </div>
+                </div>
+                <button
+                  onClick={async () => {
+                    const granted = await notificationService.requestPermission();
+                    if (granted) {
+                      showToast('Notificações ativadas com sucesso!', 'success');
+                    } else {
+                      showToast('Permissão de notificação negada.', 'warning');
+                    }
+                  }}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95"
+                >
+                  Ativar
+                </button>
+              </div>
+
+              <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-4">
+                <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Configurações de Alerta</h4>
+                <div className="space-y-3">
+                  <label className="flex items-center justify-between p-3 bg-slate-900/50 rounded-xl border border-slate-800 cursor-pointer hover:border-slate-700 transition-all">
+                    <span className="text-[10px] font-black text-white uppercase tracking-widest">Novos Leads</span>
+                    <input type="checkbox" defaultChecked className="w-4 h-4 accent-blue-500" />
+                  </label>
+                  <label className="flex items-center justify-between p-3 bg-slate-900/50 rounded-xl border border-slate-800 cursor-pointer hover:border-slate-700 transition-all">
+                    <span className="text-[10px] font-black text-white uppercase tracking-widest">Vencimentos de Hoje</span>
+                    <input type="checkbox" defaultChecked className="w-4 h-4 accent-blue-500" />
+                  </label>
+                  <label className="flex items-center justify-between p-3 bg-slate-900/50 rounded-xl border border-slate-800 cursor-pointer hover:border-slate-700 transition-all">
+                    <span className="text-[10px] font-black text-white uppercase tracking-widest">Alertas de Inadimplência</span>
+                    <input type="checkbox" defaultChecked className="w-4 h-4 accent-blue-500" />
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeSection === 'SECURITY' && (
             <div className="space-y-8 animate-in fade-in slide-in-from-right">
               <div className="flex items-center gap-3 text-indigo-500 mb-4">
                 <Shield size={24} />
@@ -792,5 +883,6 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
         </div>
       </div>
     </div>
-  );
+  </div>
+);
 };

@@ -144,6 +144,26 @@ export const App: React.FC = () => {
 
   usePersistedTab(activeTab, setActiveTab);
 
+  // Global error listener for "Failed to fetch"
+  useEffect(() => {
+    const handleError = (event: ErrorEvent) => {
+      if (event.message?.includes('Failed to fetch')) {
+        showToast('Erro de conexão com o servidor. Verifique sua internet ou tente novamente mais tarde.', 'error');
+      }
+    };
+    const handleRejection = (event: PromiseRejectionEvent) => {
+      if (event.reason?.message?.includes('Failed to fetch')) {
+        showToast('Erro de conexão com o servidor. Verifique sua internet ou tente novamente mais tarde.', 'error');
+      }
+    };
+    window.addEventListener('error', handleError);
+    window.addEventListener('unhandledrejection', handleRejection);
+    return () => {
+      window.removeEventListener('error', handleError);
+      window.removeEventListener('unhandledrejection', handleRejection);
+    };
+  }, [showToast]);
+
   const controllers = useControllers(
     activeUser,
     ui,
@@ -260,6 +280,7 @@ export const App: React.FC = () => {
             navOrder={navOrder}
             onGoBack={goBack}
             isInHub={isInHub}
+            hideNav={activeTab === 'CONTRACT_DETAILS'}
           >
             {activeTab === 'DASHBOARD' && (
               <DashboardContainer
@@ -293,6 +314,7 @@ export const App: React.FC = () => {
                 loanCtrl={loanCtrl}
                 showToast={showToast}
                 ui={ui}
+                goBack={goBack}
               />
             )}
 
@@ -302,11 +324,12 @@ export const App: React.FC = () => {
                 showToast={showToast}
                 onRefresh={() => fetchFullData(activeUser?.id || '')}
                 ui={ui}
+                goBack={goBack}
               />
             )}
 
             {activeTab === 'SOURCES' && (
-              <SourcesContainer sources={sources} ui={ui} sourceCtrl={sourceCtrl} loanCtrl={loanCtrl} />
+              <SourcesContainer sources={sources} ui={ui} sourceCtrl={sourceCtrl} loanCtrl={loanCtrl} goBack={goBack} />
             )}
 
             {activeTab === 'PROFILE' && activeUser && (
@@ -325,6 +348,7 @@ export const App: React.FC = () => {
                 navOrder={navOrder}
                 hubOrder={hubOrder}
                 saveNavConfig={saveNavConfig}
+                goBack={goBack}
               />
             )}
 
@@ -346,11 +370,11 @@ export const App: React.FC = () => {
               <PersonalFinancesPage activeUser={activeUser} goBack={goBack} />
             )}
 
-            {activeTab === 'LEADS' && activeUser && <LeadsPage activeUser={activeUser} />}
+            {activeTab === 'LEADS' && activeUser && <LeadsPage activeUser={activeUser} goBack={goBack} />}
 
             {activeTab === 'ACQUISITION' && <CustomerAcquisitionPage activeUser={activeUser} goBack={goBack} />}
 
-            {activeTab === 'SETTINGS' && <SettingsPage />}
+            {activeTab === 'SETTINGS' && <SettingsPage goBack={goBack} />}
 
             {activeTab === 'CONTRACT_DETAILS' && ui.selectedLoanId && (
               <ContractDetailsPage 

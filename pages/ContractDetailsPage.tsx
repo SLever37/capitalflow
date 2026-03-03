@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
-    ArrowLeft, DollarSign, Calendar, Clock, TrendingUp, AlertTriangle, 
+    ChevronLeft, DollarSign, Calendar, Clock, TrendingUp, AlertTriangle, 
     CheckCircle2, Receipt, MessageSquare, ShieldCheck, Banknote, 
     FileText, Download, RefreshCcw, Loader2, ChevronRight, User
 } from 'lucide-react';
@@ -115,8 +115,12 @@ export const ContractDetailsPage: React.FC<ContractDetailsPageProps> = ({
                 
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div className="flex items-center gap-4">
-                        <button onClick={onBack} className="p-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-400 hover:text-white transition-colors">
-                            <ArrowLeft size={20}/>
+                        <button
+                            onClick={onBack}
+                            className="w-10 h-10 flex items-center justify-center bg-slate-950 border border-slate-800 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all active:scale-95"
+                            title="Voltar"
+                        >
+                            <ChevronLeft size={20} />
                         </button>
                         <div>
                             <div className="flex items-center gap-2 mb-1">
@@ -341,12 +345,9 @@ export const ContractDetailsPage: React.FC<ContractDetailsPageProps> = ({
                     </div>
 
                     {/* ATALHOS RÁPIDOS MOBILE */}
-                    <div className="md:hidden grid grid-cols-2 gap-4">
+                    <div className="md:hidden grid grid-cols-1 gap-4">
                         <button onClick={() => onOpenMessage(loan)} className="flex items-center justify-center gap-2 p-4 bg-slate-900 border border-slate-800 rounded-2xl text-[10px] font-black uppercase text-slate-400">
                             <MessageSquare size={16}/> WhatsApp
-                        </button>
-                        <button onClick={onBack} className="flex items-center justify-center gap-2 p-4 bg-slate-900 border border-slate-800 rounded-2xl text-[10px] font-black uppercase text-slate-400">
-                            <ArrowLeft size={16}/> Voltar
                         </button>
                     </div>
                 </div>

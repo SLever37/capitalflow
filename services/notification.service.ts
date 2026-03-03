@@ -12,9 +12,44 @@ export const notificationService = {
     
     if (Notification.permission !== "denied") {
       const permission = await Notification.requestPermission();
-      return permission === "granted";
+      if (permission === "granted") {
+        // Tenta registrar o push logo após ganhar permissão
+        await this.subscribeToPush();
+        return true;
+      }
     }
     return false;
+  },
+
+  /**
+   * Subscreve o usuário para notificações push reais (se houver VAPID_KEY)
+   */
+  async subscribeToPush() {
+    if (!('serviceWorker' in navigator)) return;
+    
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      
+      // Aqui o usuário precisaria configurar uma VAPID_KEY no .env
+      const vapidKey = process.env.VITE_VAPID_PUBLIC_KEY;
+      
+      if (!vapidKey) {
+        console.warn("[PUSH] VAPID_PUBLIC_KEY não configurada. Push real desativado.");
+        return;
+      }
+
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: vapidKey
+      });
+
+      console.log("[PUSH] Usuário subscrito:", subscription);
+      // Aqui você enviaria a 'subscription' para o seu backend/supabase
+      // Ex: await supabase.from('user_push_subscriptions').upsert({ ... })
+      
+    } catch (e) {
+      console.error("[PUSH] Erro ao subscrever:", e);
+    }
   },
 
   /**

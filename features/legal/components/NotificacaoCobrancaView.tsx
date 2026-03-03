@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { ArrowLeft, MessageCircle, Send, ShieldAlert, AlertTriangle, FileText, Download, UserX } from 'lucide-react';
+import { ChevronLeft, MessageCircle, Send, ShieldAlert, AlertTriangle, FileText, Download, UserX } from 'lucide-react';
 import { Loan, UserProfile } from '../../../types';
 import { formatMoney } from '../../../utils/formatters';
 import { DocumentTemplates } from '../templates/DocumentTemplates';
@@ -55,8 +55,12 @@ export const NotificacaoCobrancaView: React.FC<NotificacaoCobrancaViewProps> = (
     return (
         <div className="space-y-6 animate-in slide-in-from-right duration-300">
             <div className="flex items-center gap-4 mb-8">
-                <button onClick={onBack} className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors">
-                    <ArrowLeft size={20}/>
+                <button
+                    onClick={onBack}
+                    className="w-10 h-10 flex items-center justify-center bg-slate-900 border border-slate-800 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all active:scale-95"
+                    title="Voltar"
+                >
+                    <ChevronLeft size={20} />
                 </button>
                 <div>
                     <h2 className="text-xl font-black text-white uppercase flex items-center gap-2">
