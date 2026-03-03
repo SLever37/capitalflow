@@ -15,8 +15,6 @@ interface Props {
 }
 
 export const PersonalFinancesPage: React.FC<Props> = ({ activeUser, setActiveTab, loans = [], goBack }) => {
-    const [activeSubTab, setActiveSubTab] = useState('RESUMO');
-    
     const [transactions, setTransactions] = useState<PFTransaction[]>([]);
     const [accounts, setAccounts] = useState<PFAccount[]>([]);
     const [cards, setCards] = useState<PFCard[]>([]);
@@ -109,10 +107,10 @@ export const PersonalFinancesPage: React.FC<Props> = ({ activeUser, setActiveTab
                 <div className="flex items-center gap-4">
                     <button
                         onClick={() => goBack ? goBack() : setActiveTab?.('DASHBOARD')}
-                        className="w-10 h-10 flex items-center justify-center bg-slate-900 border border-slate-800 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all active:scale-95"
-                        title="Voltar"
+                        className="flex items-center gap-2 px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all active:scale-95"
                     >
-                        <ChevronLeft size={20} />
+                        <ChevronLeft size={16} />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Voltar</span>
                     </button>
                     
                     <div className="flex items-center gap-3">
