@@ -1,53 +1,47 @@
 import { createClient } from '@supabase/supabase-js';
 
 /**
- * CapitalFlow — conexão ÚNICA com o Supabase
- *
- * ⚠️ Removido fallback hardcoded.
- * Motivo: fallback “silencioso” é a causa clássica de você operar no projeto errado
- * (e aí acontece exatamente o que você descreveu: contrato pago no app, mas “aberto”
- * no banco que você está debugando, ou vice-versa).
- *
- * Variáveis obrigatórias (Vite/Cloudflare Pages):
- * - VITE_SUPABASE_URL
- * - VITE_SUPABASE_ANON_KEY
+ * Utilitário para ler variáveis de ambiente de forma segura no Vite/Cloudflare.
+ * Prioriza import.meta.env (padrão Vite) e fallback para process.env (injetado via define).
  */
-
-type EnvLike = Record<string, any>;
-
-function readEnv(): EnvLike {
+function getEnvVar(key: string): string {
+  // 1. Tenta via import.meta.env (Vite bakes this in at build time)
   try {
-    const meta = import.meta as any;
-    if (meta?.env) return meta.env as EnvLike;
-  } catch {
-    // ignore
-  }
+    const val = (import.meta as any).env?.[key];
+    if (val) return String(val).trim();
+  } catch {}
 
-  // Fallback apenas para ambientes que injetam process.env (não é o padrão do Vite no browser)
+  // 2. Tenta via process.env (Vite define replaces this)
   try {
     // @ts-ignore
-    if (typeof process !== 'undefined' && (process as any)?.env) return (process as any).env as EnvLike;
-  } catch {
-    // ignore
-  }
+    const val = typeof process !== 'undefined' ? process.env?.[key] : undefined;
+    if (val) return String(val).trim();
+  } catch {}
 
-  return {};
+  return '';
 }
 
 function requireEnv(key: string): string {
-  const env = readEnv();
-  const val = String(env?.[key] ?? '').trim();
+  const val = getEnvVar(key);
   if (!val) {
-    throw new Error(
-      `[ENV] Variável obrigatória ausente: ${key}. ` +
-        `Configure em Cloudflare Pages (Environment Variables) e no .env.local (dev).`
-    );
+    console.warn(`[ENV] Variável obrigatória ausente: ${key}`);
+    return '';
   }
   return val;
 }
 
 const SUPABASE_URL = requireEnv('VITE_SUPABASE_URL');
 const SUPABASE_ANON_KEY = requireEnv('VITE_SUPABASE_ANON_KEY');
+
+// Se as variáveis estiverem vazias, o createClient vai falhar. 
+// Vamos garantir que o erro seja capturado pelo AppErrorBoundary.
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  const missing = !SUPABASE_URL ? 'VITE_SUPABASE_URL' : 'VITE_SUPABASE_ANON_KEY';
+  throw new Error(
+    `Configuração do Supabase ausente (${missing}). ` +
+    `Certifique-se de configurar as variáveis de ambiente no Cloudflare Pages.`
+  );
+}
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {

@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LayoutDashboard, Users, Wallet, LayoutGrid, Plus, Briefcase, PiggyBank, ChevronLeft } from 'lucide-react';
+import { LayoutDashboard, Users, Wallet, LayoutGrid, Plus, Briefcase, PiggyBank, ChevronLeft, Calendar, Calculator, ArrowRightLeft, Megaphone } from 'lucide-react';
 import { Tooltip } from '../components/ui/Tooltip';
 
 interface BottomNavProps {
@@ -24,6 +24,10 @@ export const BottomNav: React.FC<BottomNavProps> = ({
       case 'TEAM': return <Briefcase size={20}/>;
       case 'SOURCES': return <Wallet size={20}/>;
       case 'PERSONAL_FINANCE': return <PiggyBank size={20}/>;
+      case 'AGENDA': return <Calendar size={20}/>;
+      case 'SIMULATOR': return <Calculator size={20}/>;
+      case 'FLOW': return <ArrowRightLeft size={20}/>;
+      case 'ACQUISITION': return <Megaphone size={20}/>;
       default: return <LayoutGrid size={20}/>;
     }
   };
@@ -35,70 +39,33 @@ export const BottomNav: React.FC<BottomNavProps> = ({
       case 'TEAM': return 'Equipe';
       case 'SOURCES': return 'Fundos';
       case 'PERSONAL_FINANCE': return 'Finanças';
+      case 'AGENDA': return 'Agenda';
+      case 'SIMULATOR': return 'Simulador';
+      case 'FLOW': return 'Extrato';
+      case 'ACQUISITION': return 'Captação';
       default: return tab;
     }
   };
 
-  // Filtra EQUIPE se o usuário for subordinado (staff)
-  const safeNavOrder = (navOrder || []).filter(tab => !(tab === 'TEAM' && isStaff));
+  // Lista completa de abas para a barra de tarefas mobile
+  const mobileTabs = ['DASHBOARD', 'AGENDA', 'SIMULATOR', 'PERSONAL_FINANCE', 'ACQUISITION', 'FLOW', 'CLIENTS', 'SOURCES'];
+  if (!isStaff) {
+      mobileTabs.push('TEAM');
+  }
 
   return (
-    <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-950/90 backdrop-blur-xl border-t border-slate-800 z-50 flex justify-around items-center p-2 pb-safe">
-       {/* SLOTS 1 e 2 */}
-       {safeNavOrder.slice(0, 2).map(tab => (
+    <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-950/90 backdrop-blur-xl border-t border-slate-800 z-50 flex items-center p-2 pb-safe overflow-x-auto hide-scrollbar gap-2 px-4">
+       {mobileTabs.map(tab => (
            <button 
             key={tab}
             onClick={() => setActiveTab(tab)} 
-            className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${activeTab === tab ? '' : 'text-slate-500'}`}
+            className={`flex flex-col items-center gap-1 p-2 min-w-[64px] rounded-xl transition-all shrink-0 ${activeTab === tab ? '' : 'text-slate-500'}`}
             style={{ color: activeTab === tab ? primaryColor : undefined }}
            >
                {getTabIcon(tab)}
-               <span className="text-[9px] font-bold uppercase">{getTabLabel(tab)}</span>
+               <span className="text-[9px] font-bold uppercase truncate w-full text-center">{getTabLabel(tab)}</span>
            </button>
        ))}
-       
-       {/* BOTÃO CENTRAL PLUS */}
-       <div className="relative -top-6">
-            <button 
-              onClick={onNewLoan} 
-              className="w-14 h-14 rounded-full flex items-center justify-center text-white shadow-xl active:scale-95 transition-all"
-              style={{ backgroundColor: primaryColor, boxShadow: `0 10px 25px -5px ${primaryColor}66` }}
-            >
-                <Plus size={24}/>
-            </button>
-       </div>
-
-       {/* SLOT 3 (Ex: EQUIPE ou CAPITAL) */}
-       {safeNavOrder.slice(2, 3).map(tab => (
-           <button 
-            key={tab}
-            onClick={() => setActiveTab(tab)} 
-            className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${activeTab === tab ? '' : 'text-slate-500'}`}
-            style={{ color: activeTab === tab ? primaryColor : undefined }}
-           >
-               {getTabIcon(tab)}
-               <span className="text-[9px] font-bold uppercase">{getTabLabel(tab)}</span>
-           </button>
-       ))}
-
-       {/* BOTAO VOLTAR (quando em aba do Hub) ou MENU HUB */}
-       {onGoBack ? (
-         <button 
-            onClick={onGoBack} 
-            className="flex flex-col items-center gap-1 p-2 rounded-xl transition-all text-slate-400 hover:text-white active:scale-95"
-         >
-             <ChevronLeft size={20}/>
-             <span className="text-[9px] font-bold uppercase">Voltar</span>
-         </button>
-       ) : (
-         <button 
-            onClick={onOpenNav} 
-            className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${activeTab === 'PROFILE' || activeTab === 'LEGAL' ? 'text-blue-500' : 'text-slate-500'}`}
-         >
-             <LayoutGrid size={20}/>
-             <span className="text-[9px] font-bold uppercase">Menu</span>
-         </button>
-       )}
     </div>
   );
 };

@@ -79,28 +79,35 @@ export const FlowModal = ({ onClose, loans, profit }: { onClose: () => void, loa
     };
 
     return (
-        <div className="fixed inset-0 z-[200] bg-slate-950 flex flex-col animate-in fade-in duration-300 font-sans h-[100dvh]">
-            {/* Header */}
-            <div className="h-16 border-b border-slate-800 bg-slate-900 flex items-center justify-between px-4 shrink-0 z-20">
-                <div className="flex items-center gap-3">
-                    <button onClick={onClose} className="p-2 -ml-2 text-slate-400 hover:text-white transition-colors">
-                        <ChevronLeft size={24} />
-                    </button>
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center text-white shrink-0 shadow-lg shadow-emerald-900/20">
-                        <ArrowRightLeft size={20} />
-                    </div>
-                    <div>
-                        <h1 className="text-sm font-black text-white uppercase tracking-wider leading-none">Extrato Geral</h1>
-                        <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-widest">
-                            DRE e Resultado Financeiro
-                        </p>
-                    </div>
-                </div>
+        <div className="space-y-6 animate-in fade-in duration-300 font-sans pb-24">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={onClose}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all active:scale-95"
+          >
+            <ChevronLeft size={16} />
+            <span className="text-[10px] font-black uppercase tracking-widest">Voltar</span>
+          </button>
+          
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center text-white shrink-0 shadow-lg shadow-emerald-900/20">
+              <ArrowRightLeft size={20} />
+            </div>
+            <div>
+              <h1 className="text-sm font-black text-white uppercase tracking-wider leading-none">Extrato Geral</h1>
+              <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-widest">
+                DRE e Resultado Financeiro
+              </p>
+            </div>
+          </div>
+        </div>
             </div>
 
             {/* Top Bar: Period Selector */}
-            <div className="bg-slate-900 border-b border-slate-800 shrink-0 flex flex-col px-4 py-3">
-                <div className="flex items-center justify-between bg-slate-950 p-1.5 rounded-2xl border border-slate-800">
+            <div className="shrink-0 flex flex-col">
+                <div className="flex items-center justify-between bg-slate-900 p-1.5 rounded-2xl border border-slate-800">
                     <button onClick={() => handleMonthChange('prev')} className="p-2 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-white transition-colors"><ChevronLeft size={20}/></button>
                     <div className="text-center flex-1">
                         <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Período</p>
@@ -111,7 +118,7 @@ export const FlowModal = ({ onClose, loans, profit }: { onClose: () => void, loa
             </div>
 
             {/* Main Content */}
-            <div className="flex-1 overflow-y-auto bg-slate-950 p-4 sm:p-6 custom-scrollbar">
+            <div className="flex-1">
                 <div className="max-w-3xl mx-auto space-y-6 flex flex-col h-full">
                     
                 {/* Cards DRE */}

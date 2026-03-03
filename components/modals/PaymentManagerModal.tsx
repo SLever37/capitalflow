@@ -17,11 +17,9 @@ interface PaymentManagerModalProps {
     onConfirm: (
         forgivePenalty: ForgivenessMode, 
         manualDate?: Date | null, 
-        customAmount?: number,
+        amountPaid?: number,
         realDate?: Date | null,
-        interestHandling?: 'CAPITALIZE' | 'KEEP_PENDING',
-        paymentTypeOverride?: string,
-        avAmountOverride?: string
+        interestHandling?: 'CAPITALIZE' | 'KEEP_PENDING'
     ) => void;
     onOpenMessage: (loan: Loan) => void;
 }
@@ -45,8 +43,6 @@ export const PaymentManagerModal: React.FC<PaymentManagerModalProps> = ({
     if (!data) return null;
 
     const { loan, calculations } = data;
-    const isDailyFree = loan.billingCycle === 'DAILY_FREE' || loan.billingCycle === ('DAILY_FIXED' as any);
-    const isFixedTerm = loan.billingCycle === 'DAILY_FIXED_TERM';
 
     const safeParse = (val: string) => {
         if (!val) return 0;
@@ -59,36 +55,26 @@ export const PaymentManagerModal: React.FC<PaymentManagerModalProps> = ({
     // Cálculos de Display Baseados no Breakdown (Já com perdão aplicado)
     const totalInterestDue = debtBreakdown.interest + debtBreakdown.fine + debtBreakdown.dailyMora;
     
-    let amountEntering = 0;
-    if (paymentType === 'FULL') amountEntering = debtBreakdown.total;
-    else if (paymentType === 'RENEW_INTEREST') amountEntering = totalInterestDue;
-    else amountEntering = paymentType === 'CUSTOM' ? safeParse(customAmount) : safeParse(avAmount);
-
+    const amountEntering = safeParse(avAmount);
     const remainingInterest = Math.max(0, totalInterestDue - amountEntering);
     
     // Regra: Mostrar decisão de sobra apenas se houver sobra significativa
-    const showInterestDecision = 
-        (paymentType === 'PARTIAL_INTEREST') || 
-        (paymentType !== 'FULL' && paymentType !== 'LEND_MORE' && remainingInterest > 0.05);
+    const showInterestDecision = remainingInterest > 0.05;
 
-    const handleConfirmWrapper = (forceFull: boolean = false) => {
-        const typeToUse = forceFull ? 'FULL' : paymentType;
+    const handleConfirmWrapper = () => {
+        const val = safeParse(avAmount);
+        if (val <= 0) return;
+
         const nextDueDate = manualDateStr ? parseDateOnlyUTC(manualDateStr) : null;
-        
-        // Data REAL do pagamento (auditável)
         const realPaymentDate = realPaymentDateStr ? parseDateOnlyUTC(realPaymentDateStr) : new Date();
 
-        if (isDailyFree && typeToUse !== 'FULL') {
-            const val = safeParse(customAmount);
-            if (!val || val <= 0) return;
-            if (subMode === 'AMORTIZE') {
-                onConfirm(forgivenessMode, nextDueDate, 0, realPaymentDate, interestHandling, 'RENEW_AV', String(val));
-            } else {
-                onConfirm(forgivenessMode, nextDueDate, val, realPaymentDate, interestHandling, 'CUSTOM');
-            }
-        } else {
-            onConfirm(forgivenessMode, nextDueDate, undefined, realPaymentDate, interestHandling, paymentType, avAmount);
-        }
+        onConfirm(
+            forgivenessMode, 
+            nextDueDate, 
+            val, 
+            realPaymentDate, 
+            interestHandling
+        );
     };
 
     // Tem multa ou mora original para perdoar?
@@ -215,222 +201,125 @@ export const PaymentManagerModal: React.FC<PaymentManagerModalProps> = ({
                             <Calendar size={20} className="text-slate-600 group-focus-within:text-blue-500 transition-colors"/>
                         </div>
 
-                        {/* WORKSPACE PRINCIPAL */}
-                        {isDailyFree ? (
-                            <FlexibleDailyScreen 
-                                amount={customAmount} setAmount={setCustomAmount}
-                                manualDateStr={manualDateStr} setManualDateStr={setManualDateStr}
-                                debt={calculations} loan={loan} subMode={subMode} setSetSubMode={setSubMode}
-                                onConfirmFull={() => handleConfirmWrapper(true)}
-                                paymentType={paymentType} setPaymentType={setPaymentType}
-                            />
-                        ) : (
-                            <div className="space-y-4">
+                        {/* WORKSPACE PRINCIPAL - FLUXO ÚNICO */}
+                        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                            
+                            {/* CARD DE ENTRADA DE VALOR */}
+                            <div className="bg-slate-900 border border-slate-800 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden group focus-within:border-blue-500 transition-all">
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/5 blur-[60px] rounded-full"></div>
                                 
-                                {/* LISTA DE MENSALIDADES (CONTEXTO VISUAL) */}
-                                {!isFixedTerm && virtualSchedule.length > 0 && (
-                                    <div className="bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden mb-4">
-                                        <div className="p-3 bg-slate-900 border-b border-slate-800 flex items-center gap-2">
-                                            <Calendar size={14} className="text-slate-500"/>
-                                            <span className="text-[10px] font-black uppercase text-slate-400">Mensalidades</span>
-                                        </div>
-                                        <div className="max-h-[160px] overflow-y-auto custom-scrollbar p-2 space-y-1">
-                                            {virtualSchedule.map((item: any, idx: number) => {
-                                                const isLate = item.status === 'LATE';
-                                                const isFuture = item.status === 'FUTURE';
-                                                
-                                                let statusClass = 'bg-slate-900 text-slate-500 border-slate-700';
-                                                if (isLate) statusClass = 'bg-rose-500/10 text-rose-500 border-rose-500/20';
-                                                if (isFuture) statusClass = 'bg-slate-800 text-slate-400 border-slate-700';
-                                                if (item.status === 'OPEN') statusClass = 'bg-blue-500/10 text-blue-400 border-blue-500/20';
-                                                if (item.status === 'PARTIAL') statusClass = 'bg-amber-500/10 text-amber-500 border-amber-500/20';
-
-                                                return (
-                                                    <div key={idx} className="flex justify-between items-center text-[10px] p-2 hover:bg-slate-800/50 rounded-lg transition-colors">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className={`w-1 h-8 rounded-full ${isLate ? 'bg-rose-500' : item.status === 'PARTIAL' ? 'bg-amber-500' : 'bg-blue-500'}`}></div>
-                                                            <div className="flex flex-col">
-                                                                <span className="text-white capitalize font-bold text-xs">
-                                                                    {item.dateStr}
-                                                                </span>
-                                                                <span className="text-[9px] text-slate-500 font-mono">
-                                                                    {item.label}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                        <div className="text-right">
-                                                            <span className="text-[9px] text-slate-500 block mb-0.5">Venc: {item.fullDate}</span>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
+                                <div className="relative z-10">
+                                    <div className="flex items-center justify-between mb-6">
+                                        <h2 className="text-xs font-black uppercase tracking-[0.2em] text-slate-500 flex items-center gap-2">
+                                            <Banknote size={16} className="text-blue-500"/>
+                                            Registrar Pagamento
+                                        </h2>
+                                        <div className="flex items-center gap-2 px-3 py-1 bg-slate-950 border border-slate-800 rounded-full">
+                                            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
+                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Detecção Automática</span>
                                         </div>
                                     </div>
-                                )}
 
-                                {/* LISTA DE MODALIDADES (CARDS EXPANSÍVEIS) */}
-                                <div className="space-y-3">
-                                    
-                                    {/* 1. PAGAR JUROS (RENOVAR) */}
-                                    {!isFixedTerm && (
-                                        <div className={`rounded-2xl border transition-all overflow-hidden ${paymentType === 'RENEW_INTEREST' ? 'bg-slate-900 border-amber-500 ring-1 ring-amber-500/50' : 'bg-slate-900 border-slate-800 hover:border-slate-700'}`}>
-                                            <button onClick={() => setPaymentType('RENEW_INTEREST')} className="w-full p-4 flex items-center gap-4 text-left">
-                                                <div className={`p-3 rounded-xl ${paymentType === 'RENEW_INTEREST' ? 'bg-amber-500/20 text-amber-500' : 'bg-slate-800 text-slate-400'}`}>
-                                                    <RefreshCcw size={20}/>
-                                                </div>
-                                                <div className="flex-1">
-                                                    <p className={`text-sm font-bold uppercase ${paymentType === 'RENEW_INTEREST' ? 'text-white' : 'text-slate-300'}`}>Pagar Juros (Renovar)</p>
-                                                    <p className="text-[10px] text-slate-500">Apenas o lucro do período</p>
-                                                </div>
-                                                <div className="text-right">
-                                                    <span className="text-xs font-black text-amber-500">{formatMoney(totalInterestDue)}</span>
-                                                </div>
-                                            </button>
-                                            
-                                            {paymentType === 'RENEW_INTEREST' && (
-                                                <div className="px-4 pb-4 pt-0 space-y-4 animate-in slide-in-from-top-2">
-                                                    <div className="h-px bg-slate-800 w-full" />
-                                                    <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-                                                        <label className="text-[10px] font-black uppercase text-slate-500 block mb-1 flex items-center gap-1">
-                                                            <CalendarClock size={12}/> Próximo Vencimento
-                                                        </label>
-                                                        <input type="date" className="bg-transparent text-white font-bold text-sm outline-none w-full" value={manualDateStr || ''} onChange={e => setManualDateStr(e.target.value)} />
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
+                                    <div className="flex items-baseline gap-4 mb-8">
+                                        <span className="text-4xl font-black text-blue-500">R$</span>
+                                        <input 
+                                            type="text" 
+                                            inputMode="decimal" 
+                                            value={avAmount || ''} 
+                                            onChange={e => setAvAmount(e.target.value.replace(/[^0-9.,]/g, ''))} 
+                                            className="w-full bg-transparent text-6xl font-black text-white outline-none placeholder:text-slate-800 tracking-tighter" 
+                                            placeholder="0,00" 
+                                            autoFocus 
+                                        />
+                                    </div>
 
-                                    {/* 2. JUROS + AMORTIZAÇÃO (RENEW_AV) */}
-                                    <div className={`rounded-2xl border transition-all overflow-hidden ${paymentType === 'RENEW_AV' ? 'bg-slate-900 border-blue-500 ring-1 ring-blue-500/50' : 'bg-slate-900 border-slate-800 hover:border-slate-700'}`}>
-                                        <button onClick={() => setPaymentType('RENEW_AV')} className="w-full p-4 flex items-center gap-4 text-left">
-                                            <div className={`p-3 rounded-xl ${paymentType === 'RENEW_AV' ? 'bg-blue-500/20 text-blue-500' : 'bg-slate-800 text-slate-400'}`}>
-                                                <DollarSign size={20}/>
-                                            </div>
-                                            <div className="flex-1">
-                                                <p className={`text-sm font-bold uppercase ${paymentType === 'RENEW_AV' ? 'text-white' : 'text-slate-300'}`}>{isFixedTerm ? 'Abater Saldo / Pagar Diária' : 'Juros + Amortização'}</p>
-                                                <p className="text-[10px] text-slate-500">Paga juros e abate principal</p>
-                                            </div>
-                                        </button>
-
-                                        {paymentType === 'RENEW_AV' && (
-                                            <div className="px-4 pb-4 pt-0 space-y-4 animate-in slide-in-from-top-2">
-                                                <div className="h-px bg-slate-800 w-full" />
-                                                
-                                                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                                                    <label className="text-[10px] font-black uppercase text-slate-500 mb-1 block">Valor Total do Pagamento</label>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="font-black text-xl text-blue-500">R$</span>
-                                                        <input type="text" inputMode="decimal" value={avAmount || ''} onChange={e => setAvAmount(e.target.value.replace(/[^0-9.,]/g, ''))} className="w-full bg-transparent text-white text-2xl font-black outline-none placeholder:text-slate-800" placeholder="0,00" autoFocus />
-                                                    </div>
+                                    {/* PREVIEW DINÂMICO */}
+                                    {safeParse(avAmount) > 0 && (
+                                        <div className="bg-slate-950/50 border border-slate-800/50 p-6 rounded-3xl space-y-4 animate-in zoom-in-95 duration-300">
+                                            <div className="flex items-start gap-4">
+                                                <div className="w-10 h-10 bg-blue-600/20 rounded-xl flex items-center justify-center text-blue-500 shrink-0">
+                                                    <TrendingUp size={20}/>
                                                 </div>
-
-                                                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-                                                    <label className="text-[10px] font-black uppercase text-slate-500 block mb-1 flex items-center gap-1">
-                                                        <CalendarClock size={12}/> Próximo Vencimento
-                                                    </label>
-                                                    <input type="date" className="bg-transparent text-white font-bold text-sm outline-none w-full" value={manualDateStr || ''} onChange={e => setManualDateStr(e.target.value)} />
-                                                </div>
-
-                                                <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-xl space-y-2 animate-in zoom-in-95">
-                                                    <p className="text-[10px] font-black text-blue-400 uppercase mb-1">Detalhamento do Recebimento</p>
-                                                    <div className="flex justify-between text-[10px]">
-                                                        <span className="text-slate-400 uppercase font-bold">Juros do Período (Lucro):</span>
-                                                        <span className="text-white font-bold">{formatMoney(Math.min(safeParse(avAmount), totalInterestDue))}</span>
-                                                    </div>
-                                                    <div className="flex justify-between text-[10px]">
-                                                        <span className="text-slate-400 uppercase font-bold">Amortização (Abate Capital):</span>
-                                                        <span className="text-emerald-400 font-bold">{formatMoney(Math.max(0, safeParse(avAmount) - totalInterestDue))}</span>
-                                                    </div>
-                                                    <div className="h-px bg-slate-800" />
-                                                    <div className="flex justify-between text-[10px]">
-                                                        <span className="text-slate-400 uppercase font-bold">Novo Saldo Devedor:</span>
-                                                        <span className="text-white font-black">{formatMoney(Math.max(0, debtBreakdown.principal - Math.max(0, safeParse(avAmount) - totalInterestDue)))}</span>
-                                                    </div>
-                                                    <p className="text-[8px] text-slate-500 italic mt-2">
-                                                        * O valor pago primeiro cobre os juros acumulados e o excedente reduz diretamente o capital principal do contrato.
+                                                <div>
+                                                    <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">Impacto do Recebimento</p>
+                                                    <p className="text-sm text-slate-200 font-bold leading-relaxed">
+                                                        {(() => {
+                                                            const val = safeParse(avAmount);
+                                                            const totalDue = debtBreakdown.total;
+                                                            const interestDue = totalInterestDue;
+                                                            
+                                                            if (val >= totalDue - 0.05) return "Quitação total: O contrato será encerrado e arquivado.";
+                                                            if (val >= interestDue - 0.05) {
+                                                                const amort = val - interestDue;
+                                                                if (amort > 0.05) return `Encargos + Amortização: Quita os juros e abate ${formatMoney(amort)} do capital principal.`;
+                                                                return "Renovação: Quita os juros/multas do período e mantém o capital principal.";
+                                                            }
+                                                            return `Pagamento Parcial: Abate ${formatMoney(val)} apenas dos juros/encargos acumulados.`;
+                                                        })()}
                                                     </p>
                                                 </div>
                                             </div>
-                                        )}
-                                    </div>
 
-                                    {/* 3. PARCIAL (LUCRO) - NOVO BOTÃO SOLICITADO */}
-                                    {!isFixedTerm && (
-                                        <div className={`rounded-2xl border transition-all overflow-hidden ${paymentType === 'PARTIAL_INTEREST' ? 'bg-slate-900 border-purple-500 ring-1 ring-purple-500/50' : 'bg-slate-900 border-slate-800 hover:border-slate-700'}`}>
-                                            <button onClick={() => { setPaymentType('PARTIAL_INTEREST'); setAvAmount(''); }} className="w-full p-4 flex items-center gap-4 text-left">
-                                                <div className={`p-3 rounded-xl ${paymentType === 'PARTIAL_INTEREST' ? 'bg-purple-500/20 text-purple-500' : 'bg-slate-800 text-slate-400'}`}>
-                                                    <Banknote size={20}/>
-                                                </div>
-                                                <div className="flex-1">
-                                                    <p className={`text-sm font-bold uppercase ${paymentType === 'PARTIAL_INTEREST' ? 'text-white' : 'text-slate-300'}`}>Pagamento Parcial (Só Juros)</p>
-                                                    <p className="text-[10px] text-slate-500">Abate apenas juros, mantém principal e data</p>
-                                                </div>
-                                            </button>
+                                            <div className="h-px bg-slate-800/50 w-full" />
 
-                                            {paymentType === 'PARTIAL_INTEREST' && (
-                                                <div className="px-4 pb-4 pt-0 space-y-4 animate-in slide-in-from-top-2">
-                                                    <div className="h-px bg-slate-800 w-full" />
-                                                    
-                                                    <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                                                        <label className="text-[10px] font-black uppercase text-slate-500 mb-1 block">Valor Pago (Parcial)</label>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="font-black text-xl text-purple-500">R$</span>
-                                                            <input type="text" inputMode="decimal" value={avAmount || ''} onChange={e => setAvAmount(e.target.value.replace(/[^0-9.,]/g, ''))} className="w-full bg-transparent text-white text-2xl font-black outline-none placeholder:text-slate-800" placeholder="0,00" autoFocus />
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Decisão sobre a sobra (Manter Pendente vs Capitalizar) */}
-                                                    {showInterestDecision && (
-                                                        <div className="bg-slate-800/50 p-3 rounded-xl border border-slate-700">
-                                                            <div className="flex items-center gap-2 text-amber-400 mb-2">
-                                                                <AlertCircle size={14} />
-                                                                <p className="text-[10px] font-black uppercase">Saldo Juros Restante: {formatMoney(remainingInterest)}</p>
-                                                            </div>
-                                                            <div className="grid grid-cols-2 gap-2">
-                                                                <label className={`cursor-pointer p-2 rounded-lg border flex items-center gap-2 ${interestHandling === 'KEEP_PENDING' ? 'bg-blue-600/20 border-blue-500' : 'bg-slate-900 border-slate-800'}`}>
-                                                                    <input type="radio" name="interestRulePart" checked={interestHandling === 'KEEP_PENDING'} onChange={() => setInterestHandling('KEEP_PENDING')} className="accent-blue-500"/>
-                                                                    <span className="text-[9px] font-bold text-white">Manter Pendente</span>
-                                                                </label>
-                                                                <label className={`cursor-pointer p-2 rounded-lg border flex items-center gap-2 ${interestHandling === 'CAPITALIZE' ? 'bg-rose-600/20 border-rose-500' : 'bg-slate-900 border-slate-800'}`}>
-                                                                    <input type="radio" name="interestRulePart" checked={interestHandling === 'CAPITALIZE'} onChange={() => setInterestHandling('CAPITALIZE')} className="accent-rose-500"/>
-                                                                    <span className="text-[9px] font-bold text-white">Capitalizar</span>
-                                                                </label>
-                                                            </div>
-                                                        </div>
-                                                    )}
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-1">
+                                                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Novo Saldo Devedor</p>
+                                                    <p className="text-lg font-black text-white">
+                                                        {formatMoney(Math.max(0, debtBreakdown.principal - Math.max(0, safeParse(avAmount) - totalInterestDue)))}
+                                                    </p>
                                                 </div>
-                                            )}
+                                                <div className="space-y-1 text-right">
+                                                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Status do Contrato</p>
+                                                    <p className="text-lg font-black text-emerald-500">
+                                                        {safeParse(avAmount) >= debtBreakdown.total - 0.05 ? 'QUITADO' : 'ATIVO'}
+                                                    </p>
+                                                </div>
+                                            </div>
                                         </div>
                                     )}
-
-                                    {/* 4. QUITAÇÃO TOTAL */}
-                                    <div className={`rounded-2xl border transition-all overflow-hidden ${paymentType === 'FULL' ? 'bg-slate-900 border-emerald-500 ring-1 ring-emerald-500/50' : 'bg-slate-900 border-slate-800 hover:border-slate-700'}`}>
-                                        <button onClick={() => setPaymentType('FULL')} className="w-full p-4 flex items-center gap-4 text-left">
-                                            <div className={`p-3 rounded-xl ${paymentType === 'FULL' ? 'bg-emerald-500/20 text-emerald-500' : 'bg-slate-800 text-slate-400'}`}>
-                                                <CheckSquare size={20}/>
-                                            </div>
-                                            <div className="flex-1">
-                                                <p className={`text-sm font-bold uppercase ${paymentType === 'FULL' ? 'text-white' : 'text-slate-300'}`}>Quitação Total</p>
-                                                <p className="text-[10px] text-slate-500">Encerra o contrato</p>
-                                            </div>
-                                        </button>
-                                        {paymentType === 'FULL' && (
-                                            <div className="px-4 pb-4 pt-0 animate-in slide-in-from-top-2">
-                                                <div className="h-px bg-slate-800 w-full mb-4" />
-                                                <div className="bg-emerald-900/10 border border-emerald-500/20 p-4 rounded-xl flex items-center gap-3">
-                                                    <CheckCircle2 size={24} className="text-emerald-500"/>
-                                                    <div>
-                                                        <p className="text-[10px] font-black uppercase text-emerald-400">Pronto para Encerrar</p>
-                                                        <p className="text-xs text-slate-300">O valor total de <b>{formatMoney(debtBreakdown.total)}</b> será registrado e o contrato arquivado.</p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
                                 </div>
                             </div>
-                        )}
+
+                            {/* CONFIGURAÇÕES ADICIONAIS */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="bg-slate-900/50 p-5 rounded-3xl border border-slate-800 space-y-3">
+                                    <label className="text-[10px] font-black uppercase text-slate-500 block tracking-widest flex items-center gap-2">
+                                        <CalendarClock size={14} className="text-blue-500"/>
+                                        Próximo Vencimento
+                                    </label>
+                                    <input 
+                                        type="date" 
+                                        className="bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold text-sm outline-none w-full focus:border-blue-500 transition-all" 
+                                        value={manualDateStr || ''} 
+                                        onChange={e => setManualDateStr(e.target.value)} 
+                                    />
+                                </div>
+
+                                {showInterestDecision && (
+                                    <div className="bg-slate-900/50 p-5 rounded-3xl border border-slate-800 space-y-3">
+                                        <label className="text-[10px] font-black uppercase text-slate-500 block tracking-widest flex items-center gap-2">
+                                            <AlertCircle size={14} className="text-amber-500"/>
+                                            Saldo de Juros
+                                        </label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <button 
+                                                onClick={() => setInterestHandling('KEEP_PENDING')}
+                                                className={`p-3 rounded-xl border text-[10px] font-black uppercase transition-all ${interestHandling === 'KEEP_PENDING' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-950 border-slate-800 text-slate-500'}`}
+                                            >
+                                                Manter Pendente
+                                            </button>
+                                            <button 
+                                                onClick={() => setInterestHandling('CAPITALIZE')}
+                                                className={`p-3 rounded-xl border text-[10px] font-black uppercase transition-all ${interestHandling === 'CAPITALIZE' ? 'bg-rose-600 border-rose-500 text-white' : 'bg-slate-950 border-slate-800 text-slate-500'}`}
+                                            >
+                                                Capitalizar
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -441,8 +330,8 @@ export const PaymentManagerModal: React.FC<PaymentManagerModalProps> = ({
                     <MessageSquare size={20}/>
                 </button>
                 <button 
-                    onClick={() => handleConfirmWrapper(false)} 
-                    disabled={isProcessing || (isDailyFree && paymentType !== 'FULL' && !customAmount) || ((paymentType === 'RENEW_AV' || paymentType === 'PARTIAL_INTEREST') && !avAmount)} 
+                    onClick={handleConfirmWrapper} 
+                    disabled={isProcessing || !avAmount || safeParse(avAmount) <= 0} 
                     className={`flex-1 py-4 text-white rounded-2xl font-black uppercase text-sm shadow-xl transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed bg-emerald-600 hover:bg-emerald-500 hover:shadow-emerald-600/20`}
                 >
                     {isProcessing ? <Loader2 className="animate-spin" size={20}/> : <><CheckCircle2 size={20}/> Confirmar Recebimento</>}

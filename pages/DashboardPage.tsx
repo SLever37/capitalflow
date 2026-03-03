@@ -53,6 +53,7 @@ interface DashboardPageProps {
   onRenegotiate: (loan: Loan) => void;
   onNewAporte: (loan: Loan) => void;
   onAgreementPayment: (loan: Loan, agreement: Agreement, inst: AgreementInstallment) => void;
+  onNavigate: (id: string) => void;
   onRefresh: () => void;
 }
 
@@ -62,7 +63,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   searchTerm, setSearchTerm, selectedLoanId, setSelectedLoanId, onEdit, onMessage, onArchive, onRestore, 
   onDelete, onNote, onPayment, onPortalLink, onUploadPromissoria, onUploadDoc, onViewPromissoria, 
   onViewDoc, onReviewSignal, onOpenComprovante, onReverseTransaction, setWithdrawModal, showToast, 
-  isStealthMode, onRenegotiate, onNewAporte, onAgreementPayment, onRefresh
+  isStealthMode, onRenegotiate, onNewAporte, onAgreementPayment, onNavigate, onRefresh
 }) => {
   
   // Agrupa os empréstimos filtrados por cliente, respeitando a ordenação selecionada
@@ -73,7 +74,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       sources, activeUser, selectedLoanId, setSelectedLoanId, onEdit, onMessage, onArchive,
       onRestore, onDelete, onNote, onPayment, onPortalLink, onUploadPromissoria, onUploadDoc,
       onViewPromissoria, onViewDoc, onReviewSignal, onOpenComprovante, onReverseTransaction,
-      onRenegotiate, onNewAporte, onAgreementPayment, onRefresh, isStealthMode
+      onRenegotiate, onNewAporte, onAgreementPayment, onNavigate, onRefresh, isStealthMode
   };
 
   return (

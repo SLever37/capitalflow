@@ -21,24 +21,7 @@ export const ClientGroupCard: React.FC<ClientGroupCardProps> = ({ group, passThr
             <LoanCard 
                 loan={loan}
                 {...passThroughProps}
-                onEdit={(e) => { e?.stopPropagation(); passThroughProps.onEdit(loan); }}
-                onMessage={(e) => { e?.stopPropagation(); passThroughProps.onMessage(loan); }}
-                onNote={(e) => { e?.stopPropagation(); passThroughProps.onNote(loan); }}
-                onArchive={(e) => { e?.stopPropagation(); passThroughProps.onArchive(loan); }}
-                onRestore={(e) => { e?.stopPropagation(); passThroughProps.onRestore(loan); }}
-                onDelete={(e) => { e?.stopPropagation(); passThroughProps.onDelete(loan); }}
-                onPortalLink={(e) => { e?.stopPropagation(); passThroughProps.onPortalLink(loan); }}
-                onUploadPromissoria={(e) => { e?.stopPropagation(); passThroughProps.onUploadPromissoria(loan); }}
-                onUploadDoc={(e) => { e?.stopPropagation(); passThroughProps.onUploadDoc(loan); }}
-                onRenegotiate={() => { passThroughProps.onRenegotiate(loan); }}
-                onNewAporte={() => { passThroughProps.onNewAporte(loan); }}
-                onViewPromissoria={(e, url) => { e?.stopPropagation(); passThroughProps.onViewPromissoria(url); }}
-                onViewDoc={(e, url) => { e?.stopPropagation(); passThroughProps.onViewDoc(url); }}
-                isExpanded={passThroughProps.selectedLoanId === loan.id}
-                onToggleExpand={(e) => {
-                    e?.stopPropagation();
-                    passThroughProps.setSelectedLoanId(passThroughProps.selectedLoanId === loan.id ? null : loan.id);
-                }}
+                onNavigate={passThroughProps.onNavigate}
             />
         );
     }
@@ -120,24 +103,7 @@ export const ClientGroupCard: React.FC<ClientGroupCardProps> = ({ group, passThr
                             key={loan.id}
                             loan={loan}
                             {...passThroughProps}
-                            onEdit={(e) => { e?.stopPropagation(); passThroughProps.onEdit(loan); }}
-                            onMessage={(e) => { e?.stopPropagation(); passThroughProps.onMessage(loan); }}
-                            onNote={(e) => { e?.stopPropagation(); passThroughProps.onNote(loan); }}
-                            onArchive={(e) => { e?.stopPropagation(); passThroughProps.onArchive(loan); }}
-                            onRestore={(e) => { e?.stopPropagation(); passThroughProps.onRestore(loan); }}
-                            onDelete={(e) => { e?.stopPropagation(); passThroughProps.onDelete(loan); }}
-                            onPortalLink={(e) => { e?.stopPropagation(); passThroughProps.onPortalLink(loan); }}
-                            onUploadPromissoria={(e) => { e?.stopPropagation(); passThroughProps.onUploadPromissoria(loan); }}
-                            onUploadDoc={(e) => { e?.stopPropagation(); passThroughProps.onUploadDoc(loan); }}
-                            onRenegotiate={() => { passThroughProps.onRenegotiate(loan); }}
-                            onNewAporte={() => { passThroughProps.onNewAporte(loan); }}
-                            onViewPromissoria={(e, url) => { e?.stopPropagation(); passThroughProps.onViewPromissoria(url); }}
-                            onViewDoc={(e, url) => { e?.stopPropagation(); passThroughProps.onViewDoc(url); }}
-                            isExpanded={passThroughProps.selectedLoanId === loan.id}
-                            onToggleExpand={(e) => {
-                                e?.stopPropagation();
-                                passThroughProps.setSelectedLoanId(passThroughProps.selectedLoanId === loan.id ? null : loan.id);
-                            }}
+                            onNavigate={passThroughProps.onNavigate}
                         />
                     ))}
                 </div>

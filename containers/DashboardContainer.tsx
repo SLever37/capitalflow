@@ -24,12 +24,13 @@ interface DashboardContainerProps {
   fileCtrl: any;
   showToast: any;
   onRefresh: () => void;
+  onNavigate: (id: string) => void;
 }
 
 export const DashboardContainer: React.FC<DashboardContainerProps> = ({
   loans, sources, activeUser, staffMembers, mobileDashboardTab, setMobileDashboardTab,
   statusFilter, setStatusFilter, searchTerm, setSearchTerm, selectedStaffId, setSelectedStaffId,
-  ui, loanCtrl, fileCtrl, showToast, onRefresh
+  ui, loanCtrl, fileCtrl, showToast, onRefresh, onNavigate
 }) => {
   
   // LÓGICA DE FILTRAGEM DE EQUIPE
@@ -40,7 +41,7 @@ export const DashboardContainer: React.FC<DashboardContainerProps> = ({
   }, [loans, selectedStaffId, activeUser]);
 
   const filteredLoans = useMemo(() => filterLoans(scopeLoans, searchTerm, statusFilter, ui.sortOption), [scopeLoans, searchTerm, statusFilter, ui.sortOption]);
-  const stats = useMemo(() => buildDashboardStats(scopeLoans, activeUser), [scopeLoans, activeUser]);
+  const stats = useMemo(() => buildDashboardStats(scopeLoans, activeUser, sources), [scopeLoans, activeUser, sources]);
 
   const handleAgreementPayment = async (loan: Loan, agreement: Agreement, inst: AgreementInstallment) => {
       if (!activeUser || !confirm(`Confirmar recebimento da parcela ${inst.number} (R$ ${inst.amount.toFixed(2)})?`)) return;
@@ -86,6 +87,7 @@ export const DashboardContainer: React.FC<DashboardContainerProps> = ({
         onRenegotiate={(l) => { ui.setRenegotiationModalLoan(l); ui.openModal('RENEGOTIATION', l); }}
         onNewAporte={handleNewAporte}
         onAgreementPayment={handleAgreementPayment}
+        onNavigate={onNavigate}
         onRefresh={onRefresh}
         setWithdrawModal={() => ui.openModal('WITHDRAW')}
         showToast={showToast}

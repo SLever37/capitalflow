@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { AlertCircle, AlertTriangle, CheckCircle2, MessageSquare } from 'lucide-react';
+import { AlertCircle, AlertTriangle, CheckCircle2, MessageSquare, Plus } from 'lucide-react';
 import { HeaderBar } from './HeaderBar';
 import { BottomNav } from './BottomNav';
 import { UserProfile } from '../types';
@@ -103,10 +103,19 @@ export const AppShell: React.FC<AppShellProps> = ({
         {children}
       </main>
 
+      {/* FAB for New Loan (Mobile) */}
+      <button 
+        onClick={onNewLoan}
+        className="md:hidden fixed bottom-24 right-6 z-40 w-14 h-14 rounded-full flex items-center justify-center text-white shadow-xl active:scale-95 transition-all"
+        style={{ backgroundColor: activeUser?.brandColor || '#2563eb', boxShadow: `0 10px 25px -5px ${activeUser?.brandColor || '#2563eb'}66` }}
+      >
+        <Plus size={24}/>
+      </button>
+
       {activeUser && (
           <button 
             onClick={onOpenSupport}
-            className="fixed bottom-24 md:bottom-8 right-6 z-40 p-4 bg-blue-600 text-white rounded-full shadow-2xl shadow-blue-600/40 hover:scale-110 transition-all active:scale-95 group"
+            className="fixed bottom-40 md:bottom-8 right-6 z-40 p-4 bg-blue-600 text-white rounded-full shadow-2xl shadow-blue-600/40 hover:scale-110 transition-all active:scale-95 group"
           >
               <MessageSquare size={24}/>
               {totalUnread > 0 && (

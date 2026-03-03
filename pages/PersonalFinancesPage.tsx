@@ -104,23 +104,27 @@ export const PersonalFinancesPage: React.FC<Props> = ({ activeUser, setActiveTab
         <div className="space-y-8 animate-in fade-in pb-24 font-sans">
             {/* Header - Padrão Hub Central */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-4">
                     <button
                         onClick={() => goBack ? goBack() : setActiveTab?.('DASHBOARD')}
-                        className="p-2 -ml-2 text-slate-400 hover:text-white transition-colors"
+                        className="flex items-center gap-2 px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all active:scale-95"
                     >
-                        <ChevronLeft size={24} />
+                        <ChevronLeft size={16} />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Voltar</span>
                     </button>
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-600 to-rose-600 flex items-center justify-center text-white shrink-0 shadow-lg shadow-pink-900/20">
-                        <Wallet size={20} />
-                    </div>
-                    <div>
-                        <h1 className="text-sm font-black text-white uppercase tracking-wider leading-none">
-                            Minhas Finanças
-                        </h1>
-                        <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-widest">
-                            Gestão Pessoal Integrada
-                        </p>
+                    
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-600 to-rose-600 flex items-center justify-center text-white shrink-0 shadow-lg shadow-pink-900/20">
+                            <Wallet size={20} />
+                        </div>
+                        <div>
+                            <h1 className="text-sm font-black text-white uppercase tracking-wider leading-none">
+                                Minhas Finanças
+                            </h1>
+                            <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-widest">
+                                Gestão Pessoal Integrada
+                            </p>
+                        </div>
                     </div>
                 </div>
                 

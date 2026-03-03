@@ -29,7 +29,7 @@ export interface CapitalSource {
 
 export type SortOption = 'RECENT' | 'NAME' | 'VALUE' | 'STATUS' | 'DUE_DATE_ASC' | 'NAME_ASC' | 'CREATED_DESC' | 'UPDATED_DESC';
 
-export type AppTab = 'DASHBOARD' | 'CLIENTS' | 'LEGAL' | 'SOURCES' | 'PROFILE' | 'TEAM' | 'PERSONAL_FINANCE' | 'LEADS' | 'ACQUISITION' | 'SETTINGS';
+export type AppTab = 'DASHBOARD' | 'CLIENTS' | 'LEGAL' | 'SOURCES' | 'PROFILE' | 'TEAM' | 'PERSONAL_FINANCE' | 'LEADS' | 'ACQUISITION' | 'SETTINGS' | 'CONTRACT_DETAILS' | 'AGENDA' | 'SIMULATOR' | 'FLOW';
 
 export type LoanBillingModality =
   | 'MONTHLY'

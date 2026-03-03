@@ -10,6 +10,16 @@ const isUUID = (v: any) =>
 
 const safeUUID = (v: any) => (isUUID(v) ? v : null);
 
+const parseMoney = (v: string) => {
+  if (!v) return 0;
+  const clean = String(v).replace(/[R$\s]/g, '');
+  if (clean.includes('.') && clean.includes(',')) {
+    return parseFloat(clean.replace(/\./g, '').replace(',', '.')) || 0;
+  }
+  if (clean.includes(',')) return parseFloat(clean.replace(',', '.')) || 0;
+  return parseFloat(clean) || 0;
+};
+
 export const usePaymentController = (
   activeUser: UserProfile | null,
   ui: UIController,
@@ -29,9 +39,11 @@ export const usePaymentController = (
     realDate?: Date | null,
     interestHandling?: 'CAPITALIZE' | 'KEEP_PENDING',
     paymentTypeOverride?: string,
-    avAmountOverride?: string
+    avAmountOverride?: string,
+    contextOverride?: { loan: Loan, inst: any, calculations: any }
   ) => {
-    if (!activeUser || !ui.paymentModal) return;
+    const context = contextOverride || ui.paymentModal;
+    if (!activeUser || !context) return;
 
     // 🔐 BLOQUEIO ABSOLUTO
     if (lockRef.current) return;
@@ -46,25 +58,25 @@ export const usePaymentController = (
       }
 
       // 🔒 Bloqueio extra — se parcela já paga
-      if (ui.paymentModal.inst?.status === 'PAID') {
+      if (context.inst?.status === 'PAID') {
         showToast('Esta parcela já foi quitada.', 'error');
         return;
       }
 
       const { amountToPay, paymentType } =
         await paymentsService.processPayment({
-          loan: ui.paymentModal.loan,
-          inst: ui.paymentModal.inst,
-          calculations: ui.paymentModal.calculations,
-          paymentType: (paymentTypeOverride || ui.paymentType) as PaymentType,
-          avAmount: avAmountOverride || ui.avAmount,
+          loan: context.loan,
+          inst: context.inst,
+          calculations: context.calculations,
+          amountPaid: customAmount || parseMoney(avAmountOverride || ui.avAmount),
           activeUser: activeUser,
           sources,
           forgivenessMode,
           manualDate,
-          customAmount,
           realDate,
           capitalizeRemaining: interestHandling === 'CAPITALIZE',
+          paymentType: paymentTypeOverride,
+          avAmount: avAmountOverride
         });
 
       showToast('Pagamento realizado com sucesso!', 'success');
@@ -76,8 +88,8 @@ export const usePaymentController = (
       await fetchFullData(ownerId);
 
       ui.setShowReceipt({
-        loan: ui.paymentModal.loan,
-        inst: ui.paymentModal.inst,
+        loan: context.loan,
+        inst: context.inst,
         amountPaid: amountToPay,
         type: paymentType,
       });

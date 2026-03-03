@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Megaphone, Link as LinkIcon, Copy, CheckCircle2, ArrowRight, Trash2, Calendar, MousePointer2, Image as ImageIcon, Loader2, MessageCircle, Share2, Plus, Search, User, Send, Paperclip, X } from 'lucide-react';
+import { Megaphone, Link as LinkIcon, Copy, CheckCircle2, ArrowRight, Trash2, Calendar, MousePointer2, Image as ImageIcon, Loader2, MessageCircle, Share2, Plus, Search, User, Send, Paperclip, X, ChevronLeft } from 'lucide-react';
 import { Campaign, Lead, UserProfile } from "../../types";
 import { campaignService } from '../../services/campaign.service';
 import { useCampaignChat } from '../../hooks/useCampaignChat';
@@ -10,7 +10,7 @@ import { GoogleGenAI } from "@google/genai";
 const DEFAULT_VALUES = [300, 500, 800, 1000, 1500];
 const DEFAULT_TEMPLATE = "Olá! Me chamo {NOME}. Vim pela campanha {CAMPANHA}. Tenho interesse no valor de R$ {VALOR}. Link: {LINK}";
 
-export const CustomerAcquisitionPage: React.FC<{ activeUser: UserProfile | null }> = ({ activeUser }) => {
+export const CustomerAcquisitionPage: React.FC<{ activeUser: UserProfile | null, goBack?: () => void }> = ({ activeUser, goBack }) => {
   const [activeMode, setActiveMode] = useState<'CHAT' | 'CAMPAIGNS'>('CHAT');
   
   // --- STATE PARA CAMPANHAS ---
@@ -215,15 +215,25 @@ export const CustomerAcquisitionPage: React.FC<{ activeUser: UserProfile | null 
     <div className="h-[calc(100vh-12rem)] flex flex-col animate-in fade-in">
       {/* HEADER COM TOGGLE */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6 shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-orange-500/10 rounded-full flex items-center justify-center text-orange-500 border border-orange-500/20">
-            <Megaphone size={24}/>
-          </div>
-          <div>
-            <h1 className="text-2xl font-black text-white uppercase tracking-tighter">Captação de Clientes</h1>
-            <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">
-              {activeMode === 'CHAT' ? 'Gerenciamento de Leads' : 'Gerador de Campanhas'}
-            </p>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => goBack ? goBack() : window.history.back()}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all active:scale-95"
+          >
+            <ChevronLeft size={16} />
+            <span className="text-[10px] font-black uppercase tracking-widest">Voltar</span>
+          </button>
+          
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-orange-500/10 rounded-full flex items-center justify-center text-orange-500 border border-orange-500/20">
+              <Megaphone size={24}/>
+            </div>
+            <div>
+              <h1 className="text-2xl font-black text-white uppercase tracking-tighter">Captação de Clientes</h1>
+              <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">
+                {activeMode === 'CHAT' ? 'Gerenciamento de Leads' : 'Gerador de Campanhas'}
+              </p>
+            </div>
           </div>
         </div>
 

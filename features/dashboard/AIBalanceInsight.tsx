@@ -10,11 +10,17 @@ export const AIBalanceInsight: React.FC<{ loans: Loan[], sources: CapitalSource[
     const runAudit = async () => {
         setIsAnalyzing(true);
         try {
+            const caixaLivreSource = sources.find(s => {
+                const n = (s.name || '').toLowerCase();
+                return n.includes('caixa livre') || n === 'lucro' || n.includes('lucro');
+            });
+            const interestBalance = caixaLivreSource ? Number(caixaLivreSource.balance) : (Number(activeUser?.interestBalance) || 0);
+
             const context = {
                 type: 'OPERATOR_AUDIT',
                 isDemo: activeUser?.id === 'DEMO',
                 totalLent: loans.reduce((acc, l) => acc + (l.isArchived ? 0 : l.principal), 0),
-                interestBalance: activeUser?.interestBalance || 0,
+                interestBalance: interestBalance,
                 lateCount: loans.filter(l => !l.isArchived && l.installments.some(i => i.status === 'LATE')).length,
                 sourceLiquidity: sources.reduce((acc, s) => acc + s.balance, 0),
                 portfolioHealth: loans.map(l => ({ name: l.debtorName, status: l.isArchived ? 'ARCHIVED' : 'ACTIVE' }))

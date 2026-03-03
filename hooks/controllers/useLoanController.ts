@@ -226,11 +226,43 @@ export const useLoanController = (
     });
   };
 
+  const handleExportExtrato = (loan: Loan) => {
+    try {
+      const ledger = loan.ledger || [];
+      const csvContent = [
+        ['Data', 'Tipo', 'Categoria', 'Valor', 'Principal', 'Juros', 'Multa', 'Notas'].join(','),
+        ...ledger.map(t => [
+          new Date(t.date).toLocaleDateString(),
+          t.type,
+          t.category || 'GERAL',
+          t.amount.toFixed(2),
+          (t.principalDelta || 0).toFixed(2),
+          (t.interestDelta || 0).toFixed(2),
+          (t.lateFeeDelta || 0).toFixed(2),
+          `"${(t.notes || '').replace(/"/g, '""')}"`
+        ].join(','))
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `extrato_${loan.debtorName}_${loan.id}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast('Extrato exportado!', 'success');
+    } catch (e) {
+      showToast('Erro ao exportar extrato', 'error');
+    }
+  };
+
   return {
     handleSaveLoan,
     handleSaveNote,
     handleReviewSignal,
     handleGenerateLink,
+    handleExportExtrato,
     openConfirmation,
     executeConfirmation,
     openReverseTransaction,

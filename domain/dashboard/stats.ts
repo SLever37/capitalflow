@@ -2,7 +2,7 @@
 import { Loan, LoanStatus, UserProfile } from '../../types';
 import { getInstallmentStatusLogic } from '../../domain/finance/calculations';
 
-export const buildDashboardStats = (loans: Loan[], activeUser: UserProfile | null) => {
+export const buildDashboardStats = (loans: Loan[], activeUser: UserProfile | null, sources: any[] = []) => {
   const activeLoans = loans.filter(l => !l.isArchived);
   
   // 1. CAPITAL NA RUA & CONTAGEM
@@ -31,7 +31,11 @@ export const buildDashboardStats = (loans: Loan[], activeUser: UserProfile | nul
   // ROI Estimado (Lucro Projetado / Capital na Rua)
   const roi = totalLent > 0 ? (expectedProfit / totalLent) * 100 : 0;
 
-  const interestBalance = Number(activeUser?.interestBalance) || 0;
+  const caixaLivreSource = sources.find(s => {
+      const n = (s.name || '').toLowerCase();
+      return n.includes('caixa livre') || n === 'lucro' || n.includes('lucro');
+  });
+  const interestBalance = caixaLivreSource ? Number(caixaLivreSource.balance) : (Number(activeUser?.interestBalance) || 0);
   
   const paidCount = loans.filter(l => l.installments.every(i => i.status === LoanStatus.PAID)).length; 
   const lateCount = activeLoans.filter(l => l.installments.some(i => getInstallmentStatusLogic(i) === LoanStatus.LATE) && !l.installments.every(i => i.status === LoanStatus.PAID)).length;

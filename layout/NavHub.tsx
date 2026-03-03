@@ -64,19 +64,19 @@ export const NavHub: React.FC<NavHubProps> = ({ onClose, onNavigate, userLevel, 
                         })}
                         
                         {/* Atalhos fixos de utilitários */}
-                        <button onClick={() => onNavigate('DASHBOARD', 'AGENDA')} className="p-6 bg-slate-900 border border-slate-800 rounded-3xl transition-all group flex flex-col items-center justify-center gap-3 hover:border-purple-600 active:scale-95">
+                        <button onClick={() => onNavigate('AGENDA' as any)} className="p-6 bg-slate-900 border border-slate-800 rounded-3xl transition-all group flex flex-col items-center justify-center gap-3 hover:border-purple-600 active:scale-95">
                             <div className="p-4 bg-slate-800 rounded-2xl text-purple-500 group-hover:scale-110 transition-transform">
                                 <Calendar size={32}/>
                             </div>
                             <span className="font-bold text-white uppercase text-xs tracking-widest text-center">Agenda</span>
                         </button>
-                        <button onClick={() => onNavigate('DASHBOARD', 'CALC')} className="p-6 bg-slate-900 border border-slate-800 rounded-3xl transition-all group flex flex-col items-center justify-center gap-3 hover:border-blue-400 active:scale-95">
+                        <button onClick={() => onNavigate('SIMULATOR' as any)} className="p-6 bg-slate-900 border border-slate-800 rounded-3xl transition-all group flex flex-col items-center justify-center gap-3 hover:border-blue-400 active:scale-95">
                             <div className="p-4 bg-slate-800 rounded-2xl text-blue-400 group-hover:scale-110 transition-transform">
                                 <Calculator size={32}/>
                             </div>
                             <span className="font-bold text-white uppercase text-xs tracking-widest text-center">Simulador</span>
                         </button>
-                        <button onClick={() => onNavigate('DASHBOARD', 'FLOW')} className="p-6 bg-slate-900 border border-slate-800 rounded-3xl transition-all group flex flex-col items-center justify-center gap-3 hover:border-emerald-400 active:scale-95">
+                        <button onClick={() => onNavigate('FLOW' as any)} className="p-6 bg-slate-900 border border-slate-800 rounded-3xl transition-all group flex flex-col items-center justify-center gap-3 hover:border-emerald-400 active:scale-95">
                             <div className="p-4 bg-slate-800 rounded-2xl text-emerald-400 group-hover:scale-110 transition-transform">
                                 <ArrowRightLeft size={32}/>
                             </div>

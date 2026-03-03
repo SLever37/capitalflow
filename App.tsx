@@ -25,6 +25,7 @@ import { ModalHostContainer } from './containers/ModalHostContainer';
 import { OperatorSupportChat } from './features/support/OperatorSupportChat';
 import { CalendarView } from './features/calendar/CalendarView';
 import { SimulatorPanel } from './features/simulator/SimulatorPanel';
+import { FlowModal } from './components/modals/FlowModal';
 
 import { TeamPage } from './pages/TeamPage';
 import { InvitePage } from './pages/InvitePage';
@@ -33,6 +34,7 @@ import { PersonalFinancesPage } from './pages/PersonalFinancesPage';
 import { LeadsPage } from './pages/LeadsPage';
 import { CustomerAcquisitionPage } from './pages/Comercial/CaptacaoClientes';
 import { SettingsPage } from './pages/SettingsPage';
+import { ContractDetailsPage } from './pages/ContractDetailsPage';
 
 import { notificationService } from './services/notification.service';
 import { LoadingScreen } from './components/ui/LoadingScreen';
@@ -113,11 +115,32 @@ export const App: React.FC = () => {
   const isInvitePath =
     window.location.pathname === '/invite' || window.location.pathname === '/setup-password';
 
+  const contractMatch = window.location.pathname.match(/^\/contrato\/([a-f0-9-]+)$/i);
+  const contractIdFromUrl = contractMatch ? contractMatch[1] : null;
+
   // ✅ token público de assinatura vem ou do hook (portal) ou do querystring
   const legalSignToken = legalSignTokenParam || null;
 
   // ✅ view pública: portalToken OU rota pública de campanha OU assinatura pública
   const isPublicView = !!portalToken || !!campaignId || !!legalSignToken;
+
+  useEffect(() => {
+    if (contractIdFromUrl && activeTab !== 'CONTRACT_DETAILS') {
+      ui.setSelectedLoanId(contractIdFromUrl);
+      setActiveTab('CONTRACT_DETAILS');
+    }
+  }, [contractIdFromUrl, activeTab, ui]);
+
+  const navigate = (path: string) => {
+    window.history.pushState({}, '', path);
+    const match = path.match(/^\/contrato\/([a-f0-9-]+)$/i);
+    if (match) {
+      ui.setSelectedLoanId(match[1]);
+      setActiveTab('CONTRACT_DETAILS');
+    } else if (path === '/') {
+      setActiveTab('DASHBOARD');
+    }
+  };
 
   usePersistedTab(activeTab, setActiveTab);
 
@@ -257,6 +280,7 @@ export const App: React.FC = () => {
                 fileCtrl={fileCtrl}
                 showToast={showToast}
                 onRefresh={() => fetchFullData(activeUser?.id || '')}
+                onNavigate={(id) => navigate(`/contrato/${id}`)}
               />
             )}
 
@@ -324,9 +348,31 @@ export const App: React.FC = () => {
 
             {activeTab === 'LEADS' && activeUser && <LeadsPage activeUser={activeUser} />}
 
-            {activeTab === 'ACQUISITION' && <CustomerAcquisitionPage activeUser={activeUser} />}
+            {activeTab === 'ACQUISITION' && <CustomerAcquisitionPage activeUser={activeUser} goBack={goBack} />}
 
             {activeTab === 'SETTINGS' && <SettingsPage />}
+
+            {activeTab === 'CONTRACT_DETAILS' && ui.selectedLoanId && (
+              <ContractDetailsPage 
+                loanId={ui.selectedLoanId}
+                loans={loans}
+                sources={sources}
+                activeUser={activeUser}
+                onBack={() => {
+                  navigate('/');
+                }}
+                onPayment={async (forgive, date, amount, realDate, interest, contextOverride) => {
+                  await paymentCtrl.handlePayment(forgive, date, amount, realDate, interest, undefined, undefined, contextOverride);
+                  fetchFullData(activeUser?.id || '');
+                }}
+                isProcessing={ui.isProcessingPayment}
+                onOpenMessage={(l) => { ui.setMessageModalLoan(l); ui.openModal('MESSAGE_HUB'); }}
+                onRenegotiate={(l) => { ui.setRenegotiationModalLoan(l); ui.openModal('RENEGOTIATION', l); }}
+                onGenerateContract={(l) => loanCtrl.handleGenerateLink(l)}
+                onExportExtrato={(l) => loanCtrl.handleExportExtrato(l)}
+                isStealthMode={ui.isStealthMode}
+              />
+            )}
 
             <ModalHostContainer
               ui={ui}
@@ -348,17 +394,13 @@ export const App: React.FC = () => {
               handleLogout={handleLogout}
             />
 
-            {ui.activeModal?.type === 'SUPPORT_CHAT' && (
-              <OperatorSupportChat activeUser={activeUser} onClose={ui.closeModal} />
-            )}
+            {activeTab === 'SIMULATOR' && <SimulatorPanel onClose={goBack} />}
 
-            {ui.activeModal?.type === 'SIMULATOR' && <SimulatorPanel onClose={ui.closeModal} />}
-
-            {ui.activeModal?.type === 'AGENDA' && (
+            {activeTab === 'AGENDA' && (
               <CalendarView
                 activeUser={activeUser}
                 showToast={showToast}
-                onClose={ui.closeModal}
+                onClose={goBack}
                 onSystemAction={(type, meta) => {
                   if (type === 'PAYMENT' && meta && ui) {
                     ui.setPaymentModal({
@@ -382,6 +424,23 @@ export const App: React.FC = () => {
                   }
                 }}
               />
+            )}
+
+            {activeTab === 'FLOW' && activeUser && (
+              <FlowModal 
+                onClose={goBack} 
+                loans={loans} 
+                profit={
+                  sources.find(s => {
+                    const n = (s.name || '').toLowerCase();
+                    return n.includes('caixa livre') || n === 'lucro' || n.includes('lucro');
+                  })?.balance || activeUser.interestBalance || 0
+                } 
+              />
+            )}
+
+            {ui.activeModal?.type === 'SUPPORT_CHAT' && (
+              <OperatorSupportChat activeUser={activeUser} onClose={ui.closeModal} />
             )}
 
             <NavHubController ui={ui} setActiveTab={setActiveTab} activeUser={activeUser} hubOrder={hubOrder} />

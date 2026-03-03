@@ -174,7 +174,17 @@ export const FinanceModals = () => {
             {activeModal?.type === 'WITHDRAW' && activeUser && (
                 <Modal onClose={closeModal} title="Resgatar Lucros">
                     <div className="space-y-4">
-                        <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center"><p className="text-xs text-slate-500 uppercase font-bold">Disponível para Saque</p><p className="text-2xl font-black text-emerald-400">R$ {activeUser.interestBalance.toFixed(2)}</p></div>
+                        <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center">
+                            <p className="text-xs text-slate-500 uppercase font-bold">Disponível para Saque</p>
+                            <p className="text-2xl font-black text-emerald-400">
+                                R$ {
+                                    (sources.find(s => {
+                                        const n = (s.name || '').toLowerCase();
+                                        return n.includes('caixa livre') || n === 'lucro' || n.includes('lucro');
+                                    })?.balance || activeUser.interestBalance || 0).toFixed(2)
+                                }
+                            </p>
+                        </div>
                         <input type="text" inputMode="decimal" placeholder="Valor do Resgate" className="w-full bg-slate-950 p-4 rounded-xl text-white outline-none border border-slate-800" value={ui.withdrawValue || ''} onChange={e => ui.setWithdrawValue(e.target.value.replace(/[^0-9.,]/g, ''))} />
                         <select className="w-full bg-slate-950 p-4 rounded-xl text-white outline-none border border-slate-800" value={ui.withdrawSourceId || ''} onChange={e => ui.setWithdrawSourceId(e.target.value)}>
                             <option value="">Selecione o destino...</option>

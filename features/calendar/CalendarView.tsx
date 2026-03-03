@@ -235,28 +235,31 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[200] bg-slate-950 flex flex-col animate-in fade-in duration-300 font-sans h-[100dvh]">
+    <div className="space-y-6 animate-in fade-in duration-300 font-sans pb-24">
       {/* Header */}
-      <div className="h-16 border-b border-slate-800 bg-slate-900 flex items-center justify-between px-4 shrink-0 z-20">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
           <button
             onClick={onClose}
             className="p-2 -ml-2 text-slate-400 hover:text-white transition-colors"
+            title="Voltar"
           >
             <ChevronLeft size={24} />
           </button>
 
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center text-white shrink-0 shadow-lg shadow-purple-900/20">
-            <CalIcon size={20} />
-          </div>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center text-white shrink-0 shadow-lg shadow-purple-900/20">
+              <CalIcon size={20} />
+            </div>
 
-          <div>
-            <h1 className="text-sm font-black text-white uppercase tracking-wider leading-none">
-              Agenda
-            </h1>
-            <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-widest">
-              {filteredItems.length} itens
-            </p>
+            <div>
+              <h1 className="text-sm font-black text-white uppercase tracking-wider leading-none">
+                Agenda
+              </h1>
+              <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-widest">
+                {filteredItems.length} itens
+              </p>
+            </div>
           </div>
         </div>
 
@@ -275,7 +278,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto bg-slate-950 p-4 custom-scrollbar">
+      <div className="flex-1">
         {viewMode === 'RAIO_X' ? (
           <div className="space-y-6 animate-in zoom-in duration-300">
             <div className="grid grid-cols-2 gap-4">

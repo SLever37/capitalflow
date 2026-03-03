@@ -193,7 +193,14 @@ export const useSourceController = (
       return;
     }
 
-    if (amount > (Number(activeUser.interestBalance) || 0)) {
+    const caixaLivreSource = sources.find(s => {
+      const n = (s.name || '').toLowerCase();
+      return n.includes('caixa livre') || n === 'lucro' || n.includes('lucro');
+    });
+
+    const availableBalance = caixaLivreSource ? Number(caixaLivreSource.balance) : (Number(activeUser.interestBalance) || 0);
+
+    if (amount > availableBalance) {
       showToast('Saldo de lucro insuficiente.', 'error');
       return;
     }
@@ -206,9 +213,17 @@ export const useSourceController = (
     }
 
     if (activeUser.id === 'DEMO') {
-      setActiveUser({ ...activeUser, interestBalance: (activeUser.interestBalance || 0) - amount });
-      if (targetSourceId) {
-        setSources(sources.map((s) => (s.id === targetSourceId ? { ...s, balance: s.balance + amount } : s)));
+      if (caixaLivreSource) {
+        setSources(sources.map((s) => {
+          if (s.id === caixaLivreSource.id) return { ...s, balance: s.balance - amount };
+          if (targetSourceId && s.id === targetSourceId) return { ...s, balance: s.balance + amount };
+          return s;
+        }));
+      } else {
+        setActiveUser({ ...activeUser, interestBalance: (activeUser.interestBalance || 0) - amount });
+        if (targetSourceId) {
+          setSources(sources.map((s) => (s.id === targetSourceId ? { ...s, balance: s.balance + amount } : s)));
+        }
       }
       showToast('Resgate realizado (Demo)!', 'success');
       ui.closeModal();
@@ -221,15 +236,34 @@ export const useSourceController = (
       return;
     }
 
-    const { error } = await supabase.rpc('profit_withdrawal_atomic', {
-      p_amount: amount,
-      p_profile_id: safeUUID(ownerId), // ✅ CRÍTICO: lucro pertence ao DONO
-      p_target_source_id: safeUUID(targetSourceId),
-    });
+    try {
+      if (caixaLivreSource) {
+        // Se o lucro está em uma fonte "Caixa Livre", fazemos uma transferência ou saque direto da fonte
+        if (targetSourceId) {
+          // Transferência entre fontes
+          const { error: err1 } = await supabase.from('fontes').update({ balance: caixaLivreSource.balance - amount }).eq('id', caixaLivreSource.id);
+          if (err1) throw err1;
+          
+          const targetSource = sources.find(s => s.id === targetSourceId);
+          if (targetSource) {
+            const { error: err2 } = await supabase.from('fontes').update({ balance: targetSource.balance + amount }).eq('id', targetSourceId);
+            if (err2) throw err2;
+          }
+        } else {
+          // Saque externo (apenas subtrai da fonte Caixa Livre)
+          const { error } = await supabase.from('fontes').update({ balance: caixaLivreSource.balance - amount }).eq('id', caixaLivreSource.id);
+          if (error) throw error;
+        }
+      } else {
+        // Fluxo antigo: lucro está em perfis.interest_balance
+        const { error } = await supabase.rpc('profit_withdrawal_atomic', {
+          p_amount: amount,
+          p_profile_id: safeUUID(ownerId),
+          p_target_source_id: safeUUID(targetSourceId),
+        });
+        if (error) throw error;
+      }
 
-    if (error) {
-      showToast('Falha no resgate: ' + error.message, 'error');
-    } else {
       showToast('Resgate processado com sucesso!', 'success');
 
       // Integração com Minhas Finanças (Se for saque externo)
@@ -250,7 +284,9 @@ export const useSourceController = (
       }
 
       ui.closeModal();
-      await fetchFullData(ownerId); // ✅ recarrega pelo DONO
+      await fetchFullData(ownerId);
+    } catch (e: any) {
+      showToast('Falha no resgate: ' + (e?.message || 'erro desconhecido'), 'error');
     }
   };
 
