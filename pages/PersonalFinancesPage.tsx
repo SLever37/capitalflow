@@ -39,7 +39,7 @@ export const PersonalFinancesPage: React.FC<Props> = ({ activeUser, setActiveTab
         data: new Date().toISOString().split('T')[0],
         data_pagamento: new Date().toISOString().split('T')[0],
         status: 'CONSOLIDADO' as any,
-        installments: 1,
+        total_installments: 1,
         is_operation_transfer: false,
         operation_source_id: ''
     });
@@ -85,7 +85,7 @@ export const PersonalFinancesPage: React.FC<Props> = ({ activeUser, setActiveTab
                 data: new Date().toISOString().split('T')[0],
                 data_pagamento: new Date().toISOString().split('T')[0],
                 status: 'CONSOLIDADO',
-                installments: 1,
+                total_installments: 1,
                 is_operation_transfer: false,
                 operation_source_id: ''
             });
@@ -446,13 +446,69 @@ export const PersonalFinancesPage: React.FC<Props> = ({ activeUser, setActiveTab
                                     />
                                 </div>
                                 <div>
+                                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-1 block">Categoria</label>
+                                    <select 
+                                        value={newTx.categoria_id}
+                                        onChange={e => setNewTx(prev => ({ ...prev, categoria_id: e.target.value }))}
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-4 px-5 text-xs font-black text-white outline-none focus:border-blue-500 transition-all"
+                                    >
+                                        <option value="">Selecione</option>
+                                        {categories.map(cat => (
+                                            <option key={cat.id} value={cat.id}>{cat.nome}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-1 block">Conta / Origem</label>
+                                    <select 
+                                        value={newTx.conta_id}
+                                        onChange={e => setNewTx(prev => ({ ...prev, conta_id: e.target.value, cartao_id: '' }))}
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-4 px-5 text-xs font-black text-white outline-none focus:border-blue-500 transition-all"
+                                    >
+                                        <option value="">Selecione Conta</option>
+                                        {accounts.map(acc => (
+                                            <option key={acc.id} value={acc.id}>{acc.nome}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-1 block">Cartão (Opcional)</label>
+                                    <select 
+                                        value={newTx.cartao_id}
+                                        onChange={e => setNewTx(prev => ({ ...prev, cartao_id: e.target.value, conta_id: '' }))}
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-4 px-5 text-xs font-black text-white outline-none focus:border-blue-500 transition-all"
+                                    >
+                                        <option value="">Nenhum</option>
+                                        {cards.map(card => (
+                                            <option key={card.id} value={card.id}>{card.nome}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
                                     <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-1 block">Parcelas</label>
                                     <input 
                                         type="number"
-                                        value={newTx.installments}
-                                        onChange={e => setNewTx(prev => ({ ...prev, installments: Number(e.target.value) }))}
+                                        value={newTx.total_installments}
+                                        onChange={e => setNewTx(prev => ({ ...prev, total_installments: Number(e.target.value) }))}
                                         className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-4 px-5 text-sm font-black text-white outline-none focus:border-blue-500 transition-all"
                                     />
+                                </div>
+                                <div>
+                                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-1 block">Status</label>
+                                    <select 
+                                        value={newTx.status}
+                                        onChange={e => setNewTx(prev => ({ ...prev, status: e.target.value as any }))}
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-4 px-5 text-xs font-black text-white outline-none focus:border-blue-500 transition-all"
+                                    >
+                                        <option value="CONSOLIDADO">Liquidado</option>
+                                        <option value="PENDENTE">Pendente</option>
+                                    </select>
                                 </div>
                             </div>
 
@@ -511,6 +567,105 @@ export const PersonalFinancesPage: React.FC<Props> = ({ activeUser, setActiveTab
                             >
                                 <CheckCircle2 size={18}/> Confirmar Lançamento
                             </button>
+                        </div>
+                    </div>
+                </Modal>
+            )}
+            {/* Modal de Gerenciamento - INTEGRADO */}
+            {isManageModalOpen && (
+                <Modal onClose={() => setIsManageModalOpen(false)} title="Configurações Financeiras">
+                    <div className="space-y-8 p-2">
+                        {/* Seção de Contas */}
+                        <div className="space-y-4">
+                            <div className="flex justify-between items-center">
+                                <h4 className="text-[10px] font-black text-white uppercase tracking-widest flex items-center gap-2">
+                                    <Banknote size={14} className="text-blue-500"/> Minhas Contas
+                                </h4>
+                                <button 
+                                    onClick={async () => {
+                                        const nome = prompt("Nome da conta:");
+                                        const saldo = prompt("Saldo inicial:");
+                                        if (nome && saldo) {
+                                            await personalFinanceService.addAccount({ nome, saldo: parseFloat(saldo), tipo: 'CORRENTE' }, activeUser.id);
+                                            loadData();
+                                        }
+                                    }}
+                                    className="p-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-all"
+                                >
+                                    <Plus size={14}/>
+                                </button>
+                            </div>
+                            <div className="grid grid-cols-1 gap-2">
+                                {accounts.map(acc => (
+                                    <div key={acc.id} className="flex justify-between items-center p-3 bg-slate-950 border border-slate-800 rounded-xl">
+                                        <span className="text-xs font-bold text-white uppercase">{acc.nome}</span>
+                                        <button onClick={() => personalFinanceService.deleteAccount(acc.id).then(loadData)} className="text-slate-600 hover:text-rose-500">
+                                            <Trash2 size={14}/>
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Seção de Cartões */}
+                        <div className="space-y-4">
+                            <div className="flex justify-between items-center">
+                                <h4 className="text-[10px] font-black text-white uppercase tracking-widest flex items-center gap-2">
+                                    <CreditCard size={14} className="text-pink-500"/> Meus Cartões
+                                </h4>
+                                <button 
+                                    onClick={async () => {
+                                        const nome = prompt("Nome do cartão:");
+                                        const limite = prompt("Limite:");
+                                        const dia = prompt("Dia de fechamento:");
+                                        if (nome && limite && dia) {
+                                            await personalFinanceService.addCard({ nome, limite: parseFloat(limite), dia_fechamento: parseInt(dia) }, activeUser.id);
+                                            loadData();
+                                        }
+                                    }}
+                                    className="p-1.5 bg-pink-600 text-white rounded-lg hover:bg-pink-500 transition-all"
+                                >
+                                    <Plus size={14}/>
+                                </button>
+                            </div>
+                            <div className="grid grid-cols-1 gap-2">
+                                {cards.map(card => (
+                                    <div key={card.id} className="flex justify-between items-center p-3 bg-slate-950 border border-slate-800 rounded-xl">
+                                        <span className="text-xs font-bold text-white uppercase">{card.nome}</span>
+                                        <button onClick={() => personalFinanceService.deleteCard(card.id).then(loadData)} className="text-slate-600 hover:text-rose-500">
+                                            <Trash2 size={14}/>
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Seção de Categorias */}
+                        <div className="space-y-4">
+                            <div className="flex justify-between items-center">
+                                <h4 className="text-[10px] font-black text-white uppercase tracking-widest flex items-center gap-2">
+                                    <Layers size={14} className="text-amber-500"/> Categorias
+                                </h4>
+                                <button 
+                                    onClick={async () => {
+                                        const nome = prompt("Nome da categoria:");
+                                        if (nome) {
+                                            await personalFinanceService.addCategory({ nome, tipo: 'DESPESA' }, activeUser.id);
+                                            loadData();
+                                        }
+                                    }}
+                                    className="p-1.5 bg-amber-600 text-white rounded-lg hover:bg-amber-500 transition-all"
+                                >
+                                    <Plus size={14}/>
+                                </button>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                {categories.map(cat => (
+                                    <div key={cat.id} className="flex items-center gap-2 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-full">
+                                        <span className="text-[10px] font-black text-slate-400 uppercase">{cat.nome}</span>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </div>
                 </Modal>

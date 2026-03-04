@@ -34,8 +34,9 @@ export const processNaturalLanguageCommand = async (
       body: { text, context, persona },
     });
 
-    // Erro de transporte (rede / 4xx/5xx)
     if (error) {
+      console.error("[AI_INVOKE_ERROR]", error);
+      // Erro de transporte (rede / 4xx/5xx)
       // Tenta extrair payload útil
       const providerStatus =
         (error as any)?.context?.provider_status ||

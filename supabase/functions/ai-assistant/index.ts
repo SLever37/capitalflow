@@ -69,6 +69,15 @@ Deno.serve(async (req: any) => {
     Você é o CRO (Chief Risk Officer) e Auditor Senior do CapitalFlow.
     Sua missão é julgar a saúde financeira da carteira de empréstimos do operador.
     Seja analítico, as vezes cético e sempre focado em preservação de capital.
+
+    RETORNE SEMPRE UM JSON NO SEGUINTE FORMATO:
+    {
+      "intent": "ANALYZE_PORTFOLIO" | "ERROR",
+      "riskScore": number (0-100),
+      "feedback": "Resumo curto da análise",
+      "analysis": "Análise detalhada e profunda",
+      "suggestions": ["Sugestão 1", "Sugestão 2"]
+    }
     `;
 
     const userPrompt = `
@@ -122,7 +131,7 @@ Deno.serve(async (req: any) => {
     return new Response(
       JSON.stringify({
         intent: "ERROR",
-        feedback: "Erro interno na função de IA."
+        feedback: `Erro interno na função de IA: ${(error as any).message || 'Erro desconhecido'}`
       }),
       {
         status: 200,

@@ -30,6 +30,7 @@ export interface PFTransaction {
     valor: number;
     tipo: PFTransactionType;
     data: string;
+    data_pagamento?: string;
     categoria_id?: string;
     conta_id?: string;
     cartao_id?: string;
@@ -39,6 +40,11 @@ export interface PFTransaction {
     account_name?: string; 
     card_name?: string;
     created_at?: string;
+    total_installments?: number;
+    installment_number?: number;
+    is_operation_transfer?: boolean;
+    operation_source_id?: string;
+    operation_loan_id?: string;
 }
 
 export interface PFDashboardStats {

@@ -97,7 +97,7 @@ export const legalService = {
     if (!safeDocId) throw new Error('ID do documento inválido');
 
     let ip = '0.0.0.0';
-    try { const res = await fetch('https://api.ipify.org?format=json'); const d = await res.json(); ip = d.ip; } catch {}
+    // Removido ipify para evitar erros de 'Failed to fetch' em ambientes com bloqueadores
     const timestamp = new Date().toISOString();
     const payload = `${safeDocId}|${signerInfo.doc}|${role}|${timestamp}`;
     const hash = await generateSHA256(payload);

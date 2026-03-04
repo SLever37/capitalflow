@@ -65,8 +65,8 @@ export const PublicLegalSignPage: React.FC<PublicLegalSignPageProps> = ({ token 
 
         setStatus('SIGNING');
         try {
+            // Removido ipify para evitar erros de 'Failed to fetch'
             let ip = '0.0.0.0';
-            try { const res = await fetch('https://api.ipify.org?format=json'); const data = await res.json(); ip = data.ip; } catch(e){}
 
             await legalPublicService.signDocumentPublicly(token, {
                 name: expectedName,

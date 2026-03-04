@@ -42,12 +42,17 @@ import { isDev } from './utils/isDev';
 
 import { PublicCampaignPage } from './pages/Public/PublicCampaignPage';
 import { PublicSignaturePage } from './pages/Public/PublicSignaturePage';
+import { ClientPortalView } from './containers/ClientPortal/ClientPortalView';
+import { PublicLoanLeadPage } from './pages/PublicLoanLeadPage';
+import { CampanhaChat } from './pages/Campanha/CampanhaChat';
 
 export const App: React.FC = () => {
   // ✅ SEMPRE calcular params, mas NÃO dar return antes dos hooks
   const urlParams = new URLSearchParams(window.location.search);
   const campaignId = urlParams.get('campaign_id');
   const legalSignTokenParam = urlParams.get('legal_sign');
+  const isPublicLoanLead = urlParams.get('public') === 'emprestimo';
+  const path = window.location.pathname;
 
   // ✅ Hooks SEMPRE no topo (regra do React)
   const { portalToken } = usePortalRouting();
@@ -147,11 +152,14 @@ export const App: React.FC = () => {
   // Global error listener for "Failed to fetch"
   useEffect(() => {
     const handleError = (event: ErrorEvent) => {
+      // Ignora se estiver offline (erro esperado) ou se não for Failed to fetch
+      if (!navigator.onLine) return;
       if (event.message?.includes('Failed to fetch')) {
         showToast('Erro de conexão com o servidor. Verifique sua internet ou tente novamente mais tarde.', 'error');
       }
     };
     const handleRejection = (event: PromiseRejectionEvent) => {
+      if (!navigator.onLine) return;
       if (event.reason?.message?.includes('Failed to fetch')) {
         showToast('Erro de conexão com o servidor. Verifique sua internet ou tente novamente mais tarde.', 'error');
       }
@@ -222,9 +230,12 @@ export const App: React.FC = () => {
 
   const isInitializing = !bootFinished || (!!activeProfileId && !activeUser && !loadError);
 
-  // ✅ Agora SIM pode retornar rotas públicas (depois dos hooks)
+  // ✅ Rotas Públicas (Early Returns)
+  if (isPublicLoanLead) return <PublicLoanLeadPage />;
+  if (path === '/campanha/chat') return <CampanhaChat />;
   if (campaignId) return <PublicCampaignPage />;
   if (legalSignTokenParam) return <PublicSignaturePage />;
+  if (portalToken) return <ClientPortalView initialPortalToken={portalToken} />;
 
   if (isInitializing && !isPublicView && !isInvitePath) {
     return <LoadingScreen />;
@@ -382,7 +393,9 @@ export const App: React.FC = () => {
                 loans={loans}
                 sources={sources}
                 activeUser={activeUser}
-                onBack={goBack}
+                onBack={() => {
+                  navigate('/');
+                }}
                 onPayment={async (forgive, date, amount, realDate, interest, contextOverride) => {
                   await paymentCtrl.handlePayment(forgive, date, amount, realDate, interest, undefined, undefined, contextOverride);
                   fetchFullData(activeUser?.id || '');

@@ -16,39 +16,31 @@ type SavedProfile = {
 
 const resolveSmartName = (p: any): string => {
   if (!p) return 'Gestor';
-
   const isGeneric = (s: string) => {
     if (!s) return true;
     const clean = s.toLowerCase().trim();
     return ['usuário','usuario','user','operador','admin','gestor','undefined','null','']
       .includes(clean);
   };
-
   const display = asString(p.nome_exibicao || p.display_name);
   if (display && !isGeneric(display)) return display;
-
   const operator = asString(p.nome_operador || p.name || p.nome);
   if (operator && !isGeneric(operator)) return operator;
-
   const business = asString(p.nome_empresa || p.business_name);
   if (business && !isGeneric(business)) return business;
-
   const full = asString(p.nome_completo || p.full_name);
   if (full && !isGeneric(full)) return full.split(' ')[0];
-
   const email = asString(p.usuario_email || p.email || p.auth_email);
   if (email && email.includes('@')) {
     const prefix = email.split('@')[0];
     return prefix.charAt(0).toUpperCase() + prefix.slice(1);
   }
-
   return 'Gestor';
 };
 
 const mapLoginError = (err: any) => {
   let raw = String(err?.message || err || '');
   const l = raw.toLowerCase();
-
   if (
     l.includes('network') ||
     l.includes('failed to fetch') ||
@@ -57,7 +49,6 @@ const mapLoginError = (err: any) => {
   ) {
     return 'Falha de conexão. Verifique a internet.';
   }
-
   if (raw.startsWith('AUTH_SIGNIN_FAILED:')) {
     try {
       const jsonPart = raw.replace('AUTH_SIGNIN_FAILED: ', '');
@@ -65,16 +56,13 @@ const mapLoginError = (err: any) => {
       if (details.message) raw = details.message;
     } catch {}
   }
-
   const l2 = raw.toLowerCase();
-
   if (l2.includes('invalid login')) return 'Usuário ou senha inválidos.';
   if (l2.includes('invalid_credentials')) return 'Usuário ou senha inválidos.';
   if (l2.includes('email not confirmed')) return 'E-mail não confirmado.';
   if (l2.includes('refresh token not found') || l2.includes('invalid refresh token')) {
     return 'Sessão expirada. Faça login novamente.';
   }
-
   return raw || 'Erro desconhecido no login.';
 };
 
@@ -101,7 +89,6 @@ export const useAuth = () => {
     const cleanPass = String(pass || '');
 
     const { data: s, error: sessionError } = await supabase.auth.getSession();
-
     if (sessionError) {
       if (isDev) console.warn('[AUTH_SYNC] erro sessão:', sessionError.message);
       await supabase.auth.signOut().catch(() => {});
@@ -146,7 +133,6 @@ export const useAuth = () => {
         }
 
         const { data: authData, error: sessionError } = await supabase.auth.getSession();
-
         if (sessionError) {
           const msg = sessionError.message || '';
           if (msg.includes('Refresh Token Not Found') || msg.toLowerCase().includes('invalid refresh token')) {
@@ -178,21 +164,25 @@ export const useAuth = () => {
           // Usuário autenticado via OAuth (Google) mas sem sessão local
           const user = authData.session.user;
           let { data: profile } = await supabase.from('perfis').select('*').eq('user_id', user.id).maybeSingle();
-          
+
           if (!profile) {
             // Cria o perfil automaticamente para novos usuários do Google
             const newProfile = {
-                id: user.id,
-                user_id: user.id,
-                owner_profile_id: user.id,
-                nome_operador: user.user_metadata?.full_name?.split(' ')[0] || 'Usuário',
-                nome_completo: user.user_metadata?.full_name || 'Usuário Google',
-                usuario_email: user.email,
-                email: user.email,
-                access_level: 1, 
-                created_at: new Date().toISOString()
+              id: user.id,
+              user_id: user.id,
+              owner_profile_id: user.id,
+              nome_operador: user.user_metadata?.full_name?.split(' ')[0] || 'Usuário',
+              nome_completo: user.user_metadata?.full_name || 'Usuário Google',
+              usuario_email: user.email,
+              email: user.email,
+              access_level: 1,
+              created_at: new Date().toISOString()
             };
-            const { data: createdProfile, error: createError } = await supabase.from('perfis').insert([newProfile]).select().maybeSingle();
+            const { data: createdProfile, error: createError } = await supabase
+              .from('perfis')
+              .insert([newProfile])
+              .select()
+              .maybeSingle();
             if (!createError && createdProfile) {
               profile = createdProfile;
             }
@@ -202,12 +192,12 @@ export const useAuth = () => {
             setActiveProfileId(profile.id);
             trackAccess(profile.id);
             localStorage.setItem('cm_session', JSON.stringify({ profileId: profile.id, ts: Date.now() }));
-            
+
             // Atualiza a lista de perfis salvos
             const profileName = resolveSmartName(profile);
             const profileEmail = asString(profile.usuario_email || profile.email || profile.auth_email) || user.email || '';
             const saved = localStorage.getItem('cm_saved_profiles');
-            let savedProfilesList = [];
+            let savedProfilesList: any[] = [];
             if (saved) {
               try { savedProfilesList = JSON.parse(saved); } catch {}
             }
@@ -228,9 +218,7 @@ export const useAuth = () => {
 
     const { data: { subscription } } =
       supabase.auth.onAuthStateChange(async (event, session) => {
-
         const ev = String(event); // 🔥 evita erro TS2367
-
         if (isDev) console.log('[AUTH EVENT]', ev, 'session?', !!session);
 
         if (ev === 'SIGNED_OUT' || ev === 'TOKEN_REFRESH_FAILED') {
@@ -240,13 +228,11 @@ export const useAuth = () => {
               window.dispatchEvent(new Event('cm_auth_restored'));
               return;
             }
-
             const { data: s2 } = await supabase.auth.refreshSession();
             if (s2?.session) {
               window.dispatchEvent(new Event('cm_auth_restored'));
               return;
             }
-
             window.dispatchEvent(new Event('cm_auth_lost'));
           } catch {
             window.dispatchEvent(new Event('cm_auth_lost'));
@@ -280,13 +266,10 @@ export const useAuth = () => {
     ].slice(0, 5);
 
     setSavedProfiles(updated);
-
     localStorage.setItem('cm_saved_profiles', JSON.stringify(updated));
     localStorage.setItem('cm_session', JSON.stringify({ profileId, ts: Date.now() }));
-
     showToast(`Bem-vindo, ${profileName}!`, 'success');
     playNotificationSound();
-
     window.dispatchEvent(new Event('cm_auth_restored'));
   };
 
@@ -303,7 +286,20 @@ export const useAuth = () => {
 
       requestBrowserNotificationPermission();
 
-      await ensureAuthSession(userInput, authPass);
+      // ✅ CORREÇÃO: resolve o e-mail real antes de autenticar no Supabase Auth
+      let authEmail = userInput;
+
+      if (!userInput.includes('@')) {
+        const { data: p } = await supabase
+          .from('perfis')
+          .select('usuario_email,email,auth_email')
+          .or(`usuario.eq.${userInput},usuario_email.eq.${userInput},email.eq.${userInput},auth_email.eq.${userInput}`)
+          .maybeSingle();
+
+        authEmail = asString(p?.auth_email || p?.usuario_email || p?.email) || userInput;
+      }
+
+      await ensureAuthSession(authEmail, authPass);
 
       const { data: u } = await supabase.auth.getUser();
       const uid = u.user?.id;
@@ -328,13 +324,13 @@ export const useAuth = () => {
           access_level: 1,
           created_at: new Date().toISOString()
         };
-        
+
         const { data: created, error: createError } = await supabase
           .from('perfis')
           .insert([newProfile])
           .select()
           .maybeSingle();
-          
+
         if (createError || !created) {
           throw new Error('Perfil não encontrado e falha ao criar perfil automático.');
         }
@@ -364,7 +360,6 @@ export const useAuth = () => {
         p_document: cleanDoc,
         p_pin: cleanCode,
       });
-
       if (loginError) throw loginError;
       if (!loginData) throw new Error('Dados de acesso à equipe incorretos.');
 
@@ -377,7 +372,6 @@ export const useAuth = () => {
       const { data: fnData, error: fnError } = await supabase.functions.invoke('ensure_auth_user', {
         body: { profile_id: profile.id, email: authEmail, password: authPass },
       });
-
       if (fnError) throw new Error('Serviço de autenticação indisponível no momento.');
       if (!fnData?.ok) throw new Error(fnData?.error || 'Falha ao sincronizar credenciais de acesso.');
 
@@ -416,26 +410,21 @@ export const useAuth = () => {
   const handleLogout = async () => {
     setActiveProfileId(null);
     setBootFinished(true);
-
     localStorage.removeItem('cm_session');
     localStorage.removeItem('cm_supabase_auth');
-
     Object.keys(localStorage).forEach((key) => {
       if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
         localStorage.removeItem(key);
       }
     });
-
     await supabase.auth.signOut().catch(() => {});
     window.dispatchEvent(new Event('cm_auth_lost'));
   };
 
   const reauthenticate = async (password: string) => {
     if (!activeProfileId) throw new Error('Nenhum perfil ativo.');
-
     const profile = savedProfiles.find((p) => p.id === activeProfileId);
     if (!profile?.email) throw new Error('E-mail do perfil não encontrado. Faça login novamente.');
-
     await supabase.auth.signOut().catch(() => {});
     await ensureAuthSession(profile.email, password);
     window.dispatchEvent(new Event('cm_auth_restored'));
