@@ -382,9 +382,7 @@ export const App: React.FC = () => {
                 loans={loans}
                 sources={sources}
                 activeUser={activeUser}
-                onBack={() => {
-                  navigate('/');
-                }}
+                onBack={goBack}
                 onPayment={async (forgive, date, amount, realDate, interest, contextOverride) => {
                   await paymentCtrl.handlePayment(forgive, date, amount, realDate, interest, undefined, undefined, contextOverride);
                   fetchFullData(activeUser?.id || '');
