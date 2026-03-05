@@ -9,7 +9,6 @@ interface SourcesContainerProps {
   ui: any;
   sourceCtrl: any;
   loanCtrl: any;
-  goBack?: () => void;
 }
 
 export const SourcesContainer: React.FC<SourcesContainerProps> = ({
@@ -17,7 +16,6 @@ export const SourcesContainer: React.FC<SourcesContainerProps> = ({
   ui,
   sourceCtrl,
   loanCtrl,
-  goBack
 }) => {
   // ✅ Modal PIX (usa sourceId porque é isso que o PixDepositModal espera)
   const [pixSourceId, setPixSourceId] = useState<string | null>(null);
@@ -39,7 +37,6 @@ export const SourcesContainer: React.FC<SourcesContainerProps> = ({
         isStealthMode={ui.isStealthMode}
         ui={ui}
         onOpenPixDeposit={openPixDeposit}
-        goBack={goBack}
       />
 
       {/* ✅ Modal PIX */}

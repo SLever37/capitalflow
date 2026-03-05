@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { ShieldAlert, ArrowDownWideNarrow, Search, X, Users, ChevronDown } from 'lucide-react';
 import { SortOption, UserProfile } from '../../types';
+import { translateFilter } from '../../utils/translationHelpers';
 
 interface DashboardControlsProps {
     statusFilter: string;
@@ -74,7 +75,7 @@ export const DashboardControls: React.FC<DashboardControlsProps> = ({
                             className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all border flex items-center gap-2 ${statusFilter === filter ? 'bg-blue-600 text-white border-blue-500 shadow-lg shadow-blue-600/20' : 'bg-slate-900 border-slate-800 text-slate-500 hover:text-slate-300 hover:border-slate-700'}`}
                         >
                             {filter === 'ATRASO_CRITICO' && <ShieldAlert size={14} className="text-rose-500" />}
-                            {filter.replace('_', ' ')}
+                            {translateFilter(filter)}
                         </button>
                     ))}
                 </div>

@@ -4,9 +4,9 @@ import { Lead } from '../types';
 import { supabase } from '../lib/supabase';
 import { buildWhatsAppLink } from '../utils/whatsapp';
 import { formatMoney, maskPhone } from '../utils/formatters';
-import { MessageCircle, Clock, CheckCircle2, XCircle, Loader2, User, ChevronLeft } from 'lucide-react';
+import { MessageCircle, Clock, CheckCircle2, XCircle, Loader2, User } from 'lucide-react';
 
-export const LeadsPage: React.FC<{ activeUser: any; goBack?: () => void }> = ({ activeUser, goBack }) => {
+export const LeadsPage: React.FC<{ activeUser: any }> = ({ activeUser }) => {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -62,20 +62,9 @@ export const LeadsPage: React.FC<{ activeUser: any; goBack?: () => void }> = ({ 
   return (
     <div className="space-y-6 animate-in fade-in">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          {goBack && (
-            <button
-              onClick={goBack}
-              className="w-10 h-10 flex items-center justify-center bg-slate-900 border border-slate-800 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all active:scale-95"
-              title="Voltar"
-            >
-              <ChevronLeft size={20} />
-            </button>
-          )}
-          <div>
-            <h1 className="text-2xl font-black text-white uppercase tracking-tighter">Leads</h1>
-            <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Solicitações de Empréstimo</p>
-          </div>
+        <div>
+          <h1 className="text-2xl font-black text-white uppercase tracking-tighter">Leads</h1>
+          <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Solicitações de Empréstimo</p>
         </div>
         <div className="bg-slate-900 px-4 py-2 rounded-xl border border-slate-800">
            <span className="text-xs font-bold text-white">{leads.filter(l => l.status === 'NOVO').length} Novos</span>

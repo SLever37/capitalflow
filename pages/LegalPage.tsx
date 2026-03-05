@@ -60,10 +60,10 @@ export const LegalPage: React.FC<LegalPageProps> = (props) => {
             <div className="flex items-center gap-3">
                 <button
                     onClick={() => props.goBack ? props.goBack() : props.setActiveTab?.('DASHBOARD')}
-                    className="w-10 h-10 flex items-center justify-center bg-slate-900 border border-slate-800 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all active:scale-95"
+                    className="p-2 -ml-2 text-slate-400 hover:text-white transition-colors"
                     title="Voltar ao Hub Central"
                 >
-                    <ChevronLeft size={20} />
+                    <ChevronLeft size={24} />
                 </button>
                 <div>
                     <h2 className="text-2xl font-black uppercase tracking-tighter text-white flex items-center gap-2">

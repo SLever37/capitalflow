@@ -1,12 +1,13 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
-    ChevronLeft, DollarSign, Calendar, Clock, TrendingUp, AlertTriangle, 
+    ArrowLeft, DollarSign, Calendar, Clock, TrendingUp, AlertTriangle, 
     CheckCircle2, Receipt, MessageSquare, ShieldCheck, Banknote, 
     FileText, Download, RefreshCcw, Loader2, ChevronRight, User
 } from 'lucide-react';
 import { Loan, Installment, LedgerEntry, UserProfile, CapitalSource } from '../types';
 import { formatMoney } from '../utils/formatters';
+import { translateTransactionType } from '../utils/translationHelpers';
 import { parseDateOnlyUTC, todayDateOnlyUTC } from '../utils/dateHelpers';
 import { loanEngine } from '../domain/loanEngine';
 import { usePaymentManagerState, ForgivenessMode } from '../components/modals/payment/hooks/usePaymentManagerState';
@@ -115,12 +116,8 @@ export const ContractDetailsPage: React.FC<ContractDetailsPageProps> = ({
                 
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div className="flex items-center gap-4">
-                        <button
-                            onClick={onBack}
-                            className="w-10 h-10 flex items-center justify-center bg-slate-950 border border-slate-800 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all active:scale-95"
-                            title="Voltar"
-                        >
-                            <ChevronLeft size={20} />
+                        <button onClick={onBack} className="p-2 bg-slate-950 border border-slate-800 rounded-xl text-slate-400 hover:text-white transition-colors">
+                            <ArrowLeft size={20}/>
                         </button>
                         <div>
                             <div className="flex items-center gap-2 mb-1">
@@ -214,7 +211,7 @@ export const ContractDetailsPage: React.FC<ContractDetailsPageProps> = ({
                                                 <DollarSign size={18}/>
                                             </div>
                                             <div>
-                                                <p className="text-xs font-black text-white uppercase tracking-tight">{entry.type}</p>
+                                                <p className="text-xs font-black text-white uppercase tracking-tight">{translateTransactionType(entry.type)}</p>
                                                 <p className="text-[10px] text-slate-500 font-bold uppercase">{new Date(entry.date).toLocaleDateString('pt-BR')}</p>
                                             </div>
                                         </div>
@@ -345,9 +342,12 @@ export const ContractDetailsPage: React.FC<ContractDetailsPageProps> = ({
                     </div>
 
                     {/* ATALHOS RÁPIDOS MOBILE */}
-                    <div className="md:hidden grid grid-cols-1 gap-4">
+                    <div className="md:hidden grid grid-cols-2 gap-4">
                         <button onClick={() => onOpenMessage(loan)} className="flex items-center justify-center gap-2 p-4 bg-slate-900 border border-slate-800 rounded-2xl text-[10px] font-black uppercase text-slate-400">
                             <MessageSquare size={16}/> WhatsApp
+                        </button>
+                        <button onClick={onBack} className="flex items-center justify-center gap-2 p-4 bg-slate-900 border border-slate-800 rounded-2xl text-[10px] font-black uppercase text-slate-400">
+                            <ArrowLeft size={16}/> Voltar
                         </button>
                     </div>
                 </div>

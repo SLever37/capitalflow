@@ -5,10 +5,10 @@ import {
     Users, Briefcase, Activity, MessageSquare, ExternalLink,
     TrendingUp, MousePointer2
 } from 'lucide-react';
-import { maskDocument } from '../../../utils/formatters';
+import { formatMoney, maskDocument } from '../../../utils/formatters';
 import { supabase } from '../../../lib/supabase';
-import { formatMoney } from '../../../utils/formatters';
 import { getDaysDiff } from '../../../utils/dateHelpers';
+import { translateTransactionType } from '../../../utils/translationHelpers';
 
 interface MemberStats {
     totalLent: number;
@@ -218,7 +218,7 @@ export const MemberCard = ({ member, onDelete, onEdit, onOpenChat }: any) => {
                             ) : stats?.lastTransactions.map((t: any) => (
                                 <div key={t.id} className="flex justify-between items-center p-2 hover:bg-slate-900 rounded-lg transition-colors">
                                     <div className="min-w-0">
-                                        <p className="text-[10px] font-bold text-slate-300 truncate uppercase">{t.notes || t.type}</p>
+                                        <p className="text-[10px] font-bold text-slate-300 truncate uppercase">{t.notes || translateTransactionType(t.type)}</p>
                                         <p className="text-[8px] text-slate-600">{new Date(t.date).toLocaleDateString()}</p>
                                     </div>
                                     <span className={`text-[10px] font-black ${t.type === 'LEND_MORE' ? 'text-rose-500' : 'text-emerald-500'}`}>

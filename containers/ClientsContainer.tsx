@@ -11,11 +11,10 @@ interface ClientsContainerProps {
   loanCtrl: any;
   showToast: any;
   ui: any; // Added ui for accessing state
-  goBack?: () => void;
 }
 
 export const ClientsContainer: React.FC<ClientsContainerProps> = ({ 
-  clients, clientSearchTerm, setClientSearchTerm, clientCtrl, loanCtrl, showToast, ui, goBack
+  clients, clientSearchTerm, setClientSearchTerm, clientCtrl, loanCtrl, showToast, ui
 }) => {
   const filteredClients = useMemo(() => filterClients(clients, clientSearchTerm), [clients, clientSearchTerm]);
 
@@ -29,7 +28,6 @@ export const ClientsContainer: React.FC<ClientsContainerProps> = ({
         toggleClientSelection={clientCtrl.toggleClientSelection}
         executeBulkDelete={clientCtrl.executeBulkDelete}
         onDeleteClient={(id) => loanCtrl.openConfirmation({ type: 'DELETE_CLIENT', target: id })}
-        goBack={goBack}
     />
   );
 };

@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Wallet, CreditCard, TrendingUp, TrendingDown, LayoutGrid, ArrowRightLeft, ShoppingBag, Settings2, Calendar, Banknote, Coins, ChevronLeft, ArrowUpRight, ArrowDownLeft, CheckCircle2, Clock, CreditCard as CardIcon, Layers, Trash2, Filter, BarChart3, PieChart as PieIcon } from 'lucide-react';
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, PieChart, Pie, Cell } from 'recharts';
+import { Plus, Wallet, CreditCard, TrendingUp, TrendingDown, LayoutGrid, ArrowRightLeft, ShoppingBag, Settings2, Calendar, Banknote, Coins, ChevronLeft, ArrowUpRight, ArrowDownLeft, CheckCircle2, Clock, CreditCard as CardIcon, Layers } from 'lucide-react';
 import { UserProfile } from '../types';
 import { personalFinanceService } from '../features/personal-finance/services/personalFinanceService';
 import { PFTransaction, PFAccount, PFCard, PFCategory } from '../features/personal-finance/types';
@@ -27,7 +26,6 @@ export const PersonalFinancesPage: React.FC<Props> = ({ activeUser, setActiveTab
 
     const [isTxModalOpen, setIsTxModalOpen] = useState(false);
     const [isManageModalOpen, setIsManageModalOpen] = useState(false);
-    const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
     
     const [newTx, setNewTx] = useState({ 
         descricao: '', 
@@ -39,7 +37,7 @@ export const PersonalFinancesPage: React.FC<Props> = ({ activeUser, setActiveTab
         data: new Date().toISOString().split('T')[0],
         data_pagamento: new Date().toISOString().split('T')[0],
         status: 'CONSOLIDADO' as any,
-        total_installments: 1,
+        installments: 1,
         is_operation_transfer: false,
         operation_source_id: ''
     });
@@ -85,23 +83,13 @@ export const PersonalFinancesPage: React.FC<Props> = ({ activeUser, setActiveTab
                 data: new Date().toISOString().split('T')[0],
                 data_pagamento: new Date().toISOString().split('T')[0],
                 status: 'CONSOLIDADO',
-                total_installments: 1,
+                installments: 1,
                 is_operation_transfer: false,
                 operation_source_id: ''
             });
             loadData();
         } catch (e) {
             alert("Erro ao salvar transação");
-        }
-    };
-
-    const handleDeleteTx = async (id: string) => {
-        if (!confirm("Deseja realmente excluir esta transação?")) return;
-        try {
-            await personalFinanceService.deleteTransaction(id);
-            loadData();
-        } catch (e) {
-            alert("Erro ao excluir transação");
         }
     };
 
@@ -112,35 +100,6 @@ export const PersonalFinancesPage: React.FC<Props> = ({ activeUser, setActiveTab
         return { income, expense, balance };
     }, [transactions]);
 
-    const chartData = useMemo(() => {
-        const daysInMonth = new Date(year, month + 1, 0).getDate();
-        const data = [];
-        for (let i = 1; i <= daysInMonth; i++) {
-            const dayStr = i.toString().padStart(2, '0');
-            const dayTxs = transactions.filter(t => new Date(t.data).getDate() === i);
-            const income = dayTxs.filter(t => t.tipo === 'RECEITA').reduce((acc, t) => acc + t.valor, 0);
-            const expense = dayTxs.filter(t => t.tipo === 'DESPESA').reduce((acc, t) => acc + t.valor, 0);
-            data.push({ day: dayStr, income, expense });
-        }
-        return data;
-    }, [transactions, month, year]);
-
-    const categoryStats = useMemo(() => {
-        const data: { name: string; value: number }[] = [];
-        categories.forEach(cat => {
-            const val = transactions.filter(t => t.categoria_id === cat.id).reduce((acc, t) => acc + t.valor, 0);
-            if (val > 0) data.push({ name: cat.nome, value: val });
-        });
-        return data.sort((a, b) => b.value - a.value);
-    }, [transactions, categories]);
-
-    const filteredTransactions = useMemo(() => {
-        if (selectedCategory === 'ALL') return transactions;
-        return transactions.filter(t => t.categoria_id === selectedCategory);
-    }, [transactions, selectedCategory]);
-
-    const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
-
     return (
         <div className="space-y-8 animate-in fade-in pb-24 font-sans">
             {/* Header - Padrão Hub Central */}
@@ -148,10 +107,10 @@ export const PersonalFinancesPage: React.FC<Props> = ({ activeUser, setActiveTab
                 <div className="flex items-center gap-4">
                     <button
                         onClick={() => goBack ? goBack() : setActiveTab?.('DASHBOARD')}
-                        className="w-10 h-10 flex items-center justify-center bg-slate-900 border border-slate-800 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all active:scale-95"
-                        title="Voltar"
+                        className="flex items-center gap-2 px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all active:scale-95"
                     >
-                        <ChevronLeft size={20} />
+                        <ChevronLeft size={16} />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Voltar</span>
                     </button>
                     
                     <div className="flex items-center gap-3">
@@ -205,69 +164,6 @@ export const PersonalFinancesPage: React.FC<Props> = ({ activeUser, setActiveTab
                 </div>
             </div>
 
-            {/* Gráficos de Fluxo */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 bg-slate-900 border border-slate-800 p-6 rounded-[2rem] shadow-xl">
-                    <h3 className="text-[10px] font-black text-white uppercase tracking-widest mb-6 flex items-center gap-2">
-                        <BarChart3 size={14} className="text-blue-500"/> Fluxo de Caixa Diário
-                    </h3>
-                    <div className="h-64 w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={chartData}>
-                                <defs>
-                                    <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
-                                        <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                                    </linearGradient>
-                                    <linearGradient id="colorExpense" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
-                                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                                <XAxis dataKey="day" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
-                                <YAxis hide />
-                                <RechartsTooltip 
-                                    contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px' }}
-                                    itemStyle={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase' }}
-                                />
-                                <Area type="monotone" dataKey="income" stroke="#10b981" fillOpacity={1} fill="url(#colorIncome)" strokeWidth={3} />
-                                <Area type="monotone" dataKey="expense" stroke="#ef4444" fillOpacity={1} fill="url(#colorExpense)" strokeWidth={3} />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-
-                <div className="bg-slate-900 border border-slate-800 p-6 rounded-[2rem] shadow-xl">
-                    <h3 className="text-[10px] font-black text-white uppercase tracking-widest mb-6 flex items-center gap-2">
-                        <PieIcon size={14} className="text-pink-500"/> Gastos por Categoria
-                    </h3>
-                    <div className="h-64 w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie
-                                    data={categoryStats}
-                                    cx="50%"
-                                    cy="50%"
-                                    innerRadius={60}
-                                    outerRadius={80}
-                                    paddingAngle={5}
-                                    dataKey="value"
-                                >
-                                    {categoryStats.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                    ))}
-                                </Pie>
-                                <RechartsTooltip 
-                                    contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px' }}
-                                    itemStyle={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase' }}
-                                />
-                            </PieChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-            </div>
-
             {/* Seção Principal */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Contas e Cartões */}
@@ -317,25 +213,10 @@ export const PersonalFinancesPage: React.FC<Props> = ({ activeUser, setActiveTab
                 {/* Últimas Transações */}
                 <div className="lg:col-span-2 space-y-6">
                     <div className="bg-slate-900 border border-slate-800 p-6 rounded-[2rem] shadow-xl">
-                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-                            <div className="flex items-center gap-4">
-                                <h3 className="text-[10px] font-black text-white uppercase tracking-widest flex items-center gap-2">
-                                    <LayoutGrid size={14} className="text-amber-500"/> Histórico Financeiro
-                                </h3>
-                                <div className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
-                                    <Filter size={12} className="text-slate-500"/>
-                                    <select 
-                                        value={selectedCategory} 
-                                        onChange={(e) => setSelectedCategory(e.target.value)}
-                                        className="bg-transparent text-white text-[9px] font-black uppercase tracking-widest outline-none border-none cursor-pointer"
-                                    >
-                                        <option value="ALL">Todas Categorias</option>
-                                        {categories.map(cat => (
-                                            <option key={cat.id} value={cat.id}>{cat.nome}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-[10px] font-black text-white uppercase tracking-widest flex items-center gap-2">
+                                <LayoutGrid size={14} className="text-amber-500"/> Histórico Financeiro
+                            </h3>
                             <button 
                                 onClick={() => setIsTxModalOpen(true)}
                                 className="px-4 py-2 bg-white text-slate-950 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all shadow-lg active:scale-95 flex items-center gap-2"
@@ -345,16 +226,16 @@ export const PersonalFinancesPage: React.FC<Props> = ({ activeUser, setActiveTab
                         </div>
 
                         <div className="space-y-3">
-                            {filteredTransactions.length === 0 ? (
+                            {transactions.length === 0 ? (
                                 <div className="py-12 text-center">
                                     <div className="w-16 h-16 bg-slate-950 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-800">
                                         <Clock size={24} className="text-slate-700" />
                                     </div>
-                                    <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Nenhuma transação encontrada</p>
+                                    <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Nenhuma transação este mês</p>
                                 </div>
                             ) : (
-                                filteredTransactions.map(tx => (
-                                    <div key={tx.id} className="flex items-center justify-between p-4 bg-slate-950 rounded-2xl border border-slate-800 hover:border-slate-700 transition-all group">
+                                transactions.map(tx => (
+                                    <div key={tx.id} className="flex items-center justify-between p-4 bg-slate-950 rounded-2xl border border-slate-800 hover:border-slate-700 transition-all">
                                         <div className="flex items-center gap-4">
                                             <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
                                                 tx.tipo === 'RECEITA' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'
@@ -376,22 +257,13 @@ export const PersonalFinancesPage: React.FC<Props> = ({ activeUser, setActiveTab
                                                 </p>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-4">
-                                            <div className="text-right">
-                                                <p className={`text-sm font-black ${tx.tipo === 'RECEITA' ? 'text-emerald-400' : 'text-white'}`}>
-                                                    {tx.tipo === 'RECEITA' ? '+' : '-'}{formatMoney(tx.valor)}
-                                                </p>
-                                                <p className="text-[8px] text-slate-600 font-black uppercase tracking-tighter">
-                                                    {tx.status === 'CONSOLIDADO' ? 'Liquidado' : 'Pendente'}
-                                                </p>
-                                            </div>
-                                            <button 
-                                                onClick={() => handleDeleteTx(tx.id)}
-                                                className="p-2 text-slate-700 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"
-                                                title="Excluir"
-                                            >
-                                                <Trash2 size={14}/>
-                                            </button>
+                                        <div className="text-right">
+                                            <p className={`text-sm font-black ${tx.tipo === 'RECEITA' ? 'text-emerald-400' : 'text-white'}`}>
+                                                {tx.tipo === 'RECEITA' ? '+' : '-'}{formatMoney(tx.valor)}
+                                            </p>
+                                            <p className="text-[8px] text-slate-600 font-black uppercase tracking-tighter">
+                                                {tx.status === 'CONSOLIDADO' ? 'Liquidado' : 'Pendente'}
+                                            </p>
                                         </div>
                                     </div>
                                 ))
@@ -446,69 +318,13 @@ export const PersonalFinancesPage: React.FC<Props> = ({ activeUser, setActiveTab
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-1 block">Categoria</label>
-                                    <select 
-                                        value={newTx.categoria_id}
-                                        onChange={e => setNewTx(prev => ({ ...prev, categoria_id: e.target.value }))}
-                                        className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-4 px-5 text-xs font-black text-white outline-none focus:border-blue-500 transition-all"
-                                    >
-                                        <option value="">Selecione</option>
-                                        {categories.map(cat => (
-                                            <option key={cat.id} value={cat.id}>{cat.nome}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-1 block">Conta / Origem</label>
-                                    <select 
-                                        value={newTx.conta_id}
-                                        onChange={e => setNewTx(prev => ({ ...prev, conta_id: e.target.value, cartao_id: '' }))}
-                                        className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-4 px-5 text-xs font-black text-white outline-none focus:border-blue-500 transition-all"
-                                    >
-                                        <option value="">Selecione Conta</option>
-                                        {accounts.map(acc => (
-                                            <option key={acc.id} value={acc.id}>{acc.nome}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-1 block">Cartão (Opcional)</label>
-                                    <select 
-                                        value={newTx.cartao_id}
-                                        onChange={e => setNewTx(prev => ({ ...prev, cartao_id: e.target.value, conta_id: '' }))}
-                                        className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-4 px-5 text-xs font-black text-white outline-none focus:border-blue-500 transition-all"
-                                    >
-                                        <option value="">Nenhum</option>
-                                        {cards.map(card => (
-                                            <option key={card.id} value={card.id}>{card.nome}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
                                     <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-1 block">Parcelas</label>
                                     <input 
                                         type="number"
-                                        value={newTx.total_installments}
-                                        onChange={e => setNewTx(prev => ({ ...prev, total_installments: Number(e.target.value) }))}
+                                        value={newTx.installments}
+                                        onChange={e => setNewTx(prev => ({ ...prev, installments: Number(e.target.value) }))}
                                         className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-4 px-5 text-sm font-black text-white outline-none focus:border-blue-500 transition-all"
                                     />
-                                </div>
-                                <div>
-                                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-1 block">Status</label>
-                                    <select 
-                                        value={newTx.status}
-                                        onChange={e => setNewTx(prev => ({ ...prev, status: e.target.value as any }))}
-                                        className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-4 px-5 text-xs font-black text-white outline-none focus:border-blue-500 transition-all"
-                                    >
-                                        <option value="CONSOLIDADO">Liquidado</option>
-                                        <option value="PENDENTE">Pendente</option>
-                                    </select>
                                 </div>
                             </div>
 
@@ -567,105 +383,6 @@ export const PersonalFinancesPage: React.FC<Props> = ({ activeUser, setActiveTab
                             >
                                 <CheckCircle2 size={18}/> Confirmar Lançamento
                             </button>
-                        </div>
-                    </div>
-                </Modal>
-            )}
-            {/* Modal de Gerenciamento - INTEGRADO */}
-            {isManageModalOpen && (
-                <Modal onClose={() => setIsManageModalOpen(false)} title="Configurações Financeiras">
-                    <div className="space-y-8 p-2">
-                        {/* Seção de Contas */}
-                        <div className="space-y-4">
-                            <div className="flex justify-between items-center">
-                                <h4 className="text-[10px] font-black text-white uppercase tracking-widest flex items-center gap-2">
-                                    <Banknote size={14} className="text-blue-500"/> Minhas Contas
-                                </h4>
-                                <button 
-                                    onClick={async () => {
-                                        const nome = prompt("Nome da conta:");
-                                        const saldo = prompt("Saldo inicial:");
-                                        if (nome && saldo) {
-                                            await personalFinanceService.addAccount({ nome, saldo: parseFloat(saldo), tipo: 'CORRENTE' }, activeUser.id);
-                                            loadData();
-                                        }
-                                    }}
-                                    className="p-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-all"
-                                >
-                                    <Plus size={14}/>
-                                </button>
-                            </div>
-                            <div className="grid grid-cols-1 gap-2">
-                                {accounts.map(acc => (
-                                    <div key={acc.id} className="flex justify-between items-center p-3 bg-slate-950 border border-slate-800 rounded-xl">
-                                        <span className="text-xs font-bold text-white uppercase">{acc.nome}</span>
-                                        <button onClick={() => personalFinanceService.deleteAccount(acc.id).then(loadData)} className="text-slate-600 hover:text-rose-500">
-                                            <Trash2 size={14}/>
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Seção de Cartões */}
-                        <div className="space-y-4">
-                            <div className="flex justify-between items-center">
-                                <h4 className="text-[10px] font-black text-white uppercase tracking-widest flex items-center gap-2">
-                                    <CreditCard size={14} className="text-pink-500"/> Meus Cartões
-                                </h4>
-                                <button 
-                                    onClick={async () => {
-                                        const nome = prompt("Nome do cartão:");
-                                        const limite = prompt("Limite:");
-                                        const dia = prompt("Dia de fechamento:");
-                                        if (nome && limite && dia) {
-                                            await personalFinanceService.addCard({ nome, limite: parseFloat(limite), dia_fechamento: parseInt(dia) }, activeUser.id);
-                                            loadData();
-                                        }
-                                    }}
-                                    className="p-1.5 bg-pink-600 text-white rounded-lg hover:bg-pink-500 transition-all"
-                                >
-                                    <Plus size={14}/>
-                                </button>
-                            </div>
-                            <div className="grid grid-cols-1 gap-2">
-                                {cards.map(card => (
-                                    <div key={card.id} className="flex justify-between items-center p-3 bg-slate-950 border border-slate-800 rounded-xl">
-                                        <span className="text-xs font-bold text-white uppercase">{card.nome}</span>
-                                        <button onClick={() => personalFinanceService.deleteCard(card.id).then(loadData)} className="text-slate-600 hover:text-rose-500">
-                                            <Trash2 size={14}/>
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Seção de Categorias */}
-                        <div className="space-y-4">
-                            <div className="flex justify-between items-center">
-                                <h4 className="text-[10px] font-black text-white uppercase tracking-widest flex items-center gap-2">
-                                    <Layers size={14} className="text-amber-500"/> Categorias
-                                </h4>
-                                <button 
-                                    onClick={async () => {
-                                        const nome = prompt("Nome da categoria:");
-                                        if (nome) {
-                                            await personalFinanceService.addCategory({ nome, tipo: 'DESPESA' }, activeUser.id);
-                                            loadData();
-                                        }
-                                    }}
-                                    className="p-1.5 bg-amber-600 text-white rounded-lg hover:bg-amber-500 transition-all"
-                                >
-                                    <Plus size={14}/>
-                                </button>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                                {categories.map(cat => (
-                                    <div key={cat.id} className="flex items-center gap-2 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-full">
-                                        <span className="text-[10px] font-black text-slate-400 uppercase">{cat.nome}</span>
-                                    </div>
-                                ))}
-                            </div>
                         </div>
                     </div>
                 </Modal>

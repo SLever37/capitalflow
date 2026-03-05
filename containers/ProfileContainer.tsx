@@ -19,11 +19,10 @@ interface ProfileContainerProps {
   navOrder: AppTab[];
   hubOrder: AppTab[];
   saveNavConfig: (nav: AppTab[], hub: AppTab[]) => void;
-  goBack?: () => void;
 }
 
 export const ProfileContainer: React.FC<ProfileContainerProps> = ({
-  activeUser, clients, loans, sources, ui, profileCtrl, handleLogout, showToast, profileEditForm, setProfileEditForm, fileCtrl, navOrder, hubOrder, saveNavConfig, goBack
+  activeUser, clients, loans, sources, ui, profileCtrl, handleLogout, showToast, profileEditForm, setProfileEditForm, fileCtrl, navOrder, hubOrder, saveNavConfig
 }) => {
   return (
     <ProfilePage 
@@ -50,7 +49,6 @@ export const ProfileContainer: React.FC<ProfileContainerProps> = ({
         navOrder={navOrder}
         hubOrder={hubOrder}
         saveNavConfig={saveNavConfig}
-        goBack={goBack}
     />
   );
 };

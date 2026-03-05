@@ -1,5 +1,10 @@
 // components/AppGate.tsx
 import React, { useEffect, useMemo, useState } from 'react';
+import { ClientPortalView } from '../containers/ClientPortal/ClientPortalView';
+import { PublicLegalSignPage } from '../features/legal/components/PublicLegalSignPage';
+import { PublicLoanLeadPage } from '../pages/PublicLoanLeadPage';
+import { CampanhaLanding } from '../pages/Campanha/CampanhaLanding';
+import { CampanhaChat } from '../pages/Campanha/CampanhaChat';
 import { AuthScreen } from '../features/auth/AuthScreen';
 import { Lock, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -68,6 +73,18 @@ export const AppGate: React.FC<AppGateProps> = ({
   const [reauthPass, setReauthPass] = useState('');
   const [isReauthing, setIsReauthing] = useState(false);
 
+  const { params, campaignId, path, isPublicLoanLead } = useMemo(() => {
+    const p = new URLSearchParams(window.location.search);
+    const cid = p.get('campaign_id');
+    const pathname = window.location.pathname;
+    return {
+      params: p,
+      campaignId: cid,
+      path: pathname,
+      isPublicLoanLead: p.get('public') === 'emprestimo',
+    };
+  }, []);
+
   useEffect(() => {
     if (loadError && loadError !== 'SESSAO_EXPIRADA') {
       showToast(loadError, 'error');
@@ -114,7 +131,37 @@ export const AppGate: React.FC<AppGateProps> = ({
   };
 
   // =========================
-  // Rotas privadas: login
+  // Rotas públicas
+  // =========================
+  if (isPublicLoanLead) {
+    return <PublicLoanLeadPage />;
+  }
+
+  if (path === '/campanha/chat') {
+    return <CampanhaChat />;
+  }
+
+  if (path === '/campanha' || !!campaignId) {
+    if (!campaignId) {
+      return (
+        <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-500 text-sm font-bold uppercase">
+          Campanha não especificada.
+        </div>
+      );
+    }
+    return <CampanhaLanding campaignId={campaignId} />;
+  }
+
+  if (portalToken) {
+    return <ClientPortalView initialPortalToken={portalToken} />;
+  }
+
+  if (legalSignToken) {
+    return <PublicLegalSignPage token={legalSignToken} />;
+  }
+
+  // =========================
+  // Rota privada: login
   // =========================
   if (!activeUser) {
     return (

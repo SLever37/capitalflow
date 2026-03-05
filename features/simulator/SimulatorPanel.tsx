@@ -75,11 +75,12 @@ export const SimulatorPanel: React.FC<SimulatorPanelProps> = ({ onClose }) => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300 font-sans pb-24">
+      {/* Header - Padrão Hub Central */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <button
             onClick={onClose}
-            className="w-10 h-10 flex items-center justify-center bg-slate-900 border border-slate-800 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all active:scale-95"
+            className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
             title="Voltar"
           >
             <ChevronLeft size={20} />

@@ -4,6 +4,7 @@ import { Activity, AlertCircle } from 'lucide-react';
 import { LedgerEntry } from '../../../types';
 import { formatMoney } from '../../../utils/formatters';
 import { humanizeAuditLog } from '../../../utils/auditHelpers';
+import { translateTransactionType } from '../../../utils/translationHelpers';
 
 interface ProfileAuditLogProps {
     logs: (LedgerEntry & { clientName: string })[];
@@ -31,7 +32,7 @@ export const ProfileAuditLog: React.FC<ProfileAuditLogProps> = ({ logs }) => {
                           {log.type === 'LEND_MORE' ? '-' : '+'} {formatMoney(log.amount, false)}
                       </p>
                   ) : (
-                      <span className="px-2 py-0.5 bg-indigo-500/10 text-indigo-400 text-[8px] font-black rounded uppercase">Audit Edit</span>
+                      <span className="px-2 py-0.5 bg-indigo-500/10 text-indigo-400 text-[8px] font-black rounded uppercase">Edição de Auditoria</span>
                   )}
               </div>
               

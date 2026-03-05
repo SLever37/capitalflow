@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, Loader2, Shield, Users, RefreshCw, Layers, AlertCircle, Settings, Plus, BrainCircuit, ShieldAlert, Key, Fingerprint, ChevronLeft } from 'lucide-react';
+import { UserPlus, Loader2, Shield, Users, RefreshCw, Layers, AlertCircle, Settings, Plus, BrainCircuit, ShieldAlert, Key, Fingerprint } from 'lucide-react';
 import { useTeamData } from '../features/team/hooks/useTeamData';
 import { useTeamInvite } from '../features/team/hooks/useTeamInvite';
 import { MemberCard } from '../features/team/components/MemberCard';
@@ -10,7 +10,7 @@ import { TeamAIInsight } from '../features/team/components/TeamAIInsight';
 import { isDev } from '../utils/isDev';
 import { supabase } from '../lib/supabase';
 
-export const TeamPage = ({ activeUser, showToast, ui, goBack }: any) => {
+export const TeamPage = ({ activeUser, showToast, ui }: any) => {
   const [editingTeam, setEditingTeam] = useState<any>(null);
   const [editingMember, setEditingMember] = useState<any>(null);
   const [authStatus, setAuthStatus] = useState<any>(null);
@@ -130,15 +130,6 @@ export const TeamPage = ({ activeUser, showToast, ui, goBack }: any) => {
 
       <div className="flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-6 bg-slate-900 border border-slate-800 p-5 sm:p-6 rounded-[2rem] sm:rounded-[2.5rem] shadow-xl">
         <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-            {goBack && (
-                <button
-                    onClick={goBack}
-                    className="w-10 h-10 flex items-center justify-center bg-slate-950 border border-slate-800 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all active:scale-95 shrink-0"
-                    title="Voltar"
-                >
-                    <ChevronLeft size={20} />
-                </button>
-            )}
             <div className="p-3 sm:p-4 bg-blue-600 rounded-xl sm:rounded-2xl text-white shadow-lg shadow-blue-900/20 shrink-0">
                 <Shield size={24} className="sm:w-7 sm:h-7" />
             </div>

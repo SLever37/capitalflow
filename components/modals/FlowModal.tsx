@@ -80,14 +80,15 @@ export const FlowModal = ({ onClose, loans, profit }: { onClose: () => void, loa
 
     return (
         <div className="space-y-6 animate-in fade-in duration-300 font-sans pb-24">
+      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <button
             onClick={onClose}
-            className="w-10 h-10 flex items-center justify-center bg-slate-900 border border-slate-800 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all active:scale-95"
-            title="Voltar"
+            className="flex items-center gap-2 px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all active:scale-95"
           >
-            <ChevronLeft size={20} />
+            <ChevronLeft size={16} />
+            <span className="text-[10px] font-black uppercase tracking-widest">Voltar</span>
           </button>
           
           <div className="flex items-center gap-3">

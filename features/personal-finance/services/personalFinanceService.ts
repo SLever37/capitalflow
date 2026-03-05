@@ -100,7 +100,6 @@ export const personalFinanceService = {
         p_categoria_id: safeUUID(tx.categoria_id),
         p_conta_id: safeUUID(tx.conta_id),
         p_cartao_id: safeUUID(tx.cartao_id),
-        p_installments: Number(tx.total_installments) || 1,
         p_is_operation_transfer: !!tx.is_operation_transfer,
         p_operation_loan_id: safeUUID(tx.operation_loan_id),
         p_operation_source_id: safeUUID(tx.operation_source_id),

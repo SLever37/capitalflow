@@ -31,18 +31,6 @@ self.addEventListener('activate', (event) => {
 
 // Estratégia de Fetch: Network First (Tenta rede, se falhar usa cache)
 self.addEventListener('fetch', (event) => {
-  const url = new URL(event.request.url);
-  
-  // Ignorar chamadas de API (Supabase, Google, etc) e requisições que não sejam GET
-  if (
-    url.hostname.includes('supabase.co') || 
-    url.hostname.includes('googleapis.com') ||
-    url.hostname.includes('ipify.org') ||
-    event.request.method !== 'GET'
-  ) {
-    return;
-  }
-
   event.respondWith(
     fetch(event.request).catch(() => {
       return caches.match(event.request);
