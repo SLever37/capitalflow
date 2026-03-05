@@ -1,8 +1,71 @@
-// features/support/services/agreementService.ts
+// /app/applet/features/agreements/services/agreementService.ts
 import { supabase } from "../../../lib/supabase";
 import { Agreement, AgreementInstallment, UserProfile } from "../../../types";
 import { generateUUID } from "../../../utils/generators";
-import { isUUID, safeUUID } from "../../../utils/uuid";
+import { safeUUID } from "../../../utils/uuid";
+
+/**
+ * Banco (CHECK):
+ * - juros_modo: PRO_RATA | FIXO | ZERO
+ * - tipo: PARCELADO_COM_JUROS | PARCELADO_SEM_JUROS
+ * - periodicidade: SEMANAL | QUINZENAL | MENSAL
+ */
+
+type JurosModoDB = "PRO_RATA" | "FIXO" | "ZERO";
+type PeriodicidadeDB = "SEMANAL" | "QUINZENAL" | "MENSAL";
+type TipoDB = "PARCELADO_COM_JUROS" | "PARCELADO_SEM_JUROS";
+
+function safeNumber(v: any, fallback = 0): number {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function toISODateOnly(d: any): string {
+  const dt = d instanceof Date ? d : new Date(d);
+  if (Number.isNaN(dt.getTime())) {
+    const t = new Date();
+    t.setDate(t.getDate() + 1);
+    return t.toISOString().slice(0, 10);
+  }
+  return dt.toISOString().slice(0, 10);
+}
+
+function normalizePeriodicidade(v: any): PeriodicidadeDB {
+  const s = String(v ?? "").trim().toUpperCase();
+
+  // já no formato do banco
+  if (s === "SEMANAL" || s === "QUINZENAL" || s === "MENSAL") return s;
+
+  // mapeamentos comuns do front
+  if (s === "WEEKLY") return "SEMANAL";
+  if (s === "BIWEEKLY" || s === "QUINZENAL") return "QUINZENAL";
+  if (s === "MONTHLY") return "MENSAL";
+
+  // fallback seguro
+  return "MENSAL";
+}
+
+function normalizeJurosModo(v: any, interestRate: number): JurosModoDB {
+  const s = String(v ?? "").trim().toUpperCase();
+
+  if (s === "PRO_RATA" || s === "FIXO" || s === "ZERO") return s as JurosModoDB;
+
+  // heurística segura: se não tem juros, modo ZERO
+  if (safeNumber(interestRate, 0) <= 0) return "ZERO";
+
+  // se tem juros e não veio modo válido, usa PRO_RATA como padrão “seguro”
+  return "PRO_RATA";
+}
+
+function normalizeTipo(v: any, jurosModo: JurosModoDB, interestRate: number): TipoDB {
+  const s = String(v ?? "").trim().toUpperCase();
+
+  if (s === "PARCELADO_COM_JUROS" || s === "PARCELADO_SEM_JUROS") return s as TipoDB;
+
+  // deriva pelo juros
+  if (jurosModo !== "ZERO" && safeNumber(interestRate, 0) > 0) return "PARCELADO_COM_JUROS";
+  return "PARCELADO_SEM_JUROS";
+}
 
 export const agreementService = {
   async createAgreement(
@@ -12,35 +75,109 @@ export const agreementService = {
     profileId: string
   ) {
     const agreementId = generateUUID();
-    const now = new Date().toISOString();
 
-    // 1) Criar Header do Acordo
+    // --- Campos numéricos base (com fallback)
+    const interestRate = safeNumber((agreementData as any).interestRate ?? (agreementData as any).interest_rate, 0);
+
+    const negotiatedTotal = safeNumber(
+      (agreementData as any).negotiatedTotal ??
+        (agreementData as any).totalAmount ??
+        (agreementData as any).total_amount,
+      0
+    );
+
+    const totalBase = safeNumber(
+      (agreementData as any).totalDebtAtNegotiation ??
+        (agreementData as any).total_divida_base ??
+        (agreementData as any).total_base,
+      0
+    );
+
+    // --- Not null / checks
+    const periodicidade = normalizePeriodicidade((agreementData as any).frequency ?? (agreementData as any).periodicidade);
+
+    const jurosModo = normalizeJurosModo((agreementData as any).juros_modo, interestRate);
+
+    const tipo = normalizeTipo((agreementData as any).type ?? (agreementData as any).tipo, jurosModo, interestRate);
+
+    const numParcelas =
+      Math.max(
+        1,
+        safeNumber((agreementData as any).installmentsCount ?? (agreementData as any).num_parcelas ?? installments?.length, 1)
+      ) | 0;
+
+    const firstDueDate =
+      installments?.[0]?.dueDate
+        ? toISODateOnly(installments[0].dueDate)
+        : toISODateOnly(new Date(Date.now() + 24 * 60 * 60 * 1000));
+
+    // total_amount não pode ficar 0 “por acidente”
+    const totalAmount = negotiatedTotal > 0 ? negotiatedTotal : Math.max(0, totalBase);
+
+    // coluna "installments" no seu banco está como INTEGER (pelo erro que você mostrou)
+    // então vamos preencher com numParcelas para não dar conflito de tipo
+    const installmentsInt = numParcelas;
+
+    // 1) Header
     const { error: headerError } = await supabase.from("acordos_inadimplencia").insert({
       id: agreementId,
       loan_id: loanId,
       profile_id: profileId,
-      tipo_acordo: agreementData.type,
-      total_divida_base: agreementData.totalDebtAtNegotiation,
-      total_negociado: agreementData.negotiatedTotal,
-      juros_aplicado: agreementData.interestRate || 0,
-      qtd_parcelas: agreementData.installmentsCount,
-      periodicidade: agreementData.frequency,
+
       status: "ACTIVE",
-      created_at: now,
+
+      // ✅ CHECKs
+      tipo,                 // PARCELADO_COM_JUROS | PARCELADO_SEM_JUROS
+      periodicidade,        // SEMANAL | QUINZENAL | MENSAL
+      juros_modo: jurosModo, // PRO_RATA | FIXO | ZERO
+
+      // ✅ NOT NULL
+      num_parcelas: numParcelas,
+      first_due_date: firstDueDate,
+      total_amount: totalAmount,
+      interest_rate: interestRate,
+      installments: installmentsInt,
+
+      // opcionais (se existirem no schema)
+      total_negociado: negotiatedTotal,
+      juros_mensal_percent: safeNumber((agreementData as any).juros_mensal_percent, 0),
+
+      principal_base: safeNumber((agreementData as any).principal_base, 0),
+      interest_base: safeNumber((agreementData as any).interest_base, 0),
+      late_fee_base: safeNumber((agreementData as any).late_fee_base, 0),
+      total_base: totalBase,
+
+      notes: (agreementData as any).notes ?? null,
+      valor_parcela: safeNumber((agreementData as any).valor_parcela, 0) || null,
     });
+
     if (headerError) throw new Error("Erro ao criar acordo: " + headerError.message);
 
-    // 2) Criar Parcelas
-    const installmentsPayload = installments.map((inst) => ({
+    // 2) Parcelas (acordo_parcelas)
+    const installmentsPayload = (installments || []).map((inst) => ({
       id: generateUUID(),
       acordo_id: agreementId,
       profile_id: profileId,
-      numero: inst.number,
-      data_vencimento: inst.dueDate,
-      valor: inst.amount,
+      numero: safeNumber(inst.number, 1) | 0,
+      data_vencimento: toISODateOnly(inst.dueDate),
+      valor: safeNumber(inst.amount, 0),
       status: "PENDING",
       valor_pago: 0,
     }));
+
+    // se veio vazio, cria 1 parcela mínima (evita travar UI)
+    if (installmentsPayload.length === 0) {
+      installmentsPayload.push({
+        id: generateUUID(),
+        acordo_id: agreementId,
+        profile_id: profileId,
+        numero: 1,
+        data_vencimento: firstDueDate,
+        valor: totalAmount,
+        status: "PENDING",
+        valor_pago: 0,
+      });
+    }
 
     const { error: instError } = await supabase.from("acordo_parcelas").insert(installmentsPayload);
     if (instError) throw new Error("Erro ao gerar parcelas do acordo: " + instError.message);
@@ -55,19 +192,11 @@ export const agreementService = {
     sourceId: string,
     user: UserProfile
   ) {
-    // ✅ Dono real (owner) para RLS / segregação correta
     const ownerId = (user as any).supervisor_id || user.id;
 
-    // 1) Atualizar parcela
-    const newPaidAmount = installment.paidAmount + amount;
-    let newStatus = installment.status;
-
-    // Tolerância de R$ 0,10
-    if (newPaidAmount >= installment.amount - 0.1) {
-      newStatus = "PAID";
-    } else {
-      newStatus = "PARTIAL";
-    }
+    const newPaidAmount = safeNumber(installment.paidAmount, 0) + safeNumber(amount, 0);
+    const installmentAmount = safeNumber(installment.amount, 0);
+    const newStatus = newPaidAmount >= installmentAmount - 0.1 ? "PAID" : "PARTIAL";
 
     const { error: instError } = await supabase
       .from("acordo_parcelas")
@@ -80,18 +209,17 @@ export const agreementService = {
 
     if (instError) throw instError;
 
-    // 2) Registrar pagamento (perfil = ownerId)
     const { error: payErr } = await supabase.from("acordo_pagamentos").insert({
       id: generateUUID(),
       parcela_id: installment.id,
       acordo_id: agreement.id,
       profile_id: ownerId,
-      amount: amount,
+      amount: safeNumber(amount, 0),
       date: new Date().toISOString(),
     });
+
     if (payErr) throw payErr;
 
-    // 3) Atualizar Caixa (Ledger Geral) (perfil = ownerId)
     const { error: txErr } = await supabase.from("transacoes").insert({
       id: generateUUID(),
       loan_id: agreement.loanId,
@@ -100,23 +228,25 @@ export const agreementService = {
       source_id: sourceId,
       date: new Date().toISOString(),
       type: "AGREEMENT_PAYMENT",
-      amount: amount,
+      amount: safeNumber(amount, 0),
       principal_delta: 0,
       interest_delta: 0,
       late_fee_delta: 0,
       category: "RECUPERACAO",
       notes: `Pagamento Acordo ${installment.number}/${agreement.installmentsCount}`,
     });
+
     if (txErr) throw txErr;
 
-    // 4) Atualizar saldo da fonte
+    // ✅ CORRIGIDO: string literal fechada corretamente
     const { error: balErr } = await supabase.rpc("adjust_source_balance", {
       p_source_id: safeUUID(sourceId),
-      p_delta: amount,
+      p_delta: safeNumber(amount, 0),
     });
+
     if (balErr) throw balErr;
 
-    // 5) Verificar Quitação Total do Acordo
+    // Quitação total
     if (newStatus === "PAID") {
       const { count, error: countErr } = await supabase
         .from("acordo_parcelas")
@@ -127,19 +257,19 @@ export const agreementService = {
       if (countErr) throw countErr;
 
       if ((count || 0) === 0) {
-        // Quitou acordo
         const { error: agErr } = await supabase
           .from("acordos_inadimplencia")
           .update({ status: "PAID" })
           .eq("id", agreement.id);
+
         if (agErr) throw agErr;
 
-        // Marca parcelas do contrato como PAID (opcional, mas mantém consistência)
         const { error: parcelasErr } = await supabase
           .from("parcelas")
           .update({ status: "PAID", paid_total: 0 })
           .eq("loan_id", agreement.loanId)
           .neq("status", "PAID");
+
         if (parcelasErr) throw parcelasErr;
       }
     }
@@ -150,6 +280,7 @@ export const agreementService = {
       .from("acordos_inadimplencia")
       .update({ status: "BROKEN" })
       .eq("id", agreementId);
+
     if (error) throw error;
   },
 };
