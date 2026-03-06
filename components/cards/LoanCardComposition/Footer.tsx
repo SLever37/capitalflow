@@ -11,9 +11,9 @@ interface FooterProps {
     onNewAporte?: (loan: Loan) => void;
     onEdit: (e: React.MouseEvent) => void;
     onRenegotiate: (loan: Loan) => void;
-    onArchive: (e: React.MouseEvent) => void;
-    onRestore: (e: React.MouseEvent) => void;
-    onDelete: (e: React.MouseEvent) => void;
+    onArchive: () => void;
+    onRestore: () => void;
+    onDelete: () => void;
 }
 
 export const Footer: React.FC<FooterProps> = ({

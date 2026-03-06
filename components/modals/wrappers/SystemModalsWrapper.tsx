@@ -146,7 +146,16 @@ export const SystemModalsWrapper = () => {
 
                     <div className="flex gap-4 pt-2">
                         <button onClick={closeModal} className="flex-1 py-3 bg-slate-800 text-slate-300 rounded-xl font-bold uppercase">Cancelar</button>
-                        <button onClick={loanCtrl.executeConfirmation} className="flex-1 py-3 bg-rose-600 text-white rounded-xl font-bold uppercase">Confirmar</button>
+                        <button 
+                            onClick={loanCtrl.executeConfirmation} 
+                            className={`flex-1 py-3 text-white rounded-xl font-bold uppercase ${
+                                ['DELETE', 'DELETE_CLIENT', 'DELETE_SOURCE', 'REVERSE_TRANSACTION'].includes(ui.confirmation.type) 
+                                ? 'bg-rose-600' 
+                                : ui.confirmation.type === 'RESTORE' ? 'bg-emerald-600' : 'bg-blue-600'
+                            }`}
+                        >
+                            Confirmar
+                        </button>
                     </div>
                 </div>
             </Modal>

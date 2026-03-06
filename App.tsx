@@ -370,6 +370,28 @@ export const App: React.FC = () => {
                 onRenegotiate={(l) => { ui.setRenegotiationModalLoan(l); ui.openModal('RENEGOTIATION', l); }}
                 onGenerateContract={(l) => loanCtrl.handleGenerateLink(l)}
                 onExportExtrato={(l) => loanCtrl.handleExportExtrato(l)}
+                onEdit={(l) => { ui.setEditingLoan(l); ui.openModal('LOAN_FORM', l); }}
+                onArchive={(l) => loanCtrl.openConfirmation({ 
+                    type: 'ARCHIVE', 
+                    target: l, 
+                    showRefundOption: true,
+                    title: 'Arquivar Contrato?',
+                    message: 'O contrato sairá da lista ativa, mas poderá ser restaurado depois.'
+                })}
+                onRestore={(l) => loanCtrl.openConfirmation({ 
+                    type: 'RESTORE', 
+                    target: l,
+                    title: 'Restaurar Contrato?',
+                    message: 'O contrato voltará para a lista de contratos ativos.'
+                })}
+                onDelete={(l) => loanCtrl.openConfirmation({ 
+                    type: 'DELETE', 
+                    target: l, 
+                    showRefundOption: true,
+                    title: 'Excluir Permanentemente?',
+                    message: 'Todos os dados, parcelas e histórico serão apagados para sempre.'
+                })}
+                onReverseTransaction={loanCtrl.openReverseTransaction}
                 isStealthMode={ui.isStealthMode}
               />
             )}

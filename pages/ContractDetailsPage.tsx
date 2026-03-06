@@ -3,7 +3,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { 
     ArrowLeft, DollarSign, Calendar, Clock, TrendingUp, AlertTriangle, 
     CheckCircle2, Receipt, MessageSquare, ShieldCheck, Banknote, 
-    FileText, Download, RefreshCcw, Loader2, ChevronRight, User
+    FileText, Download, RefreshCcw, Loader2, ChevronRight, User, FileEdit
 } from 'lucide-react';
 import { Loan, Installment, LedgerEntry, UserProfile, CapitalSource } from '../types';
 import { formatMoney } from '../utils/formatters';
@@ -31,12 +31,18 @@ interface ContractDetailsPageProps {
     onRenegotiate: (loan: Loan) => void;
     onGenerateContract: (loan: Loan) => void;
     onExportExtrato: (loan: Loan) => void;
+    onEdit: (loan: Loan) => void;
+    onArchive: (loan: Loan) => void;
+    onRestore: (loan: Loan) => void;
+    onDelete: (loan: Loan) => void;
+    onReverseTransaction: (transaction: LedgerEntry, loan: Loan) => void;
     isStealthMode: boolean;
 }
 
 export const ContractDetailsPage: React.FC<ContractDetailsPageProps> = ({
     loanId, loans, sources, activeUser, onBack, onPayment, isProcessing,
-    onOpenMessage, onRenegotiate, onGenerateContract, onExportExtrato, isStealthMode
+    onOpenMessage, onRenegotiate, onGenerateContract, onExportExtrato,
+    onEdit, onArchive, onRestore, onDelete, onReverseTransaction, isStealthMode
 }) => {
     const loan = useMemo(() => loans.find(l => l.id === loanId), [loans, loanId]);
 
@@ -184,7 +190,10 @@ export const ContractDetailsPage: React.FC<ContractDetailsPageProps> = ({
                             <ShieldCheck size={16} className="text-purple-500"/> Ações do Contrato
                         </h3>
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            <button onClick={() => onRenegotiate(loan)} className="flex items-center justify-center gap-2 p-4 bg-slate-950 border border-slate-800 rounded-2xl text-[10px] font-black uppercase text-slate-400 hover:text-white hover:border-blue-500 transition-all">
+                            <button onClick={() => onEdit(loan)} className="flex items-center justify-center gap-2 p-4 bg-slate-950 border border-slate-800 rounded-2xl text-[10px] font-black uppercase text-slate-400 hover:text-white hover:border-blue-500 transition-all">
+                                <FileEdit size={16}/> Editar Contrato
+                            </button>
+                            <button onClick={() => onRenegotiate(loan)} className="flex items-center justify-center gap-2 p-4 bg-slate-950 border border-slate-800 rounded-2xl text-[10px] font-black uppercase text-slate-400 hover:text-white hover:border-indigo-500 transition-all">
                                 <RefreshCcw size={16}/> Renegociar
                             </button>
                             <button onClick={() => onGenerateContract(loan)} className="flex items-center justify-center gap-2 p-4 bg-slate-950 border border-slate-800 rounded-2xl text-[10px] font-black uppercase text-slate-400 hover:text-white hover:border-emerald-500 transition-all">
@@ -192,6 +201,18 @@ export const ContractDetailsPage: React.FC<ContractDetailsPageProps> = ({
                             </button>
                             <button onClick={() => onExportExtrato(loan)} className="flex items-center justify-center gap-2 p-4 bg-slate-950 border border-slate-800 rounded-2xl text-[10px] font-black uppercase text-slate-400 hover:text-white hover:border-amber-500 transition-all">
                                 <Download size={16}/> Exportar Extrato
+                            </button>
+                            {!loan.isArchived ? (
+                                <button onClick={() => onArchive(loan)} className="flex items-center justify-center gap-2 p-4 bg-slate-950 border border-slate-800 rounded-2xl text-[10px] font-black uppercase text-slate-400 hover:text-white hover:border-orange-500 transition-all">
+                                    <ShieldCheck size={16}/> Arquivar
+                                </button>
+                            ) : (
+                                <button onClick={() => onRestore(loan)} className="flex items-center justify-center gap-2 p-4 bg-slate-950 border border-slate-800 rounded-2xl text-[10px] font-black uppercase text-emerald-500 hover:text-white hover:border-emerald-500 transition-all">
+                                    <ShieldCheck size={16}/> Restaurar
+                                </button>
+                            )}
+                            <button onClick={() => onDelete(loan)} className="flex items-center justify-center gap-2 p-4 bg-slate-950 border border-slate-800 rounded-2xl text-[10px] font-black uppercase text-rose-500/70 hover:text-rose-500 hover:border-rose-500 transition-all">
+                                <AlertTriangle size={16}/> Excluir
                             </button>
                         </div>
                     </div>
@@ -215,9 +236,16 @@ export const ContractDetailsPage: React.FC<ContractDetailsPageProps> = ({
                                                 <p className="text-[10px] text-slate-500 font-bold uppercase">{new Date(entry.date).toLocaleDateString('pt-BR')}</p>
                                             </div>
                                         </div>
-                                        <div className="text-right">
-                                            <p className="text-sm font-black text-emerald-400">{formatMoney(entry.amount, isStealthMode)}</p>
-                                            <p className="text-[9px] text-slate-600 font-black uppercase tracking-widest">Confirmado</p>
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex flex-col items-end gap-2">
+                                                <p className="text-sm font-black text-emerald-400">{formatMoney(entry.amount, isStealthMode)}</p>
+                                                <button 
+                                                    onClick={(e) => { e.stopPropagation(); onReverseTransaction(entry, loan); }}
+                                                    className="text-[8px] font-black uppercase tracking-widest text-rose-500/50 hover:text-rose-500 transition-colors"
+                                                >
+                                                    Estornar
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 ))
@@ -290,7 +318,34 @@ export const ContractDetailsPage: React.FC<ContractDetailsPageProps> = ({
                                 </div>
                             )}
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+                                <div className="bg-transparent p-0 mb-8 space-y-4">
+                                    <div className="flex items-center gap-2">
+                                        <ShieldCheck size={14} className="text-rose-500"/>
+                                        <label className="text-[9px] font-black uppercase text-slate-500 block tracking-widest">Gestão de Perdão</label>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <button 
+                                            onClick={() => setForgivenessMode(forgivenessMode === 'FINE_ONLY' ? 'NONE' : 'FINE_ONLY')}
+                                            className={`p-3 rounded-xl border text-[9px] font-black uppercase transition-all ${forgivenessMode === 'FINE_ONLY' ? 'bg-rose-600 border-rose-500 text-white' : 'bg-slate-900 border-slate-800 text-slate-500'}`}
+                                        >
+                                            Perdoar Multa
+                                        </button>
+                                        <button 
+                                            onClick={() => setForgivenessMode(forgivenessMode === 'INTEREST_ONLY' ? 'NONE' : 'INTEREST_ONLY')}
+                                            className={`p-3 rounded-xl border text-[9px] font-black uppercase transition-all ${forgivenessMode === 'INTEREST_ONLY' ? 'bg-orange-600 border-orange-500 text-white' : 'bg-slate-900 border-slate-800 text-slate-500'}`}
+                                        >
+                                            Perdoar Mora
+                                        </button>
+                                        <button 
+                                            onClick={() => setForgivenessMode(forgivenessMode === 'BOTH' ? 'NONE' : 'BOTH')}
+                                            className={`col-span-2 p-3 rounded-xl border text-[9px] font-black uppercase transition-all ${forgivenessMode === 'BOTH' ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-slate-900 border-slate-800 text-slate-500'}`}
+                                        >
+                                            Perdoar Total (100% Encargos)
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
                                 <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-2">
                                     <label className="text-[9px] font-black uppercase text-slate-500 block tracking-widest">Data Recebimento</label>
                                     <input 

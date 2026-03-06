@@ -131,6 +131,7 @@ export const useLoanCardComputed = (loanRaw: Loan, sources: CapitalSource[], isS
     cardStyle,
     iconStyle,
     allLedger,
-    orderedInstallments
+    orderedInstallments,
+    activeAgreement: agreement
   };
 };

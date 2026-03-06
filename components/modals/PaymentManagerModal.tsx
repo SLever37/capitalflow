@@ -78,7 +78,7 @@ export const PaymentManagerModal: React.FC<PaymentManagerModalProps> = ({
     };
 
     // Tem multa ou mora original para perdoar?
-    const hasOriginalFine = calculations.lateFee > 0;
+    const hasOriginalFine = debtBreakdown.fine > 0 || debtBreakdown.dailyMora > 0;
 
     return (
         <div className="fixed inset-0 z-[200] bg-slate-950 flex flex-col animate-in fade-in duration-300 font-sans h-[100dvh]">

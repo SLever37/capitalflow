@@ -10,13 +10,18 @@ interface QuickActionsProps {
     onViewDoc: (e: React.MouseEvent, url: string) => void;
     onUploadPromissoria?: (e: React.MouseEvent) => void;
     onUploadDoc: (e: React.MouseEvent) => void;
+    onEdit: (e: React.MouseEvent) => void;
 }
 
 export const QuickActions: React.FC<QuickActionsProps> = ({
-    hasNotes, onMessage, onNote, onPortalLink, onViewDoc, onUploadPromissoria, onUploadDoc
+    hasNotes, onMessage, onNote, onPortalLink, onViewDoc, onUploadPromissoria, onUploadDoc, onEdit
 }) => {
     return (
         <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
+             <button onClick={(e) => { e.stopPropagation(); onEdit(e); }} className="flex items-center justify-center gap-2 px-3 py-2.5 bg-blue-600/10 text-blue-500 hover:bg-blue-600 hover:text-white rounded-xl text-[10px] font-black uppercase transition-all">
+                <FileEdit size={14} /> Editar
+             </button>
+
              <button onClick={(e) => { e.stopPropagation(); onMessage(e); }} className="flex items-center justify-center gap-2 px-3 py-2.5 bg-emerald-600/10 text-emerald-500 hover:bg-emerald-600 hover:text-white rounded-xl text-[10px] font-black uppercase transition-all">
                 <MessageSquare size={14} /> WhatsApp
              </button>
