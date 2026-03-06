@@ -1,42 +1,61 @@
 import path from 'path';
+import fs from 'fs';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
+
+function spaFallbackPlugin() {
+  return {
+    name: 'spa-fallback-404',
+    closeBundle() {
+      const distDir = path.resolve('./dist');
+      const indexFile = path.join(distDir, 'index.html');
+      const notFoundFile = path.join(distDir, '404.html');
+
+      if (fs.existsSync(indexFile)) {
+        fs.copyFileSync(indexFile, notFoundFile);
+        console.log('✅ Copiado dist/index.html -> dist/404.html');
+      }
+    },
+  };
+}
 
 export default defineConfig(({ mode }) => {
-    // FIX: Use '.' as a relative path for envDir instead of process.cwd() to avoid TypeScript errors regarding the Process type.
-    // Carrega variáveis de arquivos .env
-    const env = loadEnv(mode, '.', '');
-    
-    return {
-      server: {
-        port: 3000,
-        host: '0.0.0.0',
+  const env = loadEnv(mode, '.', '');
+
+  return {
+    server: {
+      port: 3000,
+      host: '0.0.0.0',
+    },
+    plugins: [
+      react(),
+      tailwindcss(),
+      spaFallbackPlugin(),
+    ],
+    define: {
+      'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY || env.VITE_GEMINI_API_KEY),
+      'process.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL),
+      'process.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY),
+      'process.env.NODE_ENV': JSON.stringify(mode),
+    },
+    resolve: {
+      alias: {
+        '@': path.resolve('./'),
       },
-      plugins: [react()],
-      define: {
-        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY || env.VITE_GEMINI_API_KEY),
-        'process.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL),
-        'process.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY),
-        'process.env.NODE_ENV': JSON.stringify(mode),
+    },
+    build: {
+      outDir: 'dist',
+      sourcemap: false,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            vendor: ['react', 'react-dom', 'lucide-react'],
+            charts: ['recharts'],
+            utils: ['xlsx'],
+          },
+        },
       },
-      resolve: {
-        alias: {
-          // FIX: Use path.resolve('./') instead of __dirname to avoid errors in environments where __dirname is not defined (like ESM).
-          '@': path.resolve('./'),
-        }
-      },
-      build: {
-        outDir: 'dist',
-        sourcemap: false,
-        rollupOptions: {
-            output: {
-                manualChunks: {
-                    vendor: ['react', 'react-dom', 'lucide-react'],
-                    charts: ['recharts'],
-                    utils: ['xlsx']
-                }
-            }
-        }
-      }
-    };
+    },
+  };
 });
