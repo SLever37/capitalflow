@@ -306,7 +306,7 @@ export const App: React.FC = () => {
             )}
 
             {activeTab === 'SOURCES' && (
-              <SourcesContainer sources={sources} ui={ui} sourceCtrl={sourceCtrl} loanCtrl={loanCtrl} />
+              <SourcesContainer loans={loans} sources={sources} ui={ui} sourceCtrl={sourceCtrl} loanCtrl={loanCtrl} />
             )}
 
             {activeTab === 'PROFILE' && activeUser && (

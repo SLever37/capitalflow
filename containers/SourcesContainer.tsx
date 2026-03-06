@@ -2,10 +2,11 @@
 import React, { useState } from "react";
 import PixDepositModal from "../components/modals/PixDepositModal";
 import { SourcesPage } from "../pages/SourcesPage";
-import { CapitalSource } from "../types";
+import { CapitalSource, Loan } from "../types";
 
 interface SourcesContainerProps {
   sources: CapitalSource[];
+  loans: Loan[];
   ui: any;
   sourceCtrl: any;
   loanCtrl: any;
@@ -13,6 +14,7 @@ interface SourcesContainerProps {
 
 export const SourcesContainer: React.FC<SourcesContainerProps> = ({
   sources,
+  loans,
   ui,
   sourceCtrl,
   loanCtrl,
@@ -32,6 +34,7 @@ export const SourcesContainer: React.FC<SourcesContainerProps> = ({
     <>
       <SourcesPage
         sources={sources}
+        loans={loans}
         openConfirmation={loanCtrl.openConfirmation}
         handleUpdateSourceBalance={sourceCtrl.handleUpdateSourceBalance}
         isStealthMode={ui.isStealthMode}

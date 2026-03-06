@@ -1,11 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
-import { Landmark, Banknote, Wallet, CreditCard, Edit2, PlusCircle, Trash2 } from 'lucide-react';
-import { CapitalSource } from '../../types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Landmark, Banknote, Wallet, CreditCard, Edit2, PlusCircle, Trash2, FileText } from 'lucide-react';
+import { CapitalSource, Loan } from '../../types';
 import { formatMoney } from '../../utils/formatters';
 
 interface SourceCardProps {
     source: CapitalSource;
+    loans: Loan[];
     onEdit: (source: CapitalSource) => void;
     onAddFunds: (source: CapitalSource) => void;
     onDelete: (id: string) => void;
@@ -47,7 +48,7 @@ const getBankLogoUrl = (name: string): string | null => {
 };
 
 export const SourceCard: React.FC<SourceCardProps> = ({ 
-    source, onEdit, onAddFunds, onDelete, isStealthMode 
+    source, loans, onEdit, onAddFunds, onDelete, isStealthMode 
 }) => {
     const [logoUrl, setLogoUrl] = useState<string | null>(null);
     const [imgError, setImgError] = useState(false);
@@ -62,6 +63,11 @@ export const SourceCard: React.FC<SourceCardProps> = ({
         }
     }, [source.name]);
 
+    // Contagem de contratos ativos para esta fonte
+    const activeContractsCount = useMemo(() => {
+        return loans.filter(l => l.sourceId === source.id && !l.isArchived).length;
+    }, [loans, source.id]);
+
     // Ícone padrão baseado no tipo
     const DefaultIcon = source.type === 'BANK' ? Landmark : source.type === 'CASH' ? Banknote : source.type === 'CARD' ? CreditCard : Wallet;
     
@@ -70,60 +76,71 @@ export const SourceCard: React.FC<SourceCardProps> = ({
     const bgClass = source.type === 'BANK' ? 'bg-blue-500/10' : source.type === 'CASH' ? 'bg-emerald-500/10' : source.type === 'CARD' ? 'bg-rose-500/10' : 'bg-purple-500/10';
 
     return (
-        <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl relative overflow-hidden group hover:border-slate-700 transition-all">
-            {/* Background Icon (Marca d'água grande) - Mantido sempre o ícone padrão para estética */}
-            <div className={`absolute top-0 right-0 p-6 opacity-10 transition-opacity group-hover:opacity-20 ${colorClass}`}>
-                <DefaultIcon size={80} />
+        <div className="bg-slate-900 border border-slate-800 p-4 sm:p-5 rounded-2xl relative overflow-hidden group hover:border-slate-700 transition-all shadow-sm">
+            {/* Background Icon (Marca d'água grande) - Reduzido e mais sutil */}
+            <div className={`absolute -top-2 -right-2 p-4 opacity-5 transition-opacity group-hover:opacity-10 ${colorClass}`}>
+                <DefaultIcon size={60} />
             </div>
             
-            <div className="relative z-10">
-                <div className="flex justify-between items-start mb-4">
+            <div className="relative z-10 flex flex-col h-full">
+                <div className="flex justify-between items-start mb-3">
                     {/* Área do Logo / Ícone Pequeno */}
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center overflow-hidden ${bgClass} ${colorClass}`}>
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden ${bgClass} ${colorClass} shrink-0`}>
                         {logoUrl && !imgError && source.type !== 'CARD' ? (
                             <img 
                                 src={logoUrl} 
                                 alt={source.name} 
                                 className="w-full h-full object-cover"
                                 onError={() => setImgError(true)}
+                                referrerPolicy="no-referrer"
                             />
                         ) : (
-                            <DefaultIcon size={24} />
+                            <DefaultIcon size={20} />
                         )}
                     </div>
 
-                    <button 
-                        onClick={(e) => { e.stopPropagation(); onEdit(source); }} 
-                        className="p-2 bg-slate-800 rounded-xl text-slate-400 hover:text-white transition-colors"
-                        title="Editar Saldo Manualmente"
-                    >
-                        <Edit2 size={14}/>
-                    </button>
+                    <div className="flex gap-1">
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); onEdit(source); }} 
+                            className="p-1.5 bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
+                            title="Editar Saldo Manualmente"
+                        >
+                            <Edit2 size={12}/>
+                        </button>
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); onDelete(source.id); }} 
+                            className="p-1.5 bg-slate-800 hover:bg-rose-600/20 hover:text-rose-500 text-slate-500 rounded-lg transition-all"
+                            title="Excluir Fonte"
+                        >
+                            <Trash2 size={12}/>
+                        </button>
+                    </div>
                 </div>
                 
-                <h3 className="text-lg font-black text-white uppercase tracking-tight truncate pr-2" title={source.name}>{source.name}</h3>
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-6">
-                    {source.type === 'BANK' ? 'Conta Bancária' : source.type === 'CASH' ? 'Dinheiro Físico' : source.type === 'CARD' ? 'Cartão de Crédito' : 'Carteira Digital'}
-                </p>
+                <div className="mb-3">
+                    <h3 className="text-sm font-black text-white uppercase tracking-tight truncate pr-2" title={source.name}>{source.name}</h3>
+                    <div className="flex items-center gap-2 mt-1">
+                        <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">
+                            {source.type === 'BANK' ? 'Banco' : source.type === 'CASH' ? 'Dinheiro' : source.type === 'CARD' ? 'Cartão' : 'Digital'}
+                        </p>
+                        <span className="w-1 h-1 bg-slate-700 rounded-full"></span>
+                        <div className="flex items-center gap-1 text-[9px] font-black text-blue-400 uppercase">
+                            <FileText size={10}/>
+                            {activeContractsCount} {activeContractsCount === 1 ? 'Contrato' : 'Contratos'}
+                        </div>
+                    </div>
+                </div>
                 
-                <p className={`text-2xl font-black mb-6 ${source.balance < 0 ? 'text-rose-500' : 'text-emerald-400'}`}>
-                    {formatMoney(source.balance, isStealthMode)}
-                </p>
-                
-                <div className="flex gap-2">
-                    <button 
-                        onClick={(e) => { e.stopPropagation(); onAddFunds(source); }} 
-                        className="flex-1 py-3 bg-slate-800 hover:bg-emerald-600 hover:text-white text-emerald-500 rounded-xl text-[10px] font-black uppercase transition-all flex items-center justify-center gap-2 shadow-lg"
-                    >
-                        <PlusCircle size={14}/> Adicionar
-                    </button>
+                <div className="mt-auto">
+                    <p className={`text-xl font-black mb-4 ${source.balance < 0 ? 'text-rose-500' : 'text-emerald-400'}`}>
+                        {formatMoney(source.balance, isStealthMode)}
+                    </p>
                     
                     <button 
-                        onClick={(e) => { e.stopPropagation(); onDelete(source.id); }} 
-                        className="p-3 bg-slate-800 hover:bg-rose-600 hover:text-white text-slate-500 rounded-xl transition-all"
-                        title="Excluir Fonte"
+                        onClick={(e) => { e.stopPropagation(); onAddFunds(source); }} 
+                        className="w-full py-2.5 bg-slate-800 hover:bg-emerald-600 hover:text-white text-emerald-500 rounded-xl text-[9px] font-black uppercase transition-all flex items-center justify-center gap-2 shadow-sm"
                     >
-                        <Trash2 size={16}/>
+                        <PlusCircle size={12}/> Adicionar Saldo
                     </button>
                 </div>
             </div>

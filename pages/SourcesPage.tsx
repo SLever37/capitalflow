@@ -1,12 +1,13 @@
 import React, { useState } from "react";
 import PixDepositModal from "../components/modals/PixDepositModal";
-import { CapitalSource } from "../types";
+import { CapitalSource, Loan } from "../types";
 import { Plus } from 'lucide-react';
 import { Modal } from '../components/ui/Modal';
 import { SourceCard } from '../components/cards/SourceCard';
 
 interface SourcesPageProps {
   sources: CapitalSource[];
+  loans: Loan[];
 
   openConfirmation: (config: any) => void;
   handleUpdateSourceBalance: () => void;
@@ -20,6 +21,7 @@ interface SourcesPageProps {
 
 export const SourcesPage: React.FC<SourcesPageProps> = ({
   sources,
+  loans,
   openConfirmation,
   handleUpdateSourceBalance,
   isStealthMode,
@@ -57,6 +59,7 @@ export const SourcesPage: React.FC<SourcesPageProps> = ({
           <SourceCard
             key={source.id}
             source={source}
+            loans={loans}
             onAddFunds={handleAddFunds}
             onEdit={handleEditSource}
             onDelete={(id) => openConfirmation({ type: 'DELETE_SOURCE', target: id })}
