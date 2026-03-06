@@ -24,6 +24,7 @@ export interface CapitalSource {
   balance: number;
   type: 'PROPRIO' | 'TERCEIROS' | 'MISTO';
   description?: string;
+  logo_url?: string;
   created_at?: string;
 }
 
@@ -395,6 +396,7 @@ export interface SourceUIController {
     name: string;
     type: CapitalSource["type"];
     balance: string;
+    logo_url?: string;
     operador_permitido_id?: string;
   };
   isSaving: boolean;

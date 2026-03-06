@@ -29,7 +29,7 @@ export const calendarService = {
           numero_parcela
         )
       `)
-      .eq('profile_id', safeProfileId)
+      .eq('owner_id', safeProfileId)
       .not('status', 'in', '("ENCERRADO","PAID")')
       .eq('is_archived', false);
 

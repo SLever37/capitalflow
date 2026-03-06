@@ -97,6 +97,23 @@ export const SourcesPage: React.FC<SourcesPageProps> = ({
               className="w-full bg-slate-950 p-4 rounded-xl text-white text-xl font-bold outline-none border border-slate-800 focus:border-blue-500 transition-colors"
             />
 
+            <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">
+              URL do Ícone / Logo
+            </label>
+
+            <input
+              type="text"
+              value={ui.editingSource.logo_url || ''}
+              onChange={e =>
+                ui.setEditingSource({
+                  ...ui.editingSource,
+                  logo_url: e.target.value
+                })
+              }
+              placeholder="https://..."
+              className="w-full bg-slate-950 p-4 rounded-xl text-white text-sm outline-none border border-slate-800 focus:border-blue-500 transition-colors"
+            />
+
             <button
               onClick={handleUpdateSourceBalance}
               className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl uppercase transition-all shadow-lg"

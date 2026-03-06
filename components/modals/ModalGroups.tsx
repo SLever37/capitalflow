@@ -132,6 +132,11 @@ export const FinanceModals = () => {
                             </div>
                         </div>
 
+                        <div>
+                            <label className="text-[10px] uppercase text-slate-500 font-black ml-1 mb-2 block">URL do Ícone / Logo (Opcional)</label>
+                            <input type="text" placeholder="https://..." className="w-full bg-slate-950 p-4 rounded-2xl text-white outline-none border border-slate-800 focus:border-blue-500 transition-all" value={ui.sourceForm.logo_url || ''} onChange={e => ui.setSourceForm({...ui.sourceForm, logo_url: e.target.value})} />
+                        </div>
+
                         {/* NOVO: DESIGNAR CARTEIRA A OPERADOR (EXCLUSIVIDADE) */}
                         {activeUser?.accessLevel === 1 && staffMembers.length > 0 && (
                             <div className="bg-indigo-950/20 border border-indigo-500/20 p-5 rounded-3xl space-y-3">

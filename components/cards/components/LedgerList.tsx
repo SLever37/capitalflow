@@ -106,10 +106,10 @@ const LedgerItem: React.FC<{
   );
 };
 
-export const LedgerList: React.FC<LedgerListProps> = ({ ledger, loan, onReverseTransaction, isStealthMode }) => {
+export const LedgerList: React.FC<LedgerListProps> = ({ ledger = [], loan, onReverseTransaction, isStealthMode }) => {
   return (
     <div className="space-y-2 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
-      {ledger.length > 0 ? (
+      {ledger && ledger.length > 0 ? (
         ledger.map((t) => (
           <LedgerItem
             key={t.id}

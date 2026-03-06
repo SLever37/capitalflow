@@ -21,8 +21,9 @@ export const useCalendar = (activeUser: UserProfile | null, showToast: (msg: str
     if (!activeUser) return;
     if (!silent) setIsLoading(true);
     try {
+      const ownerId = activeUser.supervisor_id || activeUser.id;
       const [sysEvents, userEvents] = await Promise.all([
-        calendarService.fetchSystemEvents(activeUser.id),
+        calendarService.fetchSystemEvents(ownerId),
         calendarService.listUserEvents(activeUser.id)
       ]);
       

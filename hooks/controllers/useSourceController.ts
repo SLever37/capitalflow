@@ -61,6 +61,7 @@ export const useSourceController = (
           name: ui.sourceForm.name,
           type: ui.sourceForm.type,
           balance: initialBalance,
+          logo_url: ui.sourceForm.logo_url || null,
           operador_permitido_id: operadorPermitido,
         },
       ]);
@@ -154,7 +155,10 @@ export const useSourceController = (
     }
 
     try {
-      const { error } = await supabase.from('fontes').update({ balance: newBalance }).eq('id', ui.editingSource.id);
+      const { error } = await supabase.from('fontes').update({ 
+        balance: newBalance,
+        logo_url: ui.editingSource.logo_url 
+      }).eq('id', ui.editingSource.id);
       if (error) throw error;
 
       showToast('Inventário da fonte atualizado!', 'success');
