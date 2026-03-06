@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 
 function getEnvVar(key: string): string {
   try {
-    const val = import.meta.env?.[key as keyof ImportMetaEnv];
+    const val = (import.meta as any)?.env?.[key];
     if (val) return String(val).trim();
   } catch {}
 
