@@ -1,23 +1,33 @@
 import React, { useState } from 'react';
 import { ShieldAlert, AlertTriangle, X } from 'lucide-react';
-import { Loan, CapitalSource } from '../../types';
-import { getDaysDiff } from '../../utils/dateHelpers';
+import { Loan, CapitalSource } from '../../../types';
+import { getDaysDiff } from '../../../utils/dateHelpers';
 
-export const DashboardAlerts = ({ loans, sources }: { loans: Loan[]; sources?: CapitalSource[] }) => {
+export const DashboardAlerts = ({
+  loans,
+  sources,
+}: {
+  loans: Loan[];
+  sources?: CapitalSource[];
+}) => {
   const activeLoans = loans.filter((l) => !l.isArchived);
+
   const critical = activeLoans.filter((l) =>
     l.installments.some((i) => getDaysDiff(i.dueDate) > 30 && i.status !== 'PAID')
   ).length;
 
   // Alerta de Saldo Baixo (< R$ 100,00)
-  const lowBalanceSources = (sources || []).filter((s) => s.balance < 100);
+  const lowBalanceSources = (sources || []).filter((s) => (s.balance ?? 0) < 100);
 
   // Lógica de Dispensa (24h)
   const [isDismissed, setIsDismissed] = useState(() => {
     const stored = localStorage.getItem('cm_alert_critical_dismissed');
     if (!stored) return false;
+
     const timestamp = Number(stored);
     const now = Date.now();
+
+    // Se passou menos de 24h (86400000 ms), mantém dispensado
     return now - timestamp < 86400000;
   });
 

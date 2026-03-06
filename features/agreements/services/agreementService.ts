@@ -10,7 +10,6 @@ import { safeUUID } from "../../../utils/uuid";
  * - tipo: PARCELADO_COM_JUROS | PARCELADO_SEM_JUROS
  * - periodicidade: SEMANAL | QUINZENAL | MENSAL
  */
-
 type JurosModoDB = "PRO_RATA" | "FIXO" | "ZERO";
 type PeriodicidadeDB = "SEMANAL" | "QUINZENAL" | "MENSAL";
 type TipoDB = "PARCELADO_COM_JUROS" | "PARCELADO_SEM_JUROS";
@@ -32,37 +31,28 @@ function toISODateOnly(d: any): string {
 
 function normalizePeriodicidade(v: any): PeriodicidadeDB {
   const s = String(v ?? "").trim().toUpperCase();
-
-  // já no formato do banco
   if (s === "SEMANAL" || s === "QUINZENAL" || s === "MENSAL") return s;
 
   // mapeamentos comuns do front
   if (s === "WEEKLY") return "SEMANAL";
-  if (s === "BIWEEKLY" || s === "QUINZENAL") return "QUINZENAL";
+  if (s === "BIWEEKLY") return "QUINZENAL";
   if (s === "MONTHLY") return "MENSAL";
 
-  // fallback seguro
   return "MENSAL";
 }
 
 function normalizeJurosModo(v: any, interestRate: number): JurosModoDB {
   const s = String(v ?? "").trim().toUpperCase();
+  if (s === "PRO_RATA" || s === "FIXO" || s === "ZERO") return s;
 
-  if (s === "PRO_RATA" || s === "FIXO" || s === "ZERO") return s as JurosModoDB;
-
-  // heurística segura: se não tem juros, modo ZERO
   if (safeNumber(interestRate, 0) <= 0) return "ZERO";
-
-  // se tem juros e não veio modo válido, usa PRO_RATA como padrão “seguro”
   return "PRO_RATA";
 }
 
 function normalizeTipo(v: any, jurosModo: JurosModoDB, interestRate: number): TipoDB {
   const s = String(v ?? "").trim().toUpperCase();
+  if (s === "PARCELADO_COM_JUROS" || s === "PARCELADO_SEM_JUROS") return s;
 
-  if (s === "PARCELADO_COM_JUROS" || s === "PARCELADO_SEM_JUROS") return s as TipoDB;
-
-  // deriva pelo juros
   if (jurosModo !== "ZERO" && safeNumber(interestRate, 0) > 0) return "PARCELADO_COM_JUROS";
   return "PARCELADO_SEM_JUROS";
 }
@@ -77,7 +67,10 @@ export const agreementService = {
     const agreementId = generateUUID();
 
     // --- Campos numéricos base (com fallback)
-    const interestRate = safeNumber((agreementData as any).interestRate ?? (agreementData as any).interest_rate, 0);
+    const interestRate = safeNumber(
+      (agreementData as any).interestRate ?? (agreementData as any).interest_rate,
+      0
+    );
 
     const negotiatedTotal = safeNumber(
       (agreementData as any).negotiatedTotal ??
@@ -94,16 +87,27 @@ export const agreementService = {
     );
 
     // --- Not null / checks
-    const periodicidade = normalizePeriodicidade((agreementData as any).frequency ?? (agreementData as any).periodicidade);
+    const periodicidade = normalizePeriodicidade(
+      (agreementData as any).frequency ?? (agreementData as any).periodicidade
+    );
 
     const jurosModo = normalizeJurosModo((agreementData as any).juros_modo, interestRate);
 
-    const tipo = normalizeTipo((agreementData as any).type ?? (agreementData as any).tipo, jurosModo, interestRate);
+    const tipo = normalizeTipo(
+      (agreementData as any).type ?? (agreementData as any).tipo,
+      jurosModo,
+      interestRate
+    );
 
     const numParcelas =
       Math.max(
         1,
-        safeNumber((agreementData as any).installmentsCount ?? (agreementData as any).num_parcelas ?? installments?.length, 1)
+        safeNumber(
+          (agreementData as any).installmentsCount ??
+            (agreementData as any).num_parcelas ??
+            installments?.length,
+          1
+        )
       ) | 0;
 
     const firstDueDate =
@@ -114,8 +118,18 @@ export const agreementService = {
     // total_amount não pode ficar 0 “por acidente”
     const totalAmount = negotiatedTotal > 0 ? negotiatedTotal : Math.max(0, totalBase);
 
+    // ✅ valor_parcela é NOT NULL no banco -> NUNCA pode ser null
+    // tenta pegar do payload, senão usa a primeira parcela, senão divide total/parcelas
+    const valorParcela = safeNumber(
+      (agreementData as any).valor_parcela ??
+        (agreementData as any).valorParcela ??
+        (agreementData as any).installmentValue ??
+        installments?.[0]?.amount ??
+        (numParcelas > 0 ? totalAmount / numParcelas : totalAmount),
+      0
+    );
+
     // coluna "installments" no seu banco está como INTEGER (pelo erro que você mostrou)
-    // então vamos preencher com numParcelas para não dar conflito de tipo
     const installmentsInt = numParcelas;
 
     // 1) Header
@@ -123,32 +137,29 @@ export const agreementService = {
       id: agreementId,
       loan_id: loanId,
       profile_id: profileId,
-
       status: "ACTIVE",
 
       // ✅ CHECKs
-      tipo,                 // PARCELADO_COM_JUROS | PARCELADO_SEM_JUROS
-      periodicidade,        // SEMANAL | QUINZENAL | MENSAL
+      tipo, // PARCELADO_COM_JUROS | PARCELADO_SEM_JUROS
+      periodicidade, // SEMANAL | QUINZENAL | MENSAL
       juros_modo: jurosModo, // PRO_RATA | FIXO | ZERO
 
       // ✅ NOT NULL
       num_parcelas: numParcelas,
       first_due_date: firstDueDate,
       total_amount: totalAmount,
+      valor_parcela: valorParcela, // ✅ NUNCA NULL
       interest_rate: interestRate,
       installments: installmentsInt,
 
       // opcionais (se existirem no schema)
       total_negociado: negotiatedTotal,
       juros_mensal_percent: safeNumber((agreementData as any).juros_mensal_percent, 0),
-
       principal_base: safeNumber((agreementData as any).principal_base, 0),
       interest_base: safeNumber((agreementData as any).interest_base, 0),
       late_fee_base: safeNumber((agreementData as any).late_fee_base, 0),
       total_base: totalBase,
-
       notes: (agreementData as any).notes ?? null,
-      valor_parcela: safeNumber((agreementData as any).valor_parcela, 0) || null,
     });
 
     if (headerError) throw new Error("Erro ao criar acordo: " + headerError.message);
@@ -158,7 +169,7 @@ export const agreementService = {
       id: generateUUID(),
       acordo_id: agreementId,
       profile_id: profileId,
-      numero: safeNumber(inst.number, 1) | 0,
+      numero: (Math.max(1, safeNumber(inst.number, 1)) | 0),
       data_vencimento: toISODateOnly(inst.dueDate),
       valor: safeNumber(inst.amount, 0),
       status: "PENDING",
@@ -173,7 +184,7 @@ export const agreementService = {
         profile_id: profileId,
         numero: 1,
         data_vencimento: firstDueDate,
-        valor: totalAmount,
+        valor: valorParcela || totalAmount,
         status: "PENDING",
         valor_pago: 0,
       });
@@ -238,7 +249,6 @@ export const agreementService = {
 
     if (txErr) throw txErr;
 
-    // ✅ CORRIGIDO: string literal fechada corretamente
     const { error: balErr } = await supabase.rpc("adjust_source_balance", {
       p_source_id: safeUUID(sourceId),
       p_delta: safeNumber(amount, 0),
