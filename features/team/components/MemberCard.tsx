@@ -84,63 +84,50 @@ export const MemberCard = ({ member, onDelete, onEdit, onOpenChat }: any) => {
     };
 
     return (
-        <div className={`bg-slate-900 border rounded-[2.5rem] flex flex-col group transition-all duration-300 relative overflow-hidden ${
-            isExpanded ? 'ring-2 ring-blue-500/50 shadow-2xl' : 'shadow-lg'
+        <div className={`flex flex-col group transition-all duration-300 relative overflow-hidden ${
+            isExpanded ? 'bg-slate-800/50' : 'hover:bg-slate-800/30'
         } ${
-            isExpired ? 'opacity-60 border-rose-900/50' : 
-            isPending ? 'border-blue-500/30' : 
-            'border-slate-800 hover:border-slate-700'
+            isExpired ? 'opacity-60' : ''
         }`}>
             
             {isPending && !isExpired && (
-                <div className="absolute top-0 right-0 px-4 py-1.5 bg-blue-600 text-white text-[8px] font-black uppercase tracking-widest rounded-bl-2xl flex items-center gap-1.5 shadow-lg z-10">
+                <div className="absolute top-0 right-0 px-4 py-1 bg-blue-600 text-white text-[8px] font-black uppercase tracking-widest rounded-bl-xl flex items-center gap-1.5 shadow-lg z-10">
                     <Timer size={10} className="animate-spin" /> {getRemainingTime()}
                 </div>
             )}
 
-            <div className="p-6 cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
-                <div className="flex items-center gap-4 mb-6">
-                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-slate-500 border overflow-hidden shrink-0 ${isPending ? 'bg-slate-800 border-blue-500/20' : 'bg-slate-800 border-slate-700'}`}>
-                       {avatarUrl ? <img src={avatarUrl} alt={member.full_name} className="w-full h-full object-cover" /> : <User size={28} className={isPending ? 'text-blue-500' : ''} />}
+            <div className="p-4 sm:p-6 cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
+                <div className="flex items-center gap-4">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center text-slate-500 border overflow-hidden shrink-0 ${isPending ? 'bg-slate-950 border-blue-500/20' : 'bg-slate-950 border-slate-800'}`}>
+                       {avatarUrl ? <img src={avatarUrl} alt={member.full_name} className="w-full h-full object-cover" /> : <User size={24} className={isPending ? 'text-blue-500' : ''} />}
                     </div>
+                    
                     <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                            <h3 className="text-white font-black text-base uppercase truncate">{member.full_name}</h3>
-                            {isExpanded ? <ChevronUp size={18} className="text-slate-600"/> : <ChevronDown size={18} className="text-slate-600"/>}
+                        <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                                <h3 className="text-sm font-semibold text-white uppercase truncate">{member.full_name}</h3>
+                                {member.role === 'ADMIN' && <ShieldCheck size={12} className="text-blue-500 shrink-0" />}
+                                {isAccepted && <CheckCircle2 size={12} className="text-emerald-500 shrink-0" />}
+                            </div>
+                            <div className="flex items-center gap-3 shrink-0">
+                                <div className="hidden sm:flex flex-col items-end">
+                                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none">Status</span>
+                                    <span className={`text-[10px] font-bold uppercase mt-1 ${daysOff === 0 ? 'text-emerald-400' : 'text-slate-500'}`}>
+                                        {daysOff === 0 ? 'Online' : daysOff ? `Off há ${daysOff}d` : 'Inativo'}
+                                    </span>
+                                </div>
+                                {isExpanded ? <ChevronUp size={18} className="text-slate-500"/> : <ChevronDown size={18} className="text-slate-500"/>}
+                            </div>
                         </div>
-                        <div className="flex items-center gap-2 mt-1">
-                            <span className="text-slate-500 text-[9px] uppercase font-black tracking-widest bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                        
+                        <div className="flex items-center gap-3 mt-1">
+                            <span className="text-slate-500 text-[10px] font-black uppercase tracking-widest">
                                 {member.cpf ? maskDocument(member.cpf) : 'S/ CPF'}
                             </span>
-                            {member.role === 'ADMIN' && (
-                                <span title="Administrador" className="flex items-center">
-                                    <ShieldCheck size={12} className="text-blue-500" />
-                                </span>
-                            )}
-                            {isAccepted && (
-                                <span title="Acesso Ativo" className="flex items-center">
-                                    <CheckCircle2 size={12} className="text-emerald-500" />
-                                </span>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                    <div className="bg-slate-950/50 p-2 rounded-xl border border-slate-800/50">
-                        <p className="text-[8px] text-slate-500 font-black uppercase mb-1">Status</p>
-                        <div className="flex items-center gap-1.5">
-                            <div className={`w-1.5 h-1.5 rounded-full ${daysOff === 0 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-700'}`}></div>
-                            <span className={`text-[10px] font-black uppercase ${daysOff === 0 ? 'text-emerald-400' : 'text-slate-500'}`}>
-                                {daysOff === 0 ? 'Online' : daysOff ? `Off há ${daysOff}d` : 'Inativo'}
+                            <span className="w-1 h-1 bg-slate-800 rounded-full"></span>
+                            <span className="text-slate-500 text-[10px] font-black uppercase tracking-widest truncate">
+                                {member.role === 'ADMIN' ? 'Administrador' : isPending ? 'Convidado' : 'Operador'}
                             </span>
-                        </div>
-                    </div>
-                    <div className="bg-slate-950/50 p-2 rounded-xl border border-slate-800/50">
-                        <p className="text-[8px] text-slate-500 font-black uppercase mb-1">Logins</p>
-                        <div className="flex items-center gap-1.5">
-                            <MousePointer2 size={10} className="text-blue-500" />
-                            <span className="text-[10px] font-black text-white">{accessCount} Acessos</span>
                         </div>
                     </div>
                 </div>
@@ -214,12 +201,12 @@ export const MemberCard = ({ member, onDelete, onEdit, onOpenChat }: any) => {
                             {loadingStats ? (
                                 <div className="py-8 flex justify-center"><Clock className="animate-spin text-slate-700" size={16}/></div>
                             ) : stats?.lastTransactions.length === 0 ? (
-                                <p className="text-[10px] text-slate-600 text-center py-4 italic">Nenhuma transação registrada.</p>
+                                <p className="text-[10px] text-slate-500 text-center py-4 italic">Nenhuma transação registrada.</p>
                             ) : stats?.lastTransactions.map((t: any) => (
                                 <div key={t.id} className="flex justify-between items-center p-2 hover:bg-slate-900 rounded-lg transition-colors">
                                     <div className="min-w-0">
                                         <p className="text-[10px] font-bold text-slate-300 truncate uppercase">{t.notes || translateTransactionType(t.type)}</p>
-                                        <p className="text-[8px] text-slate-600">{new Date(t.date).toLocaleDateString()}</p>
+                                        <p className="text-[8px] text-slate-500">{new Date(t.date).toLocaleDateString()}</p>
                                     </div>
                                     <span className={`text-[10px] font-black ${t.type === 'LEND_MORE' ? 'text-rose-500' : 'text-emerald-500'}`}>
                                         {t.type === 'LEND_MORE' ? '-' : '+'} {formatMoney(t.amount)}
@@ -233,20 +220,18 @@ export const MemberCard = ({ member, onDelete, onEdit, onOpenChat }: any) => {
 
             <div className="mt-auto p-4 bg-slate-950/50 border-t border-slate-800 flex justify-between items-center">
                 <div className="flex items-center gap-2">
-                    <div className={`p-1.5 rounded-lg ${member.role === 'ADMIN' ? 'bg-blue-500/10 text-blue-500' : 'bg-slate-800 text-slate-500'}`}>
-                        {member.role === 'ADMIN' ? <ShieldCheck size={14}/> : <User size={14}/>}
+                    <div className="flex items-center gap-1.5">
+                        <MousePointer2 size={10} className="text-blue-500" />
+                        <span className="text-[10px] font-black text-white uppercase tracking-widest">{accessCount} Acessos</span>
                     </div>
-                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider">
-                        {member.role === 'ADMIN' ? 'Administrador' : isPending ? 'Convidado' : 'Operador'}
-                    </span>
                 </div>
                 <div className="flex gap-2">
                     <button 
                         onClick={(e) => { e.stopPropagation(); onDelete(member.id); }} 
-                        className="p-2.5 bg-slate-900 text-slate-600 hover:text-rose-500 rounded-xl transition-all border border-slate-800 hover:border-rose-500/30"
+                        className="p-2 bg-slate-900 text-slate-500 hover:text-rose-500 rounded-xl transition-all border border-slate-800 hover:border-rose-500/30"
                         title="Excluir Membro"
                     >
-                        <Trash2 size={16} />
+                        <Trash2 size={14} />
                     </button>
                 </div>
             </div>

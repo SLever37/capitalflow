@@ -4,6 +4,7 @@ import { Modal } from "../../../components/ui/Modal";
 import { Agreement, Loan, UserProfile, LegalDocumentRecord } from "../../../types";
 import { generateConfissaoDividaHTML } from "../templates/ConfissaoDividaTemplate";
 import { legalService } from "../services/legalService";
+import { safeUUID } from "../../../utils/uuid";
 import { Printer, Scale, FileSignature, Loader2, ShieldCheck, Check, FileText, Activity, Users, User, Copy, MessageSquare, Link } from "lucide-react";
 import { LegalReportView } from './LegalReportView';
 
@@ -27,7 +28,12 @@ export const LegalDocumentModal: React.FC<LegalDocumentModalProps> = ({ agreemen
         setIsLoading(true);
         try {
             const params = legalService.prepareDocumentParams(agreement, loan, activeUser);
-            const record = await legalService.generateAndRegisterDocument(agreement.id, params, activeUser.id);
+            const ownerId = safeUUID((activeUser as any).supervisor_id) || safeUUID(activeUser.id);
+            if (!ownerId) {
+                console.error("ID do usuário inválido para geração de documento.");
+                return;
+            }
+            const record = await legalService.generateAndRegisterDocument(agreement.id, params, ownerId);
             setDocRecord(record);
 
             const auditData = await legalService.getFullAuditData(record.id);

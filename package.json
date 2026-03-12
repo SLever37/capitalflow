@@ -16,10 +16,14 @@
   "dependencies": {
     "@google/genai": "^1.34.0",
     "@supabase/supabase-js": "2.39.3",
+    "@types/express": "^5.0.6",
     "dotenv": "^17.3.1",
+    "express": "^5.2.1",
     "lucide-react": "^0.562.0",
+    "motion": "^12.35.2",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
+    "react-router-dom": "^7.13.1",
     "recharts": "^3.6.0",
     "xlsx": "0.18.5"
   },

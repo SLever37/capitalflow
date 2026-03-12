@@ -131,7 +131,7 @@ export const PublicSignaturePage = () => {
         <div className="min-h-screen bg-slate-950 text-white p-4 sm:p-8 flex justify-center">
             <div className="w-full max-w-2xl space-y-6">
                 {/* Header */}
-                <div className="flex items-center justify-between bg-slate-900 p-6 rounded-[2rem] border border-slate-800 shadow-xl">
+                <div className="flex items-center justify-between bg-slate-900 p-6 rounded-3xl border border-slate-800 shadow-xl">
                     <div className="flex items-center gap-4">
                         <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-900/20">
                             <FileSignature size={28} />
@@ -149,7 +149,7 @@ export const PublicSignaturePage = () => {
                 </div>
 
                 {/* Document Preview Card */}
-                <div className="bg-slate-900 border border-slate-800 rounded-[2rem] overflow-hidden shadow-xl">
+                <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
                     <div className="p-6 border-b border-slate-800 bg-slate-950/50 flex justify-between items-center">
                         <h2 className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
                             <Scale size={18} className="text-indigo-500"/> Confissão de Dívida
@@ -219,7 +219,7 @@ export const PublicSignaturePage = () => {
                         <button 
                             onClick={handleDownload}
                             disabled={!isComplete}
-                            className={`flex-1 py-4 rounded-2xl font-black uppercase tracking-widest text-sm transition-all flex items-center justify-center gap-2 ${isComplete ? 'bg-white text-slate-950 hover:bg-slate-200 shadow-xl' : 'bg-slate-800 text-slate-600 cursor-not-allowed'}`}
+                            className={`flex-1 py-4 rounded-2xl font-black uppercase tracking-widest text-sm transition-all flex items-center justify-center gap-2 ${isComplete ? 'bg-white text-slate-950 hover:bg-slate-200 shadow-xl' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}`}
                         >
                             <Download size={20}/> {isComplete ? 'Baixar PDF Final' : 'Aguardando Assinaturas'}
                         </button>
@@ -227,7 +227,7 @@ export const PublicSignaturePage = () => {
                 </div>
 
                 {/* Security Footer */}
-                <div className="flex items-center justify-center gap-6 text-slate-600">
+                <div className="flex items-center justify-center gap-6 text-slate-500">
                     <div className="flex items-center gap-2">
                         <ShieldCheck size={14}/>
                         <span className="text-[10px] font-bold uppercase tracking-widest">Criptografia SHA-256</span>

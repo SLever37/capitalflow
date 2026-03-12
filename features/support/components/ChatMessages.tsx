@@ -189,39 +189,54 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
         const isSequence = prevM && prevM.sender_type === m.sender_type;
 
         return (
-          <div key={m.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'} ${isSequence ? 'mt-1' : 'mt-4'} group`}>
+          <div key={m.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'} ${isSequence ? 'mt-1.5' : 'mt-5'} group animate-in fade-in slide-in-from-bottom-2 duration-300`}>
             <div
-              className={`max-w-[85%] px-4 py-3 relative ${
+              className={`max-w-[85%] px-4 py-3 shadow-xl transition-all hover:scale-[1.01] ${
                 isMe
-                  ? 'bg-blue-600 text-white rounded-2xl rounded-tr-sm shadow-sm'
-                  : `${chatTheme === 'blue' ? 'bg-slate-800 border border-slate-700/50' : 'bg-[#1e293b]'} text-slate-200 rounded-2xl rounded-tl-sm shadow-sm`
+                  ? 'bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-2xl rounded-tr-sm shadow-blue-900/10'
+                  : `${chatTheme === 'blue' ? 'bg-slate-800/80 border border-slate-700/50' : 'bg-slate-800/90 border border-slate-700/30'} text-slate-100 rounded-2xl rounded-tl-sm shadow-black/20 backdrop-blur-sm`
               }`}
             >
-              {renderContent(m)}
+              <div className="relative">
+                {renderContent(m)}
+              </div>
 
               <div
-                className={`flex items-center justify-end gap-1 mt-1 text-[9px] font-bold uppercase tracking-wider ${
-                  isMe ? 'opacity-70 text-blue-100' : 'opacity-50 text-slate-400'
+                className={`flex items-center justify-end gap-1.5 mt-1.5 text-[9px] font-black uppercase tracking-tighter ${
+                  isMe ? 'text-blue-100/70' : 'text-slate-500'
                 }`}
               >
-                {/* Botão de Deletar para Operador (pode deletar qualquer mensagem se tiver permissão) */}
+                {/* Botão de Deletar para Operador */}
                 {senderType === 'OPERATOR' && onDeleteMessage && (
                     <button 
                         onClick={(e) => { e.stopPropagation(); handleDelete(m.id); }} 
-                        className="mr-2 opacity-50 hover:opacity-100 transition-opacity hover:text-rose-300"
+                        className="mr-2 opacity-0 group-hover:opacity-100 transition-all hover:text-rose-400"
                         title="Apagar Mensagem"
                     >
                         <Trash2 size={10} />
                     </button>
                 )}
 
-                {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                <span className="tabular-nums">
+                    {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
 
                 {m.sender_type === 'OPERATOR' && m.operator_id && !isMe && (
-                  <User size={8} className="ml-1" />
+                  <div className="flex items-center gap-1 bg-slate-900/50 px-1 rounded">
+                    <User size={8} />
+                    <span>Oficial</span>
+                  </div>
                 )}
 
-                {isMe && (m.read ? <CheckCheck size={12} className="text-white" /> : <Check size={12} />)}
+                {isMe && (
+                    <div className="ml-1">
+                        {m.read ? (
+                            <CheckCheck size={12} className="text-emerald-400" />
+                        ) : (
+                            <Check size={12} className="text-blue-200/50" />
+                        )}
+                    </div>
+                )}
               </div>
             </div>
           </div>

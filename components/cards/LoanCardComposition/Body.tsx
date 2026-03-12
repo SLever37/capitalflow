@@ -21,43 +21,41 @@ interface BodyProps {
     strategy: any;
     isDailyFree: boolean;
     isFixedTerm: boolean;
-    onPayment: (loan: Loan, inst: Installment, calculations: any) => void;
     isStealthMode?: boolean;
 }
 
 export const Body: React.FC<BodyProps> = ({
     hasActiveAgreement, loan, activeUser, activeAgreement, onRefresh, onAgreementPayment,
     orderedInstallments, fixedTermStats, isPaid, isLate, isZeroBalance, isFullyFinalized,
-    showProgress, strategy, isDailyFree, isFixedTerm, onPayment, isStealthMode
+    showProgress, strategy, isDailyFree, isFixedTerm, isStealthMode
 }) => {
-    if (hasActiveAgreement && activeAgreement) {
-        return (
-            <AgreementView
-              agreement={activeAgreement}
-              loan={loan}
-              activeUser={activeUser}
-              onUpdate={onRefresh}
-              onPayment={(inst) => onAgreementPayment(loan, activeAgreement, inst)}
-            />
-        );
-    }
-
     return (
-        <InstallmentGrid
-            loan={loan}
-            orderedInstallments={orderedInstallments}
-            fixedTermStats={fixedTermStats}
-            isPaid={isPaid}
-            isLate={isLate}
-            isZeroBalance={isZeroBalance}
-            isFullyFinalized={isFullyFinalized}
-            showProgress={showProgress}
-            strategy={strategy}
-            isDailyFree={isDailyFree}
-            isFixedTerm={isFixedTerm}
-            onPayment={onPayment}
-            onAgreementPayment={onAgreementPayment}
-            isStealthMode={isStealthMode}
-        />
+        <div className="space-y-6">
+            {hasActiveAgreement ? (
+                <div className="bg-slate-950/50 border border-slate-800/50 p-6 rounded-2xl text-center">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-1">Contrato Renegociado</p>
+                    <p className="text-xs text-slate-500 font-medium">As informações de parcelas e pagamentos estão disponíveis nos detalhes do contrato.</p>
+                </div>
+            ) : (
+                <>
+                    {/* Sempre exibe as parcelas originais se não houver acordo ativo */}
+                    <InstallmentGrid
+                        loan={loan}
+                        orderedInstallments={orderedInstallments}
+                        fixedTermStats={fixedTermStats}
+                        isPaid={isPaid}
+                        isLate={isLate}
+                        isZeroBalance={isZeroBalance}
+                        isFullyFinalized={isFullyFinalized}
+                        showProgress={showProgress}
+                        strategy={strategy}
+                        isDailyFree={isDailyFree}
+                        isFixedTerm={isFixedTerm}
+                        onAgreementPayment={onAgreementPayment}
+                        isStealthMode={isStealthMode}
+                    />
+                </>
+            )}
+        </div>
     );
 };

@@ -17,9 +17,9 @@ export type { LoanCardProps };
 export const LoanCard: React.FC<LoanCardProps> = (props) => {
   const {
     loan, sources, isStealthMode, activeUser, onEdit, onMessage, onArchive,
-    onRestore, onDelete, onNote, onPayment, onPortalLink, onUploadPromissoria,
+    onRestore, onDelete, onNote, onPortalLink, onUploadPromissoria,
     onUploadDoc, onViewPromissoria, onViewDoc, onReviewSignal, onOpenComprovante,
-    onReverseTransaction, onRenegotiate, onNewAporte, onAgreementPayment,
+    onReverseTransaction, onRenegotiate, onActivate, onNewAporte, onAgreementPayment,
     onNavigate, onRefresh
   } = props;
 
@@ -61,11 +61,11 @@ export const LoanCard: React.FC<LoanCardProps> = (props) => {
 
   return (
     <div
-      className={`relative overflow-hidden transition-all duration-300 rounded-2xl sm:rounded-3xl border border-slate-800 bg-slate-900 hover:border-slate-700 hover:shadow-xl hover:shadow-slate-900/50 group cursor-pointer border-l-4 ${borderLeftColor} ${isExpanded ? 'ring-2 ring-blue-500/20' : ''}`}
+      className={`responsive-card relative overflow-hidden transition-all duration-300 rounded-2xl sm:rounded-3xl border border-slate-800 bg-slate-900 hover:border-slate-700 hover:shadow-xl hover:shadow-slate-900/50 group cursor-pointer border-l-4 ${borderLeftColor} ${isExpanded ? 'ring-2 ring-blue-500/20' : ''}`}
       onClick={handleCardClick}
     >
       {/* Container Principal com Padding */}
-      <div className="p-5 sm:p-6 space-y-6">
+      <div className="space-y-6">
         <Header 
           loan={loan}
           debtorNameSafe={debtorNameSafe}
@@ -110,7 +110,6 @@ export const LoanCard: React.FC<LoanCardProps> = (props) => {
               strategy={strategy}
               isDailyFree={isDailyFree}
               isFixedTerm={isFixedTerm}
-              onPayment={onPayment}
               isStealthMode={isStealthMode}
             />
 
@@ -130,6 +129,7 @@ export const LoanCard: React.FC<LoanCardProps> = (props) => {
               onRestore={() => onRestore(loan)}
               onDelete={() => onDelete(loan)}
               onRenegotiate={() => onRenegotiate(loan)}
+              onActivate={() => onActivate(loan)}
               onNewAporte={() => onNewAporte(loan)}
               onEdit={(e) => { e.stopPropagation(); onEdit(loan); }}
               isFullyFinalized={isFullyFinalized}

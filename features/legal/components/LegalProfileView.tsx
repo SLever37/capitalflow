@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { ArrowLeft, User, Scale, MapPin, Building, Lock } from 'lucide-react';
+import { ChevronLeft, User, Scale, MapPin, Building, Lock } from 'lucide-react';
 import { UserProfile } from '../../../types';
 
 interface LegalProfileViewProps {
@@ -14,8 +14,8 @@ export const LegalProfileView: React.FC<LegalProfileViewProps> = ({ activeUser, 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-right duration-300">
             <div className="flex items-center gap-4 mb-8">
-                <button onClick={onBack} className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors">
-                    <ArrowLeft size={20}/>
+                <button onClick={onBack} className="text-slate-500 hover:text-white transition-colors" title="Voltar">
+                    <ChevronLeft size={24}/>
                 </button>
                 <div>
                     <h2 className="text-xl font-black text-white uppercase flex items-center gap-2">
@@ -25,7 +25,7 @@ export const LegalProfileView: React.FC<LegalProfileViewProps> = ({ activeUser, 
                 </div>
             </div>
 
-            <div className="bg-slate-900 border border-slate-800 p-8 rounded-[3rem] max-w-2xl">
+            <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl max-w-2xl">
                 <div className="space-y-6">
                     <div className="flex items-center gap-4 p-4 bg-slate-950 rounded-2xl border border-slate-800">
                         <div className="p-3 bg-blue-500/10 text-blue-500 rounded-xl"><Building size={20}/></div>

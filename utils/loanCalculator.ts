@@ -13,6 +13,8 @@ export interface LoanCalculationInput {
   lateFeeDaily?: number; // Mora diária (ex: 0.02 para 2% ao dia)
   forgiveness?: 'FINE_ONLY' | 'INTEREST_ONLY' | 'BOTH' | 'NONE';
   currentDate?: Date; // Data de cálculo (default: hoje)
+  calculationMode?: 'NORMAL' | 'REVERSE'; // NORMAL: Principal -> Parcela | REVERSE: Parcela -> Principal/Prazo
+  targetInstallmentValue?: number; // Usado apenas no modo REVERSE
 }
 
 export interface LoanCalculationOutput {
@@ -43,10 +45,15 @@ export interface SimulatorOutput extends LoanCalculationOutput {
   nextInstallmentDate?: Date;
 }
 
-// Calcular dias entre datas
+// Calcular dias entre datas (normalizando para meia-noite UTC para evitar problemas de fuso horário/horário de verão)
 function getDaysBetween(start: Date, end: Date): number {
-  const diffTime = Math.abs(end.getTime() - start.getTime());
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  const s = new Date(start.getTime());
+  s.setHours(0, 0, 0, 0);
+  const e = new Date(end.getTime());
+  e.setHours(0, 0, 0, 0);
+  
+  const diffTime = e.getTime() - s.getTime();
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
   return diffDays;
 }
 
@@ -101,7 +108,6 @@ function applyForgiveness(
 // FUNÇÃO PRINCIPAL: Calcular empréstimo
 export function calculateLoan(input: LoanCalculationInput): LoanCalculationOutput {
   const {
-    principal,
     dailyRate,
     startDate,
     dueDate,
@@ -109,19 +115,56 @@ export function calculateLoan(input: LoanCalculationInput): LoanCalculationOutpu
     lateFeeDaily = 0,
     forgiveness = 'NONE',
     currentDate = new Date(),
+    calculationMode = 'NORMAL',
+    targetInstallmentValue = 0,
   } = input;
 
+  let { principal } = input;
+
   // Validações
-  if (principal <= 0) throw new Error('Principal deve ser > 0');
-  if (dailyRate < 0) throw new Error('Taxa diária nao pode ser negativa');
-  if (startDate >= dueDate) throw new Error('Data de inicio deve ser antes da data de vencimento');
+  if (dailyRate < 0 || startDate >= dueDate) {
+    return {
+      principal: 0,
+      interest: 0,
+      lateFee: 0,
+      total: 0,
+      daysElapsed: 0,
+      isDueToday: false,
+      isOverdue: false,
+      daysOverdue: 0,
+      breakdown: { principal: 0, interest: 0, lateFee: 0 },
+      nextDueDate: new Date()
+    };
+  }
 
   // Calcular dias
-  const daysElapsed = getDaysBetween(startDate, currentDate);
+  const daysElapsed = Math.max(0, getDaysBetween(startDate, currentDate));
   const daysToExpiry = getDaysBetween(currentDate, dueDate);
-  const daysOverdue = Math.max(0, -daysToExpiry);
+  const daysOverdue = Math.max(0, getDaysBetween(dueDate, currentDate));
   const isDueToday = daysToExpiry === 0;
   const isOverdue = daysOverdue > 0;
+
+  // Modo REVERSE: Calcula o principal a partir da parcela desejada
+  if (calculationMode === 'REVERSE' && targetInstallmentValue > 0) {
+    // total = principal * (1 + dailyRate * daysElapsed)
+    // principal = total / (1 + dailyRate * daysElapsed)
+    principal = targetInstallmentValue / (1 + dailyRate * daysElapsed);
+  }
+
+  if (principal <= 0) {
+    return {
+      principal: 0,
+      interest: 0,
+      lateFee: 0,
+      total: 0,
+      daysElapsed: 0,
+      isDueToday: false,
+      isOverdue: false,
+      daysOverdue: 0,
+      breakdown: { principal: 0, interest: 0, lateFee: 0 },
+      nextDueDate: new Date()
+    };
+  }
 
   // Calcular juros
   let interest = calculateInterest(principal, dailyRate, daysElapsed);
@@ -138,11 +181,14 @@ export function calculateLoan(input: LoanCalculationInput): LoanCalculationOutpu
   const total = principal + interest + lateFee;
 
   // Próximo vencimento (se renovar)
-  const nextDueDate = new Date(dueDate);
-  nextDueDate.setDate(nextDueDate.getDate() + 30); // +30 dias por padrão
+  // CORREÇÃO: Garantir que o próximo vencimento não seja no passado
+  const today = new Date();
+  const baseDate = dueDate < today ? today : dueDate;
+  const nextDueDate = new Date(baseDate);
+  nextDueDate.setDate(nextDueDate.getDate() + 30); // +30 dias a partir da base válida
 
   return {
-    principal,
+    principal: Math.round(principal * 100) / 100,
     interest: Math.round(interest * 100) / 100,
     lateFee: Math.round(lateFee * 100) / 100,
     total: Math.round(total * 100) / 100,
@@ -151,7 +197,7 @@ export function calculateLoan(input: LoanCalculationInput): LoanCalculationOutpu
     isOverdue,
     daysOverdue,
     breakdown: {
-      principal,
+      principal: Math.round(principal * 100) / 100,
       interest: Math.round(interest * 100) / 100,
       lateFee: Math.round(lateFee * 100) / 100,
     },
@@ -187,7 +233,10 @@ export function simulatePayment(input: SimulatorInput): SimulatorOutput {
     nextInstallmentDate = undefined;
   } else if (paymentType === 'RENEWAL') {
     // Renovação: +30 dias
-    nextInstallmentDate = new Date(calculationInput.dueDate);
+    // CORREÇÃO: Garantir que a próxima data não seja no passado
+    const today = new Date();
+    const baseDate = calculationInput.dueDate < today ? today : calculationInput.dueDate;
+    nextInstallmentDate = new Date(baseDate);
     nextInstallmentDate.setDate(nextInstallmentDate.getDate() + 30);
   } else {
     // Parcial: mesmo vencimento

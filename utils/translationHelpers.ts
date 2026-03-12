@@ -16,6 +16,24 @@ export const translateTransactionType = (type: string): string => {
     'PARTIAL_INTEREST': 'Juros Parciais',
     'SYSTEM': 'Sistema',
     'AUDIT': 'Auditoria',
+    'PAYMENT_PROFIT': 'Lucro (Juros)',
+    'payment_profit': 'Lucro (Juros)',
+    'PAYMENT_PRINCIPAL': 'Retorno de Capital',
+    'payment_principal': 'Retorno de Capital',
+    'PAYMENT_LATE_FEE': 'Multa/Mora',
+    'payment_late_fee': 'Multa/Mora',
+    'PAYMENT_INTEREST': 'Lucro (Juros)',
+    'payment_interest': 'Lucro (Juros)',
+    'PAYMENT_INTEREST_ONLY': 'Pagamento de Juros',
+    'payment_interest_only': 'Pagamento de Juros',
+    'RENEWAL': 'Renovação',
+    'renewal': 'Renovação',
+    'WITHDRAWAL': 'Resgate',
+    'withdrawal': 'Resgate',
+    'DEPOSIT': 'Depósito',
+    'deposit': 'Depósito',
+    'TRANSFER': 'Transferência',
+    'transfer': 'Transferência',
   };
 
   return translations[type] || type;
@@ -30,6 +48,12 @@ export const translateLoanStatus = (status: string): string => {
     'OVERDUE': 'Atrasado',
     'ACTIVE': 'Ativo',
     'BROKEN': 'Quebrado',
+    'ARCHIVED': 'Arquivado',
+    'RENEGOTIATED': 'Renegociado',
+    'PAGO': 'Quitado',
+    'ATRASADO': 'Atrasado',
+    'ATIVO': 'Ativo',
+    'CANCELADO': 'Cancelado',
   };
 
   return translations[status] || status;
@@ -39,10 +63,13 @@ export const translateFilter = (filter: string): string => {
   const translations: Record<string, string> = {
     'TODOS': 'Todos',
     'ATRASADOS': 'Atrasados',
-    'ATRASO_CRITICO': 'Atraso Crítico',
+    'ATRASO_CRITICO': 'Críticos',
     'EM_DIA': 'Em Dia',
-    'PAGOS': 'Pagos',
+    'QUITADO': 'Quitados',
+    'PAGOS': 'Quitados',
+    'RENEGOCIADO': 'Renegociados',
     'ARQUIVADOS': 'Arquivados',
+    'PENDENTES': 'Pendentes',
   };
 
   return translations[filter] || filter;

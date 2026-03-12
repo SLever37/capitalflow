@@ -14,7 +14,7 @@ export const usePersistedTab = (
     if (lastTab && typeof lastTab === 'string') {
       setActiveTab(lastTab as AppTab);
     }
-  }, [setActiveTab]);
+  }, []); // Remove setActiveTab from dependencies to prevent infinite loops
 
   // 🔹 Salva sempre que a aba mudar (mas evita salvar na primeira renderização)
   useEffect(() => {

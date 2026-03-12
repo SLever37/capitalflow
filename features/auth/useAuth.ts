@@ -297,14 +297,49 @@ export const useAuth = () => {
     try {
       const userInput = loginUser.trim();
       const pass = loginPassword.trim();
-      const authPass = pass.length < 6 ? pass.padEnd(6, '0') : pass;
-
+      
       if (!userInput || !pass) throw new Error('Preencha usuário e senha.');
 
       requestBrowserNotificationPermission();
 
-      await ensureAuthSession(userInput, authPass);
+      let emailToLogin = userInput;
+      let authPass = pass.length < 6 ? pass.padEnd(6, '0') : pass;
 
+      // 1. Tenta resolver o email se não for um email
+      if (!userInput.includes('@')) {
+        const { data: profileData } = await supabase
+          .from('perfis')
+          .select('email, usuario_email')
+          .ilike('nome_operador', userInput)
+          .limit(1)
+          .maybeSingle();
+
+        if (profileData) {
+          emailToLogin = profileData.usuario_email || profileData.email || userInput;
+        } else {
+          // Se não achou perfil pelo nome, e não é email, tenta ver se é um email sem @ (raro mas possível em alguns sistemas)
+          // Ou simplesmente deixa falhar no Supabase Auth com erro amigável
+        }
+      }
+
+      // 2. Tenta autenticar no Supabase
+      try {
+        await ensureAuthSession(emailToLogin, authPass);
+      } catch (err: any) {
+        // Se falhou com a senha padronizada e a senha original era diferente, tenta com a original
+        if (pass !== authPass) {
+          try {
+            await ensureAuthSession(emailToLogin, pass);
+            authPass = pass; // Se funcionou, atualiza a senha usada
+          } catch {
+            throw err; // Se falhou ambos, joga o erro original
+          }
+        } else {
+          throw err;
+        }
+      }
+
+      // 3. Resolve o perfil
       const { data: u } = await supabase.auth.getUser();
       const uid = u.user?.id;
       if (!uid) throw new Error('Sessão inválida.');
@@ -316,35 +351,30 @@ export const useAuth = () => {
         .maybeSingle();
 
       if (!profile) {
-        // Tenta criar um perfil básico se não existir (fallback de segurança)
-        const newProfile = {
-          id: uid,
-          user_id: uid,
-          owner_profile_id: uid,
-          nome_operador: userInput.split('@')[0],
-          nome_completo: userInput.split('@')[0],
-          usuario_email: userInput,
-          email: userInput,
-          access_level: 1,
-          created_at: new Date().toISOString()
-        };
-        
-        const { data: created, error: createError } = await supabase
+        // Fallback: tenta buscar pelo email se não achou por user_id
+        const { data: profileByEmail } = await supabase
           .from('perfis')
-          .insert([newProfile])
-          .select()
+          .select('*')
+          .eq('email', emailToLogin)
           .maybeSingle();
-          
-        if (createError || !created) {
-          throw new Error('Perfil não encontrado e falha ao criar perfil automático.');
+        
+        if (profileByEmail) {
+          profile = profileByEmail;
+          // Vincula o user_id se estiver faltando
+          if (!profile.user_id) {
+            await supabase.from('perfis').update({ user_id: uid }).eq('id', profile.id);
+          }
         }
-        profile = created;
+      }
+
+      if (!profile) {
+        throw new Error('Perfil não encontrado para este usuário.');
       }
 
       handleLoginSuccess(profile, showToast);
     } catch (err: any) {
       showToast(mapLoginError(err), 'error');
-      window.dispatchEvent(new Event('cm_auth_lost'));
+      // Não dispara cm_auth_lost aqui para não limpar o formulário de login desnecessariamente
     } finally {
       setIsLoading(false);
     }

@@ -124,21 +124,21 @@ export const createSupportAdapter = (
       .subscribe();
 
     // 🔵 heartbeat presença
-    const interval = setInterval(async () => {
+    const interval = window.setInterval(async () => {
       try {
         if (!isUuid(profileId) || !isUuid(loanId)) return;
 
-        const presenceProfileId =
-          role === 'OPERATOR'
-            ? (context.operatorId && isUuid(context.operatorId)
-                ? context.operatorId
-                : profileId)
+        // Tenta pegar o ID do operador se estiver no modo OPERATOR
+        const currentPresenceId = role === 'OPERATOR' 
+            ? (context.operatorId || profileId) 
             : profileId;
+
+        if (!isUuid(currentPresenceId)) return;
 
         const { error } = await supabaseClient
           .from('support_presence')
           .upsert({
-            profile_id: presenceProfileId,
+            profile_id: currentPresenceId,
             loan_id: loanId,
             role,
             last_seen_at: new Date().toISOString(),

@@ -1,11 +1,25 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Loan, LoanStatus, CapitalSource } from '../types';
 import { loanEngine, isLegallyActionable } from '../domain/loanEngine';
-import { getDaysDiff } from '../utils/dateHelpers';
+import { getDaysDiff, isValidDate } from '../utils/dateHelpers';
 import { notificationService } from '../services/notification.service';
 import { getInstallmentStatusLogic } from '../domain/finance/calculations';
 import { playNotificationSound } from '../utils/notificationSound';
+
+export interface InAppNotification {
+  id: string;
+  title: string;
+  message: string;
+  type: 'info' | 'warning' | 'error' | 'success';
+  createdAt: number;
+  isPersistent?: boolean;
+  onClick?: () => void;
+  action_url?: string;
+  item_type?: string;
+  item_id?: string;
+  metadata?: any;
+}
 
 interface NotificationProps {
   loans: Loan[];
@@ -32,10 +46,35 @@ export const useAppNotifications = ({
   const notifiedUnsignedLegal = useRef<Set<string>>(new Set());
   const lastUserId = useRef<string | null>(null);
 
+  const [notifications, setNotifications] = useState<InAppNotification[]>([]);
+
+  const addNotification = (notif: Omit<InAppNotification, 'id' | 'createdAt'>) => {
+    setNotifications(prev => {
+      // Evita duplicatas exatas recentes (mesmo titulo e mensagem)
+      const isDuplicate = prev.some(n => n.title === notif.title && n.message === notif.message && (Date.now() - n.createdAt < 60000));
+      if (isDuplicate) return prev;
+      
+      return [{
+        ...notif,
+        id: Math.random().toString(36).substring(2, 9),
+        createdAt: Date.now()
+      }, ...prev];
+    });
+  };
+
+  const removeNotification = (id: string) => {
+    setNotifications(prev => prev.filter(n => n.id !== id));
+  };
+
   const resetNotifiedCaches = () => {
     notifiedDueLoans.current = new Set();
     notifiedUnsignedLegal.current = new Set();
   };
+
+  const loansRef = useRef<Loan[]>(loans);
+  useEffect(() => {
+    loansRef.current = loans;
+  }, [loans]);
 
   // 1. Monitoramento em Tempo Real (Eventos Críticos de Negócio)
   useEffect(() => {
@@ -53,15 +92,24 @@ export const useAppNotifications = ({
         },
         (payload) => {
           if (payload.new.status === 'PENDENTE') {
-            notificationService.notify(
-              'Intencao de Pagamento Recebida!',
-              'Um cliente enviou uma intencao de pagamento.',
-              () => {
-                setActiveTab('DASHBOARD');
+            const onClick = () => {
+                setActiveTab('CONTRACT_DETAILS');
                 setSelectedLoanId(payload.new.loan_id);
-              }
+            };
+            notificationService.notify(
+              'Intenção de Pagamento Recebida!',
+              'Um cliente enviou uma intenção de pagamento.',
+              onClick
             );
-            showToast('Nova intencao de pagamento recebida!', 'success');
+            addNotification({
+                title: 'Intenção de Pagamento Recebida!',
+                message: 'Um cliente enviou uma intenção de pagamento.',
+                type: 'success',
+                item_type: 'pagamento',
+                item_id: payload.new.id,
+                metadata: { loan_id: payload.new.loan_id }
+            });
+            showToast('Nova intenção de pagamento recebida!', 'success');
           }
         }
       )
@@ -75,20 +123,29 @@ export const useAppNotifications = ({
           filter: `profile_id=eq.${activeUser.id}`,
         },
         (payload) => {
-          const loan = loans.find((l) => l.id === payload.new.loan_id);
+          const loan = loansRef.current.find((l) => l.id === payload.new.loan_id);
           if (
             loan &&
             loanEngine.computeLoanStatus(loan) === 'OVERDUE' &&
             !loan.activeAgreement
           ) {
+            const onClick = () => {
+                setActiveTab('LEGAL');
+                setSelectedLoanId(loan.id);
+            };
             notificationService.notify(
               'Ação Jurídica Necessária',
               `Contrato de ${loan.debtorName} está VENCIDO e sem assinatura.`,
-              () => {
-                setActiveTab('LEGAL');
-                setSelectedLoanId(loan.id);
-              }
+              onClick
             );
+            addNotification({
+                title: 'Ação Jurídica Necessária',
+                message: `Contrato de ${loan.debtorName} está VENCIDO e sem assinatura.`,
+                type: 'warning',
+                item_type: 'documento',
+                item_id: loan.id,
+                metadata: { loan_id: loan.id }
+            });
           }
         }
       )
@@ -102,13 +159,21 @@ export const useAppNotifications = ({
           filter: `profile_id=eq.${activeUser.id}`,
         },
         (payload) => {
+          const onClick = () => {
+              setActiveTab('LEADS');
+          };
           notificationService.notify(
             'Novo Lead de Captação!',
             `O cliente ${payload.new.nome} iniciou uma simulação.`,
-            () => {
-              setActiveTab('LEADS');
-            }
+            onClick
           );
+          addNotification({
+              title: 'Novo Lead de Captação!',
+              message: `O cliente ${payload.new.nome} iniciou uma simulação.`,
+              type: 'info',
+              item_type: 'lead',
+              item_id: payload.new.id
+          });
           showToast(`Novo lead: ${payload.new.nome}`, 'success');
         }
       )
@@ -123,13 +188,21 @@ export const useAppNotifications = ({
         },
         (payload) => {
           if (payload.new.sender === 'LEAD') {
+            const onClick = () => {
+                setActiveTab('LEADS');
+            };
             notificationService.notify(
               'Nova Mensagem de Lead',
               `Mensagem recebida no chat de captação.`,
-              () => {
-                setActiveTab('LEADS');
-              }
+              onClick
             );
+            addNotification({
+                title: 'Nova Mensagem de Lead',
+                message: `Mensagem recebida no chat de captação.`,
+                type: 'info',
+                item_type: 'lead',
+                item_id: payload.new.lead_id
+            });
           }
         }
       )
@@ -138,7 +211,7 @@ export const useAppNotifications = ({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [activeUser, disabled, setActiveTab, setSelectedLoanId, showToast, loans]);
+  }, [activeUser, disabled, setActiveTab, setSelectedLoanId, showToast]);
 
   // 2. Monitoramento Periódico (Vencimentos e Saldo)
   const runScan = async () => {
@@ -156,7 +229,7 @@ export const useAppNotifications = ({
 
         const installments = (loan as any).installments || [];
         installments.forEach((inst: any) => {
-          if (!inst?.id || !inst?.dueDate) return;
+          if (!inst?.id || !inst?.dueDate || !isValidDate(inst.dueDate)) return;
 
           const status = getInstallmentStatusLogic(inst);
           if (status === LoanStatus.PAID) return;
@@ -166,15 +239,23 @@ export const useAppNotifications = ({
           // Notifica apenas no dia exato e uma única vez por sessão
           if (diff === 0 && !notifiedDueLoans.current.has(inst.id)) {
             notifiedDueLoans.current.add(inst.id);
-
-            notificationService.notify(
-              'Cobranca do Dia',
-              `O contrato de ${loan.debtorName} vence hoje. Fique atento!`,
-              () => {
-                setActiveTab('DASHBOARD');
+            const onClick = () => {
+                setActiveTab('CONTRACT_DETAILS');
                 setSelectedLoanId(loan.id);
-              }
+            };
+            notificationService.notify(
+              'Cobrança do Dia',
+              `O contrato de ${loan.debtorName} vence hoje. Fique atento!`,
+              onClick
             );
+            addNotification({
+                title: 'Cobrança do Dia',
+                message: `O contrato de ${loan.debtorName} vence hoje. Fique atento!`,
+                type: 'info',
+                item_type: 'parcela',
+                item_id: inst.id,
+                metadata: { loan_id: loan.id }
+            });
           }
         });
       });
@@ -190,14 +271,23 @@ export const useAppNotifications = ({
           !notifiedUnsignedLegal.current.has(loan.id)
         ) {
           notifiedUnsignedLegal.current.add(loan.id);
+          const onClick = () => {
+              setActiveTab('LEGAL');
+              setSelectedLoanId(loan.id);
+          };
           notificationService.notify(
             'Ação Jurídica Necessária',
             `Contrato de ${loan.debtorName} está VENCIDO e sem confissão de dívida assinada.`,
-            () => {
-              setActiveTab('LEGAL');
-              setSelectedLoanId(loan.id);
-            }
+            onClick
           );
+          addNotification({
+              title: 'Ação Jurídica Necessária',
+              message: `Contrato de ${loan.debtorName} está VENCIDO e sem confissão de dívida assinada.`,
+              type: 'warning',
+              item_type: 'documento',
+              item_id: loan.id,
+              metadata: { loan_id: loan.id }
+          });
         }
       });
     }
@@ -209,7 +299,21 @@ export const useAppNotifications = ({
 
       // Alerta apenas se cair abaixo de 50 reais (Extrema urgencia de caixa)
       if (balance < 50 && balance > -1000) {
-        // Toast para nao poluir notificacoes nativas
+        // Adiciona notificação in-app persistente
+        setNotifications(prev => {
+            const exists = prev.some(n => n.title === 'Saldo Crítico' && n.message.includes(source.name));
+            if (exists) return prev;
+            return [{
+                id: `low-balance-${source.id}`,
+                title: 'Saldo Crítico',
+                message: `A fonte de capital "${source.name}" está com saldo muito baixo (${balance.toFixed(2)}).`,
+                type: 'error',
+                isPersistent: true,
+                createdAt: Date.now(),
+                item_type: 'carteira',
+                item_id: source.id
+            }, ...prev];
+        });
       }
     });
   };
@@ -233,5 +337,5 @@ export const useAppNotifications = ({
     };
   }, [activeUser, disabled, loans.length]);
 
-  return { manualCheck: runScan };
+  return { manualCheck: runScan, notifications, removeNotification };
 };

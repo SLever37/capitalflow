@@ -142,8 +142,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
       const matchesSearch =
         !searchTerm ||
-        item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.subtitle.toLowerCase().includes(searchTerm.toLowerCase());
+        item.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.subtitle?.toLowerCase().includes(searchTerm.toLowerCase());
 
       if (!matchesSearch) return false;
 
@@ -234,29 +234,37 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(text)}`, '_blank');
   };
 
+  const getStatusLabel = (status: string) => {
+    const map: Record<string, string> = {
+      'OVERDUE': 'VENCIDO',
+      'DUE_TODAY': 'VENCE HOJE',
+      'DUE_SOON': 'VENCE LOGO',
+      'UPCOMING': 'A CAMINHO',
+      'PENDING': 'PENDENTE',
+      'PAID': 'PAGO',
+      'DONE': 'CONCLUÍDO',
+      'LATE': 'ATRASADO',
+      'PARTIAL': 'PARCIAL',
+      'CANCELLED': 'CANCELADO'
+    };
+    return map[status] || status;
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-300 font-sans pb-24">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <button
-            onClick={onClose}
-            className="p-2 -ml-2 text-slate-400 hover:text-white transition-colors"
-            title="Voltar"
-          >
-            <ChevronLeft size={24} />
-          </button>
-
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center text-white shrink-0 shadow-lg shadow-purple-900/20">
               <CalIcon size={20} />
             </div>
 
             <div>
-              <h1 className="text-sm font-black text-white uppercase tracking-wider leading-none">
+              <h1 className="text-xl font-semibold text-white uppercase tracking-wider leading-none">
                 Agenda
               </h1>
-              <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-widest">
+              <p className="text-sm text-slate-500 font-medium uppercase mt-1 tracking-widest">
                 {filteredItems.length} itens
               </p>
             </div>
@@ -282,7 +290,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         {viewMode === 'RAIO_X' ? (
           <div className="space-y-6 animate-in zoom-in duration-300">
             <div className="grid grid-cols-2 gap-4">
-              <div className="bg-slate-900 border border-slate-800 p-4 rounded-[2rem] shadow-xl">
+              <div className="bg-slate-900 border border-slate-800 p-4 rounded-3xl shadow-xl">
                 <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-2 flex items-center gap-2">
                   <AlertTriangle className="text-rose-500" size={14} /> Vencidos
                 </p>
@@ -292,7 +300,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                 </p>
               </div>
 
-              <div className="bg-slate-900 border border-slate-800 p-4 rounded-[2rem] shadow-xl">
+              <div className="bg-slate-900 border border-slate-800 p-4 rounded-3xl shadow-xl">
                 <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-2 flex items-center gap-2">
                   <Clock className="text-amber-500" size={14} /> Hoje
                 </p>
@@ -302,7 +310,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                 </p>
               </div>
 
-              <div className="bg-slate-900 border border-slate-800 p-4 rounded-[2rem] shadow-xl">
+              <div className="bg-slate-900 border border-slate-800 p-4 rounded-3xl shadow-xl">
                 <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-2 flex items-center gap-2">
                   <CalendarDays className="text-blue-500" size={14} /> Próx. 7 Dias
                 </p>
@@ -312,7 +320,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                 </p>
               </div>
 
-              <div className="bg-slate-900 border border-slate-800 p-4 rounded-[2rem] shadow-xl">
+              <div className="bg-slate-900 border border-slate-800 p-4 rounded-3xl shadow-xl">
                 <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-2 flex items-center gap-2">
                   <CalendarCheck className="text-slate-500" size={14} /> Total Ativo
                 </p>
@@ -327,7 +335,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
               </div>
             </div>
 
-            <div className="bg-slate-900 border border-slate-800 p-6 rounded-[2rem] shadow-xl">
+            <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl shadow-xl">
               <h3 className="text-[10px] font-black text-white uppercase tracking-widest mb-4 flex items-center gap-2">
                 <Activity size={14} className="text-purple-500" /> Saúde da Carteira
               </h3>
@@ -409,7 +417,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                       {group.items.map((item) => (
                         <div
                           key={item.id}
-                          className={`bg-slate-900 border p-4 rounded-[2rem] transition-all hover:scale-[1.02] active:scale-[0.98] ${
+                          className={`responsive-card bg-slate-900 border transition-all hover:scale-[1.02] active:scale-[0.98] ${
                             item.status === 'OVERDUE'
                               ? 'border-rose-500/30 bg-rose-500/5'
                               : 'border-slate-800'
@@ -427,11 +435,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                 {getInitials(item.title)}
                               </div>
 
-                              <div>
-                                <h4 className="text-xs font-black text-white uppercase tracking-wider">
+                              <div className="min-w-0 flex-1">
+                                <h4 className="client-name font-black text-white uppercase tracking-wider">
                                   {item.title}
                                 </h4>
-                                <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">
+                                <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest truncate">
                                   {item.subtitle}
                                 </p>
                               </div>
@@ -448,7 +456,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                     : 'bg-slate-800 text-slate-400'
                                 }`}
                               >
-                                {item.status}
+                                {getStatusLabel(item.status)}
                               </span>
                             </div>
                           </div>
@@ -473,7 +481,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                             </div>
 
                             <button
-                              onClick={() => onSystemAction('PAYMENT', item.meta)}
+                              onClick={() => onSystemAction('NAVIGATE_CONTRACT', { loanId: item.loanId })}
                               className="px-4 py-2 bg-slate-800 text-white text-[10px] font-black uppercase rounded-xl hover:bg-white hover:text-slate-950 transition-all"
                             >
                               Baixar

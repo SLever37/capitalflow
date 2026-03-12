@@ -102,32 +102,8 @@ export const PersonalFinancesPage: React.FC<Props> = ({ activeUser, setActiveTab
 
     return (
         <div className="space-y-8 animate-in fade-in pb-24 font-sans">
-            {/* Header - Padrão Hub Central */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div className="flex items-center gap-4">
-                    <button
-                        onClick={() => goBack ? goBack() : setActiveTab?.('DASHBOARD')}
-                        className="flex items-center gap-2 px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all active:scale-95"
-                    >
-                        <ChevronLeft size={16} />
-                        <span className="text-[10px] font-black uppercase tracking-widest">Voltar</span>
-                    </button>
-                    
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-600 to-rose-600 flex items-center justify-center text-white shrink-0 shadow-lg shadow-pink-900/20">
-                            <Wallet size={20} />
-                        </div>
-                        <div>
-                            <h1 className="text-sm font-black text-white uppercase tracking-wider leading-none">
-                                Minhas Finanças
-                            </h1>
-                            <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-widest">
-                                Gestão Pessoal Integrada
-                            </p>
-                        </div>
-                    </div>
-                </div>
-                
+            {/* Header - Padrão Menu Lateral */}
+            <div className="flex flex-col md:flex-row justify-end items-start md:items-center gap-4">
                 <div className="flex items-center gap-2 bg-slate-900 p-1 rounded-xl border border-slate-800">
                     <button onClick={() => setMonth(m => m === 0 ? 11 : m - 1)} className="p-2 hover:bg-slate-800 rounded-lg text-slate-400">
                         <ChevronLeft size={16}/>
@@ -143,19 +119,19 @@ export const PersonalFinancesPage: React.FC<Props> = ({ activeUser, setActiveTab
 
             {/* Cards de Resumo */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-slate-900 border border-slate-800 p-6 rounded-[2rem] shadow-xl">
+                <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl shadow-xl">
                     <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-2 flex items-center gap-2">
                         <ArrowUpRight className="text-emerald-500" size={14}/> Receitas
                     </p>
                     <p className="text-2xl font-black text-white">{formatMoney(stats.income)}</p>
                 </div>
-                <div className="bg-slate-900 border border-slate-800 p-6 rounded-[2rem] shadow-xl">
+                <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl shadow-xl">
                     <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-2 flex items-center gap-2">
                         <ArrowDownLeft className="text-rose-500" size={14}/> Despesas
                     </p>
                     <p className="text-2xl font-black text-rose-500">{formatMoney(stats.expense)}</p>
                 </div>
-                <div className="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 p-6 rounded-[2rem] shadow-2xl relative overflow-hidden">
+                <div className="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 p-6 rounded-3xl shadow-2xl relative overflow-hidden">
                     <div className="absolute top-0 right-0 p-4 opacity-5"><Wallet size={64} className="text-white"/></div>
                     <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-2">Balanço Líquido</p>
                     <p className={`text-2xl font-black ${stats.balance >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
@@ -168,7 +144,7 @@ export const PersonalFinancesPage: React.FC<Props> = ({ activeUser, setActiveTab
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Contas e Cartões */}
                 <div className="space-y-6">
-                    <div className="bg-slate-900 border border-slate-800 p-6 rounded-[2rem] shadow-xl">
+                    <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl shadow-xl">
                         <div className="flex justify-between items-center mb-6">
                             <h3 className="text-[10px] font-black text-white uppercase tracking-widest flex items-center gap-2">
                                 <CardIcon size={14} className="text-blue-500"/> Contas & Cartões
@@ -212,7 +188,7 @@ export const PersonalFinancesPage: React.FC<Props> = ({ activeUser, setActiveTab
 
                 {/* Últimas Transações */}
                 <div className="lg:col-span-2 space-y-6">
-                    <div className="bg-slate-900 border border-slate-800 p-6 rounded-[2rem] shadow-xl">
+                    <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl shadow-xl">
                         <div className="flex justify-between items-center mb-6">
                             <h3 className="text-[10px] font-black text-white uppercase tracking-widest flex items-center gap-2">
                                 <LayoutGrid size={14} className="text-amber-500"/> Histórico Financeiro
@@ -229,7 +205,7 @@ export const PersonalFinancesPage: React.FC<Props> = ({ activeUser, setActiveTab
                             {transactions.length === 0 ? (
                                 <div className="py-12 text-center">
                                     <div className="w-16 h-16 bg-slate-950 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-800">
-                                        <Clock size={24} className="text-slate-700" />
+                                        <Clock size={24} className="text-slate-500" />
                                     </div>
                                     <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Nenhuma transação este mês</p>
                                 </div>
@@ -261,7 +237,7 @@ export const PersonalFinancesPage: React.FC<Props> = ({ activeUser, setActiveTab
                                             <p className={`text-sm font-black ${tx.tipo === 'RECEITA' ? 'text-emerald-400' : 'text-white'}`}>
                                                 {tx.tipo === 'RECEITA' ? '+' : '-'}{formatMoney(tx.valor)}
                                             </p>
-                                            <p className="text-[8px] text-slate-600 font-black uppercase tracking-tighter">
+                                            <p className="text-[8px] text-slate-500 font-black uppercase tracking-tighter">
                                                 {tx.status === 'CONSOLIDADO' ? 'Liquidado' : 'Pendente'}
                                             </p>
                                         </div>

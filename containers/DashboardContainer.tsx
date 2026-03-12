@@ -1,5 +1,5 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { DashboardPage } from '../pages/DashboardPage';
 import { Loan, CapitalSource, UserProfile, Agreement, AgreementInstallment } from '../types';
 import { filterLoans } from '../domain/filters/loanFilters';
@@ -35,13 +35,19 @@ export const DashboardContainer: React.FC<DashboardContainerProps> = ({
   
   // LÓGICA DE FILTRAGEM DE EQUIPE
   const scopeLoans = useMemo(() => {
-    if (!activeUser || activeUser.accessLevel !== 1) return loans;
-    if (selectedStaffId === 'ALL') return loans;
-    return loans.filter(l => l.operador_responsavel_id === selectedStaffId);
+    if (!activeUser) return [];
+    
+    if (activeUser.accessLevel === 'ADMIN' || (activeUser as any).accessLevel === 1) {
+      if (selectedStaffId === 'ALL') return loans;
+      return loans.filter(l => l.operador_responsavel_id === selectedStaffId);
+    }
+    
+    return loans.filter(l => l.owner_id === activeUser.id || l.operador_responsavel_id === activeUser.id);
   }, [loans, selectedStaffId, activeUser]);
 
-  const filteredLoans = useMemo(() => filterLoans(scopeLoans, searchTerm, statusFilter, ui.sortOption), [scopeLoans, searchTerm, statusFilter, ui.sortOption]);
-  const stats = useMemo(() => buildDashboardStats(scopeLoans, activeUser, sources), [scopeLoans, activeUser, sources]);
+  // Filtros de busca e status aplicados diretamente aos empréstimos do escopo
+  const filteredLoans = useMemo(() => filterLoans(scopeLoans, searchTerm, statusFilter), [scopeLoans, searchTerm, statusFilter]);
+  const stats = useMemo(() => buildDashboardStats(scopeLoans, sources), [scopeLoans, sources]);
 
   const handleAgreementPayment = async (loan: Loan, agreement: Agreement, inst: AgreementInstallment) => {
       if (!activeUser || !confirm(`Confirmar recebimento da parcela ${inst.number} (R$ ${inst.amount.toFixed(2)})?`)) return;
@@ -63,7 +69,10 @@ export const DashboardContainer: React.FC<DashboardContainerProps> = ({
 
   return (
     <DashboardPage 
-        loans={loans} sources={sources} filteredLoans={filteredLoans} stats={stats} 
+        loans={loans}
+        sources={sources} 
+        filteredLoans={filteredLoans}
+        stats={stats} 
         activeUser={activeUser} staffMembers={staffMembers} selectedStaffId={selectedStaffId} onStaffChange={setSelectedStaffId}
         mobileDashboardTab={mobileDashboardTab} setMobileDashboardTab={setMobileDashboardTab}
         statusFilter={statusFilter} setStatusFilter={setStatusFilter} searchTerm={searchTerm} setSearchTerm={setSearchTerm}
@@ -75,7 +84,6 @@ export const DashboardContainer: React.FC<DashboardContainerProps> = ({
         onRestore={(l) => loanCtrl.openConfirmation({ type: 'RESTORE', target: l })}
         onDelete={(l) => loanCtrl.openConfirmation({ type: 'DELETE', target: l, showRefundOption: true })}
         onNote={(l) => { ui.setNoteModalLoan(l); ui.setNoteText(l.notes); ui.openModal('NOTE'); }}
-        onPayment={(l, i, c) => { ui.setPaymentModal({ loan: l, inst: i, calculations: c }); ui.openModal('PAYMENT'); }}
         onPortalLink={(l) => loanCtrl.handleGenerateLink(l)}
         onUploadPromissoria={(l) => { ui.setPromissoriaUploadLoanId(String(l.id)); ui.promissoriaFileInputRef.current?.click(); }}
         onUploadDoc={(l) => { ui.setExtraDocUploadLoanId(String(l.id)); ui.setExtraDocKind('CONFISSAO'); ui.extraDocFileInputRef.current?.click(); }}
@@ -84,7 +92,12 @@ export const DashboardContainer: React.FC<DashboardContainerProps> = ({
         onReviewSignal={loanCtrl.handleReviewSignal}
         onOpenComprovante={fileCtrl.handleOpenComprovante}
         onReverseTransaction={loanCtrl.openReverseTransaction}
-        onRenegotiate={(l) => { ui.setRenegotiationModalLoan(l); ui.openModal('RENEGOTIATION', l); }}
+        onRenegotiate={(l) => { 
+            const loans = Array.isArray(l) ? l : [l];
+            ui.setRenegotiationModalLoans(loans); 
+            ui.openModal('RENEGOTIATION', loans); 
+        }}
+        onActivate={loanCtrl.handleActivateLoan}
         onNewAporte={handleNewAporte}
         onAgreementPayment={handleAgreementPayment}
         onNavigate={onNavigate}

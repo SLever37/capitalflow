@@ -32,6 +32,7 @@ import { legalDocumentService } from '../../services/legalDocument.service';
 
 interface ClientPortalViewProps {
   initialPortalToken: string;
+  initialPortalCode: string;
 }
 
 interface ContractBlockProps {
@@ -144,7 +145,7 @@ const ContractBlock: React.FC<ContractBlockProps> = ({ loan, onPay, onChat }) =>
   );
 };
 
-export const ClientPortalView: React.FC<ClientPortalViewProps> = ({ initialPortalToken }) => {
+export const ClientPortalView: React.FC<ClientPortalViewProps> = ({ initialPortalToken, initialPortalCode }) => {
   if (initialPortalToken === 'VALIDATING') {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 gap-4">
@@ -160,7 +161,7 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({ initialPorta
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 max-w-md w-full text-center">
           <ShieldCheck size={48} className="mx-auto text-rose-500 mb-4" />
           <h2 className="text-white font-black text-xl mb-2">Acesso Negado</h2>
-          <p className="text-slate-400 text-sm mb-4">Link inválido, expirado ou código de segurança ausente.</p>
+          <p className="text-slate-400 text-sm mb-4">Portal indisponível ou link inválido.</p>
           <button
             onClick={() => (window.location.href = '/')}
             className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold uppercase text-xs transition-all"
@@ -173,7 +174,7 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({ initialPorta
   }
 
   const { isLoading, portalError, loggedClient, clientContracts, loadFullPortalData } =
-    useClientPortalLogic(initialPortalToken);
+    useClientPortalLogic(initialPortalToken, initialPortalCode);
 
   const [activeLoanForPayment, setActiveLoanForPayment] = useState<any>(null);
   const [activeLoanForChat, setActiveLoanForChat] = useState<any>(null);
@@ -197,7 +198,7 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({ initialPorta
     setLegalDocsError(null);
 
     try {
-      const docs = await legalDocumentService.listDocs(initialPortalToken);
+      const docs = await legalDocumentService.listDocs(initialPortalToken, initialPortalCode);
       setDocList(docs);
     } catch (e: any) {
       console.error('[PORTAL][LEGAL] loadDocs error:', e);
@@ -236,7 +237,7 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({ initialPorta
 
   const alertTheme = globalSummary.lateCount > 0;
 
-  const clientNotification = usePortalClientNotifications(initialPortalToken, {
+  const clientNotification = usePortalClientNotifications(initialPortalToken, initialPortalCode, {
     overdueCount: globalSummary.lateCount,
     maxDaysLate: globalSummary.maxLate,
     nextDueDate: null
@@ -257,7 +258,7 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({ initialPorta
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 max-w-md w-full text-center">
           <ShieldCheck size={48} className="mx-auto text-rose-500 mb-4" />
           <h2 className="text-white font-black text-xl mb-2">Acesso Indisponível</h2>
-          <p className="text-slate-400 text-sm mb-4">{portalError || 'Link inválido ou expirado.'}</p>
+          <p className="text-slate-400 text-sm mb-4">Portal indisponível ou link inválido.</p>
         </div>
       </div>
     );
@@ -268,6 +269,7 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({ initialPorta
       <div className="fixed inset-0 z-[200] bg-slate-950">
         <DocumentViewer
           token={initialPortalToken}
+          code={initialPortalCode}
           docId={activeDocId}
           onBack={() => setActiveDocId(null)}
           onSigned={() => {
@@ -295,7 +297,7 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({ initialPorta
         </div>
       )}
 
-      <div className="w-full max-w-lg bg-slate-900 sm:rounded-[2.5rem] flex flex-col h-full sm:h-[90vh] sm:border border-slate-800 shadow-2xl overflow-hidden relative">
+      <div className="w-full max-w-lg bg-slate-900 sm:rounded-3xl flex flex-col h-full sm:h-[90vh] sm:border border-slate-800 shadow-2xl overflow-hidden relative">
         <div className="bg-slate-950 border-b border-slate-800 p-5 flex items-center justify-between shrink-0 relative z-10">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white font-black text-sm shadow-lg border-2 border-slate-900">
@@ -322,7 +324,7 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({ initialPorta
           {alertTheme && <div className="absolute top-0 right-0 w-full h-64 bg-rose-900/10 blur-[80px] pointer-events-none"></div>}
 
           <div
-            className={`p-6 rounded-[2rem] border relative overflow-hidden transition-all ${
+            className={`p-6 rounded-3xl border relative overflow-hidden transition-all ${
               alertTheme ? 'bg-gradient-to-br from-rose-950 to-slate-900 border-rose-500/30' : 'bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700'
             }`}
           >
@@ -370,7 +372,7 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({ initialPorta
             <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest pl-1">Seus Contratos</h3>
 
             {clientContracts.length === 0 ? (
-              <div className="text-center py-10 text-slate-600 text-xs font-bold uppercase border-2 border-dashed border-slate-800 rounded-2xl">
+              <div className="text-center py-10 text-slate-500 text-xs font-bold uppercase border-2 border-dashed border-slate-800 rounded-2xl">
                 Nenhum contrato ativo encontrado.
               </div>
             ) : (
@@ -404,6 +406,7 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({ initialPorta
       {activeLoanForPayment && (
         <PortalPaymentModal
           portalToken={initialPortalToken}
+          portalCode={initialPortalCode}
           loan={activeLoanForPayment}
           installment={
             activeLoanForPayment.installments.find((i: any) => i.status !== 'PAID') || activeLoanForPayment.installments[0]
@@ -422,7 +425,7 @@ export const ClientPortalView: React.FC<ClientPortalViewProps> = ({ initialPorta
 
       {isLegalOpen && (
         <div className="fixed inset-0 bg-slate-950/95 flex items-center justify-center z-[150] p-4 backdrop-blur-sm">
-          <div className="bg-slate-900 p-6 rounded-[2.5rem] border border-indigo-500/30 max-w-lg w-full shadow-2xl animate-in zoom-in-95 relative max-h-[80vh] overflow-y-auto">
+          <div className="bg-slate-900 p-6 rounded-3xl border border-indigo-500/30 max-w-lg w-full shadow-2xl animate-in zoom-in-95 relative max-h-[80vh] overflow-y-auto">
             <button
               onClick={() => setIsLegalOpen(false)}
               className="absolute top-6 right-6 p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white"

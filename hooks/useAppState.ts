@@ -9,7 +9,7 @@ const DEFAULT_NAV: AppTab[] = ['DASHBOARD', 'CLIENTS', 'TEAM'] as AppTab[];
 const DEFAULT_HUB: AppTab[] = ['SOURCES', 'LEGAL', 'PROFILE', 'PERSONAL_FINANCE', 'LEADS', 'ACQUISITION'] as AppTab[];
 
 const CACHE_KEY = (profileId: string) => `cm_cache_${profileId}`;
-const CACHE_MAX_AGE = 24 * 60 * 60 * 1000; // 24 horas
+const CACHE_MAX_AGE = 12 * 60 * 60 * 1000; // 12 horas
 
 type AppCacheSnapshot = {
   ts: number;
@@ -61,7 +61,7 @@ const DEMO_USER: UserProfile = {
 };
 
 const mapProfileFromDB = (data: any): UserProfile => {
-  let hubOrder = ((data.ui_hub_order || DEFAULT_HUB) as string[]).filter(t => t !== 'MASTER') as AppTab[];
+  let hubOrder = Array.from(new Set(((data.ui_hub_order || DEFAULT_HUB) as string[]).filter(t => t !== 'MASTER'))) as AppTab[];
 
   if (Array.isArray(hubOrder) && !hubOrder.includes('PERSONAL_FINANCE')) {
     hubOrder = [...hubOrder, 'PERSONAL_FINANCE'];
@@ -156,8 +156,11 @@ export const useAppState = (activeProfileId: string | null, onProfileNotFound?: 
 
       if (!profileData) {
         if (onProfileNotFound) onProfileNotFound();
-        setLoadError('Perfil não encontrado');
+        setLoadError('Perfil não encontrado no sistema.');
         setIsLoadingData(false);
+        
+        // Limpa a sessão local se o perfil não existe mais no banco
+        localStorage.removeItem('cm_session');
         return;
       }
 
@@ -170,7 +173,7 @@ export const useAppState = (activeProfileId: string | null, onProfileNotFound?: 
         supabase.from('fontes').select('*').eq('profile_id', ownerId),
         supabase
           .from('contratos')
-          .select('*, parcelas(*), transacoes(*), acordos_inadimplencia(*, acordo_parcelas(*)), sinalizacoes_pagamento(*)')
+          .select('*, parcelas(*), transacoes(*), acordos_inadimplencia(*, acordo_parcelas(*))')
           .eq('owner_id', ownerId)
       ]);
 
@@ -226,8 +229,8 @@ export const useAppState = (activeProfileId: string | null, onProfileNotFound?: 
 
       // Se for erro de token inválido, sinaliza necessidade de reauth
       if (
-        errMsg.includes('Refresh Token') || 
-        errMsg.includes('JWT') ||
+        errMsg?.includes('Refresh Token') || 
+        errMsg?.includes('JWT') ||
         error.code === 'PGRST301' // JWT expired
       ) {
         setLoadError('SESSAO_EXPIRADA');
@@ -259,9 +262,13 @@ export const useAppState = (activeProfileId: string | null, onProfileNotFound?: 
       setLoans(cached.loans);
       setStaffMembers(cached.staffMembers);
 
-      setTimeout(() => {
-        fetchFullData(activeProfileId);
-      }, 1000);
+      // Só busca novamente se o cache tiver mais de 5 minutos
+      const cacheAge = Date.now() - cached.ts;
+      if (cacheAge > 5 * 60 * 1000) {
+        setTimeout(() => {
+          fetchFullData(activeProfileId);
+        }, 1000);
+      }
     } else {
       fetchFullData(activeProfileId);
     }

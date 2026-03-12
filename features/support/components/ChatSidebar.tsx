@@ -83,6 +83,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
         
         return (
           <button
+            id={key}
             key={key}
             onClick={() => isSelectionMode ? toggleSelection(key) : onSelectChat(item)}
             className={`w-full p-4 rounded-xl flex items-start gap-3 transition-all border ${
@@ -94,7 +95,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
             } ${isInsideGroup ? 'ml-4 w-[calc(100%-1rem)] border-l-2 border-l-slate-800 rounded-l-none' : ''}`}
           >
             {isSelectionMode ? (
-                <div className={`mt-2 ${isSelected ? 'text-rose-500' : 'text-slate-600'}`}>
+                <div className={`mt-2 ${isSelected ? 'text-rose-500' : 'text-slate-500'}`}>
                     {isSelected ? <CheckSquare size={20}/> : <Square size={20}/>}
                 </div>
             ) : (
@@ -131,26 +132,26 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                   <p className={`text-[11px] truncate leading-tight ${isActive && !isSelectionMode ? 'text-blue-200' : 'text-slate-500'}`}>
                     {item.lastMessage || 'Novo Contato'}
                   </p>
-                  {activeTab !== 'ACTIVE' && !isSelectionMode && <ChevronRight size={12} className="text-slate-600"/>}
+                  {activeTab !== 'ACTIVE' && !isSelectionMode && <ChevronRight size={12} className="text-slate-500"/>}
               </div>
               
               {item.type === 'CAMPAIGN' && (
-                  <p className="text-[9px] text-slate-600 font-bold uppercase mt-1.5 tracking-wider">
+                  <p className="text-[9px] text-slate-500 font-bold uppercase mt-1.5 tracking-wider">
                     WhatsApp: {item.whatsapp || 'N/A'}
                   </p>
               )}
               {item.type === 'ACTIVE' && (
-                  <p className="text-[9px] text-slate-600 font-bold uppercase mt-1.5 tracking-wider">
+                  <p className="text-[9px] text-slate-500 font-bold uppercase mt-1.5 tracking-wider">
                     Contrato #{item.loanId?.slice(0,6)}
                   </p>
               )}
               {item.type === 'CLIENT' && (
-                  <p className="text-[9px] text-slate-600 font-bold uppercase mt-1.5 tracking-wider">
+                  <p className="text-[9px] text-slate-500 font-bold uppercase mt-1.5 tracking-wider">
                     Doc: {item.debtorDocument || 'N/A'}
                   </p>
               )}
               {item.type === 'TEAM' && (
-                  <p className="text-[9px] text-slate-600 font-bold uppercase mt-1.5 tracking-wider">
+                  <p className="text-[9px] text-slate-500 font-bold uppercase mt-1.5 tracking-wider">
                     {item.role}
                   </p>
               )}
@@ -174,7 +175,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                     <input 
                         type="text" 
                         placeholder="Buscar..." 
-                        className="w-full bg-slate-900 border border-slate-800 rounded-xl py-3 pl-10 pr-4 text-xs font-bold text-white outline-none focus:border-blue-500 transition-all placeholder:text-slate-600"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl py-3 pl-10 pr-4 text-xs font-bold text-white outline-none focus:border-blue-500 transition-all placeholder:text-slate-500"
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
                     />
@@ -238,7 +239,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
           {/* Lista de Chats/Contatos */}
           <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
             {displayList.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-64 text-slate-600">
+              <div className="flex flex-col items-center justify-center h-64 text-slate-500">
                 <Users size={32} className="mb-3 opacity-20"/>
                 <p className="text-xs font-bold uppercase">Nada encontrado</p>
               </div>

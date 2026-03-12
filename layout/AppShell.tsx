@@ -1,16 +1,19 @@
 
 import React, { useState, useEffect } from 'react';
-import { AlertCircle, AlertTriangle, CheckCircle2, MessageSquare, Plus } from 'lucide-react';
+import { AlertCircle, AlertTriangle, CheckCircle2, MessageSquare, Plus, ArrowLeft, LayoutDashboard, Users, Briefcase, Wallet, PiggyBank, Calendar, Calculator, ArrowRightLeft, Megaphone, User, Menu, ShieldCheck, FileText, X } from 'lucide-react';
 import { HeaderBar } from './HeaderBar';
 import { BottomNav } from './BottomNav';
 import { UserProfile } from '../types';
 import { supabase } from '../lib/supabase';
 import { notificationService } from '../services/notification.service';
 import { useCampaignNotifications } from '../hooks/useCampaignNotifications';
+import { InAppNotification } from '../hooks/useAppNotifications';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface AppShellProps {
   children: React.ReactNode;
   toast: { msg: string; type: 'success' | 'error' | 'info' | 'warning' } | null;
+  clearToast?: () => void;
   activeTab: string;
   setActiveTab: (tab: any) => void;
   activeUser: UserProfile | null;
@@ -23,12 +26,18 @@ interface AppShellProps {
   navOrder: string[]; 
   onGoBack?: () => void;
   isInHub?: boolean;
+  title?: string;
+  subtitle?: string;
+  notifications?: InAppNotification[];
+  removeNotification?: (id: string) => void;
+  onNavigate?: (path: string) => void;
 }
 
 export const AppShell: React.FC<AppShellProps> = ({ 
-  children, toast, activeTab, setActiveTab, activeUser, isLoadingData, onOpenNav, onNewLoan, isStealthMode, toggleStealthMode, onOpenSupport, navOrder, onGoBack, isInHub
+  children, toast, clearToast, activeTab, setActiveTab, activeUser, isLoadingData, onOpenNav, onNewLoan, isStealthMode, toggleStealthMode, onOpenSupport, navOrder, onGoBack, isInHub, title, subtitle, notifications, removeNotification, onNavigate
 }) => {
   const [unreadSupport, setUnreadSupport] = useState(0);
+  const [showWelcome, setShowWelcome] = useState(true);
   const { unreadCampaignCount } = useCampaignNotifications(activeUser);
 
   const totalUnread = unreadSupport + unreadCampaignCount;
@@ -78,14 +87,54 @@ export const AppShell: React.FC<AppShellProps> = ({
     return () => { supabase.removeChannel(channel); };
   }, [activeUser?.id]);
 
+  // Highlight logic based on URL query parameters
+  useEffect(() => {
+    const handleHighlight = () => {
+      const params = new URLSearchParams(window.location.search);
+      const highlightId = params.get('highlight');
+      if (highlightId) {
+        // Small delay to allow rendering
+        setTimeout(() => {
+          const el = document.getElementById(highlightId);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.classList.add('ring-4', 'ring-blue-500', 'ring-offset-2', 'ring-offset-slate-900', 'transition-all', 'duration-1000');
+            setTimeout(() => {
+              el.classList.remove('ring-4', 'ring-blue-500', 'ring-offset-2', 'ring-offset-slate-900');
+            }, 3000);
+          }
+        }, 500);
+      }
+    };
+
+    handleHighlight(); // Run on mount and tab change
+    window.addEventListener('popstate', handleHighlight);
+    return () => window.removeEventListener('popstate', handleHighlight);
+  }, [activeTab]); // Re-run when tab changes as content might have loaded
+
   return (
-    <div className="min-h-screen bg-slate-950 pb-28 md:pb-12 text-slate-100 font-sans selection:bg-blue-600/30 relative">
-      {toast && (
-        <div className={`fixed z-[150] px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-top-4 fade-in duration-300 left-4 right-4 top-4 md:left-auto md:right-4 md:w-auto ${toast.type === 'error' ? 'bg-rose-600 text-white' : toast.type === 'warning' ? 'bg-amber-500 text-black' : 'bg-emerald-600 text-white'}`}>
-            {toast.type === 'error' ? <AlertCircle size={24}/> : toast.type === 'warning' ? <AlertTriangle size={24}/> : <CheckCircle2 size={24}/>}
-            <span className="font-bold text-sm leading-tight">{toast.msg}</span>
-        </div>
-      )}
+    <div className="min-h-screen w-full bg-slate-950 pb-28 md:pb-12 text-slate-100 font-sans selection:bg-blue-600/30 relative overflow-y-auto touch-pan-y overflow-x-hidden">
+      <AnimatePresence>
+        {toast && (
+          <motion.div 
+            initial={{ y: -50, opacity: 0, rotateX: 90 }}
+            animate={{ y: 0, opacity: 1, rotateX: 0 }}
+            exit={{ x: 300, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+            drag="x"
+            dragConstraints={{ left: 0, right: 0 }}
+            onDragEnd={(e, { offset, velocity }) => {
+              if (offset.x > 100 || offset.x < -100 || velocity.x > 500 || velocity.x < -500) {
+                clearToast?.();
+              }
+            }}
+            className={`fixed z-[150] px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 left-4 right-4 top-4 md:left-auto md:right-4 md:w-auto cursor-grab active:cursor-grabbing ${toast.type === 'error' ? 'bg-rose-600 text-white' : toast.type === 'warning' ? 'bg-amber-500 text-black' : 'bg-emerald-600 text-white'}`}
+          >
+              {toast.type === 'error' ? <AlertCircle size={24}/> : toast.type === 'warning' ? <AlertTriangle size={24}/> : <CheckCircle2 size={24}/>}
+              <span className="font-bold text-sm leading-tight">{toast.msg}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <HeaderBar 
         activeTab={activeTab} 
@@ -97,16 +146,19 @@ export const AppShell: React.FC<AppShellProps> = ({
         isStealthMode={isStealthMode}
         toggleStealthMode={toggleStealthMode}
         navOrder={navOrder}
+        notifications={notifications}
+        removeNotification={removeNotification}
+        onNavigate={onNavigate}
       />
 
-      <main className="w-full max-w-[1920px] mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
+      <main className="w-full max-w-[1600px] mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
         {children}
       </main>
 
       {/* FAB for New Loan (Mobile) */}
       <button 
         onClick={onNewLoan}
-        className="md:hidden fixed bottom-24 right-6 z-40 w-14 h-14 rounded-full flex items-center justify-center text-white shadow-xl active:scale-95 transition-all"
+        className="md:hidden fixed bottom-24 right-6 z-40 w-14 h-14 rounded-full flex items-center justify-center text-white shadow-xl active:scale-95 transition-all mb-safe"
         style={{ backgroundColor: activeUser?.brandColor || '#2563eb', boxShadow: `0 10px 25px -5px ${activeUser?.brandColor || '#2563eb'}66` }}
       >
         <Plus size={24}/>
@@ -115,7 +167,7 @@ export const AppShell: React.FC<AppShellProps> = ({
       {activeUser && (
           <button 
             onClick={onOpenSupport}
-            className="fixed bottom-40 md:bottom-8 right-6 z-40 p-4 bg-blue-600 text-white rounded-full shadow-2xl shadow-blue-600/40 hover:scale-110 transition-all active:scale-95 group"
+            className="fixed bottom-48 md:bottom-8 right-6 z-40 p-4 bg-blue-600 text-white rounded-full shadow-2xl shadow-blue-600/40 hover:scale-110 transition-all active:scale-95 group mb-safe"
           >
               <MessageSquare size={24}/>
               {totalUnread > 0 && (

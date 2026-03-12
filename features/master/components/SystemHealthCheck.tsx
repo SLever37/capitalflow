@@ -103,7 +103,7 @@ export const SystemHealthCheck = () => {
             const url = `${window.location.origin}/?portal=${mockId}`;
             tests.push({
                 id: 'port-1', category: 'PORTAL', name: 'Estrutura de Link Seguro',
-                passed: url.includes('?portal=') && url.includes(mockId),
+                passed: url?.includes('?portal=') && url?.includes(mockId),
                 details: `URL Gerada: ${url}`
             });
         } catch (e: any) {

@@ -15,7 +15,6 @@ interface InstallmentCardProps {
     vm: InstallmentViewModel;
     loan: Loan; 
     fixedTermStats: any; 
-    onPayment: (loan: Loan, inst: Installment, calculations: any) => void;
     strategy: any; 
     isStealthMode?: boolean;
 }
@@ -24,7 +23,6 @@ const InstallmentCardComponent: React.FC<InstallmentCardProps> = ({
     vm,
     loan,
     fixedTermStats,
-    onPayment,
     strategy,
     isStealthMode
 }) => {
@@ -33,7 +31,10 @@ const InstallmentCardComponent: React.FC<InstallmentCardProps> = ({
         statusColor, statusText, displayDueDate, paidUntilDate, realIndex, showProgress, debt, isFullyFinalized
     } = vm;
 
-    const containerClasses = `p-4 sm:p-5 rounded-2xl sm:rounded-3xl border flex flex-col justify-between h-full ${
+    const isRenegotiated = originalInst.status === 'RENEGOCIADO';
+
+    const containerClasses = `responsive-card rounded-2xl sm:rounded-3xl border flex flex-col justify-between h-full ${
+        isRenegotiated ? 'bg-slate-900/50 border-slate-800/50 opacity-70 grayscale-[50%]' :
         isPaid || isFixedTermDone || isZeroBalance ? 'bg-emerald-500/5 border-emerald-500/20' : 
         isLateInst ? 'bg-rose-500/5 border-rose-500/20' : 
         isPrepaid ? 'bg-emerald-500/10 border-emerald-500/30' : 
@@ -42,17 +43,24 @@ const InstallmentCardComponent: React.FC<InstallmentCardProps> = ({
 
     if (isFixedTerm && fixedTermStats) {
         return (
-            <div className={containerClasses}>
+            <div id={originalInst.id} className={containerClasses}>
                 <InstallmentCardFixedTermPanel fixedTermStats={fixedTermStats} isStealthMode={isStealthMode} />
                 <InstallmentCardStatus text={statusText} colorClass={statusColor} />
-                <InstallmentCardAmounts debt={debt} isPrepaid={isPrepaid} isLateInst={isLateInst} isPaid={isPaid} isStealthMode={isStealthMode} />
-                <InstallmentCardAction isDisabled={isActionDisabled} isFullyFinalized={isFullyFinalized} onPayment={onPayment} loan={loan} originalInst={originalInst} debt={debt} />
+                <InstallmentCardAmounts 
+                    debt={debt} 
+                    originalAmount={originalInst.amount}
+                    isPrepaid={isPrepaid} 
+                    isLateInst={isLateInst} 
+                    isPaid={isPaid} 
+                    isStealthMode={isStealthMode} 
+                />
+                <InstallmentCardAction isDisabled={isActionDisabled} isFullyFinalized={isFullyFinalized} loan={loan} originalInst={originalInst} debt={debt} />
             </div>
         );
     }
 
     return (
-        <div className={containerClasses}>
+        <div id={originalInst.id} className={containerClasses}>
             <div className="flex justify-between items-start mb-3 sm:mb-4">
                 <div>
                     <InstallmentCardHeader realIndex={realIndex} showProgress={showProgress} renewalCount={originalInst.renewalCount} />
@@ -69,8 +77,15 @@ const InstallmentCardComponent: React.FC<InstallmentCardProps> = ({
                 </div>
             </div>
             <InstallmentCardStatus text={statusText} colorClass={statusColor} />
-            <InstallmentCardAmounts debt={debt} isPrepaid={isPrepaid} isLateInst={isLateInst} isPaid={isPaid} isStealthMode={isStealthMode} />
-            <InstallmentCardAction isDisabled={isActionDisabled} isFullyFinalized={isFullyFinalized} onPayment={onPayment} loan={loan} originalInst={originalInst} debt={debt} />
+            <InstallmentCardAmounts 
+                debt={debt} 
+                originalAmount={originalInst.amount}
+                isPrepaid={isPrepaid} 
+                isLateInst={isLateInst} 
+                isPaid={isPaid} 
+                isStealthMode={isStealthMode} 
+            />
+            <InstallmentCardAction isDisabled={isActionDisabled} isFullyFinalized={isFullyFinalized} loan={loan} originalInst={originalInst} debt={debt} />
         </div>
     );
 };

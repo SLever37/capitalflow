@@ -93,10 +93,10 @@ export const SourceCard: React.FC<SourceCardProps> = ({
 
     return (
         <>
-            <div className="bg-slate-900 border border-slate-800 p-3 sm:p-4 rounded-xl relative overflow-hidden group hover:border-slate-700 transition-all shadow-sm flex flex-col h-full">
+            <div id={source.id} className="bg-slate-900 border border-slate-800 p-2.5 sm:p-3 rounded-xl relative overflow-hidden group hover:border-slate-700 transition-all shadow-sm flex flex-col h-full">
                 {/* Background Icon (Marca d'água grande) - Reduzido e mais sutil */}
                 <div className={`absolute -top-1 -right-1 p-2 opacity-5 transition-opacity group-hover:opacity-10 ${colorClass}`}>
-                    <DefaultIcon size={40} />
+                    <DefaultIcon size={32} />
                 </div>
                 
                 <div className="relative z-10 flex flex-col h-full">
@@ -104,19 +104,19 @@ export const SourceCard: React.FC<SourceCardProps> = ({
                         {/* Área do Logo / Ícone Pequeno */}
                         <button 
                             onClick={handleUpdateLogo}
-                            className={`w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden ${bgClass} ${colorClass} shrink-0 hover:ring-2 ring-blue-500/50 transition-all`}
+                            className={`w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden bg-slate-950 border border-slate-800 shrink-0 hover:border-slate-600 transition-all`}
                             title="Clique para alterar o ícone"
                         >
                             {logoUrl && !imgError && source.type !== 'CARD' ? (
                                 <img 
                                     src={logoUrl} 
                                     alt={source.name} 
-                                    className="w-full h-full object-cover"
+                                    className="w-full h-full object-contain p-1"
                                     onError={() => setImgError(true)}
                                     referrerPolicy="no-referrer"
                                 />
                             ) : (
-                                <DefaultIcon size={16} />
+                                <DefaultIcon size={14} className={colorClass} />
                             )}
                         </button>
 
@@ -163,7 +163,7 @@ export const SourceCard: React.FC<SourceCardProps> = ({
                     </div>
                     
                     <div className="mt-auto">
-                        <p className={`text-lg font-black mb-2 ${source.balance < 0 ? 'text-rose-500' : 'text-emerald-400'}`}>
+                        <p className={`text-base font-black mb-2 ${source.balance < 0 ? 'text-rose-500' : 'text-emerald-400'}`}>
                             {formatMoney(source.balance, isStealthMode)}
                         </p>
                         
@@ -216,7 +216,7 @@ export const SourceCard: React.FC<SourceCardProps> = ({
                                         </div>
                                     ))
                                 ) : (
-                                    <p className="text-xs text-slate-600 text-center py-8 italic">Nenhum contrato ativo vinculado a esta fonte.</p>
+                                    <p className="text-xs text-slate-500 text-center py-8 italic">Nenhum contrato ativo vinculado a esta fonte.</p>
                                 )}
                             </div>
                         </div>

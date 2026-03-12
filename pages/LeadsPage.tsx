@@ -4,9 +4,9 @@ import { Lead } from '../types';
 import { supabase } from '../lib/supabase';
 import { buildWhatsAppLink } from '../utils/whatsapp';
 import { formatMoney, maskPhone } from '../utils/formatters';
-import { MessageCircle, Clock, CheckCircle2, XCircle, Loader2, User } from 'lucide-react';
+import { MessageCircle, Clock, CheckCircle2, XCircle, Loader2, User, ChevronLeft } from 'lucide-react';
 
-export const LeadsPage: React.FC<{ activeUser: any }> = ({ activeUser }) => {
+export const LeadsPage: React.FC<{ activeUser: any; goBack?: () => void }> = ({ activeUser, goBack }) => {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -60,20 +60,16 @@ export const LeadsPage: React.FC<{ activeUser: any }> = ({ activeUser }) => {
   if (loading) return <div className="flex justify-center p-10"><Loader2 className="animate-spin text-blue-500" /></div>;
 
   return (
-    <div className="space-y-6 animate-in fade-in">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-black text-white uppercase tracking-tighter">Leads</h1>
-          <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Solicitações de Empréstimo</p>
-        </div>
+    <div className="space-y-6 animate-in fade-in font-sans pb-24">
+      <div className="flex flex-col md:flex-row justify-end items-start md:items-center gap-4">
         <div className="bg-slate-900 px-4 py-2 rounded-xl border border-slate-800">
-           <span className="text-xs font-bold text-white">{leads.filter(l => l.status === 'NOVO').length} Novos</span>
+           <span className="text-sm font-semibold uppercase tracking-widest text-white">{leads.filter(l => l.status === 'NOVO').length} Novos</span>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {leads.map(lead => (
-          <div key={lead.id} className={`bg-slate-900 border ${lead.status === 'NOVO' ? 'border-blue-500/50 shadow-lg shadow-blue-500/10' : 'border-slate-800'} p-5 rounded-2xl relative overflow-hidden group transition-all hover:border-slate-700`}>
+          <div id={lead.id} key={lead.id} className={`bg-slate-900 border ${lead.status === 'NOVO' ? 'border-blue-500/50 shadow-lg shadow-blue-500/10' : 'border-slate-800'} p-5 rounded-2xl relative overflow-hidden group transition-all hover:border-slate-700`}>
              {lead.status === 'NOVO' && <div className="absolute top-0 right-0 bg-blue-600 text-white text-[9px] font-black uppercase px-3 py-1 rounded-bl-xl">Novo</div>}
              
              <div className="flex items-start justify-between mb-4">
@@ -82,21 +78,21 @@ export const LeadsPage: React.FC<{ activeUser: any }> = ({ activeUser }) => {
                       <User size={20}/>
                    </div>
                    <div>
-                      <h3 className="text-white font-bold text-sm">{lead.nome || 'Sem Nome'}</h3>
-                      <p className="text-slate-500 text-xs">{maskPhone(lead.whatsapp)}</p>
+                      <h3 className="text-white font-semibold text-sm">{lead.nome || 'Sem Nome'}</h3>
+                      <p className="text-slate-500 text-sm">{maskPhone(lead.whatsapp)}</p>
                    </div>
                 </div>
              </div>
 
              <div className="mb-4">
-                <p className="text-[10px] text-slate-500 font-black uppercase">Valor Solicitado</p>
+                <p className="text-sm text-slate-500 font-semibold uppercase tracking-widest">Valor Solicitado</p>
                 <p className="text-xl font-black text-emerald-400">{formatMoney(lead.valor_solicitado)}</p>
              </div>
 
              <div className="flex gap-2">
                 <button 
                   onClick={() => openWhatsApp(lead)}
-                  className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-black uppercase text-[10px] flex items-center justify-center gap-2 transition-all"
+                  className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-black uppercase text-sm flex items-center justify-center gap-2 transition-all"
                 >
                    <MessageCircle size={14}/> Conversar
                 </button>
@@ -113,7 +109,7 @@ export const LeadsPage: React.FC<{ activeUser: any }> = ({ activeUser }) => {
                 )}
              </div>
 
-             <div className="mt-3 flex items-center justify-between text-[9px] font-bold uppercase text-slate-600">
+             <div className="mt-3 flex items-center justify-between text-sm font-medium uppercase text-slate-500">
                 <span className="flex items-center gap-1"><Clock size={10}/> {new Date(lead.created_at).toLocaleDateString('pt-BR')}</span>
                 <span className={`${lead.status === 'CONVERTIDO' ? 'text-blue-500' : lead.status === 'REJEITADO' ? 'text-rose-500' : 'text-slate-500'}`}>{lead.status}</span>
              </div>
@@ -122,7 +118,7 @@ export const LeadsPage: React.FC<{ activeUser: any }> = ({ activeUser }) => {
 
         {leads.length === 0 && (
           <div className="col-span-full py-20 text-center text-slate-500">
-             <p className="text-sm font-bold uppercase">Nenhum lead encontrado.</p>
+             <p className="text-sm font-semibold uppercase">Nenhum lead encontrado.</p>
           </div>
         )}
       </div>

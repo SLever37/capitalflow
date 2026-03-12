@@ -73,7 +73,7 @@ export const useUiState = () => {
   } | null>(null);
 
   // Context Modals Data
-  const [renegotiationModalLoan, setRenegotiationModalLoan] = useState<Loan | null>(null);
+  const [renegotiationModalLoans, setRenegotiationModalLoans] = useState<Loan[]>([]);
   const [newAporteModalLoan, setNewAporteModalLoan] = useState<Loan | null>(null);
   const [messageModalLoan, setMessageModalLoan] = useState<Loan | null>(null);
 
@@ -182,7 +182,7 @@ export const useUiState = () => {
     setSelectedClientsToDelete([]);
 
     // modais auxiliares
-    setRenegotiationModalLoan(null);
+    setRenegotiationModalLoans([]);
     setNewAporteModalLoan(null);
     setMessageModalLoan(null);
 
@@ -277,8 +277,8 @@ export const useUiState = () => {
     setAvAmount,
 
     // context modals
-    renegotiationModalLoan,
-    setRenegotiationModalLoan,
+    renegotiationModalLoans,
+    setRenegotiationModalLoans,
     newAporteModalLoan,
     setNewAporteModalLoan,
     messageModalLoan,

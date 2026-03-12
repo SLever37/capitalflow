@@ -36,9 +36,16 @@ export const PortalInstallmentItem: React.FC<PortalInstallmentItemProps> = ({ lo
             </div>
             
             {/* Exibe o Total Real (Incluindo Multas se houver) */}
-            <span className={`text-xs font-black ${installment.status === 'PAID' ? 'text-emerald-500 decoration-slate-500' : 'text-white'}`}>
-                {formatMoney(details.total)}
-            </span>
+            <div className="text-right">
+                <p className={`text-xs font-black ${installment.status === 'PAID' ? 'text-emerald-500 decoration-slate-500' : 'text-white'}`}>
+                    {formatMoney(details.total)}
+                </p>
+                {Math.abs(details.total - (installment.amount || 0)) > 1 && installment.status !== 'PAID' && (
+                    <p className="text-[9px] text-slate-500 font-bold line-through">
+                        {formatMoney(installment.amount)}
+                    </p>
+                )}
+            </div>
         </div>
     );
 };

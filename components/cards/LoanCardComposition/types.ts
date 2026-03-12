@@ -13,7 +13,6 @@ export interface LoanCardProps {
   onRestore: (loan: Loan) => void;
   onDelete: (loan: Loan) => void;
   onNote: (loan: Loan) => void;
-  onPayment: (loan: Loan, inst: Installment, calculations: any) => void;
   onPortalLink: (loan: Loan) => void;
   onUploadPromissoria: (loan: Loan) => void;
   onUploadDoc: (loan: Loan) => void;
@@ -23,6 +22,7 @@ export interface LoanCardProps {
   onOpenComprovante: (url: string) => void;
   onReverseTransaction: (transaction: LedgerEntry, loan: Loan) => void;
   onRenegotiate: (loan: Loan) => void;
+  onActivate: (loan: Loan) => void;
   onAgreementPayment: (loan: Loan, agreement: Agreement, inst: AgreementInstallment) => void;
   onRefresh: () => void;
   onNewAporte?: (loan: Loan) => void;

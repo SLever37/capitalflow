@@ -99,7 +99,7 @@ export const CampanhaLanding: React.FC<CampanhaLandingProps> = ({ campaignId }) 
           <p className="text-slate-400 text-sm font-medium">Simule seu crédito agora mesmo.</p>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-[2rem] p-6 sm:p-8 shadow-2xl">
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="text-[10px] font-black uppercase text-slate-500 ml-1 mb-1 block">Nome Completo *</label>
@@ -178,7 +178,7 @@ export const CampanhaLanding: React.FC<CampanhaLandingProps> = ({ campaignId }) 
             </button>
           </form>
           
-          <p className="text-[9px] text-slate-600 text-center mt-6 leading-relaxed">
+          <p className="text-[9px] text-slate-500 text-center mt-6 leading-relaxed">
             Esta é uma simulação. A liberação e condições estão sujeitas à análise e validação cadastral.
           </p>
         </div>

@@ -48,7 +48,10 @@ export const agreementAdapter = (raw: any): Agreement => {
     startDate: safeDateString(raw.created_at),
     status: normalizedStatus,
     createdAt: safeDateString(raw.created_at),
-    installments
+    installments,
+    gracePeriod: asNumber(raw.grace_period),
+    discount: asNumber(raw.discount),
+    downPayment: asNumber(raw.down_payment)
   } as Agreement;
 };
 
@@ -77,6 +80,8 @@ export const mapLoanFromDB = (l: any, clientsData: any[] = []): Loan => {
       normalizedInstallmentStatus = LoanStatus.PENDING;
     } else if (rawStatus === 'LATE' || rawStatus === 'ATRASADO') {
       normalizedInstallmentStatus = LoanStatus.LATE;
+    } else if (rawStatus === 'RENEGOCIADO') {
+      normalizedInstallmentStatus = LoanStatus.RENEGOCIADO;
     } else {
       normalizedInstallmentStatus = LoanStatus.PENDING;
     }
@@ -119,22 +124,40 @@ export const mapLoanFromDB = (l: any, clientsData: any[] = []): Loan => {
   const signals = rawSinais.map((s: any) => ({
     id: asString(s.id),
     date: safeDateString(s.created_at),
-    type: asString(s.type),
+    type: asString(s.method || s.type || s.tipo_intencao),
     status: asString(s.status),
-    comprovanteUrl: asString(s.proof_url),
+    comprovanteUrl: asString(s.comprovante_url || s.proof_url),
     clientViewedAt: safeDateString(s.client_viewed_at),
     reviewNote: asString(s.review_note)
   }));
 
   let activeAgreement: Agreement | undefined = undefined;
+  let pastAgreements: Agreement[] = [];
   const agreementsArr = asArray(l.acordos_inadimplencia);
+  
   if (agreementsArr.length > 0) {
-    const rawAgreement = agreementsArr
-      .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
-    try {
-      if (rawAgreement) activeAgreement = agreementAdapter(rawAgreement);
-    } catch (e) {
-      console.warn('Falha ao mapear acordo', l.id, e);
+    const mappedAgreements = agreementsArr
+      .map(raw => {
+        try {
+          return agreementAdapter(raw);
+        } catch (e) {
+          console.warn('Falha ao mapear acordo', l.id, e);
+          return null;
+        }
+      })
+      .filter(Boolean) as Agreement[];
+
+    // Ordena do mais recente para o mais antigo
+    mappedAgreements.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    // Identifica o acordo ativo (se houver)
+    const activeIndex = mappedAgreements.findIndex(a => a.status === 'ACTIVE' || a.status === 'ATIVO');
+    
+    if (activeIndex !== -1) {
+      activeAgreement = mappedAgreements[activeIndex];
+      pastAgreements = mappedAgreements.filter((_, idx) => idx !== activeIndex);
+    } else {
+      pastAgreements = mappedAgreements;
     }
   }
 
@@ -195,6 +218,7 @@ export const mapLoanFromDB = (l: any, clientsData: any[] = []): Loan => {
     documentPhotos: [],
 
     activeAgreement,
+    pastAgreements,
 
     status: asString(l.status) as LoanStatus,
   };

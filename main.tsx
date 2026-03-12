@@ -4,8 +4,11 @@ import './index.css';
 import { App } from './App';
 import { AppErrorBoundary } from './components/system/AppErrorBoundary';
 
+console.log('CapitalFlow: Booting main.tsx...');
+
 const rootElement = document.getElementById('root');
 if (!rootElement) {
+  console.error("CapitalFlow: Could not find root element to mount to");
   throw new Error("Could not find root element to mount to");
 }
 
@@ -17,3 +20,4 @@ root.render(
     </AppErrorBoundary>
   </React.StrictMode>
 );
+console.log('CapitalFlow: Render initiated.');

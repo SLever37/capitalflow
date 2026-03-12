@@ -56,7 +56,7 @@ export const ProfileAuditLog: React.FC<ProfileAuditLogProps> = ({ logs }) => {
             </div>
             <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
                 {logs.length === 0 ? (
-                    <div className="text-center text-slate-600 py-20 uppercase text-xs font-black tracking-widest border-2 border-dashed border-slate-800 rounded-3xl">Nenhum registro de auditoria.</div>
+                    <div className="text-center text-slate-500 py-20 uppercase text-xs font-black tracking-widest border-2 border-dashed border-slate-800 rounded-3xl">Nenhum registro de auditoria.</div>
                 ) : (
                     logs.map((log) => renderAuditEntry(log))
                 )}

@@ -99,6 +99,7 @@ export const paymentsService = {
       activeUser,
       sources,
       realDate,
+      manualDate,
       capitalizeRemaining = false,
       paymentType: legacyPaymentType,
       avAmount: legacyAvAmount
@@ -215,6 +216,23 @@ export const paymentsService = {
     });
 
     if (error) throw new Error('Falha na persistência: ' + error.message);
+
+    // ✅ Se o usuário forneceu uma data manual (próximo vencimento), 
+    // atualizamos a data de vencimento da parcela. Isso é crucial para renovações
+    // onde o principal permanece mas o período de juros deve avançar.
+    if (manualDate) {
+      const { error: dateError } = await supabase
+        .from('parcelas')
+        .update({
+          data_vencimento: manualDate.toISOString().split('T')[0]
+        })
+        .eq('id', instId);
+      
+      if (dateError) {
+        console.error('Erro ao atualizar data de vencimento:', dateError);
+        // Não lançamos erro aqui para não travar o fluxo de pagamento que já foi processado no RPC
+      }
+    }
 
     // Determina o tipo para o recibo (apenas visual)
     let finalType = 'CUSTOM';

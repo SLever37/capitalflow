@@ -75,7 +75,7 @@ export const EventModal: React.FC<EventModalProps> = ({ onClose, onSave, initial
             <input 
               type="text" 
               placeholder="O que precisa ser feito?" 
-              className="w-full bg-slate-950/50 border border-slate-800 rounded-2xl px-4 py-3 text-lg font-bold text-white outline-none focus:border-blue-500 transition-colors placeholder:text-slate-600"
+              className="w-full bg-slate-950/50 border border-slate-800 rounded-2xl px-4 py-3 text-lg font-bold text-white outline-none focus:border-blue-500 transition-colors placeholder:text-slate-500"
               value={title}
               onChange={e => setTitle(e.target.value)}
               autoFocus
@@ -92,7 +92,7 @@ export const EventModal: React.FC<EventModalProps> = ({ onClose, onSave, initial
                     value={date}
                     onChange={e => setDate(e.target.value)}
                 />
-                <Calendar size={14} className="absolute right-3 top-3 text-slate-600 pointer-events-none"/>
+                <Calendar size={14} className="absolute right-3 top-3 text-slate-500 pointer-events-none"/>
             </div>
             <div className="bg-slate-950 border border-slate-800 rounded-xl p-2 flex flex-col relative group focus-within:border-blue-500 transition-colors">
                 <label className="text-[9px] font-black uppercase text-slate-500 mb-1 ml-1">Hora</label>
@@ -102,7 +102,7 @@ export const EventModal: React.FC<EventModalProps> = ({ onClose, onSave, initial
                     value={time}
                     onChange={e => setTime(e.target.value)}
                 />
-                <Clock size={14} className="absolute right-3 top-3 text-slate-600 pointer-events-none"/>
+                <Clock size={14} className="absolute right-3 top-3 text-slate-500 pointer-events-none"/>
             </div>
             
             <div className="bg-slate-950 border border-slate-800 rounded-xl p-2 flex flex-col relative group focus-within:border-blue-500 transition-colors">
@@ -116,7 +116,7 @@ export const EventModal: React.FC<EventModalProps> = ({ onClose, onSave, initial
                     <option value="MEDIUM">Média</option>
                     <option value="HIGH">Alta</option>
                 </select>
-                <Flag size={14} className="absolute right-3 top-3 text-slate-600 pointer-events-none"/>
+                <Flag size={14} className="absolute right-3 top-3 text-slate-500 pointer-events-none"/>
             </div>
 
             <div className="bg-slate-950 border border-slate-800 rounded-xl p-2 flex flex-col relative group focus-within:border-blue-500 transition-colors">
@@ -130,7 +130,7 @@ export const EventModal: React.FC<EventModalProps> = ({ onClose, onSave, initial
                     <option value="MEETING">Reunião</option>
                     <option value="REMINDER">Lembrete</option>
                 </select>
-                <Tag size={14} className="absolute right-3 top-3 text-slate-600 pointer-events-none"/>
+                <Tag size={14} className="absolute right-3 top-3 text-slate-500 pointer-events-none"/>
             </div>
         </div>
 
@@ -142,7 +142,7 @@ export const EventModal: React.FC<EventModalProps> = ({ onClose, onSave, initial
                 value={description}
                 onChange={e => setDescription(e.target.value)}
             />
-            <AlignLeft size={14} className="absolute right-3 top-3 text-slate-600 pointer-events-none group-focus-within:text-blue-500 transition-colors"/>
+            <AlignLeft size={14} className="absolute right-3 top-3 text-slate-500 pointer-events-none group-focus-within:text-blue-500 transition-colors"/>
         </div>
 
         {/* Ações */}

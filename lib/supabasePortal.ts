@@ -28,11 +28,12 @@ function readEnv(): EnvLike {
 function requireEnv(key: string): string {
   const env = readEnv();
   const val = String(env?.[key] ?? '').trim();
-  if (!val) {
-    throw new Error(
-      `[ENV] Variável obrigatória ausente: ${key}. ` +
-        `Configure em Cloudflare Pages (Environment Variables) e no .env.local (dev).`
-    );
+  if (!val || val === 'undefined' || val === 'null') {
+    if (key === 'VITE_SUPABASE_URL') return 'https://hzchchbxkhryextaymkn.supabase.co';
+    if (key === 'VITE_SUPABASE_ANON_KEY') return 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh6Y2hjaGJ4a2hyeWV4dGF5bWtuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3NTk2ODcsImV4cCI6MjA4MzMzNTY4N30.kX6FlTuPkl7XfycwVuZN2mI6e3ed8NaDUoyAHy9L3nc';
+
+    console.warn(`[ENV] Variável obrigatória ausente: ${key}. Usando valor de fallback.`);
+    return 'placeholder-key';
   }
   return val;
 }

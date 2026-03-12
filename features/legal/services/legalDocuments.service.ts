@@ -50,15 +50,15 @@ export const legalDocumentsService = {
 
     const payload = {
       id: docId,
-      profile_id: profileId,
-      type: type,
-      status: LegalDocumentStatus.PENDENTE,
-      content_snapshot: snapshot,
+      tipo: type, // Campo obrigatório no banco (NOT NULL)
+      tipo_documento: type, // Mantido para compatibilidade com migrations recentes
+      status_assinatura: LegalDocumentStatus.PENDENTE,
+      snapshot: snapshot,
       hash_sha256: hash,
       created_at: now,
       // Campos opcionais de relacionamento
-      loan_id: relatedEntityId?.loanId || null,
-      acordo_id: relatedEntityId?.agreementId || null, // Mapeando para coluna existente se houver, ou genérico
+      loan_id: safeUUID(relatedEntityId?.loanId) || null,
+      acordo_id: safeUUID(relatedEntityId?.agreementId) || null,
       metadata: {
         version: '1.0',
         origin: 'SYSTEM_GENERATED'

@@ -1,7 +1,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { Loan, Installment } from '../../../../types';
-import { parseDateOnlyUTC, addDaysUTC, todayDateOnlyUTC, toISODateOnlyUTC, getDaysDiff } from '../../../../utils/dateHelpers';
+import { parseDateOnlyUTC, addDaysUTC, addMonthsUTC, todayDateOnlyUTC, toISODateOnlyUTC, getDaysDiff } from '../../../../utils/dateHelpers';
 import { paymentModalityDispatcher } from '../../../../features/payments/modality/index';
 import { formatMoney } from '../../../../utils/formatters';
 import { calculateTotalDue } from '../../../../domain/finance/calculations';
@@ -164,12 +164,26 @@ export const usePaymentManagerState = ({ data, paymentType, setPaymentType, avAm
             
             if(data.loan.billingCycle !== 'DAILY_FIXED_TERM') setAvAmount('');
             setCustomAmount('');
-
-            const currentDueDate = parseDateOnlyUTC(data.inst.dueDate);
-            let daysToAdd = data.loan.billingCycle.includes('DAILY') ? 1 : 30;
-            setManualDateStr(toISODateOnlyUTC(addDaysUTC(currentDueDate, daysToAdd)));
         }
     }, [data?.loan?.id, data?.inst?.id]);
+
+    // Sugestão de próxima data baseada na data de recebimento
+    useEffect(() => {
+        if (data && realPaymentDateStr) {
+            const paymentDate = parseDateOnlyUTC(realPaymentDateStr);
+            const isDaily = data.loan.billingCycle?.includes('DAILY') || false;
+            
+            let nextDate: Date;
+            if (isDaily) {
+                nextDate = addDaysUTC(paymentDate, 1);
+            } else {
+                // Pedido do usuário: +30 dias a partir da data de recebimento
+                nextDate = addDaysUTC(paymentDate, 30);
+            }
+            
+            setManualDateStr(toISODateOnlyUTC(nextDate));
+        }
+    }, [data?.loan?.id, data?.inst?.id, realPaymentDateStr, data?.loan?.billingCycle]);
 
     return {
         customAmount, setCustomAmount,

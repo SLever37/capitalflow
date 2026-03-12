@@ -48,7 +48,7 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ onClose, onC
             (l.ledger || []).forEach(t => {
                 if (new Date(t.date).getTime() >= startOfMonth) {
                     if (t.type === 'LEND_MORE') monthOut += t.amount;
-                    else if (t.type.includes('PAYMENT')) monthIn += t.amount;
+                    else if (t.type?.includes('PAYMENT')) monthIn += t.amount;
                 }
             });
         });
@@ -116,7 +116,7 @@ export const AIAssistantModal: React.FC<AIAssistantModalProps> = ({ onClose, onC
             <div className="flex flex-col items-center justify-center py-6 space-y-6">
                 
                 {/* Visual Brain Animation */}
-                <div className={`relative w-24 h-24 rounded-[2rem] flex items-center justify-center transition-all duration-700 rotate-45 
+                <div className={`relative w-24 h-24 rounded-3xl flex items-center justify-center transition-all duration-700 rotate-45 
                     ${status === 'LISTENING' ? 'bg-blue-600 animate-pulse shadow-[0_0_40px_rgba(37,99,235,0.4)]' : 
                       status === 'THINKING' ? 'bg-purple-600 animate-spin scale-110' : 
                       status === 'SUCCESS' ? 'bg-emerald-500 rotate-0' : 'bg-slate-800'}`

@@ -49,7 +49,7 @@ export const PortalEducationalAI: React.FC<{ contracts: Loan[], clientName: stri
                 </button>
             </div>
 
-            <div className="bg-slate-950/50 p-6 rounded-[2rem] border border-slate-800 relative overflow-hidden group">
+            <div className="bg-slate-950/50 p-6 rounded-3xl border border-slate-800 relative overflow-hidden group">
                 <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
                     <Trophy size={64} className="text-white"/>
                 </div>
@@ -57,7 +57,7 @@ export const PortalEducationalAI: React.FC<{ contracts: Loan[], clientName: stri
                 {loading && !result ? (
                     <div className="py-8 flex flex-col items-center justify-center gap-3">
                         <Loader2 className="animate-spin text-pink-500" size={24}/>
-                        <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Traçando seu Perfil...</p>
+                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Traçando seu Perfil...</p>
                     </div>
                 ) : (
                     <div className="space-y-4 relative z-10">

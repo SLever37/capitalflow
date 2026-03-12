@@ -4,7 +4,6 @@ import { UserProfile } from '../../../types';
 import { generateUUID } from '../../../utils/generators';
 import { onlyDigits, maskDocument, maskPhone } from '../../../utils/formatters';
 import { asString, asNumber } from '../../../utils/safe';
-import * as XLSX from 'xlsx';
 
 type UpdatableProfileFields = Partial<Omit<UserProfile, 'id' | 'profile_id'>>;
 
@@ -117,6 +116,7 @@ export const operatorProfileService = {
     },
 
     async importProfileFromSheet(file: File, profileId: string): Promise<UserProfile> {
+        const XLSX = await import('xlsx');
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = async (e) => {

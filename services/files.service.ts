@@ -119,5 +119,19 @@ export const filesService = {
   async saveSelectedClients(selectedCandidates: any[], activeUser: any, showToast: any) {
       // O processamento agora é feito via executeImport no controlador para maior controle de progresso
       return; 
+  },
+
+  async uploadFile(file: File, path: string): Promise<string | null> {
+    try {
+      const { data, error } = await supabase.storage.from('documentos').upload(path, file, {
+        upsert: true
+      });
+      if (error) throw error;
+      const { data: publicData } = supabase.storage.from('documentos').getPublicUrl(path);
+      return publicData.publicUrl;
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      return null;
+    }
   }
 };

@@ -82,7 +82,7 @@ export const PortalChatDrawer: React.FC<PortalChatDrawerProps> = ({ loan, isOpen
         />
 
         <div className="bg-slate-950 px-4 py-2 border-t border-slate-800 sm:hidden">
-          <p className="text-[8px] text-slate-600 text-center font-black uppercase tracking-widest">
+          <p className="text-[8px] text-slate-500 text-center font-black uppercase tracking-widest">
             Conexão Segura CapitalFlow SSL
           </p>
         </div>

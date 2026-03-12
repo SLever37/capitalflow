@@ -24,7 +24,7 @@ interface DashboardPageProps {
   onStaffChange: (id: string) => void;
   mobileDashboardTab: 'CONTRACTS' | 'BALANCE';
   setMobileDashboardTab: (val: 'CONTRACTS' | 'BALANCE') => void;
-  statusFilter: 'TODOS' | 'ATRASADOS' | 'EM_DIA' | 'PAGOS' | 'ARQUIVADOS' | 'ATRASO_CRITICO';
+  statusFilter: any;
   setStatusFilter: (val: any) => void;
   sortOption: SortOption;
   setSortOption: (val: SortOption) => void;
@@ -38,7 +38,6 @@ interface DashboardPageProps {
   onRestore: (loan: Loan) => void;
   onDelete: (loan: Loan) => void;
   onNote: (loan: Loan) => void;
-  onPayment: (loan: Loan, inst: any, calcs: any) => void;
   onPortalLink: (loan: Loan) => void;
   onUploadPromissoria: (loan: Loan) => void;
   onUploadDoc: (loan: Loan) => void;
@@ -50,7 +49,8 @@ interface DashboardPageProps {
   setWithdrawModal: (open: boolean) => void;
   showToast: (msg: string, type?: 'error'|'success') => void;
   isStealthMode: boolean;
-  onRenegotiate: (loan: Loan) => void;
+  onRenegotiate: (loan: Loan | Loan[]) => void;
+  onActivate: (loan: Loan) => void;
   onNewAporte: (loan: Loan) => void;
   onAgreementPayment: (loan: Loan, agreement: Agreement, inst: AgreementInstallment) => void;
   onNavigate: (id: string) => void;
@@ -61,20 +61,18 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   loans, sources, filteredLoans, stats, activeUser, staffMembers, selectedStaffId, onStaffChange,
   mobileDashboardTab, setMobileDashboardTab, statusFilter, setStatusFilter, sortOption, setSortOption, 
   searchTerm, setSearchTerm, selectedLoanId, setSelectedLoanId, onEdit, onMessage, onArchive, onRestore, 
-  onDelete, onNote, onPayment, onPortalLink, onUploadPromissoria, onUploadDoc, onViewPromissoria, 
+  onDelete, onNote, onPortalLink, onUploadPromissoria, onUploadDoc, onViewPromissoria, 
   onViewDoc, onReviewSignal, onOpenComprovante, onReverseTransaction, setWithdrawModal, showToast, 
-  isStealthMode, onRenegotiate, onNewAporte, onAgreementPayment, onNavigate, onRefresh
+  isStealthMode, onRenegotiate, onActivate, onNewAporte, onAgreementPayment, onNavigate, onRefresh
 }) => {
   
-  // Agrupa os empréstimos filtrados por cliente, respeitando a ordenação selecionada
   const groupedLoans = useMemo(() => groupLoansByClient(filteredLoans, sortOption), [filteredLoans, sortOption]);
 
-  // Objeto com todas as props necessárias para o LoanCard (para passar via drill-down)
   const loanCardProps = {
       sources, activeUser, selectedLoanId, setSelectedLoanId, onEdit, onMessage, onArchive,
-      onRestore, onDelete, onNote, onPayment, onPortalLink, onUploadPromissoria, onUploadDoc,
+      onRestore, onDelete, onNote, onPortalLink, onUploadPromissoria, onUploadDoc,
       onViewPromissoria, onViewDoc, onReviewSignal, onOpenComprovante, onReverseTransaction,
-      onRenegotiate, onNewAporte, onAgreementPayment, onNavigate, onRefresh, isStealthMode
+      onRenegotiate, onActivate, onNewAporte, onAgreementPayment, onNavigate, onRefresh, isStealthMode
   };
 
   return (
@@ -85,7 +83,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       </div>
 
       <div className="flex flex-col lg:flex-row gap-6 sm:gap-8">
-          <div className={`flex-1 space-y-6 sm:space-y-8 ${mobileDashboardTab === 'BALANCE' ? 'hidden md:block' : ''}`}>
+          <div className={`flex-1 min-w-0 space-y-6 sm:space-y-8 ${mobileDashboardTab === 'BALANCE' ? 'hidden md:block' : ''}`}>
               <DashboardAlerts loans={loans} sources={sources} />
               <DashboardControls 
                 statusFilter={statusFilter} setStatusFilter={setStatusFilter} 
@@ -98,40 +96,35 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 onStaffChange={onStaffChange}
               />
 
-              {/* Lista de Contratos: Renderização Agrupada */}
               {groupedLoans.length > 0 ? (
                   <div className="columns-1 md:columns-2 xl:columns-3 gap-4">
-                      {groupedLoans.map(group => {
-                          return (
-                              <div key={group.clientId || group.clientName} className="break-inside-avoid mb-4">
-                                  <ClientGroupCard 
-                                      group={group}
-                                      passThroughProps={loanCardProps}
-                                      isStealthMode={isStealthMode}
-                                  />
-                              </div>
-                          );
-                      })}
+                      {groupedLoans.map(group => (
+                          <div key={group.id} className="break-inside-avoid mb-4">
+                              <ClientGroupCard 
+                                  group={group}
+                                  passThroughProps={loanCardProps}
+                                  isStealthMode={isStealthMode}
+                              />
+                          </div>
+                      ))}
                   </div>
               ) : (
-                  // Empty State Otimizado
-                  <div className="flex flex-col items-center justify-center py-20 px-6 bg-slate-900/50 border border-dashed border-slate-800 rounded-[3rem] text-center mt-4">
+                  <div className="flex flex-col items-center justify-center py-20 px-6 bg-slate-900/50 border border-dashed border-slate-800 rounded-3xl text-center mt-4">
                       <div className="w-20 h-20 bg-slate-900 rounded-3xl flex items-center justify-center mb-6 shadow-2xl shadow-black/50 border border-slate-800 rotate-3 transition-transform hover:rotate-6">
-                          <BarChart3 className="w-8 h-8 text-slate-600" />
+                          <BarChart3 className="w-8 h-8 text-slate-500" />
                       </div>
                       <h3 className="text-white font-black uppercase tracking-tight text-lg mb-2">Nenhum contrato encontrado</h3>
                       <p className="text-slate-500 text-xs font-medium max-w-sm leading-relaxed">
                           Não encontramos registros com os filtros atuais. <br/>
-                          Limpe a busca ou inicie uma nova operação.
+                          Tente ajustar a busca ou os filtros de status.
                       </p>
                   </div>
               )}
           </div>
 
-          <aside className={`w-full lg:w-96 space-y-5 sm:space-y-6 ${mobileDashboardTab === 'CONTRACTS' ? 'hidden md:block' : ''}`}>
+          <aside className={`w-full lg:w-80 shrink-0 min-w-0 space-y-5 sm:space-y-6 ${mobileDashboardTab === 'CONTRACTS' ? 'hidden md:block' : ''}`}>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4">
                   
-                  {/* CARD CAPITAL NA RUA */}
                   <StatCard 
                     title="Capital na Rua" 
                     value={`R$ ${stats.totalLent.toLocaleString()}`} 
@@ -151,7 +144,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                     }
                   />
 
-                  {/* CARD RECEBIDO TOTAL */}
                   <StatCard 
                     title="Recebido (Total)" 
                     value={`R$ ${stats.totalReceived.toLocaleString()}`} 
@@ -169,7 +161,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                     }
                   />
 
-                  {/* CARD LUCRO PROJETADO */}
                   <StatCard 
                     title="Lucro Projetado" 
                     value={`R$ ${stats.expectedProfit.toLocaleString()}`} 
@@ -189,18 +180,17 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                     }
                   />
 
-                  {/* CARD LUCRO DISPONÍVEL */}
                   <ProfitCard balance={stats.interestBalance} onWithdraw={() => setWithdrawModal(true)} isStealthMode={isStealthMode} />
               </div>
               
-              <div className="bg-slate-900 border border-slate-800 rounded-[2.5rem] p-8 flex flex-col items-center shadow-xl">
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 flex flex-col items-center shadow-xl">
                   <h3 className="text-[10px] font-black uppercase mb-6 tracking-widest text-slate-500 flex items-center gap-2 w-full"><PieIcon className="w-4 h-4 text-blue-500" /> Saúde da Carteira</h3>
-                  <div style={{ width: '100%', minHeight: 300 }}> 
-                      <ResponsiveContainer width="100%" height={300}><PieChart><Pie data={stats.pieData} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value" stroke="none" cornerRadius={4}>{stats.pieData.map((entry: any, index: number) => <Cell key={index} fill={entry.color} />)}</Pie><Tooltip contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '12px', fontSize: '10px', fontWeight: 'bold' }} /></PieChart></ResponsiveContainer>
+                  <div style={{ width: '100%', minHeight: 220 }}> 
+                      <ResponsiveContainer width="100%" height={220}><PieChart><Pie data={stats.pieData} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value" stroke="none" cornerRadius={4}>{stats.pieData.map((entry: any, index: number) => <Cell key={index} fill={entry.color} />)}</Pie><Tooltip contentStyle={{ backgroundColor: '#0f172a', border: 'none', borderRadius: '12px', fontSize: '10px', fontWeight: 'bold' }} /></PieChart></ResponsiveContainer>
                   </div>
                   <h3 className="text-[10px] font-black uppercase mb-4 mt-8 tracking-widest text-slate-500 flex items-center gap-2 w-full pt-6 border-t border-slate-800"><TrendingUp className="w-4 h-4 text-emerald-500" /> Evolução (6 Meses)</h3>
-                  <div style={{ width: '100%', minHeight: 300, marginBottom: '1.5rem' }}>
-                      <ResponsiveContainer width="100%" height={300}><LineChart data={stats.lineChartData}><CartesianGrid strokeDasharray="3 3" stroke="#1e293b" /><XAxis dataKey="name" tick={{fontSize: 10, fill: '#64748b'}} axisLine={false} /><YAxis tick={{fontSize: 10, fill: '#64748b'}} axisLine={false} /><Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', fontSize: '10px' }} /><Line type="monotone" dataKey="Entradas" stroke="#10b981" strokeWidth={3} dot={{r: 4}} /><Line type="monotone" dataKey="Saidas" stroke="#f43f5e" strokeWidth={3} dot={{r: 4}} /></LineChart></ResponsiveContainer>
+                  <div style={{ width: '100%', minHeight: 220, marginBottom: '1.5rem' }}>
+                      <ResponsiveContainer width="100%" height={220}><LineChart data={stats.lineChartData}><CartesianGrid strokeDasharray="3 3" stroke="#1e293b" /><XAxis dataKey="name" tick={{fontSize: 10, fill: '#64748b'}} axisLine={false} /><YAxis tick={{fontSize: 10, fill: '#64748b'}} axisLine={false} /><Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', fontSize: '10px' }} /><Line type="monotone" dataKey="Entradas" stroke="#10b981" strokeWidth={3} dot={{r: 4}} /><Line type="monotone" dataKey="Saidas" stroke="#f43f5e" strokeWidth={3} dot={{r: 4}} /></LineChart></ResponsiveContainer>
                   </div>
 
                   <AIBalanceInsight loans={loans} sources={sources} activeUser={activeUser} />

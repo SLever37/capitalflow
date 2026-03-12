@@ -111,7 +111,7 @@ serve(async (req) => {
     }
 
     const { data: userData, error: getError } = await supabaseAdmin.auth.admin.getUserByEmail(cleanEmail);
-    if (getError && !getError.message.toLowerCase().includes("user not found")) {
+    if (getError && !getError.message?.toLowerCase().includes("user not found")) {
       throw new Error(`Erro ao consultar Auth: ${getError.message}`);
     }
 

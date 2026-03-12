@@ -149,7 +149,7 @@ export const SystemModalsWrapper = () => {
                         <button 
                             onClick={loanCtrl.executeConfirmation} 
                             className={`flex-1 py-3 text-white rounded-xl font-bold uppercase ${
-                                ['DELETE', 'DELETE_CLIENT', 'DELETE_SOURCE', 'REVERSE_TRANSACTION'].includes(ui.confirmation.type) 
+                                ['DELETE', 'DELETE_CLIENT', 'DELETE_SOURCE', 'REVERSE_TRANSACTION'].includes(ui.confirmation.type || '') 
                                 ? 'bg-rose-600' 
                                 : ui.confirmation.type === 'RESTORE' ? 'bg-emerald-600' : 'bg-blue-600'
                             }`}

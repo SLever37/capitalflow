@@ -21,7 +21,7 @@ const safeFloat = (v: any): number => {
 };
 
 export const contractsService = {
-  async saveLoan(loan: Loan, activeUser: UserProfile, _sources: CapitalSource[], editingLoan: Loan | null) {
+  async saveLoan(loan: Loan, activeUser: UserProfile, _sources: CapitalSource[], editingLoan: Loan | null, options?: { skipTransaction?: boolean }) {
     if (!activeUser?.id) throw new Error('Usuário não autenticado.');
 
     // ✅ ownerId = dono da conta (supervisor) ou o próprio usuário
@@ -127,6 +127,8 @@ export const contractsService = {
       client_id: finalClientId,
       source_id: safeUUID(loan.sourceId),
 
+      status: loan.status || 'ATIVO',
+
       debtor_name: loan.debtorName,
       debtor_phone: loan.debtorPhone,
       debtor_document: loan.debtorDocument,
@@ -209,7 +211,7 @@ export const contractsService = {
           interest_remaining: safeFloat(inst.interestRemaining),
           late_fee_accrued: safeFloat(inst.lateFeeAccrued),
 
-          status: 'PENDING',
+          status: 'PENDENTE',
           paid_total: 0,
         }));
 
@@ -219,7 +221,7 @@ export const contractsService = {
 
       // Saída de Caixa (novo contrato)
       const safeSourceId = safeUUID(loan.sourceId);
-      if (safeSourceId) {
+      if (safeSourceId && !options?.skipTransaction) {
         await supabase.rpc('adjust_source_balance', { p_source_id: safeSourceId, p_delta: -principal });
 
         await supabase.from('transacoes').insert({

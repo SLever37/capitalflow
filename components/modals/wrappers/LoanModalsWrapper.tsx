@@ -40,10 +40,10 @@ export const LoanModalsWrapper = () => {
         );
     }
 
-    if (activeModal?.type === 'RENEGOTIATION' && ui.renegotiationModalLoan && activeUser) {
+    if (activeModal?.type === 'RENEGOTIATION' && ui.renegotiationModalLoans?.length > 0 && activeUser) {
         return (
             <RenegotiationModal
-                loan={ui.renegotiationModalLoan}
+                loans={ui.renegotiationModalLoans}
                 activeUser={activeUser}
                 onClose={closeModal}
                 onSuccess={() => { closeModal(); fetchFullData(activeUser.id); }}

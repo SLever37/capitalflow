@@ -94,7 +94,7 @@ serve(async (req) => {
         p_idempotency_key: `mp-${paymentId}`
       });
 
-      if (rpcError && !rpcError.message.includes("Parcela já quitada")) {
+      if (rpcError && !rpcError.message?.includes("Parcela já quitada")) {
         return json({ ok: false, error: rpcError.message }, 500);
       }
 

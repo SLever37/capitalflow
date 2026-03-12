@@ -1,6 +1,8 @@
 import { supabase } from '../../../lib/supabase';
 import { CalendarEvent, EventStatus } from '../types';
 import { safeUUID } from '../../../utils/uuid';
+import { mapLoanFromDB } from '../../../services/adapters/dbAdapters';
+import { resolveLoanVisualClassification } from '../../../utils/loanFilterResolver';
 
 export const calendarService = {
 
@@ -10,37 +12,35 @@ export const calendarService = {
 
     const events: CalendarEvent[] = [];
 
-    const { data: loans } = await supabase
+    const { data: rawLoans } = await supabase
       .from('contratos')
       .select(`
-        id, 
-        debtor_name, 
-        debtor_phone, 
-        client_id, 
-        status,
+        *,
         parcelas (
-          id, 
-          data_vencimento, 
-          status, 
-          amount, 
-          principal_remaining, 
-          interest_remaining, 
-          late_fee_accrued, 
-          numero_parcela
+          *
+        ),
+        acordos_inadimplencia (
+          *,
+          acordo_parcelas (*)
         )
       `)
       .eq('owner_id', safeProfileId)
       .not('status', 'in', '("ENCERRADO","PAID")')
       .eq('is_archived', false);
 
-    if (loans) {
-      loans.forEach((loan: any) => {
-        loan.parcelas?.forEach((p: any) => {
+    if (rawLoans) {
+      const loans = rawLoans.map(l => mapLoanFromDB(l));
 
+      loans.forEach((loan) => {
+        // Filtragem Operacional: Apenas EM_DIA, ATRASADO, CRITICO
+        const classification = resolveLoanVisualClassification(loan);
+        if (!['EM_DIA', 'ATRASADO', 'CRITICO'].includes(classification)) {
+          return;
+        }
+
+        loan.installments?.forEach((p) => {
           if (p.status !== 'PAID') {
-
-            const dueDate = p.data_vencimento;
-
+            const dueDate = p.dueDate;
             const today = new Date();
             today.setHours(0, 0, 0, 0);
 
@@ -61,14 +61,14 @@ export const calendarService = {
             else if (isSoon) status = 'DUE_SOON';
 
             const installmentTotal =
-              (Number(p.principal_remaining) || 0) +
-              (Number(p.interest_remaining) || 0) +
-              (Number(p.late_fee_accrued) || 0);
+              (Number(p.principalRemaining) || 0) +
+              (Number(p.interestRemaining) || 0) +
+              (Number(p.lateFeeAccrued) || 0);
 
             events.push({
               id: `inst-${p.id}`,
-              title: loan.debtor_name,
-              description: `Parcela ${p.numero_parcela || 'Única'} • R$ ${Number(p.amount).toFixed(2)}`,
+              title: loan.debtorName,
+              description: `Parcela ${p.number || 'Única'} • R$ ${Number(p.amount).toFixed(2)}`,
               start_time: dueDate,
               end_time: dueDate,
               is_all_day: true,
@@ -78,16 +78,15 @@ export const calendarService = {
               meta: {
                 loanId: loan.id,
                 installmentId: p.id,
-                clientId: loan.client_id,
+                clientId: loan.clientId,
                 amount: installmentTotal,
-                clientName: loan.debtor_name,
-                clientPhone: loan.debtor_phone
+                clientName: loan.debtorName,
+                clientPhone: loan.debtorPhone
               },
               color: isLate
                 ? '#f43f5e'
                 : (isToday ? '#f59e0b' : '#3b82f6')
             });
-
           }
         });
       });

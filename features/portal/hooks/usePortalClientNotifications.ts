@@ -9,14 +9,15 @@ interface PortalNotificationState {
 
 export const usePortalClientNotifications = (
     portalToken: string,
+    portalCode: string,
     stats: { overdueCount: number; maxDaysLate: number; nextDueDate: Date | null }
 ) => {
     const [notification, setNotification] = useState<PortalNotificationState | null>(null);
 
     useEffect(() => {
-        if (!portalToken) return;
+        if (!portalToken || !portalCode) return;
 
-        const STORAGE_KEY = `portal:lastOverdueState:${portalToken}`;
+        const STORAGE_KEY = `portal:lastOverdueState:${portalToken}:${portalCode}`;
         const lastStateStr = localStorage.getItem(STORAGE_KEY);
         const lastState = lastStateStr ? JSON.parse(lastStateStr) : { overdueCount: 0, maxDaysLate: 0 };
 

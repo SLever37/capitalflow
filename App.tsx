@@ -1,5 +1,5 @@
 // src/App.tsx
-import React, { useEffect } from 'react';
+import React, { useEffect, lazy, Suspense, useCallback } from 'react';
 
 import { AppShell } from './layout/AppShell';
 import { NavHubController } from './layout/NavHubController';
@@ -15,33 +15,36 @@ import { useAppNotifications } from './hooks/useAppNotifications';
 import { useExitGuard } from './hooks/useExitGuard';
 import { useNavigationStack } from './hooks/useNavigationStack';
 
-import { DashboardContainer } from './containers/DashboardContainer';
-import { ClientsContainer } from './containers/ClientsContainer';
-import { SourcesContainer } from './containers/SourcesContainer';
-import { ProfileContainer } from './containers/ProfileContainer';
-import { LegalContainer } from './containers/LegalContainer';
-import { ModalHostContainer } from './containers/ModalHostContainer';
-
-import { OperatorSupportChat } from './features/support/OperatorSupportChat';
-import { CalendarView } from './features/calendar/CalendarView';
-import { SimulatorPanel } from './features/simulator/SimulatorPanel';
-import { FlowModal } from './components/modals/FlowModal';
-
-import { TeamPage } from './pages/TeamPage';
-import { InvitePage } from './pages/InvitePage';
-import { SetupPasswordPage } from './pages/SetupPasswordPage';
-import { PersonalFinancesPage } from './pages/PersonalFinancesPage';
-import { LeadsPage } from './pages/LeadsPage';
-import { CustomerAcquisitionPage } from './pages/Comercial/CaptacaoClientes';
-import { SettingsPage } from './pages/SettingsPage';
-import { ContractDetailsPage } from './pages/ContractDetailsPage';
-
 import { notificationService } from './services/notification.service';
 import { LoadingScreen } from './components/ui/LoadingScreen';
 import { isDev } from './utils/isDev';
+import { Agreement, AgreementInstallment, Loan } from './types';
+import { agreementService } from './features/agreements/services/agreementService';
 
-import { PublicCampaignPage } from './pages/Public/PublicCampaignPage';
-import { PublicSignaturePage } from './pages/Public/PublicSignaturePage';
+// Lazy loading components for optimization
+const DashboardContainer = lazy(() => import('./containers/DashboardContainer').then(m => ({ default: m.DashboardContainer })));
+const ClientsContainer = lazy(() => import('./containers/ClientsContainer').then(m => ({ default: m.ClientsContainer })));
+const SourcesContainer = lazy(() => import('./containers/SourcesContainer').then(m => ({ default: m.SourcesContainer })));
+const ProfileContainer = lazy(() => import('./containers/ProfileContainer').then(m => ({ default: m.ProfileContainer })));
+const LegalContainer = lazy(() => import('./containers/LegalContainer').then(m => ({ default: m.LegalContainer })));
+const ModalHostContainer = lazy(() => import('./containers/ModalHostContainer').then(m => ({ default: m.ModalHostContainer })));
+
+const OperatorSupportChat = lazy(() => import('./features/support/OperatorSupportChat').then(m => ({ default: m.OperatorSupportChat })));
+const CalendarView = lazy(() => import('./features/calendar/CalendarView').then(m => ({ default: m.CalendarView })));
+const SimulatorPanel = lazy(() => import('./features/simulator/SimulatorPanel').then(m => ({ default: m.SimulatorPanel })));
+const FlowModal = lazy(() => import('./components/modals/FlowModal').then(m => ({ default: m.FlowModal })));
+
+const TeamPage = lazy(() => import('./pages/TeamPage').then(m => ({ default: m.TeamPage })));
+const InvitePage = lazy(() => import('./pages/InvitePage').then(m => ({ default: m.InvitePage })));
+const SetupPasswordPage = lazy(() => import('./pages/SetupPasswordPage').then(m => ({ default: m.SetupPasswordPage })));
+const PersonalFinancesPage = lazy(() => import('./pages/PersonalFinancesPage').then(m => ({ default: m.PersonalFinancesPage })));
+const LeadsPage = lazy(() => import('./pages/LeadsPage').then(m => ({ default: m.LeadsPage })));
+const CustomerAcquisitionPage = lazy(() => import('./pages/Comercial/CaptacaoClientes').then(m => ({ default: m.CustomerAcquisitionPage })));
+const SettingsPage = lazy(() => import('./pages/SettingsPage').then(m => ({ default: m.SettingsPage })));
+const ContractDetailsPage = lazy(() => import('./pages/ContractDetailsPage').then(m => ({ default: m.ContractDetailsPage })));
+
+const PublicCampaignPage = lazy(() => import('./pages/Public/PublicCampaignPage').then(m => ({ default: m.PublicCampaignPage })));
+const PublicSignaturePage = lazy(() => import('./pages/Public/PublicSignaturePage').then(m => ({ default: m.PublicSignaturePage })));
 
 export const App: React.FC = () => {
   // ✅ SEMPRE calcular params, mas NÃO dar return antes dos hooks
@@ -50,8 +53,8 @@ export const App: React.FC = () => {
   const legalSignTokenParam = urlParams.get('legal_sign');
 
   // ✅ Hooks SEMPRE no topo (regra do React)
-  const { portalToken } = usePortalRouting();
-  const { toast, showToast } = useToast();
+  const { portalToken, portalCode } = usePortalRouting();
+  const { toast, showToast, clearToast } = useToast();
 
   const {
     activeProfileId,
@@ -110,7 +113,15 @@ export const App: React.FC = () => {
   ui.setSortOption = setSortOption;
   ui.staffMembers = staffMembers;
 
-  const { goBack, isInHub } = useNavigationStack(activeTab, setActiveTab, () => ui.setShowNavHub(true));
+  const handleSetActiveTab = useCallback((tab: any) => {
+    if (window.location.pathname.startsWith('/contrato/')) {
+      window.history.replaceState({}, '', '/');
+    }
+    setActiveTab(tab);
+  }, [setActiveTab]);
+
+  const openNavHub = useCallback(() => ui.setShowNavHub(true), [ui.setShowNavHub]);
+  const { goBack, isInHub } = useNavigationStack(activeTab, handleSetActiveTab, openNavHub);
 
   const isInvitePath =
     window.location.pathname === '/invite' || window.location.pathname === '/setup-password';
@@ -127,22 +138,35 @@ export const App: React.FC = () => {
   useEffect(() => {
     if (contractIdFromUrl && activeTab !== 'CONTRACT_DETAILS') {
       ui.setSelectedLoanId(contractIdFromUrl);
-      setActiveTab('CONTRACT_DETAILS');
+      handleSetActiveTab('CONTRACT_DETAILS');
     }
-  }, [contractIdFromUrl, activeTab, ui]);
+  }, [contractIdFromUrl, activeTab, handleSetActiveTab]);
 
   const navigate = (path: string) => {
     window.history.pushState({}, '', path);
-    const match = path.match(/^\/contrato\/([a-f0-9-]+)$/i);
+    const url = new URL(path, window.location.origin);
+    const pathname = url.pathname;
+    
+    const match = pathname.match(/^\/contratos?\/([a-f0-9-]+)/i);
     if (match) {
       ui.setSelectedLoanId(match[1]);
-      setActiveTab('CONTRACT_DETAILS');
-    } else if (path === '/') {
-      setActiveTab('DASHBOARD');
+      handleSetActiveTab('CONTRACT_DETAILS');
+    } else if (pathname.startsWith('/clientes')) {
+      handleSetActiveTab('CLIENTS');
+    } else if (pathname.startsWith('/fontes')) {
+      handleSetActiveTab('SOURCES');
+    } else if (pathname.startsWith('/suporte')) {
+      ui.openModal('SUPPORT_CHAT');
+    } else if (pathname.startsWith('/leads')) {
+      handleSetActiveTab('LEADS');
+    } else if (pathname === '/' || pathname === '/dashboard') {
+      handleSetActiveTab('DASHBOARD');
+    } else {
+      handleSetActiveTab('DASHBOARD');
     }
   };
 
-  usePersistedTab(activeTab, setActiveTab);
+  usePersistedTab(activeTab, handleSetActiveTab);
 
   const controllers = useControllers(
     activeUser,
@@ -166,7 +190,7 @@ export const App: React.FC = () => {
   const { loanCtrl, clientCtrl, sourceCtrl, profileCtrl, paymentCtrl, fileCtrl, aiCtrl, adminCtrl } =
     controllers;
 
-  useAppNotifications({
+  const { notifications, removeNotification } = useAppNotifications({
     loans,
     sources,
     activeUser,
@@ -203,15 +227,23 @@ export const App: React.FC = () => {
   const isInitializing = !bootFinished || (!!activeProfileId && !activeUser && !loadError);
 
   // ✅ Agora SIM pode retornar rotas públicas (depois dos hooks)
-  if (campaignId) return <PublicCampaignPage />;
-  if (legalSignTokenParam) return <PublicSignaturePage />;
+  if (campaignId) return (
+    <Suspense fallback={<LoadingScreen />}>
+      <PublicCampaignPage />
+    </Suspense>
+  );
+  if (legalSignTokenParam) return (
+    <Suspense fallback={<LoadingScreen />}>
+      <PublicSignaturePage />
+    </Suspense>
+  );
 
   if (isInitializing && !isPublicView && !isInvitePath) {
     return <LoadingScreen />;
   }
 
   return (
-    <>
+    <Suspense fallback={<LoadingScreen />}>
       {isInvitePath ? (
         <>
           {window.location.pathname === '/invite' && <InvitePage />}
@@ -220,6 +252,7 @@ export const App: React.FC = () => {
       ) : (
         <AppGate
           portalToken={portalToken}
+          portalCode={portalCode}
           legalSignToken={legalSignToken}
           activeProfileId={activeProfileId}
           activeUser={activeUser}
@@ -245,8 +278,9 @@ export const App: React.FC = () => {
         >
           <AppShell
             toast={toast}
+            clearToast={clearToast}
             activeTab={activeTab}
-            setActiveTab={setActiveTab}
+            setActiveTab={handleSetActiveTab}
             activeUser={activeUser}
             isLoadingData={isLoadingData}
             onOpenNav={() => ui.setShowNavHub(true)}
@@ -260,6 +294,11 @@ export const App: React.FC = () => {
             navOrder={navOrder}
             onGoBack={goBack}
             isInHub={isInHub}
+            title={activeTab === 'CONTRACT_DETAILS' ? loans.find(l => l.id === ui.selectedLoanId)?.debtorName : undefined}
+            subtitle={activeTab === 'CONTRACT_DETAILS' ? loans.find(l => l.id === ui.selectedLoanId)?.debtorPhone : undefined}
+            notifications={notifications}
+            removeNotification={removeNotification}
+            onNavigate={navigate}
           >
             {activeTab === 'DASHBOARD' && (
               <DashboardContainer
@@ -293,6 +332,7 @@ export const App: React.FC = () => {
                 loanCtrl={loanCtrl}
                 showToast={showToast}
                 ui={ui}
+                goBack={goBack}
               />
             )}
 
@@ -302,11 +342,21 @@ export const App: React.FC = () => {
                 showToast={showToast}
                 onRefresh={() => fetchFullData(activeUser?.id || '')}
                 ui={ui}
+                goBack={goBack}
               />
             )}
 
             {activeTab === 'SOURCES' && (
-              <SourcesContainer loans={loans} sources={sources} ui={ui} sourceCtrl={sourceCtrl} loanCtrl={loanCtrl} />
+              <SourcesContainer 
+                loans={loans} 
+                sources={sources} 
+                ui={ui} 
+                sourceCtrl={sourceCtrl} 
+                loanCtrl={loanCtrl} 
+                goBack={goBack} 
+                activeUser={activeUser} 
+                onRefresh={() => fetchFullData(activeUser?.supervisor_id || activeUser?.id || '')}
+              />
             )}
 
             {activeTab === 'PROFILE' && activeUser && (
@@ -325,6 +375,7 @@ export const App: React.FC = () => {
                 navOrder={navOrder}
                 hubOrder={hubOrder}
                 saveNavConfig={saveNavConfig}
+                goBack={goBack}
               />
             )}
 
@@ -346,7 +397,7 @@ export const App: React.FC = () => {
               <PersonalFinancesPage activeUser={activeUser} goBack={goBack} />
             )}
 
-            {activeTab === 'LEADS' && activeUser && <LeadsPage activeUser={activeUser} />}
+            {activeTab === 'LEADS' && activeUser && <LeadsPage activeUser={activeUser} goBack={goBack} />}
 
             {activeTab === 'ACQUISITION' && <CustomerAcquisitionPage activeUser={activeUser} goBack={goBack} />}
 
@@ -359,7 +410,11 @@ export const App: React.FC = () => {
                 sources={sources}
                 activeUser={activeUser}
                 onBack={() => {
-                  navigate('/');
+                  ui.setSelectedLoanId(null);
+                  if (window.location.pathname.startsWith('/contrato/')) {
+                    window.history.replaceState({}, '', '/');
+                  }
+                  goBack();
                 }}
                 onPayment={async (forgive, date, amount, realDate, interest, contextOverride) => {
                   await paymentCtrl.handlePayment(forgive, date, amount, realDate, interest, undefined, undefined, contextOverride);
@@ -367,7 +422,11 @@ export const App: React.FC = () => {
                 }}
                 isProcessing={ui.isProcessingPayment}
                 onOpenMessage={(l) => { ui.setMessageModalLoan(l); ui.openModal('MESSAGE_HUB'); }}
-                onRenegotiate={(l) => { ui.setRenegotiationModalLoan(l); ui.openModal('RENEGOTIATION', l); }}
+                onRenegotiate={(l) => { 
+                    const loans = Array.isArray(l) ? l : [l];
+                    ui.setRenegotiationModalLoans(loans); 
+                    ui.openModal('RENEGOTIATION', loans[0]); 
+                }}
                 onGenerateContract={(l) => loanCtrl.handleGenerateLink(l)}
                 onExportExtrato={(l) => loanCtrl.handleExportExtrato(l)}
                 onEdit={(l) => { ui.setEditingLoan(l); ui.openModal('LOAN_FORM', l); }}
@@ -392,6 +451,20 @@ export const App: React.FC = () => {
                     message: 'Todos os dados, parcelas e histórico serão apagados para sempre.'
                 })}
                 onReverseTransaction={loanCtrl.openReverseTransaction}
+                onActivate={loanCtrl.handleActivateLoan}
+                onAgreementPayment={async (loan: Loan, agreement: Agreement, inst: AgreementInstallment) => {
+                  if (!activeUser) return;
+                  try {
+                      await agreementService.processPayment(agreement, inst, inst.amount, loan.sourceId, activeUser);
+                      showToast("Parcela do acordo recebida!", "success");
+                      ui.setShowReceipt({ loan, inst: { ...inst, agreementId: agreement.id }, amountPaid: inst.amount, type: 'AGREEMENT_PAYMENT' });
+                      ui.openModal('RECEIPT');
+                      fetchFullData(activeUser?.id || '');
+                  } catch (e: any) {
+                      showToast("Erro ao processar pagamento: " + e.message, "error");
+                  }
+                }}
+                onRefresh={() => fetchFullData(activeUser?.id || '')}
                 isStealthMode={ui.isStealthMode}
               />
             )}
@@ -424,6 +497,11 @@ export const App: React.FC = () => {
                 showToast={showToast}
                 onClose={goBack}
                 onSystemAction={(type, meta) => {
+                  if (type === 'NAVIGATE_CONTRACT' && meta?.loanId) {
+                    ui.setSelectedLoanId(meta.loanId);
+                    handleSetActiveTab('CONTRACT_DETAILS');
+                    return;
+                  }
                   if (type === 'PAYMENT' && meta && ui) {
                     ui.setPaymentModal({
                       loan: {
@@ -465,10 +543,10 @@ export const App: React.FC = () => {
               <OperatorSupportChat activeUser={activeUser} onClose={ui.closeModal} />
             )}
 
-            <NavHubController ui={ui} setActiveTab={setActiveTab} activeUser={activeUser} hubOrder={hubOrder} />
+            <NavHubController ui={ui} setActiveTab={handleSetActiveTab} activeUser={activeUser} hubOrder={hubOrder} />
           </AppShell>
         </AppGate>
       )}
-    </>
+    </Suspense>
   );
 };

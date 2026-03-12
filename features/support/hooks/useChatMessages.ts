@@ -59,7 +59,7 @@ export const useChatMessages = ({ loanId, profileId, senderType, operatorId }: U
 
           // Se a mensagem tiver anexo, recarregamos para garantir a Signed URL
           // Caso contrário, adicionamos direto para rapidez
-          const hasAttachment = ['image', 'audio', 'file'].includes(newMsg.type);
+          const hasAttachment = ['image', 'audio', 'file'].includes(newMsg.type || '');
           
           if (hasAttachment) {
              const freshData = await supportChatService.getMessages(loanId);

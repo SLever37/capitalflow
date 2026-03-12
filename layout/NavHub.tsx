@@ -1,6 +1,6 @@
 
-import React from 'react';
-import { LayoutGrid, X, User, Calendar, Calculator, ArrowRightLeft, Shield, Scale, Wallet, Briefcase, Users, LayoutDashboard, PiggyBank, Settings, MessageCircle, Megaphone } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { LayoutGrid, X, User, Calendar, Calculator, ArrowRightLeft, Shield, Scale, Wallet, Briefcase, Users, LayoutDashboard, PiggyBank, Settings, MessageCircle, Megaphone, MenuSquare } from 'lucide-react';
 import { AppTab, UserProfile } from "../types";
 
 interface NavHubProps {
@@ -12,75 +12,133 @@ interface NavHubProps {
 }
 
 export const NavHub: React.FC<NavHubProps> = ({ onClose, onNavigate, userLevel, hubOrder, unreadCampaignCount = 0 }) => {
+    const scrollRef = useRef<HTMLDivElement>(null);
+    const [isDragging, setIsDragging] = useState(false);
+    const [hasDragged, setHasDragged] = useState(false);
+    const [startY, setStartY] = useState(0);
+    const [scrollTop, setScrollTop] = useState(0);
+
+    const handlePointerDown = (e: React.PointerEvent) => {
+        if (!scrollRef.current || e.pointerType !== 'mouse') return;
+        setIsDragging(true);
+        setHasDragged(false);
+        setStartY(e.pageY - scrollRef.current.offsetTop);
+        setScrollTop(scrollRef.current.scrollTop);
+        (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    };
+
+    const handlePointerUp = (e: React.PointerEvent) => {
+        if (e.pointerType !== 'mouse') return;
+        setIsDragging(false);
+        (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    };
+
+    const handlePointerMove = (e: React.PointerEvent) => {
+        if (!isDragging || !scrollRef.current || e.pointerType !== 'mouse') return;
+        e.preventDefault();
+        const y = e.pageY - scrollRef.current.offsetTop;
+        const walk = (y - startY) * 2; // Scroll-fast
+        if (Math.abs(walk) > 10) {
+            setHasDragged(true);
+        }
+        scrollRef.current.scrollTop = scrollTop - walk;
+    };
+
     const getTabMeta = (tab: AppTab) => {
         switch (tab) {
-            case 'PROFILE': return { icon: <User size={32}/>, label: 'Meu Perfil', color: 'text-blue-500', hover: 'hover:border-blue-600' };
-            case 'SOURCES': return { icon: <Wallet size={32}/>, label: 'Meus Fundos', color: 'text-emerald-500', hover: 'hover:border-emerald-600' };
-            case 'LEGAL': return { icon: <Scale size={32}/>, label: 'Jurídico', color: 'text-indigo-500', hover: 'hover:border-indigo-600' };
-            case 'TEAM': return { icon: <Briefcase size={32}/>, label: 'Minha Equipe', color: 'text-purple-500', hover: 'hover:border-purple-600' };
-            case 'CLIENTS': return { icon: <Users size={32}/>, label: 'Clientes', color: 'text-amber-500', hover: 'hover:border-amber-600' };
-            case 'DASHBOARD': return { icon: <LayoutDashboard size={32}/>, label: 'Painel Geral', color: 'text-cyan-500', hover: 'hover:border-cyan-600' };
-            case 'PERSONAL_FINANCE': return { icon: <PiggyBank size={32}/>, label: 'Minhas Finanças', color: 'text-pink-500', hover: 'hover:border-pink-600' };
-            case 'SETTINGS': return { icon: <Settings size={32}/>, label: 'Ajustes', color: 'text-slate-400', hover: 'hover:border-slate-500' };
-            case 'LEADS': return { icon: <MessageCircle size={32}/>, label: 'Leads', color: 'text-green-500', hover: 'hover:border-green-600' };
-            case 'ACQUISITION': return { icon: <Megaphone size={32}/>, label: 'Captação', color: 'text-orange-500', hover: 'hover:border-orange-600' };
-            default: return { icon: <LayoutGrid size={32}/>, label: tab, color: 'text-slate-500', hover: 'hover:border-slate-600' };
+            case 'PROFILE': return { icon: <User size={20}/>, label: 'Perfil', color: 'text-blue-500', hover: 'hover:border-blue-600' };
+            case 'SOURCES': return { icon: <Wallet size={20}/>, label: 'Capital', color: 'text-emerald-500', hover: 'hover:border-emerald-600' };
+            case 'LEGAL': return { icon: <Scale size={20}/>, label: 'Jurídico', color: 'text-indigo-500', hover: 'hover:border-indigo-600' };
+            case 'TEAM': return { icon: <Briefcase size={20}/>, label: 'Minha Equipe', color: 'text-purple-500', hover: 'hover:border-purple-600' };
+            case 'CLIENTS': return { icon: <Users size={20}/>, label: 'Clientes', color: 'text-amber-500', hover: 'hover:border-amber-600' };
+            case 'DASHBOARD': return { icon: <LayoutDashboard size={20}/>, label: 'Painel Geral', color: 'text-cyan-500', hover: 'hover:border-cyan-600' };
+            case 'PERSONAL_FINANCE': return { icon: <PiggyBank size={20}/>, label: 'Minhas Finanças', color: 'text-pink-500', hover: 'hover:border-pink-600' };
+            case 'SETTINGS': return { icon: <Settings size={20}/>, label: 'Ajustes', color: 'text-slate-400', hover: 'hover:border-slate-500' };
+            case 'LEADS': return { icon: <MessageCircle size={20}/>, label: 'Leads', color: 'text-green-500', hover: 'hover:border-green-600' };
+            case 'ACQUISITION': return { icon: <Megaphone size={20}/>, label: 'Captação', color: 'text-orange-500', hover: 'hover:border-orange-600' };
+            default: return { icon: <LayoutGrid size={20}/>, label: tab, color: 'text-slate-500', hover: 'hover:border-slate-600' };
         }
     };
 
+    // Ensure DASHBOARD is always the first item in the menu
+    const displayOrder = ['DASHBOARD' as AppTab, ...hubOrder.filter(tab => tab !== 'DASHBOARD')];
+
     return (
-        <div className="fixed inset-0 z-[60] bg-slate-950/40 backdrop-blur-xl flex flex-col items-center justify-start md:justify-center p-4 pt-6 animate-in fade-in zoom-in-95 duration-200">
-            {/* Container com scroll */}
-            <div className="w-full max-w-sm relative flex flex-col max-h-[90dvh]">
+        <div 
+            className="fixed inset-0 z-[200] bg-slate-950/40 backdrop-blur-sm hidden md:flex justify-start animate-in fade-in duration-200"
+            onClick={onClose}
+        >
+            <div 
+                className="w-full max-w-sm h-full bg-slate-900 border-r border-slate-800 shadow-2xl flex flex-col animate-in slide-in-from-left duration-300"
+                onClick={(e) => e.stopPropagation()}
+            >
                 {/* Header fixo com botão fechar */}
-                <div className="flex justify-between items-center mb-6 shrink-0 px-1">
-                    <h2 className="text-2xl font-black text-white uppercase tracking-tighter flex items-center gap-2">
-                        <LayoutGrid className="text-blue-500"/> Hub Central
+                <div className="flex justify-between items-center p-6 border-b border-slate-800/50 shrink-0">
+                    <h2 className="text-xl font-black uppercase tracking-tighter flex items-center gap-3">
+                        <div className="p-2 bg-blue-600/20 rounded-xl">
+                            <MenuSquare className="text-blue-500" size={24}/>
+                        </div>
+                        <span className="text-white">Menu</span> <span className="text-blue-500">Principal</span>
                     </h2>
                     <button 
                         onClick={onClose} 
-                        className="p-3 bg-slate-900 border border-slate-800 rounded-2xl text-slate-400 hover:text-white hover:border-slate-600 transition-all active:scale-95"
+                        className="p-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-slate-400 hover:text-white transition-all active:scale-95"
                     >
                         <X size={20}/>
                     </button>
                 </div>
                 
-                {/* Grid com scroll */}
-                <div className="flex-1 overflow-y-auto overscroll-contain pb-6" style={{ WebkitOverflowScrolling: 'touch' }}>
-                    <div className="grid grid-cols-2 gap-4">
-                        {hubOrder.map(tab => {
-                            const meta = getTabMeta(tab);
-                            return (
-                                <button key={tab} onClick={() => onNavigate(tab)} className={`p-6 bg-slate-900 border border-slate-800 rounded-3xl transition-all group flex flex-col items-center justify-center gap-3 relative active:scale-95 ${meta.hover}`}>
-                                    <div className={`p-4 bg-slate-800 rounded-2xl ${meta.color} group-hover:scale-110 transition-transform`}>{meta.icon}</div>
-                                    <span className="font-bold text-white uppercase text-xs tracking-widest text-center">{meta.label}</span>
-                                    {tab === 'ACQUISITION' && unreadCampaignCount > 0 && (
-                                        <span className="absolute top-4 right-4 bg-rose-500 text-white text-[10px] font-black w-6 h-6 flex items-center justify-center rounded-full ring-4 ring-slate-900 animate-bounce shadow-lg shadow-rose-500/50">
-                                            {unreadCampaignCount > 99 ? '99+' : unreadCampaignCount}
-                                        </span>
-                                    )}
-                                </button>
-                            );
-                        })}
-                        
-                        {/* Atalhos fixos de utilitários */}
-                        <button onClick={() => onNavigate('AGENDA' as any)} className="p-6 bg-slate-900 border border-slate-800 rounded-3xl transition-all group flex flex-col items-center justify-center gap-3 hover:border-purple-600 active:scale-95">
-                            <div className="p-4 bg-slate-800 rounded-2xl text-purple-500 group-hover:scale-110 transition-transform">
-                                <Calendar size={32}/>
+                {/* Lista com scroll */}
+                <div 
+                    ref={scrollRef}
+                    onPointerDown={handlePointerDown}
+                    onPointerUp={handlePointerUp}
+                    onPointerMove={handlePointerMove}
+                    className={`flex-1 overflow-y-auto overscroll-contain p-4 space-y-2 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`} 
+                    style={{ WebkitOverflowScrolling: 'touch' }}
+                >
+                    {displayOrder.map(tab => {
+                        const meta = getTabMeta(tab);
+                        return (
+                            <button 
+                                key={tab} 
+                                onClick={() => {
+                                    if (!hasDragged) onNavigate(tab);
+                                }} 
+                                className={`w-full p-4 bg-slate-950/50 hover:bg-slate-800 border border-slate-800/50 rounded-2xl transition-all group flex items-center gap-4 relative active:scale-95 ${meta.hover}`}
+                            >
+                                <div className={`p-3 bg-slate-900 rounded-xl ${meta.color} group-hover:scale-110 transition-transform`}>
+                                    {meta.icon}
+                                </div>
+                                <span className="font-bold text-white uppercase text-[11px] tracking-widest">{meta.label}</span>
+                                {tab === 'ACQUISITION' && unreadCampaignCount > 0 && (
+                                    <span className="absolute top-1/2 -translate-y-1/2 right-4 bg-rose-500 text-white text-[9px] font-black w-5 h-5 flex items-center justify-center rounded-full ring-4 ring-slate-950 animate-bounce shadow-lg shadow-rose-500/50">
+                                        {unreadCampaignCount > 99 ? '99+' : unreadCampaignCount}
+                                    </span>
+                                )}
+                            </button>
+                        );
+                    })}
+                    
+                    {/* Atalhos fixos de utilitários */}
+                    <div className="pt-4 mt-4 border-t border-slate-800/50 space-y-2">
+                        <button onClick={() => { if (!hasDragged) onNavigate('AGENDA' as any); }} className="w-full p-4 bg-slate-950/50 hover:bg-slate-800 border border-slate-800/50 rounded-2xl transition-all group flex items-center gap-4 active:scale-95">
+                            <div className="p-3 bg-slate-900 rounded-xl text-purple-500 group-hover:scale-110 transition-transform">
+                                <Calendar size={20}/>
                             </div>
-                            <span className="font-bold text-white uppercase text-xs tracking-widest text-center">Agenda</span>
+                            <span className="font-bold text-white uppercase text-[11px] tracking-widest">Agenda</span>
                         </button>
-                        <button onClick={() => onNavigate('SIMULATOR' as any)} className="p-6 bg-slate-900 border border-slate-800 rounded-3xl transition-all group flex flex-col items-center justify-center gap-3 hover:border-blue-400 active:scale-95">
-                            <div className="p-4 bg-slate-800 rounded-2xl text-blue-400 group-hover:scale-110 transition-transform">
-                                <Calculator size={32}/>
+                        <button onClick={() => { if (!hasDragged) onNavigate('SIMULATOR' as any); }} className="w-full p-4 bg-slate-950/50 hover:bg-slate-800 border border-slate-800/50 rounded-2xl transition-all group flex items-center gap-4 active:scale-95">
+                            <div className="p-3 bg-slate-900 rounded-xl text-blue-400 group-hover:scale-110 transition-transform">
+                                <Calculator size={20}/>
                             </div>
-                            <span className="font-bold text-white uppercase text-xs tracking-widest text-center">Simulador</span>
+                            <span className="font-bold text-white uppercase text-[11px] tracking-widest">Simulador</span>
                         </button>
-                        <button onClick={() => onNavigate('FLOW' as any)} className="p-6 bg-slate-900 border border-slate-800 rounded-3xl transition-all group flex flex-col items-center justify-center gap-3 hover:border-emerald-400 active:scale-95">
-                            <div className="p-4 bg-slate-800 rounded-2xl text-emerald-400 group-hover:scale-110 transition-transform">
-                                <ArrowRightLeft size={32}/>
+                        <button onClick={() => { if (!hasDragged) onNavigate('FLOW' as any); }} className="w-full p-4 bg-slate-950/50 hover:bg-slate-800 border border-slate-800/50 rounded-2xl transition-all group flex items-center gap-4 active:scale-95">
+                            <div className="p-3 bg-slate-900 rounded-xl text-emerald-400 group-hover:scale-110 transition-transform">
+                                <ArrowRightLeft size={20}/>
                             </div>
-                            <span className="font-bold text-white uppercase text-xs tracking-widest text-center">Extrato Geral</span>
+                            <span className="font-bold text-white uppercase text-[11px] tracking-widest">Extrato</span>
                         </button>
                     </div>
                 </div>

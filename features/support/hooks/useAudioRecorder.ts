@@ -95,7 +95,7 @@ export const useAudioRecorder = () => {
 
         const mimeType = recorder.mimeType || 'audio/webm';
         const blob = new Blob(chunksRef.current, { type: mimeType });
-        const ext = mimeType.includes('ogg') ? 'ogg' : 'webm'; // Simplificação
+        const ext = mimeType?.includes('ogg') ? 'ogg' : 'webm'; // Simplificação
         const file = new File([blob], `audio_${Date.now()}.${ext}`, { type: mimeType });
         
         resolve({ audioFile: file, duration: recordMs });

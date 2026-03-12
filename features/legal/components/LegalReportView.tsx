@@ -82,11 +82,11 @@ export const LegalReportView: React.FC<LegalReportViewProps> = ({ docRecord, ful
             <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6">
                 <h4 className="text-xs font-black uppercase text-purple-500 mb-4 flex items-center gap-2"><Activity size={14}/> Trilha de Auditoria (Logs)</h4>
                 <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar pr-2">
-                    {logs.length === 0 ? <p className="text-[10px] text-slate-600 italic">Nenhum log registrado.</p> : logs.map((log: any) => (
+                    {logs.length === 0 ? <p className="text-[10px] text-slate-500 italic">Nenhum log registrado.</p> : logs.map((log: any) => (
                         <div key={log.id} className="text-[10px] border-l-2 border-slate-800 pl-3 py-1">
                             <span className="text-slate-500 font-mono mr-2">{new Date(log.timestamp).toLocaleString()}</span>
                             <span className="text-white font-bold">{log.action}</span>
-                            <span className="text-slate-600 block text-[9px] mt-0.5">{log.details} | IP: {log.ip_origem}</span>
+                            <span className="text-slate-500 block text-[9px] mt-0.5">{log.details} | IP: {log.ip_origem}</span>
                         </div>
                     ))}
                 </div>

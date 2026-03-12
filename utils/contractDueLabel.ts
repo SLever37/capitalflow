@@ -21,9 +21,13 @@ function toISODateOnly(d: Date) {
  * - senão, pega a próxima pendente a vencer (a menor dueDate futura)
  */
 function pickRelevantInstallment(installments: Installment[]): Installment | null {
-  const pending = (installments || []).filter(
-    (i: any) => (i?.status === 'PENDING' || i?.status === 'OPEN' || i?.status === 'ACTIVE') && !!i?.dueDate
-  );
+  const pending = (installments || []).filter((i: any) => {
+    const status = String(i?.status || '').toUpperCase();
+    const principal = Number(i?.principal_remaining ?? i?.principalRemaining ?? 0);
+    const interest = Number(i?.interest_remaining ?? i?.interestRemaining ?? 0);
+    const isPaid = status === 'PAID' || (principal + interest) <= 0.05;
+    return !isPaid && !!i?.dueDate;
+  });
   if (!pending.length) return null;
 
   const today = todayDateOnlyUTC();

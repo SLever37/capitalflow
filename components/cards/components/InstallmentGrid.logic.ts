@@ -50,17 +50,20 @@ export const prepareInstallmentViewModel = (
     // Diferença em relação a HOJE (Positivo = Atrasado)
     const daysDiff = getDaysDiff(displayDueDate);
     
-    // Status de Atraso real: Se a data passou e não está pago
-    const isLateInst = daysDiff > 0 && inst.status !== LoanStatus.PAID;
+    const totalRemaining = (inst.principalRemaining || 0) + (inst.interestRemaining || 0);
+    const isRenegotiated = inst.status === LoanStatus.RENEGOCIADO;
+    const isInstPaid = inst.status === LoanStatus.PAID || totalRemaining <= 0.05;
+    
+    // Status de Atraso real: Se a data passou e não está pago nem renegociado
+    const isLateInst = daysDiff > 0 && !isInstPaid && !isRenegotiated;
     
     const isFixedTermDone = isFixedTerm && fixedTermStats && fixedTermStats.paidDays >= fixedTermStats.totalDays;
-    const isInstPaid = inst.status === LoanStatus.PAID;
-    const isActionDisabled = isInstPaid || isFullyFinalized;
+    const isActionDisabled = isInstPaid || isFullyFinalized || isRenegotiated;
 
     let isPrepaid = false;
     let daysPrepaid = 0;
     
-    if (isDailyFree) {
+    if (isDailyFree && !isRenegotiated) {
         if (daysDiff < 0) { 
             isPrepaid = true; 
             daysPrepaid = Math.abs(daysDiff); 
@@ -71,7 +74,11 @@ export const prepareInstallmentViewModel = (
     let statusColor = '';
 
     // LÓGICA DE STATUS - MODO FOCO
-    if (isInstPaid || isZeroBalance) { 
+    if (isRenegotiated) {
+        statusText = 'RENEGOCIADA (CONGELADA)';
+        statusColor = 'text-slate-500 font-black';
+    }
+    else if (isInstPaid || isZeroBalance) { 
         statusText = 'CONTRATO FINALIZADO'; 
         statusColor = 'text-emerald-500 font-black'; 
     }

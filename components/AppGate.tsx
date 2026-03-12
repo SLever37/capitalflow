@@ -13,6 +13,7 @@ import { playNotificationSound } from '../utils/notificationSound';
 
 interface AppGateProps {
   portalToken?: string | null;
+  portalCode?: string | null;
   legalSignToken?: string | null;
 
   activeProfileId: string | null;
@@ -45,6 +46,7 @@ interface AppGateProps {
 
 export const AppGate: React.FC<AppGateProps> = ({
   portalToken,
+  portalCode,
   legalSignToken,
   activeUser,
   activeProfileId,
@@ -153,7 +155,7 @@ export const AppGate: React.FC<AppGateProps> = ({
   }
 
   if (portalToken) {
-    return <ClientPortalView initialPortalToken={portalToken} />;
+    return <ClientPortalView initialPortalToken={portalToken} initialPortalCode={portalCode || ''} />;
   }
 
   if (legalSignToken) {

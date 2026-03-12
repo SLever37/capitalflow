@@ -36,6 +36,7 @@ export class AppErrorBoundary extends React.Component<Props, State> {
   }
 
   static getDerivedStateFromError(err: any): State {
+    console.error('AppErrorBoundary: Caught error', err);
     return {
       hasError: true,
       message: String(err?.message || err || 'Erro desconhecido'),
@@ -100,7 +101,7 @@ export class AppErrorBoundary extends React.Component<Props, State> {
             </h1>
             
             <p style={{ fontSize: 14, color: '#94a3b8', marginBottom: 24, lineHeight: 1.6 }}>
-              {this.state.message.includes('Configuração do Supabase ausente') 
+              {this.state.message?.includes('Configuração do Supabase ausente') 
                 ? 'As variáveis de ambiente do Supabase não foram detectadas. Verifique as configurações no painel do Cloudflare Pages.'
                 : 'Ocorreu um erro inesperado ao carregar a aplicação. Tente recarregar a página ou entre em contato com o suporte.'}
             </p>

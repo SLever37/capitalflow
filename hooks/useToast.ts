@@ -62,5 +62,9 @@ export const useToast = () => {
     [playBeep]
   );
 
-  return { toast, showToast };
+  const clearToast = useCallback(() => {
+    setToast(null);
+  }, []);
+
+  return { toast, showToast, clearToast };
 };

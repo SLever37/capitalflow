@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ShieldAlert, ArrowDownWideNarrow, Search, X, Users, ChevronDown } from 'lucide-react';
+import { ShieldAlert, ArrowDownWideNarrow, Search, Users, ChevronDown } from 'lucide-react';
 import { SortOption, UserProfile } from '../../types';
 import { translateFilter } from '../../utils/translationHelpers';
 
@@ -19,15 +19,16 @@ interface DashboardControlsProps {
 }
 
 export const DashboardControls: React.FC<DashboardControlsProps> = ({
-    statusFilter, setStatusFilter, sortOption, setSortOption, searchTerm, setSearchTerm, showToast,
+    statusFilter, setStatusFilter, sortOption, setSortOption, searchTerm, setSearchTerm, 
     staffMembers = [], selectedStaffId, onStaffChange, isMaster
 }) => {
     const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
     const [isMobileSortOpen, setIsMobileSortOpen] = useState(false);
 
+    const allFilters = ['TODOS', 'EM_DIA', 'ATRASADOS', 'ATRASO_CRITICO', 'QUITADO', 'RENEGOCIADO'];
+
     return (
         <div className="flex flex-col gap-3">
-            {/* Seletor de Equipe (Apenas Master) */}
             {isMaster && staffMembers.length > 1 && (
                 <div className="flex items-center gap-2 mb-2">
                     <div className="p-2 bg-indigo-600 rounded-xl text-white shadow-lg shadow-indigo-600/20">
@@ -51,7 +52,7 @@ export const DashboardControls: React.FC<DashboardControlsProps> = ({
                 </div>
             )}
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap md:flex-nowrap items-center gap-2">
                 <div className="flex md:hidden gap-1.5 flex-shrink-0">
                     <button 
                         onClick={() => { setIsMobileSearchOpen(!isMobileSearchOpen); setIsMobileSortOpen(false); }}
@@ -67,14 +68,14 @@ export const DashboardControls: React.FC<DashboardControlsProps> = ({
                     </button>
                 </div>
 
-                <div className="flex gap-2 overflow-x-auto no-scrollbar flex-1 py-1">
-                    {['TODOS', 'ATRASADOS', 'ATRASO_CRITICO', 'EM_DIA', 'PAGOS', 'ARQUIVADOS'].map(filter => (
+                <div className="flex gap-2 overflow-x-auto no-scrollbar flex-1 py-1 w-full md:w-auto">
+                    {allFilters.map(filter => (
                         <button 
                             key={filter} 
                             onClick={() => setStatusFilter(filter as any)} 
-                            className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all border flex items-center gap-2 ${statusFilter === filter ? 'bg-blue-600 text-white border-blue-500 shadow-lg shadow-blue-600/20' : 'bg-slate-900 border-slate-800 text-slate-500 hover:text-slate-300 hover:border-slate-700'}`}
+                            className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest whitespace-nowrap leading-tight transition-all border flex items-center gap-2 ${statusFilter === filter ? 'bg-blue-600 text-white border-blue-500 shadow-lg shadow-blue-600/20' : 'bg-slate-900 border-slate-800 text-slate-500 hover:text-slate-300 hover:border-slate-700'}`}
                         >
-                            {filter === 'ATRASO_CRITICO' && <ShieldAlert size={14} className="text-rose-500" />}
+                            {filter === 'ATRASO_CRITICO' && <ShieldAlert size={14} className="text-rose-500 shrink-0" />}
                             {translateFilter(filter)}
                         </button>
                     ))}
@@ -97,12 +98,12 @@ export const DashboardControls: React.FC<DashboardControlsProps> = ({
             </div>
 
             {(isMobileSearchOpen || window.innerWidth >= 768) && (
-                <div className={`bg-slate-900 border border-slate-800 p-2 rounded-2xl flex items-center gap-2 animate-in slide-in-from-top-2 duration-200 ${!isMobileSearchOpen ? 'hidden md:flex' : 'flex'}`}>
+                <div className={`bg-slate-900 border border-slate-800 p-2 rounded-2xl flex items-center gap-2 animate-in slide-in-from-top-2 duration-200 ${!isMobileSearchOpen ? 'hidden md:flex' : 'flex'} w-full md:w-auto`}>
                     <Search className="text-slate-500 ml-2 flex-shrink-0" size={18}/>
                     <input 
                         type="text" 
                         placeholder="Buscar por nome, CPF/CNPJ..." 
-                        className="bg-transparent w-full p-2 text-white outline-none text-sm" 
+                        className="bg-transparent w-full p-2 text-white outline-none text-sm min-w-[200px]" 
                         value={searchTerm} 
                         onChange={e => setSearchTerm(e.target.value)} 
                         autoFocus={isMobileSearchOpen}
@@ -110,7 +111,6 @@ export const DashboardControls: React.FC<DashboardControlsProps> = ({
                 </div>
             )}
 
-            {/* Mobile Sort Dropdown */}
             {isMobileSortOpen && (
                 <div className="md:hidden bg-slate-900 border border-slate-800 p-2 rounded-2xl flex items-center gap-2 animate-in slide-in-from-top-2 duration-200 relative">
                     <div className="px-3 text-slate-500"><ArrowDownWideNarrow size={16}/></div>

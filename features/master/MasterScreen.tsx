@@ -66,11 +66,11 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
 
                     <div className="relative w-full sm:w-80 group">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <Search size={16} className="text-slate-600 group-focus-within:text-rose-500 transition-colors"/>
+                            <Search size={16} className="text-slate-500 group-focus-within:text-rose-500 transition-colors"/>
                         </div>
                         <input 
                             type="text" 
-                            className="w-full bg-slate-900 border border-slate-800 rounded-xl py-3 pl-10 pr-4 text-white text-sm outline-none focus:border-rose-500 transition-all placeholder:text-slate-600 font-medium"
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl py-3 pl-10 pr-4 text-white text-sm outline-none focus:border-rose-500 transition-all placeholder:text-slate-500 font-medium"
                             placeholder="Buscar operador..."
                             value={searchTerm}
                             onChange={e => setSearchTerm(e.target.value)}
@@ -125,7 +125,7 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
                     })}
 
                     {filteredUsers.length === 0 && (
-                        <div className="text-center py-20 border-2 border-dashed border-slate-800 rounded-[3rem] opacity-50">
+                        <div className="text-center py-20 border-2 border-dashed border-slate-800 rounded-3xl opacity-50">
                             <p className="text-slate-500 font-bold uppercase text-xs tracking-widest">Nenhum usuário encontrado.</p>
                         </div>
                     )}

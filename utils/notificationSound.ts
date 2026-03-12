@@ -4,26 +4,35 @@ const BEEP_SOUND = "data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAE
 
 export const playNotificationSound = () => {
   try {
-    // Usando AudioContext para gerar um beep sem depender de arquivo
     const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
     if (!AudioContext) return;
 
     const ctx = new AudioContext();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(880, ctx.currentTime); // A5
-    osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.5);
     
-    gain.gain.setValueAtTime(0.1, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+    // Primeiro tom (mais alto)
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(880, ctx.currentTime);
+    gain1.gain.setValueAtTime(0.1, ctx.currentTime);
+    gain1.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+    osc1.start(ctx.currentTime);
+    osc1.stop(ctx.currentTime + 0.1);
 
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.5);
+    // Segundo tom (mais baixo, logo em seguida)
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(660, ctx.currentTime + 0.1);
+    gain2.gain.setValueAtTime(0, ctx.currentTime);
+    gain2.gain.linearRampToValueAtTime(0.1, ctx.currentTime + 0.1);
+    gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+    osc2.start(ctx.currentTime + 0.1);
+    osc2.stop(ctx.currentTime + 0.4);
   } catch (e) {
     console.error("Erro ao tocar som", e);
   }

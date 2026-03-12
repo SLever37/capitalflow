@@ -65,7 +65,7 @@ export const WitnessBaseManager: React.FC<WitnessBaseManagerProps> = ({ profileI
     };
 
     return (
-        <div className="bg-slate-900 border border-slate-800 rounded-[2.5rem] p-6 sm:p-8 space-y-6">
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6">
             <div className="flex justify-between items-center">
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-indigo-500/10 text-indigo-400 rounded-xl"><Users size={20}/></div>
@@ -123,7 +123,7 @@ export const WitnessBaseManager: React.FC<WitnessBaseManagerProps> = ({ profileI
                         <p className="text-[10px] font-black uppercase tracking-widest text-white">Acessando base de dados...</p>
                     </div>
                 ) : witnesses.length === 0 && !error ? (
-                    <div className="col-span-2 py-16 text-center text-slate-600 text-[10px] font-bold uppercase tracking-widest border-2 border-dashed border-slate-800 rounded-3xl">
+                    <div className="col-span-2 py-16 text-center text-slate-500 text-[10px] font-bold uppercase tracking-widest border-2 border-dashed border-slate-800 rounded-3xl">
                         A base está vazia. Cadastre testemunhas para agilizar seus contratos.
                     </div>
                 ) : (

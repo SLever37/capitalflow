@@ -49,12 +49,20 @@ const engine = {
    */
   computeLoanStatus(loan: Loan): 'PAID' | 'ACTIVE' | 'OVERDUE' {
     const bal = engine.computeRemainingBalance(loan);
-    if (n(bal.totalRemaining) <= 0.05) return 'PAID';
+    const isExplicitlyActive = loan.status === 'ATIVO' || loan.status === 'EM_ACORDO';
+    
+    if (n(bal.totalRemaining) <= 0.05 && !isExplicitlyActive) return 'PAID';
 
     const today = new Date();
     const overdue = getInstallments(loan).some((inst) => {
+      // Se a parcela já tem saldo zerado, ela NÃO pode ser considerada vencida/aberta
+      const principalOpen = n(inst?.principal_remaining ?? inst?.principalRemaining);
+      const interestOpen = n(inst?.interest_remaining ?? inst?.interestRemaining);
+      if (principalOpen + interestOpen <= 0.05) return false;
+
       const status = String(inst?.status || '').toUpperCase();
       if (status === 'PAID') return false;
+
       const due = getDueDate(inst);
       if (!due) return false;
       return due.getTime() < today.getTime();
@@ -67,6 +75,28 @@ const engine = {
    * Soma tudo o que ainda falta receber no contrato.
    */
   computeRemainingBalance(loan: Loan): RemainingBalance {
+    const agreement = loan.activeAgreement;
+    const isAgreementActive = agreement && (agreement.status === 'ACTIVE' || agreement.status === 'ATIVO');
+    
+    // Se houver acordo ativo, usamos as parcelas do acordo para o saldo
+    if (isAgreementActive && agreement.installments && agreement.installments.length > 0) {
+      let total = 0;
+      let paid = 0;
+      for (const inst of agreement.installments) {
+        const amt = n(inst.amount);
+        const pAmt = n(inst.paidAmount);
+        total += amt;
+        paid += pAmt;
+      }
+      const remaining = Math.max(0, total - paid);
+      return {
+        principalRemaining: remaining,
+        interestRemaining: 0,
+        lateFeeRemaining: 0,
+        totalRemaining: remaining,
+      };
+    }
+
     const installments = getInstallments(loan);
 
     if (!installments.length) {
@@ -146,11 +176,17 @@ export function isLegallyActionable(loan: Loan): boolean {
   if (!loan) return false;
 
   const bal = engine.computeRemainingBalance(loan);
-  if (n(bal.totalRemaining) > 0.05) return true;
+  // Se não tem saldo devedor, não é acionável
+  if (n(bal.totalRemaining) <= 0.05) return false;
 
   const today = new Date();
 
   for (const inst of getInstallments(loan)) {
+    // Se a parcela já tem saldo zerado, ela NÃO pode ser considerada para ação jurídica
+    const principalOpen = n(inst?.principal_remaining ?? inst?.principalRemaining);
+    const interestOpen = n(inst?.interest_remaining ?? inst?.interestRemaining);
+    if (principalOpen + interestOpen <= 0.05) continue;
+
     const status = String(inst?.status || '').toUpperCase();
     if (status === 'PAID') continue;
 
@@ -158,9 +194,12 @@ export function isLegallyActionable(loan: Loan): boolean {
     if (!due) continue;
 
     const overdueDays = (today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24);
-    const principalOpen = n(inst?.principal_remaining ?? inst?.principalRemaining);
 
-    if (overdueDays > 30 && principalOpen > 0) return true;
+    // Regra: Mais de 5 dias de atraso já considera "acionável" para notificação,
+    // mas a regra jurídica estrita pode ser 30 dias. 
+    // O usuário reclamou de "notificação falsa de cliente que não venceu".
+    // Então só deve retornar true se JÁ VENCEU.
+    if (overdueDays > 0) return true;
   }
 
   return false;

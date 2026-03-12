@@ -55,7 +55,7 @@ export const notificationService = {
               n.close();
           };
         } catch (err: any) {
-          if (err.name === 'TypeError' || err.message.includes('Illegal constructor')) {
+          if (err.name === 'TypeError' || err.message?.includes('Illegal constructor')) {
             navigator.serviceWorker?.getRegistration().then(registration => {
               if (registration) {
                 registration.showNotification(title, options);

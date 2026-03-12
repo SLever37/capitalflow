@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { ShieldCheck, X, MessageCircle, Palette } from 'lucide-react';
+import { ShieldCheck, X, MessageCircle, Palette, ChevronLeft } from 'lucide-react';
 import { supportChatService } from '../../services/supportChat.service';
 import { ChatSidebar } from './components/ChatSidebar';
 import { useCampaignChat } from '../../hooks/useCampaignChat';
@@ -95,10 +95,10 @@ export const OperatorSupportChat = ({ activeUser, onClose }: { activeUser: any; 
   }, [activeUser.id]);
 
   // Filtros de busca para cada lista
-  const filteredActive = useMemo(() => activeChats.filter(c => c.clientName.toLowerCase().includes(searchTerm.toLowerCase())), [activeChats, searchTerm]);
-  const filteredClients = useMemo(() => contracts.filter(c => c.clientName.toLowerCase().includes(searchTerm.toLowerCase())), [contracts, searchTerm]);
-  const filteredTeam = useMemo(() => teamMembers.filter(t => t.clientName.toLowerCase().includes(searchTerm.toLowerCase())), [teamMembers, searchTerm]);
-  const filteredCampaign = useMemo(() => campaignLeads.filter(l => (l.nome || '').toLowerCase().includes(searchTerm.toLowerCase()) || (l.whatsapp || '').includes(searchTerm)), [campaignLeads, searchTerm]);
+  const filteredActive = useMemo(() => activeChats.filter(c => c.clientName?.toLowerCase().includes(searchTerm.toLowerCase())), [activeChats, searchTerm]);
+  const filteredClients = useMemo(() => contracts.filter(c => c.clientName?.toLowerCase().includes(searchTerm.toLowerCase())), [contracts, searchTerm]);
+  const filteredTeam = useMemo(() => teamMembers.filter(t => t.clientName?.toLowerCase().includes(searchTerm.toLowerCase())), [teamMembers, searchTerm]);
+  const filteredCampaign = useMemo(() => campaignLeads.filter(l => (l.nome?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || (l.whatsapp || '').includes(searchTerm)), [campaignLeads, searchTerm]);
 
   const handleSelectContact = (contact: any) => {
       if (contact.type === 'TEAM') {
@@ -151,11 +151,19 @@ export const OperatorSupportChat = ({ activeUser, onClose }: { activeUser: any; 
       {/* HEADER */}
       <div className="h-16 border-b border-slate-800 bg-slate-950 flex items-center justify-between px-4 sm:px-6 shrink-0">
         <div className="flex items-center gap-3">
+          <button
+            onClick={onClose}
+            className="p-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all active:scale-95 shadow-lg shrink-0"
+            title="Voltar"
+          >
+            <ChevronLeft size={20} />
+          </button>
+
           <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center text-white shadow-lg shadow-blue-900/50">
              <ShieldCheck size={20}/>
           </div>
           <div>
-            <h1 className="text-sm font-black text-white uppercase tracking-wider leading-none">Central de Atendimento</h1>
+            <h1 className="text-sm font-black text-white uppercase tracking-wider leading-none">Central de <span className="text-blue-500">Atendimento</span></h1>
             <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-widest">Painel do Operador</p>
           </div>
         </div>
@@ -215,7 +223,7 @@ export const OperatorSupportChat = ({ activeUser, onClose }: { activeUser: any; 
             )
           ) : (
             /* Empty State */
-            <div className={`flex-1 flex flex-col items-center justify-center text-slate-600 ${chatTheme === 'blue' ? 'bg-blue-950/20' : 'bg-slate-900/50'}`}>
+            <div className={`flex-1 flex flex-col items-center justify-center text-slate-500 ${chatTheme === 'blue' ? 'bg-blue-950/20' : 'bg-slate-900/50'}`}>
               <div className="w-24 h-24 bg-slate-800/50 rounded-3xl flex items-center justify-center mb-6 border-2 border-dashed border-slate-700">
                  <MessageCircle size={40} className="opacity-50"/>
               </div>

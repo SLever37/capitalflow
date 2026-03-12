@@ -1,135 +1,219 @@
 
 import React, { useState, useEffect } from 'react';
-import { Loan } from "../../../types";
+import { Loan, LoanStatus } from "../../../types";
 import { Modal } from "../../../components/ui/Modal";
-import { Calculator, Calendar, CheckCircle2, AlertTriangle, ArrowRight } from "lucide-react";
-import { simulateAgreement } from "../logic/calculations";
+import { Calculator, CheckCircle2, AlertTriangle, Hash, DollarSign, Percent } from "lucide-react";
+import { simulateAgreement, CalculationMode } from "../logic/calculations";
 import { formatMoney } from "../../../utils/formatters";
 import { agreementService } from "../services/agreementService";
+import { contractsService } from "../../../services/contracts.service";
+import { legalService } from "../../legal/services/legalService";
+import { generateUUID } from "../../../utils/generators";
+import { safeUUID } from "../../../utils/uuid";
+import { supabase } from "../../../lib/supabase";
 
 interface RenegotiationModalProps {
-    loan: Loan;
+    loans: Loan[];
     activeUser: any;
     onClose: () => void;
     onSuccess: () => void;
 }
 
-export const RenegotiationModal: React.FC<RenegotiationModalProps> = ({ loan, activeUser, onClose, onSuccess }) => {
+export const RenegotiationModal: React.FC<RenegotiationModalProps> = ({ loans, activeUser, onClose, onSuccess }) => {
     const [step, setStep] = useState(1);
     const [type, setType] = useState<'PARCELADO_COM_JUROS' | 'PARCELADO_SEM_JUROS'>('PARCELADO_COM_JUROS');
-    const [installmentsCount, setInstallmentsCount] = useState(1);
-    const [frequency, setFrequency] = useState<'WEEKLY' | 'BIWEEKLY' | 'MONTHLY'>('MONTHLY');
-    const [interestRate, setInterestRate] = useState(5); // 5% ao mês padrão
+    const [calculationMode, setCalculationMode] = useState<CalculationMode>('BY_INSTALLMENTS');
+    
+    const [installmentValue, setInstallmentValue] = useState<number | string>(0);
+    const [installmentsCount, setInstallmentsCount] = useState<number | string>(1);
+    const [interestRate, setInterestRate] = useState<number | string>(5);
+    const [gracePeriod, setGracePeriod] = useState<number | string>(0);
+    const [discount, setDiscount] = useState<number | string>(0);
+    const [downPayment, setDownPayment] = useState<number | string>(0);
+
     const [firstDueDate, setFirstDueDate] = useState('');
     const [totalDebt, setTotalDebt] = useState(0);
     
     const [simulation, setSimulation] = useState<any>(null);
     const [isSaving, setIsSaving] = useState(false);
+    const [frequency, setFrequency] = useState<'WEEKLY' | 'BIWEEKLY' | 'MONTHLY'>('MONTHLY');
 
     useEffect(() => {
-        // Calcula dívida total atual (Principal + Juros + Multas acumuladas)
-        const debt = loan.installments.reduce((acc, i) => acc + (i.principalRemaining + i.interestRemaining + (i.lateFeeAccrued || 0)), 0);
+        if (!loans || loans.length === 0) return;
+        const debt = loans.reduce((total, loan) => total + (loan.installments || []).reduce((acc, i) => acc + (i.principalRemaining + i.interestRemaining + (i.lateFeeAccrued || 0)), 0), 0);
         setTotalDebt(debt);
-        
-        // Data default: Amanhã
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
         setFirstDueDate(tomorrow.toISOString().split('T')[0]);
-    }, [loan]);
+    }, [loans]);
 
     const handleSimulate = () => {
+        const finalType = calculationMode === 'BY_VALUE_AND_COUNT' ? 'PARCELADO_SEM_JUROS' : type;
         const result = simulateAgreement({
-            totalDebt,
-            type,
-            installmentsCount,
-            interestRate,
-            firstDueDate,
-            frequency
+            totalDebt, type: finalType, installmentsCount: installmentsCount as number, installmentValue: installmentValue as number, calculationMode,
+            interestRate: interestRate as number, firstDueDate, frequency, gracePeriod: gracePeriod as number, discount: discount as number, downPayment: downPayment as number
         });
         setSimulation(result);
         setStep(2);
     };
 
     const handleConfirm = async () => {
-        if (!simulation) return;
+        if (!simulation || !loans.length) return;
         setIsSaving(true);
+        const finalType = calculationMode === 'BY_VALUE_AND_COUNT' ? 'PARCELADO_SEM_JUROS' : type;
+
         try {
-            await agreementService.createAgreement(
-                loan.id,
-                {
-                    loanId: loan.id,
-                    type,
-                    totalDebtAtNegotiation: totalDebt,
-                    negotiatedTotal: simulation.negotiatedTotal,
-                    interestRate,
-                    installmentsCount,
-                    frequency,
-                    startDate: new Date().toISOString()
-                },
-                simulation.installments,
-                activeUser.id
-            );
+            const oldInstallmentIds = loans.flatMap(l => (l.installments || []).map(i => i.id));
+            if (oldInstallmentIds.length > 0) {
+                const { error: updateError } = await supabase
+                    .from('parcelas')
+                    .update({ status: LoanStatus.RENEGOCIADO })
+                    .in('id', oldInstallmentIds);
+                if (updateError) throw new Error(`Falha ao marcar parcelas antigas como renegociadas: ${updateError.message}`);
+            }
+
+            const commonAgreementData = {
+                type: finalType,
+                totalDebtAtNegotiation: totalDebt,
+                negotiatedTotal: simulation.negotiatedTotal,
+                interestRate: finalType === 'PARCELADO_COM_JUROS' ? (Number(interestRate) || 0) : 0,
+                installmentsCount: simulation.installments.length,
+                frequency,
+                startDate: new Date().toISOString(),
+                gracePeriod: Number(gracePeriod) || 0,
+                discount: Number(discount) || 0,
+                downPayment: Number(downPayment) || 0,
+                calculation_mode: calculationMode,
+                installment_value: calculationMode !== 'BY_INSTALLMENTS' ? (Number(installmentValue) || 0) : (simulation.installments[0]?.amount || 0),
+                calculation_result: simulation.calculationResult,
+                notes: `Acordo (${calculationMode}) com entrada de ${formatMoney(Number(downPayment) || 0)}, desconto de ${formatMoney(Number(discount) || 0)}.`
+            };
+
+            let agreementId: string, targetLoanId: string, targetLoan: any;
+
+            if (loans.length === 1) {
+                targetLoan = loans[0];
+                targetLoanId = targetLoan.id;
+
+                const negotiationNote = `\n[RENEGOCIADO EM ${new Date().toLocaleDateString('pt-BR')}] Novo acordo de ${simulation.installments.length}x de ${formatMoney(simulation.installments[0]?.amount || 0)}. Total: ${formatMoney(simulation.negotiatedTotal)}.`;
+                const updatedNotes = (targetLoan.notes || '') + negotiationNote;
+
+                agreementId = await agreementService.createAgreement(targetLoanId, { ...commonAgreementData, loanId: targetLoanId } as any, simulation.installments, activeUser.id);
+                await supabase.from('contratos').update({ status: LoanStatus.EM_ACORDO, notes: updatedNotes }).eq('id', targetLoanId);
+
+            } else {
+                const mainLoan = loans[0];
+                const newLoanId = generateUUID();
+                const frequencyMap: Record<string, any> = { 'WEEKLY': 'DAILY', 'BIWEEKLY': 'DAILY', 'MONTHLY': 'MONTHLY' };
+
+                const newLoan: Loan = {
+                    id: newLoanId,
+                    profile_id: mainLoan.profile_id,
+                    clientId: mainLoan.clientId || (mainLoan as any).client_id,
+                    sourceId: mainLoan.sourceId || (mainLoan as any).source_id,
+                    debtorName: mainLoan.debtorName,
+                    debtorPhone: mainLoan.debtorPhone,
+                    debtorDocument: mainLoan.debtorDocument,
+                    debtorAddress: mainLoan.debtorAddress,
+                    principal: simulation.negotiatedTotal,
+                    totalToReceive: simulation.negotiatedTotal,
+                    interestRate: finalType === 'PARCELADO_COM_JUROS' ? (Number(interestRate) || 0) : 0,
+                    finePercent: 0,
+                    dailyInterestPercent: 0,
+                    billingCycle: frequencyMap[frequency] || 'MONTHLY',
+                    startDate: new Date().toISOString(),
+                    status: LoanStatus.ATIVO,
+                    notes: `Refinanciamento unificado de ${loans.length} contratos. Originais: ${loans.map(l => l.id.slice(0, 8)).join(', ')}. `,
+                    installments: simulation.installments.map((inst: any) => ({
+                        id: generateUUID(),
+                        number: inst.number,
+                        dueDate: inst.dueDate,
+                        amount: inst.amount,
+                        scheduledPrincipal: inst.amount,
+                        scheduledInterest: 0,
+                        principalRemaining: inst.amount,
+                        interestRemaining: 0,
+                        lateFeeAccrued: 0,
+                        paidTotal: 0,
+                        paidPrincipal: 0,
+                        paidInterest: 0,
+                        paidLateFee: 0,
+                        status: LoanStatus.PENDING
+                    })),
+                    ledger: [],
+                    preferredPaymentMethod: mainLoan.preferredPaymentMethod,
+                };
+
+                await contractsService.saveLoan(newLoan, activeUser, [], null, { skipTransaction: true });
+                agreementId = await agreementService.createAgreement(newLoanId, { ...commonAgreementData, loanId: newLoanId } as any, simulation.installments, activeUser.id);
+                targetLoanId = newLoanId; targetLoan = newLoan;
+
+                const unificationNote = `\n[UNIFICADO EM ${new Date().toLocaleDateString('pt-BR')}] Contrato migrado para a unificação ${newLoanId.slice(0, 8)}.`;
+                for (const loan of loans) {
+                    const updatedNotes = (loan.notes || '') + unificationNote;
+                    await supabase.from('contratos').update({ status: LoanStatus.RENEGOCIADO, notes: updatedNotes }).eq('id', loan.id);
+                }
+            }
+
+            try {
+                const params = legalService.prepareDocumentParams({ ...commonAgreementData, id: agreementId, createdAt: new Date().toISOString(), status: 'ATIVO', installments: simulation.installments } as any, targetLoan, activeUser);
+                const ownerId = safeUUID((activeUser as any).supervisor_id) || safeUUID(activeUser.id);
+                if (!ownerId) throw new Error("ID do usuário inválido.");
+                const doc = await legalService.generateAndRegisterDocument(agreementId, params, ownerId);
+                await supabase.from('acordos_inadimplencia').update({ legal_document_id: doc.id }).eq('id', agreementId);
+            } catch (docError) { console.error("Erro ao gerar documento jurídico:", docError); }
+
             onSuccess();
-            onClose();
-        } catch (e) {
-            alert("Erro ao criar acordo.");
-            console.error(e);
+        } catch (e: any) {
+            console.error("Erro detalhado na renegociação:", e);
+            alert("Erro ao criar acordo/unificação: " + (e.message || "Erro desconhecido"));
         } finally {
             setIsSaving(false);
         }
     };
 
     return (
-        <Modal onClose={onClose} title="Acordo de Inadimplência">
+        <Modal onClose={onClose} title={loans.length > 1 ? `Unificar ${loans.length} Contratos` : "Acordo de Inadimplência"}>
             <div className="space-y-6">
                 {step === 1 && (
                     <div className="space-y-4 animate-in slide-in-from-right">
-                        <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center">
-                            <p className="text-[10px] uppercase font-black text-slate-500">Dívida Atual Calculada</p>
+                         <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center">
+                            <p className="text-[10px] uppercase font-black text-slate-500">Dívida Total Calculada</p>
                             <p className="text-3xl font-black text-rose-500">{formatMoney(totalDebt)}</p>
+                            {loans.length > 1 && <p className="text-[10px] text-slate-400 mt-2">Somando {loans.length} contratos selecionados</p>}
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <button onClick={() => setType('PARCELADO_COM_JUROS')} className={`p-4 rounded-2xl border transition-all ${type === 'PARCELADO_COM_JUROS' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-900 border-slate-800 text-slate-400'}`}>
-                                <p className="font-bold text-xs uppercase mb-1">Parcelado c/ Juros</p>
-                                <p className="text-[9px] opacity-70">Recalcula dívida com nova taxa</p>
-                            </button>
-                            <button onClick={() => setType('PARCELADO_SEM_JUROS')} className={`p-4 rounded-2xl border transition-all ${type === 'PARCELADO_SEM_JUROS' ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-slate-900 border-slate-800 text-slate-400'}`}>
-                                <p className="font-bold text-xs uppercase mb-1">Sem Juros (Fixar)</p>
-                                <p className="text-[9px] opacity-70">Congela o valor atual</p>
-                            </button>
+                        <div className="grid grid-cols-3 gap-2">
+                            <button onClick={() => setCalculationMode('BY_INSTALLMENTS')} className={`p-3 rounded-xl border text-center transition-all ${calculationMode === 'BY_INSTALLMENTS' ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-900 border-slate-800 text-slate-400'}`}><Hash size={16} className="mx-auto mb-1"/><p className="text-[9px] font-bold uppercase">Por Parcelas</p></button>
+                            <button onClick={() => setCalculationMode('BY_INSTALLMENT_VALUE')} className={`p-3 rounded-xl border text-center transition-all ${calculationMode === 'BY_INSTALLMENT_VALUE' ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-900 border-slate-800 text-slate-400'}`}><DollarSign size={16} className="mx-auto mb-1"/><p className="text-[9px] font-bold uppercase">Por Valor</p></button>
+                            <button onClick={() => setCalculationMode('BY_VALUE_AND_COUNT')} className={`p-3 rounded-xl border text-center transition-all ${calculationMode === 'BY_VALUE_AND_COUNT' ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-slate-900 border-slate-800 text-slate-400'}`}><Percent size={16} className="mx-auto mb-1"/><p className="text-[9px] font-bold uppercase">Valor + Qtd</p></button>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="text-[10px] uppercase font-bold text-slate-500">Nº Parcelas</label>
-                                <input type="number" min="1" max="60" value={installmentsCount} onChange={e => setInstallmentsCount(parseInt(e.target.value))} className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none" />
-                            </div>
-                            <div>
-                                <label className="text-[10px] uppercase font-bold text-slate-500">Periodicidade</label>
-                                <select value={frequency} onChange={e => setFrequency(e.target.value as any)} className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none">
-                                    <option value="MONTHLY">Mensal</option>
-                                    <option value="BIWEEKLY">Quinzenal</option>
-                                    <option value="WEEKLY">Semanal</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        {type === 'PARCELADO_COM_JUROS' && (
-                            <div>
-                                <label className="text-[10px] uppercase font-bold text-slate-500">Taxa de Juros (% ao mês)</label>
-                                <input type="number" step="0.1" value={interestRate} onChange={e => setInterestRate(parseFloat(e.target.value))} className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none" />
+                        {calculationMode !== 'BY_VALUE_AND_COUNT' && (
+                            <div className="grid grid-cols-2 gap-4">
+                                <button onClick={() => setType('PARCELADO_COM_JUROS')} className={`p-4 rounded-2xl border transition-all ${type === 'PARCELADO_COM_JUROS' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-900 border-slate-800 text-slate-400'}`}><p className="font-bold text-xs uppercase mb-1">Parcelado c/ Juros</p><p className="text-[9px] opacity-70">Recalcula dívida com nova taxa</p></button>
+                                <button onClick={() => setType('PARCELADO_SEM_JUROS')} className={`p-4 rounded-2xl border transition-all ${type === 'PARCELADO_SEM_JUROS' ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-slate-900 border-slate-800 text-slate-400'}`}><p className="font-bold text-xs uppercase mb-1">Sem Juros (Fixar)</p><p className="text-[9px] opacity-70">Congela o valor atual</p></button>
                             </div>
                         )}
 
-                        <div>
-                            <label className="text-[10px] uppercase font-bold text-slate-500">1º Vencimento</label>
-                            <input type="date" value={firstDueDate || ''} onChange={e => setFirstDueDate(e.target.value)} className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none" />
+                        <div className="grid grid-cols-2 gap-4">
+                            {calculationMode === 'BY_INSTALLMENTS' && <div><label className="text-[10px] uppercase font-bold text-slate-500">Nº Parcelas</label><input type="number" min="1" max="60" value={installmentsCount} onChange={e => setInstallmentsCount(e.target.value)} className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none" /></div>}
+                            {calculationMode === 'BY_INSTALLMENT_VALUE' && <div><label className="text-[10px] uppercase font-bold text-slate-500">Valor da Parcela (R$)</label><input type="number" step="0.01" value={installmentValue} onChange={e => setInstallmentValue(e.target.value)} className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none" /></div>}
+                            {calculationMode === 'BY_VALUE_AND_COUNT' && <><div key="val"><label className="text-[10px] uppercase font-bold text-slate-500">Valor da Parcela (R$)</label><input type="number" step="0.01" value={installmentValue} onChange={e => setInstallmentValue(e.target.value)} className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none" /></div><div key="qtd"><label className="text-[10px] uppercase font-bold text-slate-500">Nº Parcelas</label><input type="number" min="1" max="60" value={installmentsCount} onChange={e => setInstallmentsCount(e.target.value)} className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none" /></div></>}
+                            <div><label className="text-[10px] uppercase font-bold text-slate-500">Periodicidade</label><select value={frequency} onChange={e => setFrequency(e.target.value as any)} className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none"><option value="MONTHLY">Mensal</option><option value="BIWEEKLY">Quinzenal</option><option value="WEEKLY">Semanal</option></select></div>
                         </div>
 
-                        <button onClick={handleSimulate} className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black uppercase text-xs shadow-lg hover:bg-blue-500 transition-all flex items-center justify-center gap-2">
-                            <Calculator size={16}/> Simular Acordo
-                        </button>
+                        {calculationMode !== 'BY_VALUE_AND_COUNT' && type === 'PARCELADO_COM_JUROS' && <div><label className="text-[10px] uppercase font-bold text-slate-500">Taxa de Juros (% ao mês)</label><input type="number" step="0.1" value={interestRate} onChange={e => setInterestRate(e.target.value)} className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none" /></div>}
+
+                        <div className="grid grid-cols-3 gap-4">
+                            <div><label className="text-[10px] uppercase font-bold text-slate-500">Desconto (R$)</label><input type="number" value={discount} onChange={e => setDiscount(e.target.value)} disabled={calculationMode === 'BY_VALUE_AND_COUNT'} className={`w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none ${calculationMode === 'BY_VALUE_AND_COUNT' ? 'opacity-50' : ''}`} /></div>
+                            <div><label className="text-[10px] uppercase font-bold text-slate-500">Entrada (R$)</label><input type="number" value={downPayment} onChange={e => setDownPayment(e.target.value)} className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none" /></div>
+                            <div><label className="text-[10px] uppercase font-bold text-slate-500">Carência (Dias)</label><input type="number" value={gracePeriod} onChange={e => setGracePeriod(e.target.value)} className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none" /></div>
+                        </div>
+
+                        <div><label className="text-[10px] uppercase font-bold text-slate-500">1º Vencimento</label><input type="date" value={firstDueDate || ''} onChange={e => setFirstDueDate(e.target.value)} className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none" /></div>
+
+                        <button onClick={handleSimulate} className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black uppercase text-xs shadow-lg hover:bg-blue-500 transition-all flex items-center justify-center gap-2"><Calculator size={16}/> Simular Acordo</button>
                     </div>
                 )}
 
@@ -140,10 +224,11 @@ export const RenegotiationModal: React.FC<RenegotiationModalProps> = ({ loan, ac
                                 <div>
                                     <p className="text-[10px] uppercase font-bold text-slate-500">Novo Total</p>
                                     <p className="text-2xl font-black text-white">{formatMoney(simulation.negotiatedTotal)}</p>
+                                    {simulation.calculationResult && simulation.calculationResult !== 'SAME' && <p className={`text-[10px] font-bold mt-1 ${simulation.calculationResult === 'DISCOUNT' ? 'text-emerald-400' : 'text-rose-400'}`}>{simulation.calculationResult === 'DISCOUNT' ? 'Desconto de ' : 'Acréscimo de '} {formatMoney(simulation.diffAmount)}</p>}
                                 </div>
                                 <div className="text-right">
                                     <p className="text-[10px] uppercase font-bold text-slate-500">Parcelas</p>
-                                    <p className="text-xl font-bold text-blue-400">{installmentsCount}x {formatMoney(simulation.installments[0].amount)}</p>
+                                    <p className="text-xl font-bold text-blue-400">{simulation.installments.length}x {formatMoney(simulation.installments[0]?.amount || 0)}</p>
                                 </div>
                             </div>
                             
@@ -160,16 +245,12 @@ export const RenegotiationModal: React.FC<RenegotiationModalProps> = ({ loan, ac
 
                         <div className="bg-amber-900/20 border border-amber-500/30 p-3 rounded-xl flex items-start gap-3">
                             <AlertTriangle size={20} className="text-amber-500 flex-shrink-0 mt-1"/>
-                            <p className="text-[10px] text-amber-200 leading-relaxed">
-                                <b>Atenção:</b> Ao confirmar, o contrato original será congelado e este acordo passará a ser a cobrança vigente. Se o acordo for quebrado, a dívida original retorna.
-                            </p>
+                            <p className="text-[10px] text-amber-200 leading-relaxed"><b>Atenção:</b> {loans.length > 1 ? `Ao confirmar, os ${loans.length} contratos originais serão marcados como RENEGOCIADOS e um NOVO contrato unificado será criado. As parcelas originais serão mantidas no histórico.` : "Ao confirmar, as parcelas originais serão marcadas como RENEGOCIADAS e um novo acordo será criado, mantendo o histórico."}</p>
                         </div>
 
                         <div className="flex gap-3">
                             <button onClick={() => setStep(1)} className="flex-1 py-4 bg-slate-800 text-white rounded-2xl font-bold uppercase text-xs">Voltar</button>
-                            <button onClick={handleConfirm} disabled={isSaving} className="flex-[2] py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase text-xs shadow-lg hover:bg-emerald-500 transition-all flex items-center justify-center gap-2">
-                                {isSaving ? 'Processando...' : <><CheckCircle2 size={16}/> Confirmar Acordo</>}
-                            </button>
+                            <button onClick={handleConfirm} disabled={isSaving} className="flex-[2] py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase text-xs shadow-lg hover:bg-emerald-500 transition-all flex items-center justify-center gap-2">{isSaving ? 'Processando...' : <><CheckCircle2 size={16}/> Confirmar Acordo</>}</button>
                         </div>
                     </div>
                 )}

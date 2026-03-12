@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, Scroll, UserCheck, ShieldCheck, Link as LinkIcon, FileSignature, Users, User, MapPin, Save, Loader2, Scale, ChevronDown, Copy, ExternalLink, Send } from 'lucide-react';
+import { ChevronLeft, Scroll, UserCheck, ShieldCheck, Link as LinkIcon, FileSignature, Users, User, MapPin, Save, Loader2, Scale, ChevronDown, Copy, ExternalLink, Send } from 'lucide-react';
 import { Loan, UserProfile, LegalWitness, LegalDocumentParams } from '../../../types';
 import { formatMoney } from '../../../utils/formatters';
+import { safeUUID } from '../../../utils/uuid';
 import { DocumentTemplates } from '../templates/DocumentTemplates';
 import { legalService } from '../services/legalService';
 import { witnessService } from '../services/witness.service';
@@ -119,10 +120,15 @@ export const ConfissaoDividaView: React.FC<ConfissaoDividaViewProps> = ({ loans,
                 timestamp: new Date().toISOString()
             };
 
+            const ownerId = safeUUID((activeUser as any).supervisor_id) || safeUUID(activeUser.id);
+            if (!ownerId) {
+                showToast("Erro: ID do usuário inválido.", "error");
+                return;
+            }
             const docRecord = await legalService.generateAndRegisterDocument(
                 selectedLoan.activeAgreement?.id || selectedLoan.id, 
                 params, 
-                activeUser.id
+                ownerId
             );
 
             showToast("Documento registrado com sucesso!", "success");
@@ -164,8 +170,8 @@ export const ConfissaoDividaView: React.FC<ConfissaoDividaViewProps> = ({ loans,
         <div className="space-y-6 animate-in slide-in-from-right duration-300 pb-20">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
                 <div className="flex items-center gap-4">
-                    <button onClick={onBack} className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors">
-                        <ArrowLeft size={20}/>
+                    <button onClick={onBack} className="text-slate-500 hover:text-white transition-colors" title="Voltar">
+                        <ChevronLeft size={24}/>
                     </button>
                     <div>
                         <h2 className="text-xl font-black text-white uppercase flex items-center gap-2">
@@ -186,7 +192,7 @@ export const ConfissaoDividaView: React.FC<ConfissaoDividaViewProps> = ({ loans,
                 <WitnessBaseManager profileId={activeUser?.id || ''} />
             ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div className="bg-slate-900 border border-slate-800 p-6 rounded-[2rem] space-y-4">
+                    <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl space-y-4">
                         <h3 className="text-xs font-black text-white uppercase tracking-widest border-b border-slate-800 pb-3 flex items-center gap-2">
                             <UserCheck size={16} className="text-blue-500"/> 1. Escolher Contrato Ativo
                         </h3>
@@ -209,7 +215,7 @@ export const ConfissaoDividaView: React.FC<ConfissaoDividaViewProps> = ({ loans,
                         </div>
                     </div>
 
-                    <div className="bg-slate-900 border border-slate-800 p-6 rounded-[2rem] space-y-6">
+                    <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl space-y-6">
                         <div className="bg-slate-950 p-4 rounded-xl border border-indigo-900/30">
                             <div className="flex items-center gap-2 text-indigo-400 mb-4">
                                 <Users size={16}/>

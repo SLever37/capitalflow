@@ -110,7 +110,7 @@ export const useProfileController = (
     // Nota: Usamos o ID do dono para garantir que toda a organização seja limpa
     await supabase.from('transacoes').delete().eq('profile_id', ownerId);
     await supabase.from('documentos_juridicos').delete().eq('profile_id', ownerId);
-    await supabase.from('sinalizacoes_pagamento').delete().eq('profile_id', ownerId);
+    await supabase.from('payment_intents').delete().eq('profile_id', ownerId);
     await supabase.from('parcelas').delete().eq('profile_id', ownerId);
 
     // ✅ Contratos e Clientes agora são filtrados por owner_id (Schema v3+)

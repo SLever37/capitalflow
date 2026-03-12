@@ -35,7 +35,7 @@ export const LoanForm: React.FC<LoanFormProps> = (props) => {
 
   return (
     <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-md flex items-start md:items-center justify-center z-[100] p-4 overflow-y-auto">
-      <div className="bg-slate-900 border border-slate-800 rounded-[2rem] sm:rounded-[3rem] w-full max-w-6xl p-5 sm:p-12 shadow-2xl my-4 md:my-auto animate-in zoom-in-95 duration-200 mb-20 md:mb-auto">
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-6xl p-5 sm:p-12 shadow-2xl my-4 md:my-auto animate-in zoom-in-95 duration-200 mb-20 md:mb-auto">
         <div className="flex justify-between items-start mb-6 sm:mb-10">
             <div>
                 <h2 className="text-xl sm:text-3xl font-black text-white tracking-tighter uppercase leading-none">
@@ -109,7 +109,7 @@ export const LoanForm: React.FC<LoanFormProps> = (props) => {
       {showCamera.active && (
         <div className="fixed inset-0 z-[110] bg-slate-950 flex flex-col items-center justify-center p-6">
           <div className="mb-6 text-white text-[10px] font-black uppercase tracking-[0.3em] bg-blue-600 px-6 py-2 rounded-full">MODO CAPTURA</div>
-          <video ref={videoRef} autoPlay playsInline className="w-full max-w-2xl h-auto border-4 border-slate-900 rounded-[2rem] shadow-2xl shadow-blue-900/20" />
+          <video ref={videoRef} autoPlay playsInline className="w-full max-w-2xl h-auto border-4 border-slate-900 rounded-3xl shadow-2xl shadow-blue-900/20" />
           <div className="mt-8 sm:mt-12 flex gap-10">
             <button onClick={stopCamera} className="p-6 bg-slate-800 rounded-full text-slate-400 hover:text-white hover:bg-rose-600 transition-all shadow-xl"><X size={28}/></button>
             <button onClick={takePhoto} className="p-10 bg-white rounded-full text-black shadow-2xl shadow-white/10 active:scale-90 transition-transform"><Camera size={36}/></button>

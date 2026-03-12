@@ -98,9 +98,9 @@ export const useLoanController = (
       const note =
         window.prompt(nextStatus === 'APROVADO' ? 'Observação (opcional):' : 'Motivo/observação (opcional):') || null;
 
-      // ✅ sinalizacoes_pagamento: filtra por profile_id = DONO (ownerId)
+      // ✅ payment_intents: filtra por profile_id = DONO (ownerId)
       const { error } = await supabase
-        .from('sinalizacoes_pagamento')
+        .from('payment_intents')
         .update({
           status: nextStatus,
           reviewed_at: new Date().toISOString(),
@@ -257,12 +257,23 @@ export const useLoanController = (
     }
   };
 
+  const handleActivateLoan = (loan: Loan) => {
+    openConfirmation({
+      type: 'ACTIVATE',
+      target: loan,
+      title: 'Reativar Contrato?',
+      message: 'O contrato e seu acordo (se houver) voltarão ao estado ATIVO.',
+      showRefundOption: false
+    });
+  };
+
   return {
     handleSaveLoan,
     handleSaveNote,
     handleReviewSignal,
     handleGenerateLink,
     handleExportExtrato,
+    handleActivateLoan,
     openConfirmation,
     executeConfirmation,
     openReverseTransaction,

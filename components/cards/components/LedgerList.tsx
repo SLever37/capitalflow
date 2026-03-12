@@ -3,6 +3,7 @@ import { Settings, HandCoins, CheckCircle2, Undo2 } from 'lucide-react';
 import { LedgerEntry, Loan } from '../../../types';
 import { humanizeAuditLog } from '../../../utils/auditHelpers';
 import { formatMoney } from '../../../utils/formatters';
+import { translateTransactionType } from '../../../utils/translationHelpers';
 
 interface LedgerListProps {
   ledger: LedgerEntry[];
@@ -53,31 +54,33 @@ const LedgerItem: React.FC<{
       ? 'Pagamento de Acordo'
       : isAudit
       ? 'Sistema / Auditoria'
-      : (t.notes || (isOutflow ? 'Saída de Capital' : 'Pagamento'));
+      : (t.notes ? translateTransactionType(t.notes) : (isOutflow ? 'Saída de Capital' : 'Pagamento'));
 
   return (
     <div className="flex flex-col border-b border-slate-800/50 pb-2 mb-2 last:border-0 last:pb-0 last:mb-0 group">
-      <div className="flex justify-between items-center text-xs">
-        <div className="flex items-center gap-2">
-          <div className={`p-1.5 rounded-lg ${badgeClass}`}>
+      <div className="table-row text-xs">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className={`p-1.5 rounded-lg shrink-0 ${badgeClass}`}>
             {badgeIcon}
           </div>
-          <div>
-            <p className="text-white font-bold">{titleText}</p>
-            <p className="text-[9px] text-slate-500">
+          <div className="min-w-0">
+            <p className="text-white font-bold truncate">{titleText}</p>
+            <p className="text-[9px] text-slate-500 truncate">
               {new Date(t.date).toLocaleDateString()} às{' '}
               {new Date(t.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="text-right">
           {!isAudit && (
-            <span className={`font-black ${isOutflow ? 'text-rose-500' : 'text-emerald-500'}`}>
+            <span className={`font-black whitespace-nowrap ${isOutflow ? 'text-rose-500' : 'text-emerald-500'}`}>
               {isOutflow ? '-' : '+'} {formatMoney(t.amount, isStealth)}
             </span>
           )}
+        </div>
 
+        <div className="flex justify-end">
           {isReversible && !isAgreementPayment && (
             <button
               onClick={(e) => {
@@ -120,7 +123,7 @@ export const LedgerList: React.FC<LedgerListProps> = ({ ledger = [], loan, onRev
           />
         ))
       ) : (
-        <p className="text-[10px] text-slate-600 text-center italic py-4">Nenhuma transação registrada.</p>
+        <p className="text-[10px] text-slate-500 text-center italic py-4">Nenhuma transação registrada.</p>
       )}
     </div>
   );

@@ -16,7 +16,6 @@ interface InstallmentGridProps {
     strategy: any;
     isDailyFree: boolean;
     isFixedTerm: boolean;
-    onPayment: (loan: Loan, inst: Installment, calculations: any) => void;
     onAgreementPayment: (loan: Loan, agreement: Agreement, inst: AgreementInstallment) => void;
     isStealthMode?: boolean;
 }
@@ -24,7 +23,7 @@ interface InstallmentGridProps {
 export const InstallmentGrid: React.FC<InstallmentGridProps> = (props) => {
     const {
         loan, orderedInstallments, fixedTermStats, isPaid, isZeroBalance, isFullyFinalized,
-        showProgress, strategy, isDailyFree, isFixedTerm, onPayment, isStealthMode
+        showProgress, strategy, isDailyFree, isFixedTerm, isStealthMode
     } = props;
 
     // Contexto imutável para a função de view model
@@ -52,7 +51,6 @@ export const InstallmentGrid: React.FC<InstallmentGridProps> = (props) => {
                         vm={viewModel}
                         loan={loan}
                         fixedTermStats={fixedTermStats}
-                        onPayment={onPayment}
                         strategy={strategy}
                         isStealthMode={isStealthMode}
                     />

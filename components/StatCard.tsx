@@ -31,7 +31,7 @@ export const StatCard: React.FC<StatCardProps> = ({
 
   return (
     <div 
-      className={`relative overflow-hidden bg-slate-900 border border-slate-800 p-5 rounded-[2.5rem] hover:border-slate-700 transition-all duration-300 group cursor-default h-full flex flex-col justify-between`}
+      className={`responsive-card relative overflow-hidden bg-slate-900 border border-slate-800 rounded-3xl hover:border-slate-700 transition-all duration-300 group cursor-default h-full flex flex-col justify-between`}
       onClick={onClick}
     >
         {/* Background Glow Effect */}
@@ -44,7 +44,7 @@ export const StatCard: React.FC<StatCardProps> = ({
                     <div className={`p-2.5 rounded-2xl bg-slate-950 border border-slate-800/50 text-slate-400 shadow-sm`}>
                         {icon}
                     </div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">{title}</p>
+                    <p className="card-title font-black uppercase tracking-widest text-slate-500">{title}</p>
                 </div>
                 {onClick && <ChevronRight size={16} className="text-slate-600 group-hover:text-white transition-colors" />}
             </div>

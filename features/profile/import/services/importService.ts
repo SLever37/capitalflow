@@ -1,5 +1,4 @@
 
-import * as XLSX from 'xlsx';
 import { FIELD_MAPS, ImportCandidate } from '../domain/importSchema';
 import { onlyDigits, parseCurrency } from '../../../../utils/formatters';
 import { isValidCPForCNPJ } from '../../../../utils/validators';
@@ -23,6 +22,7 @@ const safeParseDate = (val: any): string | undefined => {
 
 export const importService = {
     async getSheets(file: File): Promise<{ name: string, headers: string[], rows: any[] }[]> {
+        const XLSX = await import('xlsx');
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = (e) => {

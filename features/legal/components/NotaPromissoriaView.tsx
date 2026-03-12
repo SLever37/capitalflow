@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { ArrowLeft, Printer, Landmark, Scale, Calendar } from 'lucide-react';
+import { ChevronLeft, Printer, Landmark, Scale, Calendar } from 'lucide-react';
 import { Loan, UserProfile } from '../../../types';
 import { formatMoney } from '../../../utils/formatters';
 import { DocumentTemplates } from '../templates/DocumentTemplates';
@@ -38,8 +38,8 @@ export const NotaPromissoriaView: React.FC<NotaPromissoriaViewProps> = ({ loans,
     return (
         <div className="space-y-6 animate-in slide-in-from-right duration-300">
             <div className="flex items-center gap-4 mb-8">
-                <button onClick={onBack} className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors">
-                    <ArrowLeft size={20}/>
+                <button onClick={onBack} className="text-slate-500 hover:text-white transition-colors" title="Voltar">
+                    <ChevronLeft size={24}/>
                 </button>
                 <div>
                     <h2 className="text-xl font-black text-white uppercase flex items-center gap-2">
@@ -51,7 +51,7 @@ export const NotaPromissoriaView: React.FC<NotaPromissoriaViewProps> = ({ loans,
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {activeLoans.map(loan => (
-                    <div key={loan.id} className="bg-slate-900 border border-slate-800 p-6 rounded-[2.5rem] flex flex-col group hover:border-blue-500 transition-all">
+                    <div key={loan.id} className="bg-slate-900 border border-slate-800 p-6 rounded-3xl flex flex-col group hover:border-blue-500 transition-all">
                         <div className="flex justify-between items-start mb-4">
                             <div className="p-3 bg-blue-500/10 text-blue-500 rounded-2xl"><Landmark size={24}/></div>
                             <span className="text-[9px] font-black uppercase bg-blue-950 text-blue-400 px-2 py-1 rounded">Apta p/ Impressão</span>

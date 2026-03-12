@@ -178,7 +178,7 @@ export const CalculatorModal = ({ onClose }: { onClose: () => void }) => {
                 </div>
 
                 {mode === 'BASIC' ? (
-                    <div className="bg-slate-950 p-6 rounded-[2rem] border border-slate-800 shadow-2xl">
+                    <div className="bg-slate-950 p-6 rounded-3xl border border-slate-800 shadow-2xl">
                         <div className="bg-slate-900 p-4 rounded-2xl mb-4 text-right">
                             <span className="text-3xl font-mono text-white tracking-widest">{calcDisplay}</span>
                         </div>
@@ -263,7 +263,7 @@ export const CalculatorModal = ({ onClose }: { onClose: () => void }) => {
                                     </div>
                                 </div>
 
-                                <div className="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 p-6 rounded-[2rem] relative overflow-hidden shadow-2xl">
+                                <div className="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 p-6 rounded-3xl relative overflow-hidden shadow-2xl">
                                     <div className="flex flex-col items-center text-center">
                                         <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-2">Retorno Total (Juros)</span>
                                         <span className="text-4xl font-black text-white tracking-tight">{formatCurrency(results.grossProfit)}</span>

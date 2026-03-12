@@ -5,7 +5,7 @@ import { formatMoney } from '../../utils/formatters';
 
 export const ProfitCard = ({ balance, onWithdraw, isStealthMode }: { balance: number, onWithdraw: () => void, isStealthMode?: boolean }) => {
     return (
-        <div className="relative overflow-hidden bg-slate-900 border border-slate-800 p-5 rounded-[2.5rem] hover:border-emerald-500/30 transition-all duration-300 group h-full flex flex-col justify-between">
+        <div className="relative overflow-hidden bg-slate-900 border border-slate-800 p-5 rounded-3xl hover:border-emerald-500/30 transition-all duration-300 group h-full flex flex-col justify-between">
             <div className={`absolute -top-10 -right-10 w-32 h-32 bg-emerald-500 rounded-full blur-[60px] opacity-10 group-hover:opacity-20 transition-opacity`}></div>
 
             <div>

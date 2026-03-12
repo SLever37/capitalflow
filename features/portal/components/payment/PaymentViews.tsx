@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { CheckCircle2, Copy, Loader2, QrCode, AlertTriangle, Wallet, CreditCard, MessageSquare, Clock, Calendar, Loader } from 'lucide-react';
+import { CheckCircle2, Copy, Loader2, QrCode, AlertTriangle, Wallet, CreditCard, MessageSquare, Clock, Calendar, Loader, Upload, FileText, X } from 'lucide-react';
 import { formatMoney } from '../../../../utils/formatters';
 import { getPortalDueLabel } from '../../mappers/portalDebtRules';
 
@@ -17,10 +17,12 @@ interface BillingViewProps {
     error: string | null;
     isInstallmentPaid?: boolean;
     isProcessing?: boolean;
+    receiptFile?: File | null;
+    onFileChange?: (file: File | null) => void;
 }
 
 export const BillingView: React.FC<BillingViewProps> = ({
-    totalToPay, interestOnlyWithFees, dueDateISO, daysLateRaw, pixKey, onCopyPix, onNotify, error, isInstallmentPaid = false, isProcessing = false
+    totalToPay, interestOnlyWithFees, dueDateISO, daysLateRaw, pixKey, onCopyPix, onNotify, error, isInstallmentPaid = false, isProcessing = false, receiptFile, onFileChange
 }) => {
     // Usa o helper centralizado para determinar a mensagem
     const { label, variant, detail } = getPortalDueLabel(daysLateRaw, dueDateISO);
@@ -96,6 +98,46 @@ export const BillingView: React.FC<BillingViewProps> = ({
                     Utilize o aplicativo do seu banco para transferir o valor exato para a chave acima.
                 </p>
             </div>
+
+            {/* Upload de Comprovante */}
+            {!isInstallmentPaid && (
+                <div className="space-y-3">
+                    <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest pl-1">Anexar Comprovante (Opcional)</p>
+                    
+                    {!receiptFile ? (
+                        <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-slate-800 rounded-2xl cursor-pointer hover:bg-slate-900/50 transition-all group">
+                            <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                <Upload className="w-6 h-6 text-slate-500 group-hover:text-blue-500 mb-2 transition-colors" />
+                                <p className="text-[10px] text-slate-500 font-bold uppercase">Clique para selecionar arquivo</p>
+                            </div>
+                            <input 
+                                type="file" 
+                                className="hidden" 
+                                accept="image/*,application/pdf"
+                                onChange={(e) => onFileChange?.(e.target.files?.[0] || null)}
+                            />
+                        </label>
+                    ) : (
+                        <div className="bg-slate-900 border border-blue-500/30 p-3 rounded-2xl flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-blue-500/10 text-blue-500 rounded-lg">
+                                    <FileText size={18} />
+                                </div>
+                                <div className="overflow-hidden">
+                                    <p className="text-xs text-white font-bold truncate max-w-[180px]">{receiptFile.name}</p>
+                                    <p className="text-[9px] text-slate-500 uppercase">{(receiptFile.size / 1024).toFixed(0)} KB</p>
+                                </div>
+                            </div>
+                            <button 
+                                onClick={() => onFileChange?.(null)}
+                                className="p-2 text-slate-500 hover:text-rose-500 transition-colors"
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
 
             <div className="space-y-3">
                 {isInstallmentPaid ? (

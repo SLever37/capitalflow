@@ -121,6 +121,12 @@ export const getDaysDiff = (targetDate: DateInput): number => {
   return Math.round(diffTime / MS_PER_DAY);
 };
 
+export const isValidDate = (d: any): boolean => {
+  if (!d) return false;
+  const date = new Date(d);
+  return !isNaN(date.getTime());
+};
+
 export const getDueStatus = (dueDate: DateInput) => {
   const diff = getDaysDiff(dueDate);
   return {

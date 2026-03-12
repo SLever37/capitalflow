@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, User, ShieldAlert, AlertCircle, CheckCircle2, Wallet, Layers } from 'lucide-react';
+import { ChevronDown, ChevronUp, User, ShieldAlert, AlertCircle, CheckCircle2, Wallet, Layers, RefreshCcw } from 'lucide-react';
 import { ClientGroup } from '../../domain/dashboard/loanGrouping';
 import { formatMoney } from '../../utils/formatters';
 import { LoanCard } from './LoanCard';
@@ -13,6 +13,13 @@ interface ClientGroupCardProps {
 
 export const ClientGroupCard: React.FC<ClientGroupCardProps> = ({ group, passThroughProps, isStealthMode }) => {
     const [isExpanded, setIsExpanded] = useState(false);
+
+    const handleRenegotiateAll = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (passThroughProps.onRenegotiate) {
+            passThroughProps.onRenegotiate(group.loans);
+        }
+    };
 
     // REGRA: Se for apenas um contrato, não agrupa visualmente. Renderiza o LoanCard direto.
     if (group.isStandalone && group.loans.length === 1) {
@@ -50,14 +57,14 @@ export const ClientGroupCard: React.FC<ClientGroupCardProps> = ({ group, passThr
     }
 
     return (
-        <div className={`rounded-3xl border transition-all duration-300 overflow-hidden mb-4 ${statusColor} ${isExpanded ? 'shadow-2xl' : 'shadow-md'}`}>
+        <div className={`responsive-card rounded-3xl border transition-all duration-300 overflow-hidden mb-4 ${statusColor} ${isExpanded ? 'shadow-2xl' : 'shadow-md'}`}>
             <div 
-                className="p-5 cursor-pointer flex flex-col gap-4 relative"
+                className="cursor-pointer flex flex-col gap-4 relative"
                 onClick={() => setIsExpanded(!isExpanded)}
             >
-                <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-4">
-                        <div className="relative">
+                <div className="flex justify-between items-start gap-3 flex-wrap sm:flex-nowrap">
+                    <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+                        <div className="relative shrink-0">
                             {group.avatarUrl ? (
                                 <img src={group.avatarUrl} className="w-12 h-12 rounded-full object-cover border-2 border-slate-700" alt={group.clientName} />
                             ) : (
@@ -70,18 +77,27 @@ export const ClientGroupCard: React.FC<ClientGroupCardProps> = ({ group, passThr
                             </div>
                         </div>
                         
-                        <div>
-                            <h3 className="text-white font-black text-lg uppercase leading-tight">{group.clientName}</h3>
-                            <div className="flex items-center gap-2 mt-1">
-                                <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded border bg-slate-950/50 ${statusTextColor} border-current opacity-80`}>
+                        <div className="min-w-0">
+                            <h3 className="client-name text-white font-black uppercase leading-tight">{group.clientName}</h3>
+                            <div className="flex flex-wrap items-center gap-2 mt-1">
+                                <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded border bg-slate-950/50 ${statusTextColor} border-current opacity-80 whitespace-nowrap`}>
                                     {statusText}
                                 </span>
-                                <span className="text-[9px] text-slate-500 font-bold uppercase flex items-center gap-1">
+                                <span className="text-[9px] text-slate-500 font-bold uppercase flex items-center gap-1 whitespace-nowrap">
                                     <Layers size={10}/> {group.contractCount} Contratos
                                 </span>
                             </div>
                         </div>
                     </div>
+
+                    {(group.status === 'LATE' || group.status === 'CRITICAL') && group.loans.length > 1 && (
+                        <button 
+                            onClick={handleRenegotiateAll}
+                            className="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase shadow-lg flex items-center gap-1 transition-all z-10 shrink-0"
+                        >
+                            <RefreshCcw size={12} /> Unificar
+                        </button>
+                    )}
                 </div>
 
                 <div className="flex items-center justify-between pt-2 border-t border-slate-800/50 mt-1">

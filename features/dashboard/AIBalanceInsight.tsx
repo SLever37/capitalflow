@@ -37,7 +37,7 @@ export const AIBalanceInsight: React.FC<{ loans: Loan[], sources: CapitalSource[
     useEffect(() => { if (loans.length > 0) runAudit(); }, []);
 
     return (
-        <div className="w-full bg-slate-900 border border-slate-800 rounded-[2.5rem] overflow-hidden flex flex-col shadow-2xl mt-8">
+        <div className="w-full bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden flex flex-col shadow-2xl mt-8">
             <div className="bg-gradient-to-r from-blue-600/10 to-indigo-600/10 p-6 border-b border-slate-800 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <div className="p-3 bg-blue-600 rounded-2xl text-white shadow-lg"><BrainCircuit size={20}/></div>
@@ -91,7 +91,7 @@ export const AIBalanceInsight: React.FC<{ loans: Loan[], sources: CapitalSource[
                 )}
             </div>
             <div className="p-4 bg-slate-900/50 border-t border-slate-800 flex justify-center">
-                <p className="text-[9px] font-black text-slate-600 uppercase tracking-[0.2em]">Soberania Analítica • v5.0</p>
+                <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">Soberania Analítica • v5.0</p>
             </div>
         </div>
     );

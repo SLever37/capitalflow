@@ -1,9 +1,9 @@
-import React, { useState } from "react";
-import PixDepositModal from "../components/modals/PixDepositModal";
+import React, { useState, useRef } from "react";
 import { CapitalSource, Loan } from "../types";
-import { Plus } from 'lucide-react';
+import { Plus, ChevronLeft, Wallet, Upload, Image as ImageIcon } from 'lucide-react';
 import { Modal } from '../components/ui/Modal';
 import { SourceCard } from '../components/cards/SourceCard';
+import { filesService } from '../services/files.service';
 
 interface SourcesPageProps {
   sources: CapitalSource[];
@@ -17,6 +17,8 @@ interface SourcesPageProps {
 
   // ✅ NOVO: abre o modal PIX (fica no Container)
   onOpenPixDeposit: (source: CapitalSource) => void;
+  goBack?: () => void;
+  activeUser?: any;
 }
 
 export const SourcesPage: React.FC<SourcesPageProps> = ({
@@ -26,8 +28,11 @@ export const SourcesPage: React.FC<SourcesPageProps> = ({
   handleUpdateSourceBalance,
   isStealthMode,
   ui,
-  onOpenPixDeposit
+  onOpenPixDeposit,
+  goBack,
+  activeUser
 }) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ✅ "Adicionar saldo" agora chama PIX
   const handleAddFunds = (source: CapitalSource) => {
@@ -38,16 +43,28 @@ export const SourcesPage: React.FC<SourcesPageProps> = ({
     ui.setEditingSource(source);
   };
 
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-black uppercase tracking-tighter text-white">
-          Fontes de Capital
-        </h2>
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !activeUser || !ui.editingSource) return;
 
+    // Use filesService.uploadFile
+    const path = `${activeUser.id}/source_logos/${Date.now()}_${file.name}`;
+    const url = await filesService.uploadFile(file, path);
+
+    if (url) {
+      ui.setEditingSource({
+        ...ui.editingSource,
+        logo_url: url
+      });
+    }
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in">
+      <div className="flex flex-col md:flex-row justify-end items-start md:items-center gap-4">
         <button
           onClick={() => ui.openModal('SOURCE_FORM')}
-          className="px-4 py-2 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase hover:bg-blue-500 transition-all shadow-lg shadow-blue-600/20 flex items-center gap-2"
+          className="w-full md:w-auto px-6 py-3 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase hover:bg-blue-500 transition-all shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2 shrink-0"
         >
           <Plus size={16} /> Nova Fonte
         </button>
@@ -98,25 +115,48 @@ export const SourcesPage: React.FC<SourcesPageProps> = ({
             />
 
             <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">
-              URL do Ícone / Logo
+              Imagem da Carteira (Logo)
             </label>
 
-            <input
-              type="text"
-              value={ui.editingSource.logo_url || ''}
-              onChange={e =>
-                ui.setEditingSource({
-                  ...ui.editingSource,
-                  logo_url: e.target.value
-                })
-              }
-              placeholder="https://..."
-              className="w-full bg-slate-950 p-4 rounded-xl text-white text-sm outline-none border border-slate-800 focus:border-blue-500 transition-colors"
-            />
+            <div className="flex items-center gap-4">
+              {ui.editingSource.logo_url ? (
+                <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-slate-700 group">
+                  <img src={ui.editingSource.logo_url} alt="Logo" className="w-full h-full object-cover" />
+                  <button 
+                    onClick={() => ui.setEditingSource({ ...ui.editingSource, logo_url: '' })}
+                    className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <span className="text-xs text-white font-bold">Remover</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="w-16 h-16 rounded-xl bg-slate-800 flex items-center justify-center border border-slate-700 border-dashed">
+                  <ImageIcon size={24} className="text-slate-500" />
+                </div>
+              )}
+
+              <div className="flex-1">
+                 <input 
+                   type="file" 
+                   ref={fileInputRef} 
+                   className="hidden" 
+                   accept="image/*"
+                   onChange={handleFileChange}
+                 />
+                 <button
+                   onClick={() => fileInputRef.current?.click()}
+                   className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold uppercase rounded-lg border border-slate-700 flex items-center gap-2 transition-colors"
+                 >
+                   <Upload size={14} />
+                   Carregar Imagem
+                 </button>
+                 <p className="text-[10px] text-slate-500 mt-1">JPG, PNG ou GIF (Max 2MB)</p>
+              </div>
+            </div>
 
             <button
               onClick={handleUpdateSourceBalance}
-              className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl uppercase transition-all shadow-lg"
+              className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl uppercase transition-all shadow-lg mt-4"
             >
               Salvar Correção
             </button>

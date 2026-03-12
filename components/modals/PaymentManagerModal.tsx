@@ -81,7 +81,7 @@ export const PaymentManagerModal: React.FC<PaymentManagerModalProps> = ({
     const hasOriginalFine = debtBreakdown.fine > 0 || debtBreakdown.dailyMora > 0;
 
     return (
-        <div className="fixed inset-0 z-[200] bg-slate-950 flex flex-col animate-in fade-in duration-300 font-sans h-[100dvh]">
+        <div className="fixed inset-0 z-[90] bg-slate-950 flex flex-col animate-in fade-in duration-300 font-sans h-[100dvh] pt-16 sm:pt-20 pb-28 md:pb-0">
             
             {/* HEADER SUPERIOR */}
             <div className="h-16 border-b border-slate-800 bg-slate-950 flex items-center justify-between px-4 sm:px-6 shrink-0">
@@ -105,7 +105,7 @@ export const PaymentManagerModal: React.FC<PaymentManagerModalProps> = ({
                 <div className="w-full md:w-[380px] lg:w-[420px] bg-slate-900/50 border-b md:border-b-0 md:border-r border-slate-800 flex flex-col md:overflow-y-auto custom-scrollbar p-4 sm:p-6 shrink-0">
                     
                     {/* CARD PRINCIPAL DE VALOR */}
-                    <div className="bg-slate-950 p-6 rounded-[2rem] border border-slate-800 text-center relative overflow-hidden shadow-2xl mb-6">
+                    <div className="bg-slate-950 p-6 rounded-3xl border border-slate-800 text-center relative overflow-hidden shadow-2xl mb-6">
                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-emerald-500"></div>
                         <p className="text-xs font-black uppercase text-slate-500 mb-2 tracking-widest">Total a Receber</p>
                         <p className="text-4xl font-black text-white mb-2 tracking-tight">
@@ -198,14 +198,14 @@ export const PaymentManagerModal: React.FC<PaymentManagerModalProps> = ({
                                     className="bg-transparent text-white font-bold text-sm outline-none w-full appearance-none cursor-pointer"
                                 />
                             </div>
-                            <Calendar size={20} className="text-slate-600 group-focus-within:text-blue-500 transition-colors"/>
+                            <Calendar size={20} className="text-slate-500 group-focus-within:text-blue-500 transition-colors"/>
                         </div>
 
                         {/* WORKSPACE PRINCIPAL - FLUXO ÚNICO */}
                         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                             
                             {/* CARD DE ENTRADA DE VALOR */}
-                            <div className="bg-slate-900 border border-slate-800 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden group focus-within:border-blue-500 transition-all">
+                            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden group focus-within:border-blue-500 transition-all">
                                 <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/5 blur-[60px] rounded-full"></div>
                                 
                                 <div className="relative z-10">

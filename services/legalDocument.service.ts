@@ -21,9 +21,10 @@ export const legalDocumentService = {
   /**
    * Lista documentos disponíveis para o token do portal
    */
-  async listDocs(token: string): Promise<PortalDocListItem[]> {
+  async listDocs(token: string, code: string): Promise<PortalDocListItem[]> {
     const { data, error } = await supabasePortal.rpc('portal_list_docs', {
       p_token: token,
+      p_shortcode: code,
     });
 
     if (error) throw new Error(error.message || 'Falha ao listar documentos.');
@@ -33,10 +34,11 @@ export const legalDocumentService = {
   /**
    * Busca documento específico (HTML renderizado + snapshot)
    */
-  async getDoc(token: string, docId: string): Promise<PortalDoc> {
+  async getDoc(token: string, code: string, docId: string): Promise<PortalDoc> {
     const { data, error } = await supabasePortal
       .rpc('portal_get_doc', {
         p_token: token,
+        p_shortcode: code,
         p_doc_id: docId,
       })
       .single();
@@ -97,6 +99,7 @@ export const legalDocumentService = {
    */
   async signDoc(payload: {
     token: string;
+    code: string;
     docId: string;
     role: string;
     name: string;
@@ -111,6 +114,7 @@ export const legalDocumentService = {
       'portal_sign_document',
       {
         p_token: payload.token,
+        p_shortcode: payload.code,
         p_documento_id: payload.docId,
         p_papel: payload.role,
         p_nome: payload.name,

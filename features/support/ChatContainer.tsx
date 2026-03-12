@@ -84,36 +84,41 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
 
   return (
     <div className="flex flex-col flex-1 min-h-0 bg-slate-950/20 relative overflow-hidden">
-      {/* Header Status */}
-      <div className="absolute top-0 right-0 left-0 p-2 flex justify-between items-center pointer-events-none z-10 px-4 pt-3 bg-gradient-to-b from-slate-900/80 to-transparent">
+      {/* Header Status - Glassmorphism design */}
+      <div className="absolute top-0 right-0 left-0 p-3 flex justify-between items-center pointer-events-none z-20 px-6 pt-4 bg-gradient-to-b from-slate-950/90 via-slate-950/40 to-transparent backdrop-blur-[2px]">
         <div className="pointer-events-auto">
           {isOnline ? (
-            <span className="flex items-center gap-1 text-[10px] font-black uppercase text-emerald-400 bg-emerald-950/40 px-2 py-1 rounded-full border border-emerald-500/20">
-              <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span> Online Agora
-            </span>
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.1)]">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Online</span>
+            </div>
           ) : (
-            <span className="flex items-center gap-1 text-[10px] font-black uppercase text-slate-500 bg-slate-900/40 px-2 py-1 rounded-full border border-slate-700">
-              Offline
-            </span>
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/40 border border-slate-700/50">
+              <span className="w-2 h-2 bg-slate-600 rounded-full"></span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Offline</span>
+            </div>
           )}
         </div>
 
-        <div className="pointer-events-auto flex gap-2">
+        <div className="pointer-events-auto flex gap-2.5">
           {ticketStatus === 'OPEN' && (
             <>
               <button
                 onClick={() => startCall('VOICE')}
-                className="p-2 bg-slate-900/80 backdrop-blur text-slate-300 hover:text-white hover:bg-emerald-600 rounded-full shadow-lg border border-slate-700 transition-all"
+                className="p-2.5 bg-slate-900/60 hover:bg-emerald-600/20 text-slate-300 hover:text-emerald-400 rounded-2xl shadow-xl border border-slate-700/50 backdrop-blur-md transition-all duration-300 group"
                 title="Chamada de voz"
               >
-                <Phone size={16} />
+                <Phone size={18} className="group-hover:scale-110 transition-transform" />
               </button>
               <button
                 onClick={() => startCall('VIDEO')}
-                className="p-2 bg-slate-900/80 backdrop-blur text-slate-300 hover:text-white hover:bg-blue-600 rounded-full shadow-lg border border-slate-700 transition-all"
+                className="p-2.5 bg-slate-900/60 hover:bg-blue-600/20 text-slate-300 hover:text-blue-400 rounded-2xl shadow-xl border border-slate-700/50 backdrop-blur-md transition-all duration-300 group"
                 title="Chamada de vídeo"
               >
-                <Video size={16} />
+                <Video size={18} className="group-hover:scale-110 transition-transform" />
               </button>
             </>
           )}

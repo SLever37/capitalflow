@@ -9,9 +9,9 @@ import { asArray, asNumber, asString, safeDateString } from '../../utils/safe';
 function normalizeAgreementStatus(statusRaw: unknown): 'ACTIVE' | 'PAID' | 'BROKEN' {
   const s = asString(statusRaw).toUpperCase().trim();
   if (!s) return 'ACTIVE';
-  if (['PAGO', 'PAID', 'QUITADO'].includes(s)) return 'PAID';
-  if (['BROKEN', 'QUEBRADO', 'CANCELADO', 'INATIVO'].includes(s)) return 'BROKEN';
-  if (['ATIVO', 'ACTIVE'].includes(s)) return 'ACTIVE';
+  if (['PAGO', 'PAID', 'QUITADO', 'FINALIZADO', 'SETTLED'].includes(s)) return 'PAID';
+  if (['BROKEN', 'QUEBRADO', 'CANCELADO', 'INATIVO', 'QUEBROU'].includes(s)) return 'BROKEN';
+  if (['ATIVO', 'ACTIVE', 'ABERTO', 'OPEN'].includes(s)) return 'ACTIVE';
   return 'ACTIVE';
 }
 
@@ -58,7 +58,7 @@ export function agreementAdapter(rawAgreement: any, rawInstallments?: any[]): Ag
       dueDate: safeDateString(p?.due_date ?? p?.dueDate, 'dueDate'),
       paidDate: safeDateString(p?.paid_at ?? p?.paidAt ?? p?.data_pagamento),
       status: normalizeAgreementInstallmentStatus(p?.status),
-      paidAmount: asNumber(p?.paid_amount ?? p?.valor_pago ?? 0),
+      paidAmount: asNumber(p?.paid_amount ?? p?.valor_pago ?? p?.paidAmount ?? 0),
     } as AgreementInstallment;
   });
 

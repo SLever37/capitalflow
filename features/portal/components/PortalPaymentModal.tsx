@@ -4,11 +4,13 @@ import React, { useState, useMemo } from 'react';
 import { X, Wallet, CheckCircle2 } from 'lucide-react';
 import { Loan, Installment } from '../../../types';
 import { portalService } from '../../../services/portal.service';
+import { supabasePortal } from '../../../lib/supabasePortal';
 import { resolvePaymentOptions, debugDebtCheck } from '../mappers/portalDebtRules';
 import { BillingView, NotifyingView, SuccessView } from './payment/PaymentViews';
 
 interface PortalPaymentModalProps {
   portalToken: string;
+  portalCode: string;
   loan: Loan;
   installment: Installment;
   clientData: { name: string; email?: string; doc?: string; id?: string };
@@ -39,6 +41,7 @@ const isInstallmentPaid = (inst: any) => {
 
 export const PortalPaymentModal: React.FC<PortalPaymentModalProps> = ({
   portalToken,
+  portalCode,
   loan,
   installment,
   clientData,
@@ -47,6 +50,7 @@ export const PortalPaymentModal: React.FC<PortalPaymentModalProps> = ({
   const [step, setStep] = useState<'BILLING' | 'NOTIFYING' | 'SUCCESS'>('BILLING');
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
 
   const closedLoan = isLoanClosed(loan as any);
   const paidInst = isInstallmentPaid(installment as any);
@@ -82,9 +86,38 @@ export const PortalPaymentModal: React.FC<PortalPaymentModalProps> = ({
     setIsProcessing(true);
 
     try {
-      const comprovanteUrl = null;
+      let comprovanteUrl = null;
+
+      // 📤 UPLOAD DO COMPROVANTE (Se houver)
+      if (receiptFile) {
+        const fileExt = receiptFile.name.split('.').pop();
+        const fileName = `${loan.id}_${Date.now()}.${fileExt}`;
+        const filePath = `portal_receipts/${fileName}`;
+
+        const { data: uploadData, error: uploadError } = await supabasePortal
+          .storage
+          .from('comprovantes')
+          .upload(filePath, receiptFile);
+
+        if (uploadError) {
+          console.error('Erro no upload:', uploadError);
+          // Prossegue mesmo sem o arquivo se for erro de bucket, ou para?
+          // Melhor parar para garantir que o cliente saiba que não enviou.
+          throw new Error('Falha ao enviar arquivo do comprovante. Tente novamente.');
+        }
+
+        if (uploadData) {
+          const { data: { publicUrl } } = supabasePortal
+            .storage
+            .from('comprovantes')
+            .getPublicUrl(filePath);
+          comprovanteUrl = publicUrl;
+        }
+      }
+
       await portalService.submitPaymentIntentByPortalToken(
         portalToken,
+        portalCode,
         'COMPROVANTE',
         comprovanteUrl ?? null
       );
@@ -136,6 +169,8 @@ export const PortalPaymentModal: React.FC<PortalPaymentModalProps> = ({
             // ✅ aqui agora é verdade mesmo
             isInstallmentPaid={shouldBlock}
             isProcessing={isProcessing}
+            receiptFile={receiptFile}
+            onFileChange={setReceiptFile}
           />
         )}
 

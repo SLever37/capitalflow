@@ -3,7 +3,7 @@ import { Loan, UserProfile, CapitalSource, LedgerEntry } from '../../types';
 import { executeLedgerAction } from './ledgerActions';
 import { reverseTransaction } from './ledgerReverse';
 
-export type LedgerActionType = 'DELETE' | 'ARCHIVE' | 'RESTORE' | 'DELETE_CLIENT' | 'DELETE_SOURCE';
+export type LedgerActionType = 'DELETE' | 'ARCHIVE' | 'RESTORE' | 'DELETE_CLIENT' | 'DELETE_SOURCE' | 'ACTIVATE';
 
 export const ledgerService = {
   executeLedgerAction(params: {

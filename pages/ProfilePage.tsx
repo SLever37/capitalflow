@@ -19,6 +19,7 @@ import {
   Shield,
   User,
   Download,
+  ChevronLeft,
 } from 'lucide-react';
 
 import type { AppTab, Loan, UserProfile, Client, CapitalSource } from '../types';
@@ -51,6 +52,7 @@ interface ProfilePageProps {
   navOrder: AppTab[];
   hubOrder: AppTab[];
   saveNavConfig: (nav: AppTab[], hub: AppTab[]) => void;
+  goBack?: () => void;
 }
 
 export const ProfilePage: React.FC<ProfilePageProps> = ({
@@ -69,6 +71,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   navOrder,
   hubOrder,
   saveNavConfig,
+  goBack,
 }) => {
   const { backupRestoreRef, auditLogs } = useProfilePageLogic(loans);
 
@@ -136,10 +139,11 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   if (!profileEditForm) return null;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+    <div className="space-y-8 pb-20 max-w-[1600px] mx-auto animate-in fade-in">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
       {/* SIDEBAR */}
       <div className="lg:col-span-4 space-y-6">
-        <div className="bg-slate-900 border border-slate-800 p-6 rounded-[2.5rem] relative overflow-hidden">
+        <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl relative overflow-hidden">
           <div className="flex flex-col items-center mb-6">
             <div
               className="relative group cursor-pointer"
@@ -153,7 +157,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                     alt="Foto do perfil"
                   />
                 ) : (
-                  <User size={48} className="text-slate-600" />
+                  <User size={48} className="text-slate-500" />
                 )}
               </div>
               <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -168,10 +172,10 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
               <Camera size={12} /> Alterar Foto
             </button>
 
-            <h2 className="text-xl font-black text-white mt-4">
+            <h2 className="text-xl font-black text-white mt-4 truncate w-full text-center px-4">
               {profileEditForm.name}
             </h2>
-            <p className="text-sm text-slate-500 font-bold uppercase tracking-widest">
+            <p className="text-xs text-slate-500 font-bold uppercase tracking-widest truncate w-full text-center px-4">
               {profileEditForm.businessName || 'Operador'}
             </p>
           </div>
@@ -265,7 +269,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
 
       {/* CONTEÚDO */}
       <div className="lg:col-span-8 space-y-6">
-        <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-[2.5rem]">
+        <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-3xl">
           {/* GENERAL */}
           {activeSection === 'GENERAL' && (
             <div className="space-y-6 animate-in fade-in slide-in-from-right">
@@ -291,7 +295,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                           name: e.target.value,
                         })
                       }
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:border-blue-500"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white text-sm font-bold outline-none focus:border-blue-500"
                     />
                   </div>
 
@@ -308,7 +312,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                           email: e.target.value,
                         })
                       }
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:border-blue-500"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white text-sm font-bold outline-none focus:border-blue-500"
                     />
                   </div>
 
@@ -325,7 +329,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                           businessName: e.target.value,
                         })
                       }
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:border-blue-500"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white text-sm font-bold outline-none focus:border-blue-500"
                     />
                   </div>
 
@@ -342,7 +346,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                           pixKey: e.target.value,
                         })
                       }
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-emerald-400 font-bold outline-none focus:border-emerald-500"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-emerald-400 text-sm font-bold outline-none focus:border-emerald-500"
                       placeholder="CPF, Email ou Telefone"
                     />
                   </div>
@@ -362,7 +366,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                           fullName: e.target.value,
                         })
                       }
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:border-blue-500"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white text-sm font-bold outline-none focus:border-blue-500"
                     />
                   </div>
 
@@ -379,7 +383,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                           document: maskDocument(e.target.value),
                         })
                       }
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:border-blue-500"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white text-sm font-bold outline-none focus:border-blue-500"
                       placeholder="000.000.000-00"
                     />
                   </div>
@@ -397,7 +401,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                           phone: maskPhone(e.target.value),
                         })
                       }
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:border-blue-500"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white text-sm font-bold outline-none focus:border-blue-500"
                     />
                   </div>
 
@@ -414,7 +418,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                           address: e.target.value,
                         })
                       }
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:border-blue-500"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white text-sm font-bold outline-none focus:border-blue-500"
                       placeholder="Rua, Número, Bairro"
                     />
                   </div>
@@ -433,7 +437,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                             city: e.target.value,
                           })
                         }
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:border-blue-500"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white text-sm font-bold outline-none focus:border-blue-500"
                       />
                     </div>
                     <div>
@@ -450,7 +454,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                           })
                         }
                         maxLength={2}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white font-bold outline-none focus:border-blue-500"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-white text-sm font-bold outline-none focus:border-blue-500"
                       />
                     </div>
                   </div>
@@ -676,7 +680,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-4">
                   <h4 className="text-[10px] font-black uppercase text-emerald-500 tracking-widest flex items-center gap-2">
-                    <ArrowDown size={14} /> Barra Inferior (Fixo)
+                    <ArrowDown size={14} /> Barra Superior (Fixo)
                   </h4>
 
                   <div className="space-y-2">
@@ -704,9 +708,9 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                           <button
                             onClick={() => moveTab(tab, 'NAV', 'SWAP')}
                             className="p-1.5 bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white rounded"
-                            title="Mover para o Hub"
+                            title="Mover para o Menu Lateral"
                           >
-                            Hub
+                            Menu
                           </button>
                         </div>
                       </div>
@@ -716,7 +720,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
 
                 <div className="space-y-4">
                   <h4 className="text-[10px] font-black uppercase text-blue-500 tracking-widest flex items-center gap-2">
-                    <LayoutGrid size={14} /> Hub Central (Menu)
+                    <LayoutGrid size={14} /> Menu Lateral
                   </h4>
 
                   <div className="space-y-2">
@@ -792,5 +796,6 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
         </div>
       </div>
     </div>
+  </div>
   );
 };

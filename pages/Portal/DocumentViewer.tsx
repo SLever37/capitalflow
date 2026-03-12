@@ -13,6 +13,7 @@ import { maskDocument } from '../../utils/formatters';
 
 interface DocumentViewerProps {
   token: string;
+  code: string;
   docId: string;
   onBack: () => void;
   onSigned: () => void;
@@ -20,6 +21,7 @@ interface DocumentViewerProps {
 
 export const DocumentViewer: React.FC<DocumentViewerProps> = ({
   token,
+  code,
   docId,
   onBack,
   onSigned,
@@ -42,14 +44,14 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
   useEffect(() => {
     loadDocument();
     // eslint-disable-next-line
-  }, [docId, token]);
+  }, [docId, token, code]);
 
   const loadDocument = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      const doc = await legalDocumentService.getDoc(token, docId);
+      const doc = await legalDocumentService.getDoc(token, code, docId);
       setDocument(doc);
 
       const check = await legalDocumentService.missingFields(docId);
@@ -91,6 +93,7 @@ export const DocumentViewer: React.FC<DocumentViewerProps> = ({
 
       await legalDocumentService.signDoc({
         token,
+        code,
         docId,
         role,
         name: signerName,

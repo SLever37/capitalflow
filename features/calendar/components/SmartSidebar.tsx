@@ -50,13 +50,13 @@ export const SmartSidebar: React.FC<SmartSidebarProps> = ({ events, onAction, cu
                 <div className="mb-6">
                     <p className="text-[10px] font-bold text-rose-500 uppercase mb-2 flex items-center gap-1"><AlertCircle size={12}/> Atrasados ({lateEvents.length})</p>
                     {lateEvents.slice(0, 5).map(e => renderCard(e))}
-                    {lateEvents.length > 5 && <p className="text-[9px] text-center text-slate-600 cursor-pointer hover:text-slate-400">Ver mais {lateEvents.length - 5}...</p>}
+                    {lateEvents.length > 5 && <p className="text-[9px] text-center text-slate-500 cursor-pointer hover:text-slate-400">Ver mais {lateEvents.length - 5}...</p>}
                 </div>
             )}
 
             <div className="mb-4">
                 <p className="text-[10px] font-bold text-blue-500 uppercase mb-2 flex items-center gap-1"><CheckCircle2 size={12}/> Agenda de Hoje</p>
-                {todayEvents.length === 0 ? <p className="text-[10px] text-slate-600 italic">Nada agendado para hoje.</p> : todayEvents.map(e => renderCard(e))}
+                {todayEvents.length === 0 ? <p className="text-[10px] text-slate-500 italic">Nada agendado para hoje.</p> : todayEvents.map(e => renderCard(e))}
             </div>
         </div>
     );

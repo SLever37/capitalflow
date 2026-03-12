@@ -4,10 +4,11 @@ import { formatMoney, numberToWordsBRL } from "../../../utils/formatters";
 export const DocumentTemplates = {
     // 1. CONFISSÃO DE DÍVIDA (Art. 784, III CPC)
     confissaoDivida: (data: any) => `
-        <div style="font-family: 'Times New Roman', serif; padding: 50px; line-height: 1.6; color: #000; background: #fff; max-width: 850px; margin: auto; text-align: justify; border: 1px solid #eee;">
-            <div style="text-align: center; border: 2px solid #000; padding: 15px; margin-bottom: 30px;">
-                <h2 style="margin: 0; text-transform: uppercase; letter-spacing: 1px;">Instrumento Particular de Confissão de Dívida</h2>
-                <small style="font-weight: bold;">TÍTULO EXECUTIVO EXTRAJUDICIAL - ART. 784, III DO CPC</small>
+        <div style="font-family: 'Times New Roman', serif; padding: 50px; line-height: 1.6; color: #000; background: #fff; max-width: 850px; margin: auto; text-align: justify; border: 1px solid #eee; box-shadow: 0 0 20px rgba(0,0,0,0.05);">
+            <div style="text-align: center; border: 2px solid #000; padding: 20px; margin-bottom: 30px; background: #fdfdfd;">
+                <h2 style="margin: 0; text-transform: uppercase; letter-spacing: 2px; font-weight: 900;">Instrumento Particular de Confissão de Dívida</h2>
+                <div style="height: 1px; background: #000; margin: 10px auto; width: 50%;"></div>
+                <small style="font-weight: bold; display: block; margin-top: 5px;">TÍTULO EXECUTIVO EXTRAJUDICIAL - ART. 784, III DO CPC/2015</small>
             </div>
             
             <p><strong>CREDOR(A):</strong> ${data.creditorName}, CPF/CNPJ sob o nº ${data.creditorDoc}, com endereço profissional em ${data.creditorAddress}.</p>
@@ -15,11 +16,32 @@ export const DocumentTemplates = {
 
             <p>Pelo presente instrumento, o(a) <strong>DEVEDOR(A)</strong> reconhece e confessa, de forma irrevogável e irretratável, nos termos dos Artigos 389, 394 e 395 do Código Civil Brasileiro, ser devedor(a) da quantia líquida, certa e exigível de <strong>${formatMoney(data.amount)} (${numberToWordsBRL(data.amount)})</strong>.</p>
 
-            <h4 style="text-transform: uppercase; border-bottom: 1px solid #000; padding-bottom: 5px; margin-top: 25px;">CLÁUSULAS E CONDIÇÕES:</h4>
+            <h4 style="text-transform: uppercase; border-bottom: 2px solid #000; padding-bottom: 5px; margin-top: 30px; font-weight: 900;">CLÁUSULAS E CONDIÇÕES:</h4>
             
             <p><strong>1. DO OBJETO:</strong> A dívida ora reconhecida é líquida e certa, referente à operação de mútuo financeiro detalhada no contrato eletrônico ID ${data.loanId.substring(0,8)}.</p>
             
-            <p><strong>2. DO PAGAMENTO:</strong> O pagamento será realizado conforme as condições pactuadas no contrato original ou termo de acordo anexo, mediante transferência bancária, PIX ou boleto emitido pelo CREDOR.</p>
+            <p><strong>2. DO PAGAMENTO:</strong> O pagamento será realizado conforme o cronograma de parcelamento abaixo discriminado:</p>
+            
+            ${data.installments && data.installments.length > 0 ? `
+                <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 11pt;">
+                    <thead>
+                        <tr style="background: #f4f4f4;">
+                            <th style="border: 1px solid #000; padding: 8px; text-align: center;">Parcela</th>
+                            <th style="border: 1px solid #000; padding: 8px; text-align: center;">Vencimento</th>
+                            <th style="border: 1px solid #000; padding: 8px; text-align: center;">Valor</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.installments.map((inst: any, idx: number) => `
+                            <tr>
+                                <td style="border: 1px solid #000; padding: 8px; text-align: center;">${(inst.number || idx + 1).toString().padStart(2, '0')}</td>
+                                <td style="border: 1px solid #000; padding: 8px; text-align: center;">${new Date(inst.dueDate).toLocaleDateString('pt-BR')}</td>
+                                <td style="border: 1px solid #000; padding: 8px; text-align: center;">${formatMoney(inst.amount)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            ` : `<p><em>O pagamento será realizado conforme condições pactuadas no termo de acordo anexo.</em></p>`}
 
             <p><strong>3. DA MORA E INADIMPLEMENTO:</strong> O não pagamento de qualquer parcela no seu vencimento importará no vencimento antecipado de toda a dívida, sujeitando o DEVEDOR ao pagamento do valor principal acrescido de:</p>
             <ul style="list-style-type: disc; margin-left: 20px;">
@@ -33,9 +55,9 @@ export const DocumentTemplates = {
 
             <p><strong>5. DA VALIDADE DIGITAL:</strong> As partes reconhecem a validade desta assinatura eletrônica, conforme MP 2.200-2/2001 e Lei 14.063/2020, possuindo este documento plena eficácia executiva para todos os fins de direito, renunciando o DEVEDOR à faculdade de impugnar a validade das assinaturas digitais aposta neste instrumento.</p>
 
-            <p><strong>6. DO FORO:</strong> As partes elegem o foro da Comarca de <strong>${data.city}/${data.state}</strong> para dirimir quaisquer dúvidas ou litígios oriundos deste instrumento, com renúncia expressa a qualquer outro, por mais privilegiado que seja.</p>
+            <p><strong>6. DO FORO:</strong> As partes elegem o foro da Comarca de <strong>${data.city || 'São Paulo'}/${data.state || 'SP'}</strong> para dirimir quaisquer dúvidas ou litígios oriundos deste instrumento.</p>
 
-            <p style="margin-top: 40px; text-align: center;">${data.city}, ${new Date().toLocaleDateString('pt-BR')}.</p>
+            <p style="margin-top: 40px; text-align: center; font-weight: bold;">${data.city || 'São Paulo'}, ${new Date().toLocaleDateString('pt-BR')}.</p>
 
             <div style="margin-top: 60px; display: grid; grid-template-columns: 1fr 1fr; gap: 50px;">
                 <div style="text-align: center; border-top: 1px solid #000; padding-top: 5px;">
@@ -126,4 +148,3 @@ export const DocumentTemplates = {
         </div>
     `
 };
-

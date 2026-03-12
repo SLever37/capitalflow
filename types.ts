@@ -1,14 +1,29 @@
+
 // types.ts
 
 /* =====================================================
    LOAN CORE
 ===================================================== */
 
+// Unifica todos os status possíveis em um único enum para consistência
 export enum LoanStatus {
+  // Status de Parcela/Interno
   PENDING = 'PENDING',
   PAID = 'PAID',
   LATE = 'LATE',
-  PARTIAL = 'PARTIAL'
+  PARTIAL = 'PARTIAL',
+  
+  // Status de Contrato/Visualização
+  ATIVO = 'ATIVO',
+  PAGO = 'PAGO',
+  QUITADO = 'QUITADO',
+  CANCELADO = 'CANCELADO',
+  EM_DIA = 'EM_DIA',
+  ATRASADO = 'ATRASADO',
+  ATRASO_CRITICO = 'ATRASO_CRITICO',
+  RENEGOCIADO = 'RENEGOCIADO',
+  EM_ACORDO = 'EM_ACORDO',
+  ARQUIVADO = 'ARQUIVADO',
 }
 
 export type PaymentMethod =
@@ -120,7 +135,11 @@ export type AgreementType =
 export type AgreementStatus =
   | 'ACTIVE'
   | 'PAID'
-  | 'BROKEN';
+  | 'BROKEN'
+  | 'ATIVO'
+  | 'PAGO'
+  | 'CANCELADO'
+  | 'FINALIZADO';
 
 export interface AgreementInstallment {
   id: string;
@@ -128,7 +147,7 @@ export interface AgreementInstallment {
   number: number;
   dueDate: string;
   amount: number;
-  status: 'PENDING' | 'PAID' | 'LATE' | 'PARTIAL';
+  status: 'PENDING' | 'PAID' | 'LATE' | 'PARTIAL' | 'PAGO';
   paidAmount: number;
   paidDate?: string;
 }
@@ -146,6 +165,13 @@ export interface Agreement {
   status: AgreementStatus;
   createdAt: string;
   installments?: AgreementInstallment[];
+  gracePeriod?: number;
+  discount?: number;
+  downPayment?: number;
+  legalDocumentId?: string;
+  calculationMode?: 'BY_INSTALLMENTS' | 'BY_INSTALLMENT_VALUE' | 'BY_VALUE_AND_COUNT';
+  installmentValue?: number;
+  calculationResult?: 'DISCOUNT' | 'SAME' | 'INCREASE';
 }
 
 /* =====================================================
@@ -187,10 +213,18 @@ export interface Installment {
   logs?: string[];
 }
 
+export type LedgerEventType = 
+  | 'PAYMENT'
+  | 'CHARGE'
+  | 'RENEGOTIATION_CREATED'
+  | 'RENEGOTIATION_BROKEN'
+  | 'AGREEMENT_PAYMENT'
+  | 'INFO';
+
 export interface LedgerEntry {
   id: string;
   date: string;
-  type: string;
+  type: LedgerEventType | string;
   amount: number;
   principalDelta: number;
   interestDelta: number;
@@ -235,6 +269,7 @@ export interface Loan {
   skipWeekends?: boolean;
   clientAvatarUrl?: string;
   activeAgreement?: Agreement;
+  pastAgreements?: Agreement[];
   paymentSignals?: any[];
   customDocuments?: LoanDocument[];
   createdAt?: string;
@@ -282,6 +317,9 @@ export interface LegalDocumentParams {
   contractDate?: string;
   agreementDate?: string;
   timestamp?: string;
+  discount?: number;
+  gracePeriod?: number;
+  downPayment?: number;
 }
 
 export interface LegalDocumentRecord {
@@ -358,8 +396,9 @@ export type LoanStatusFilter =
   | 'TODOS'
   | 'ATRASADOS'
   | 'EM_DIA'
+  | 'QUITADO'
   | 'PAGOS'
-  | 'ARQUIVADOS'
+  | 'RENEGOCIADO'
   | 'ATRASO_CRITICO';
 
 export type AccessLevel = 'ADMIN' | 'OPERATOR' | 'VIEWER';

@@ -184,7 +184,7 @@ export const useLoanForm = ({ initialData, clients, sources, userProfile, onAdd,
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = safeFileFirst(e.target.files);
       if (file) {
-          const fileType = file.type.includes('pdf') ? 'PDF' : 'IMAGE';
+          const fileType = file.type?.includes('pdf') ? 'PDF' : 'IMAGE';
           setIsUploading(true);
           try {
               let publicUrl = '';

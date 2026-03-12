@@ -54,7 +54,7 @@ export const ExecutionPipeline: React.FC<ExecutionPipelineProps> = ({ fullAuditD
                             <div className={step.status ? 'text-emerald-500' : 'text-slate-700'}>
                                 {step.status ? <CheckSquare size={18}/> : <Square size={18}/>}
                             </div>
-                            <span className={`text-xs font-bold ${step.status ? 'text-slate-200' : 'text-slate-600'}`}>{step.label}</span>
+                            <span className={`text-xs font-bold ${step.status ? 'text-slate-200' : 'text-slate-500'}`}>{step.label}</span>
                         </div>
                     ))}
                 </div>
@@ -67,7 +67,7 @@ export const ExecutionPipeline: React.FC<ExecutionPipelineProps> = ({ fullAuditD
                 <button 
                     onClick={handleDownloadPackage}
                     disabled={!allReady}
-                    className="w-full py-4 bg-blue-600 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-xl font-black uppercase text-xs shadow-lg transition-all flex items-center justify-center gap-2"
+                    className="w-full py-4 bg-blue-600 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-xl font-black uppercase text-xs shadow-lg transition-all flex items-center justify-center gap-2"
                 >
                     <Package size={16}/> Baixar Pacote Jurídico (JSON + PDF)
                 </button>

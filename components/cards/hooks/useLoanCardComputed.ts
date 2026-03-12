@@ -1,9 +1,10 @@
 
 import { useMemo } from 'react';
 import { Loan, CapitalSource, LoanStatus } from '../../../types';
-import { getDaysDiff, parseDateOnlyUTC, addDaysUTC } from '../../../utils/dateHelpers';
-import { getInstallmentStatusLogic, rebuildLoanStateFromLedger } from '../../../domain/finance/calculations';
+import { parseDateOnlyUTC, addDaysUTC, getDaysDiff } from '../../../utils/dateHelpers';
+import { rebuildLoanStateFromLedger } from '../../../domain/finance/calculations';
 import { modalityRegistry } from '../../../domain/finance/modalities/registry';
+import { resolveLoanVisualClassification } from '../../../utils/loanFilterResolver';
 
 export const useLoanCardComputed = (loanRaw: Loan, sources: CapitalSource[], isStealthMode: boolean = false) => {
   // 1. Reconstrói o estado financeiro do contrato para garantir que parciais sejam abatidos
@@ -12,12 +13,14 @@ export const useLoanCardComputed = (loanRaw: Loan, sources: CapitalSource[], isS
   const strategy = useMemo(() => modalityRegistry.get(loan.billingCycle), [loan.billingCycle]);
   const showProgress = strategy.card.showProgress;
 
-  const isPaid = useMemo(() => loan.installments.every(i => i.status === LoanStatus.PAID), [loan.installments]);
-  const isLate = useMemo(() => loan.installments.some(i => getInstallmentStatusLogic(i) === LoanStatus.LATE), [loan.installments]);
-  
-  const isCritical = useMemo(() => 
-    loan.installments.some(i => getDaysDiff(i.dueDate) > 30 && i.status !== LoanStatus.PAID), 
-  [loan.installments]);
+  // LÓGICA CENTRALIZADA
+  const classification = useMemo(() => resolveLoanVisualClassification(loan), [loan]);
+
+  const isPaid = classification === 'QUITADO';
+  const isLate = classification === 'ATRASADO' || classification === 'CRITICO';
+  const isCritical = classification === 'CRITICO';
+  const isRenegotiated = classification === 'RENEGOCIADO';
+  const isFullyFinalized = classification === 'QUITADO';
   
   const hasNotes = useMemo(() => loan.notes && loan.notes.trim().length > 0, [loan.notes]);
 
@@ -32,9 +35,7 @@ export const useLoanCardComputed = (loanRaw: Loan, sources: CapitalSource[], isS
   const isZeroBalance = totalDebt < 0.10;
 
   const agreement = loan.activeAgreement;
-  const normalizedAgreementStatus = (agreement?.status === 'ACTIVE') ? 'ACTIVE' : agreement?.status;
-  const hasActiveAgreement = !!agreement && normalizedAgreementStatus === 'ACTIVE';
-  const isAgreementPaid = !!agreement && agreement.status === 'PAID';
+  const hasActiveAgreement = isRenegotiated;
 
   const fixedTermStats = useMemo(() => {
       if (!isFixedTerm) return null;
@@ -51,13 +52,11 @@ export const useLoanCardComputed = (loanRaw: Loan, sources: CapitalSource[], isS
       return { totalDays, paidDays, dailyValue, progressPercent, paidUntilDate };
   }, [isFixedTerm, loan]);
 
-  const isFullyFinalized = isPaid || isZeroBalance || (isFixedTerm && fixedTermStats && fixedTermStats.paidDays >= fixedTermStats.totalDays) || isAgreementPaid;
-
   // Estilos
   let cardStyle = "bg-slate-900 border-slate-800";
   let iconStyle = "bg-slate-800 text-slate-500";
 
-  if (hasActiveAgreement) {
+  if (isRenegotiated) {
       cardStyle = "bg-indigo-950/20 border-indigo-500/30";
       iconStyle = "bg-indigo-500/20 text-indigo-400";
   } else if (hasNotes) { 
@@ -68,19 +67,15 @@ export const useLoanCardComputed = (loanRaw: Loan, sources: CapitalSource[], isS
     cardStyle = "bg-emerald-950/40 border-emerald-500/60 shadow-emerald-900/20";
     iconStyle = "bg-emerald-500 text-emerald-950";
   }
-  else if (isLate && !hasActiveAgreement) {
-    cardStyle = "bg-rose-950/30 border-rose-500/50 shadow-rose-900/10";
+  else if (isLate) {
+    cardStyle = isCritical 
+      ? "bg-rose-950/40 border-rose-600/60 shadow-rose-900/20" 
+      : "bg-rose-950/30 border-rose-500/50 shadow-rose-900/10";
     iconStyle = "bg-rose-500/20 text-rose-500";
   }
-  else if (!isLate && !hasActiveAgreement) {
-    const daysUntilDue = Math.min(...loan.installments.filter(i => i.status !== LoanStatus.PAID).map(i => {
-        if (!loan.billingCycle.includes('DAILY') && loan.startDate && i.dueDate) {
-             const d1 = parseDateOnlyUTC(loan.startDate).getTime();
-             const d2 = parseDateOnlyUTC(i.dueDate).getTime();
-             if (d1 === d2) return 30;
-        }
-        return -getDaysDiff(i.dueDate);
-    }));
+  else if (classification === 'EM_DIA') {
+    const nextInst = loan.installments.find(i => i.status !== LoanStatus.PAID);
+    const daysUntilDue = nextInst ? -getDaysDiff(nextInst.dueDate) : 999;
 
     if (daysUntilDue >= 0 && daysUntilDue <= 3) {
       cardStyle = "bg-orange-950/30 border-orange-500/50 shadow-orange-900/10";
@@ -125,13 +120,14 @@ export const useLoanCardComputed = (loanRaw: Loan, sources: CapitalSource[], isS
     totalDebt,
     isZeroBalance,
     hasActiveAgreement,
-    isAgreementPaid,
+    isAgreementPaid: isPaid && !!agreement,
     isFullyFinalized,
     fixedTermStats,
     cardStyle,
     iconStyle,
     allLedger,
     orderedInstallments,
-    activeAgreement: agreement
+    activeAgreement: agreement,
+    classification
   };
 };

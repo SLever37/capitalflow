@@ -41,18 +41,18 @@ export const InstallmentCardTimeline: React.FC<InstallmentCardTimelineProps> = (
             {/* DATA DO EMPRÉSTIMO / CONTRATO (Conectado à data real de início do contrato) */}
             <div className="relative">
                 <div className="absolute -left-[18px] top-1.5 w-2.5 h-2.5 rounded-full bg-slate-800 border-2 border-slate-900"></div>
-                <p className="text-[9px] font-bold text-slate-500 uppercase leading-none tracking-wider">Início do Contrato</p>
-                <p className="text-xs font-bold text-slate-300 mt-0.5">{formatBRDate(loan.startDate)}</p>
+                <p className="text-[10px] font-black text-slate-500 uppercase leading-normal tracking-widest">Início do Contrato</p>
+                <p className="text-sm font-bold text-slate-300 mt-0.5">{formatBRDate(loan.startDate)}</p>
             </div>
 
             {/* DATA DE VENCIMENTO REAL (Conectado à data real da parcela ativa) */}
             <div className="relative">
                 <div className={`absolute -left-[18px] top-1.5 w-2.5 h-2.5 rounded-full border-2 border-slate-900 ${isLateInst && !isPaid ? 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.4)]' : 'bg-slate-800'}`}></div>
                 <div className="flex flex-col">
-                    <p className="text-[9px] font-bold text-slate-500 uppercase leading-none tracking-wider">
+                    <p className="text-[10px] font-black text-slate-500 uppercase leading-normal tracking-widest">
                         {label}
                     </p>
-                    <p className={`text-xs font-black mt-0.5 ${dueDateColorClass}`}>
+                    <p className={`text-sm font-black mt-0.5 ${dueDateColorClass}`}>
                         {formatBRDate(originalInst.dueDate)}
                     </p>
                     

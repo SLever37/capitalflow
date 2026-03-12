@@ -26,7 +26,7 @@ export const PortalContractItem: React.FC<PortalContractItemProps> = ({ loan, on
                 <div>
                     <div className="flex items-center gap-2">
                         <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Contrato</span>
-                        <span className="text-[10px] font-mono text-slate-600">#{loan.id.substring(0,6).toUpperCase()}</span>
+                        <span className="text-[10px] font-mono text-slate-500">#{loan.id.substring(0,6).toUpperCase()}</span>
                     </div>
                     <h4 className="text-white font-bold text-sm mt-0.5">{loan.billingCycle === 'DAILY_FREE' ? 'Modalidade Diária' : 'Crédito Mensal'}</h4>
                 </div>
@@ -43,11 +43,21 @@ export const PortalContractItem: React.FC<PortalContractItemProps> = ({ loan, on
             {/* Conteúdo Principal do Card */}
             {!isPaidOff && (
                 <div className="flex justify-between items-end mb-4">
-                    <div>
-                        <p className="text-[10px] text-slate-500 uppercase font-bold">Total Aberto</p>
-                        <p className={`text-xl font-black ${hasLateInstallments ? 'text-rose-400' : 'text-white'}`}>
-                            {formatMoney(totalDue)}
-                        </p>
+                    <div className="flex gap-4">
+                        <div>
+                            <p className="text-[10px] text-slate-500 uppercase font-bold">Total Aberto</p>
+                            <p className={`text-xl font-black ${hasLateInstallments ? 'text-rose-400' : 'text-white'}`}>
+                                {formatMoney(totalDue)}
+                            </p>
+                        </div>
+                        {loan.installments && loan.installments.length > 0 && (
+                            <div className="border-l border-slate-800 pl-4">
+                                <p className="text-[10px] text-slate-500 uppercase font-bold">Valor Parcela</p>
+                                <p className="text-sm text-slate-300 font-black mt-1">
+                                    {loan.installments.length}x {formatMoney(loan.installments[0].amount || 0)}
+                                </p>
+                            </div>
+                        )}
                     </div>
                     {nextDueDate && (
                         <div className="text-right">

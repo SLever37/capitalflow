@@ -77,11 +77,16 @@ export const Header: React.FC<HeaderProps> = ({
       amountLabel = 'Saldo Restante';
   }
 
+  // Se for mensal, tenta mostrar o valor da parcela como informação secundária
+  const installmentInfo = loan.billingCycle === 'MONTHLY' && loan.installments && loan.installments.length > 0 
+    ? `${loan.installments.length}x ${formatMoney(loan.installments[0].amount || 0, isStealthMode)}`
+    : null;
+
   let Badge = null;
   if (isFullyFinalized) {
     Badge = <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 text-emerald-500 rounded-lg border border-emerald-500/20"><CheckCircle2 size={12} className="shrink-0" /><span className="text-[10px] font-black uppercase tracking-wider">Finalizado</span></div>;
   } else if (hasActiveAgreement) {
-    Badge = <div className="flex items-center gap-1.5 px-3 py-1 bg-indigo-500/10 text-indigo-400 rounded-lg border border-indigo-500/20"><Handshake size={12} className="shrink-0" /><span className="text-[10px] font-black uppercase tracking-wider">Acordo</span></div>;
+    Badge = <div className="flex items-center gap-1.5 px-3 py-1 bg-indigo-500/10 text-indigo-400 rounded-lg border border-indigo-500/20"><Handshake size={12} className="shrink-0" /><span className="text-[10px] font-black uppercase tracking-wider">Renegociado</span></div>;
   } else {
     const label = getDueBadgeLabel(daysUntilDue);
     const { cls, icon } = getDueBadgeStyle(daysUntilDue);
@@ -90,30 +95,35 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <div className="w-full flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
           <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-sm transition-colors ${iconStyle}`}>
             {isFullyFinalized ? <CheckCircle2 size={22} /> : (daysUntilDue < 0 || isLate) ? <AlertTriangle size={22} /> : <Calendar size={22} />}
           </div>
-          <div className="min-w-0 flex flex-col">
-            <h3 className="text-base sm:text-lg font-black text-white uppercase leading-tight tracking-tight truncate">{debtorNameSafe}</h3>
-            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest truncate">
+          <div className="min-w-0 flex flex-col flex-1">
+            <h3 className="client-name font-black text-white uppercase leading-tight tracking-tight pr-2">{debtorNameSafe}</h3>
+            <p className="section-title truncate">
               {loan.billingCycle === 'DAILY_FREE' ? 'Diário' : loan.billingCycle === 'DAILY_FIXED_TERM' ? 'Prazo Fixo' : 'Mensal'} • {loan.id.substring(0, 6)}
             </p>
           </div>
         </div>
-        <div className={`text-slate-600 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}><ChevronDown size={20} /></div>
+        <div className={`text-slate-500 transition-transform duration-300 shrink-0 mt-2.5 ${isExpanded ? 'rotate-180' : ''}`}><ChevronDown size={20} /></div>
       </div>
 
-      <div className="flex items-center justify-between pl-[3.5rem] relative">
-        <div className="absolute left-[1.35rem] top-[-1rem] bottom-1 w-px bg-slate-800/50"></div>
-        <div className="flex flex-col">
-          <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider mb-0.5 flex items-center gap-1"><Wallet size={10} /> {amountLabel}</span>
-          <span className={`text-sm sm:text-base font-black ${(daysUntilDue < 0 || (isLate && !hasActiveAgreement)) ? 'text-rose-400' : isFullyFinalized ? 'text-emerald-400' : 'text-white'}`}>
+      <div className="flex flex-row items-center justify-between gap-3 pl-0 sm:pl-[3.5rem] relative">
+        <div className="hidden sm:block absolute left-[1.35rem] top-[-1rem] bottom-1 w-px bg-slate-800/50"></div>
+        <div className="flex flex-col min-w-0 flex-1">
+          <span className="section-title mb-0.5 flex items-center gap-1 truncate">
+            <Wallet size={10} className="shrink-0" /> {amountLabel}
+            {installmentInfo && <span className="text-blue-400 ml-1">• {installmentInfo}</span>}
+          </span>
+          <span className={`text-sm sm:text-base font-black truncate ${(daysUntilDue < 0 || (isLate && !hasActiveAgreement)) ? 'text-rose-400' : isFullyFinalized ? 'text-emerald-400' : 'text-white'}`}>
             {formatMoney(displayAmount, isStealthMode)}
           </span>
         </div>
-        <div>{Badge}</div>
+        <div className="shrink-0 flex items-center">
+          {Badge}
+        </div>
       </div>
     </div>
   );

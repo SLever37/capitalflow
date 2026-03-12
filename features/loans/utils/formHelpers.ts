@@ -12,7 +12,7 @@ export const safeIsoDateOnly = (val: string | undefined): string => {
         const d = String(now.getDate()).padStart(2, '0');
         return `${y}-${m}-${d}`;
     }
-    return val.includes('T') ? val.split('T')[0] : val;
+    return val?.includes('T') ? val.split('T')[0] : val;
 };
 
 export const safeSourceId = (sources: CapitalSource[], requestedId?: string): string => {

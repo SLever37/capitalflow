@@ -1,6 +1,5 @@
 import { Loan, Client, CapitalSource, UserProfile, LedgerEntry, Installment, LoanStatus } from "../types";
 import { getInstallmentStatusLogic } from "../domain/finance/calculations";
-import * as XLSX from 'xlsx';
 
 export interface BackupData {
   version: string;
@@ -70,6 +69,7 @@ export const generateLoansCSV = (loans: Loan[]) => {
 // --- IMPORTAÇÃO EXCEL E CSV ---
 
 export const parseExcelClients = async (file: File): Promise<Partial<Client>[]> => {
+  const XLSX = await import('xlsx');
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {

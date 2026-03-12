@@ -4,6 +4,7 @@ import { getDaysDiff } from '../../utils/dateHelpers';
 import { normalizeName, onlyDigits } from '../../utils/formatters';
 
 export interface ClientGroup {
+  id: string; // Unique ID for the group
   clientId: string;
   clientName: string;
   avatarUrl?: string;
@@ -47,6 +48,7 @@ export const groupLoansByClient = (loans: Loan[], sortOption: SortOption = 'DUE_
 
     if (!groups[groupKey]) {
       groups[groupKey] = {
+        id: groupKey,
         clientId: rawId || '',
         clientName: rawName,
         avatarUrl: loan.clientAvatarUrl,

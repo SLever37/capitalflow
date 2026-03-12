@@ -25,7 +25,7 @@ export const Ledger: React.FC<LedgerProps> = ({
             </div>
             
             {/* Cabeçalho das Colunas */}
-            <div className="grid grid-cols-12 px-4 py-2 bg-slate-900/30 text-[9px] font-bold text-slate-600 uppercase border-b border-slate-800/50">
+            <div className="grid grid-cols-12 px-4 py-2 bg-slate-900/30 text-[9px] font-bold text-slate-500 uppercase border-b border-slate-800/50">
                 <div className="col-span-7">Descrição / Data</div>
                 <div className="col-span-5 text-right">Valor / Ação</div>
             </div>

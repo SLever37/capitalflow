@@ -5,18 +5,8 @@ import { Settings, FileText, Cpu, Layers, Code, ShieldCheck, Zap } from 'lucide-
 export const SettingsPage: React.FC = () => {
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
-            {/* HEADER */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <h2 className="text-2xl font-black uppercase tracking-tighter text-white flex items-center gap-2">
-                        <Settings className="text-slate-400" size={28}/> Ajustes & Sistema
-                    </h2>
-                    <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">Documentação Técnica e Configurações</p>
-                </div>
-            </div>
-
             {/* CONTEÚDO TÉCNICO (README) */}
-            <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-[2.5rem]">
+            <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-3xl">
                 
                 <div className="flex items-center gap-3 mb-8 pb-6 border-b border-slate-800">
                     <div className="p-3 bg-blue-600/10 text-blue-500 rounded-2xl"><Cpu size={24}/></div>

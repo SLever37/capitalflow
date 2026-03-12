@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, Loader2, Shield, Users, RefreshCw, Layers, AlertCircle, Settings, Plus, BrainCircuit, ShieldAlert, Key, Fingerprint } from 'lucide-react';
+import { UserPlus, Loader2, Shield, Users, RefreshCw, Layers, AlertCircle, Settings, Plus, BrainCircuit, ShieldAlert, Key, Fingerprint, ChevronLeft } from 'lucide-react';
 import { useTeamData } from '../features/team/hooks/useTeamData';
 import { useTeamInvite } from '../features/team/hooks/useTeamInvite';
 import { MemberCard } from '../features/team/components/MemberCard';
@@ -10,7 +10,7 @@ import { TeamAIInsight } from '../features/team/components/TeamAIInsight';
 import { isDev } from '../utils/isDev';
 import { supabase } from '../lib/supabase';
 
-export const TeamPage = ({ activeUser, showToast, ui }: any) => {
+export const TeamPage = ({ activeUser, showToast, ui, goBack }: any) => {
   const [editingTeam, setEditingTeam] = useState<any>(null);
   const [editingMember, setEditingMember] = useState<any>(null);
   const [authStatus, setAuthStatus] = useState<any>(null);
@@ -100,15 +100,46 @@ export const TeamPage = ({ activeUser, showToast, ui }: any) => {
   }
 
   return (
-    <div className="p-4 sm:p-6 space-y-8 pb-20 max-w-7xl mx-auto">
+    <div className="space-y-6 animate-in fade-in">
       
+      {/* Team Selector Bar */}
+      <div className="flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-4 bg-slate-900 p-3 rounded-2xl border border-slate-800">
+          <div className="flex items-center gap-2 flex-1 w-full lg:w-auto">
+              <div className="flex items-center gap-2 bg-slate-950 px-3 py-2 rounded-xl border border-slate-800 flex-1 lg:flex-none lg:min-w-[240px] min-w-0">
+                  <Layers size={14} className="text-blue-500 shrink-0"/>
+                  <select 
+                      value={activeTeam?.id || ''} 
+                      onChange={(e) => setActiveTeam(teams.find(t => t.id === e.target.value))}
+                      className="bg-transparent text-white text-sm font-medium uppercase tracking-widest outline-none border-none cursor-pointer hover:text-blue-400 transition-colors w-full truncate"
+                  >
+                      {teams.length === 0 ? (
+                          <option>Nenhuma Equipe</option>
+                      ) : (
+                          teams.map(t => (
+                              <option key={t.id} value={t.id} className="bg-slate-900 text-white">{t.name}</option>
+                          ))
+                      )}
+                  </select>
+              </div>
+              <div className="flex gap-1 shrink-0">
+                  <button onClick={() => handleOpenTeamEditor(false)} disabled={!activeTeam} className="p-2 text-slate-500 hover:text-white hover:bg-slate-800 rounded-xl transition-all border border-transparent hover:border-slate-700"><Settings size={16} /></button>
+                  <button onClick={() => handleOpenTeamEditor(true)} className="p-2 text-slate-500 hover:text-emerald-500 hover:bg-slate-800 rounded-xl transition-all border border-transparent hover:border-slate-700"><Plus size={16} /></button>
+              </div>
+          </div>
+          
+          <div className="flex gap-2 w-full lg:w-auto shrink-0">
+              <button onClick={refresh} disabled={loading} className={`p-3 bg-slate-800 text-slate-400 rounded-xl border border-slate-700 hover:text-white transition-all active:scale-95 shrink-0 ${loading ? 'animate-spin' : ''}`}><RefreshCw size={18} /></button>
+              <button onClick={() => ui.openModal('INVITE')} className="flex-1 lg:flex-none px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm uppercase shadow-lg shadow-blue-600/20 hover:bg-blue-500 transition-all flex items-center justify-center gap-2 active:scale-95 shrink-0"><UserPlus size={18} /> Novo Membro</button>
+          </div>
+      </div>
+
       {/* Banner de Diagnóstico (DEV ONLY) */}
       {isDev && authStatus && (
         <div className="bg-slate-900 border border-blue-500/30 p-3 rounded-2xl flex items-center justify-between gap-4 overflow-x-auto no-scrollbar">
             <div className="flex items-center gap-4 text-[9px] font-black uppercase tracking-widest">
                 <span className="flex items-center gap-1 text-slate-500"><Key size={10} className={authStatus.authenticated ? 'text-emerald-500' : 'text-rose-500'}/> Auth: {authStatus.authenticated ? 'Ativo' : 'Inativo'}</span>
-                <span className="text-slate-600 truncate max-w-[150px]">UID: {authStatus.uid}</span>
-                <span className="text-slate-600">Email: {authStatus.email}</span>
+                <span className="text-slate-500 truncate max-w-[150px]">UID: {authStatus.uid}</span>
+                <span className="text-slate-500">Email: {authStatus.email}</span>
             </div>
             <button onClick={() => refresh()} className="text-[9px] font-black text-blue-500 hover:text-white uppercase flex items-center gap-1">
                 <RefreshCw size={10}/> Forçar Refresh
@@ -118,7 +149,7 @@ export const TeamPage = ({ activeUser, showToast, ui }: any) => {
 
       {/* Alerta de Erro Crítico (RLS ou Banco) */}
       {fetchError && (
-        <div className="bg-rose-950/20 border border-rose-500/50 p-6 rounded-[2rem] flex items-start gap-4 animate-in slide-in-from-top-4">
+        <div className="bg-rose-950/20 border border-rose-500/50 p-6 rounded-3xl flex items-start gap-4 animate-in slide-in-from-top-4">
            <ShieldAlert className="text-rose-500 shrink-0" size={32}/>
            <div className="flex-1">
               <h3 className="text-white font-black uppercase text-sm">Falha de Integridade</h3>
@@ -128,71 +159,33 @@ export const TeamPage = ({ activeUser, showToast, ui }: any) => {
         </div>
       )}
 
-      <div className="flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-6 bg-slate-900 border border-slate-800 p-5 sm:p-6 rounded-[2rem] sm:rounded-[2.5rem] shadow-xl">
-        <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-            <div className="p-3 sm:p-4 bg-blue-600 rounded-xl sm:rounded-2xl text-white shadow-lg shadow-blue-900/20 shrink-0">
-                <Shield size={24} className="sm:w-7 sm:h-7" />
-            </div>
-            <div className="flex-1 min-w-0">
-                <h2 className="text-lg sm:text-2xl font-black uppercase text-white tracking-tighter leading-none truncate">Gestão de Time</h2>
-                
-                <div className="flex items-center gap-2 mt-2">
-                    <div className="flex items-center gap-2 bg-slate-950 px-2 py-1 sm:px-3 sm:py-1.5 rounded-lg border border-slate-800 min-w-0 flex-1 sm:flex-none">
-                        <Layers size={10} className="text-blue-500 shrink-0"/>
-                        <select 
-                            value={activeTeam?.id || ''} 
-                            onChange={(e) => setActiveTeam(teams.find(t => t.id === e.target.value))}
-                            className="bg-transparent text-white text-[9px] sm:text-[10px] font-black uppercase tracking-widest outline-none border-none cursor-pointer hover:text-blue-400 transition-colors w-full truncate"
-                        >
-                            {teams.length === 0 ? (
-                                <option>Nenhuma Equipe</option>
-                            ) : (
-                                teams.map(t => (
-                                    <option key={t.id} value={t.id} className="bg-slate-900 text-white">{t.name}</option>
-                                ))
-                            )}
-                        </select>
-                    </div>
-
-                    <div className="flex gap-1 shrink-0">
-                        <button onClick={() => handleOpenTeamEditor(false)} disabled={!activeTeam} className="p-1.5 text-slate-500 hover:text-white hover:bg-slate-800 rounded-lg transition-all"><Settings size={14} /></button>
-                        <button onClick={() => handleOpenTeamEditor(true)} className="p-1.5 text-slate-500 hover:text-emerald-500 hover:bg-slate-800 rounded-lg transition-all"><Plus size={14} /></button>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div className="flex gap-2 w-full lg:w-auto">
-            <button onClick={refresh} disabled={loading} className={`p-3 sm:p-4 bg-slate-800 text-slate-400 rounded-xl sm:rounded-2xl border border-slate-700 hover:text-white transition-all active:scale-95 ${loading ? 'animate-spin' : ''}`}><RefreshCw size={18} /></button>
-            <button onClick={() => ui.openModal('INVITE')} className="flex-1 lg:flex-none px-4 sm:px-6 py-3 sm:py-4 bg-blue-600 text-white rounded-xl sm:rounded-2xl font-black text-xs uppercase shadow-lg shadow-blue-600/20 hover:bg-blue-500 transition-all flex items-center justify-center gap-2 active:scale-95"><UserPlus size={18} /> Novo Membro</button>
-        </div>
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          <div className="lg:col-span-8 space-y-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="lg:col-span-8">
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
                 {teams.length === 0 ? (
-                    <div className="col-span-full py-24 flex flex-col items-center justify-center bg-slate-900/50 border-2 border-dashed border-slate-800 rounded-[3rem]">
-                        <Users size={32} className="text-slate-600 mb-4"/>
-                        <p className="text-slate-500 font-bold uppercase text-xs">Nenhuma equipe encontrada.</p>
-                        <button onClick={() => handleOpenTeamEditor(true)} className="mt-4 px-4 py-2 bg-slate-800 text-white rounded-xl text-[10px] font-black uppercase hover:bg-slate-700">Criar Primeira Equipe</button>
+                    <div className="py-24 flex flex-col items-center justify-center">
+                        <Users size={32} className="text-slate-500 mb-4"/>
+                        <p className="text-sm font-medium text-slate-500 uppercase">Nenhuma equipe encontrada.</p>
+                        <button onClick={() => handleOpenTeamEditor(true)} className="mt-4 px-4 py-2 bg-slate-800 text-white rounded-xl text-sm font-semibold uppercase hover:bg-slate-700">Criar Primeira Equipe</button>
                     </div>
                 ) : members.length === 0 && !loading ? (
-                    <div className="col-span-full py-20 flex flex-col items-center justify-center bg-slate-900/30 border border-slate-800 rounded-[3rem] text-center px-6">
-                        <Users size={40} className="text-slate-700 mb-4"/>
-                        <h4 className="text-white font-black uppercase text-sm mb-1">Equipe Vazia</h4>
-                        <p className="text-slate-500 text-xs font-medium max-w-xs mx-auto">Não há membros registrados ou o acesso está bloqueado por políticas de segurança.</p>
-                        <button onClick={refresh} className="mt-6 flex items-center gap-2 text-blue-500 font-black text-[10px] uppercase"><RefreshCw size={12}/> Tentar Atualizar</button>
+                    <div className="py-20 flex flex-col items-center justify-center text-center px-6">
+                        <Users size={40} className="text-slate-500 mb-4"/>
+                        <h4 className="text-xl font-semibold text-white uppercase mb-1">Equipe Vazia</h4>
+                        <p className="text-sm font-medium text-slate-500 max-w-xs mx-auto">Não há membros registrados ou o acesso está bloqueado por políticas de segurança.</p>
+                        <button onClick={refresh} className="mt-6 flex items-center gap-2 text-blue-500 font-semibold text-sm uppercase"><RefreshCw size={12}/> Tentar Atualizar</button>
                     </div>
                 ) : (
-                    members.map((member) => (
-                        <MemberCard 
-                            key={member.id} 
-                            member={member} 
-                            onDelete={deleteMember} 
-                            onEdit={handleOpenMemberEditor}
-                        />
-                    ))
+                    <div className="divide-y divide-slate-800">
+                        {members.map((member) => (
+                            <MemberCard 
+                                key={member.id} 
+                                member={member} 
+                                onDelete={deleteMember} 
+                                onEdit={handleOpenMemberEditor}
+                            />
+                        ))}
+                    </div>
                 )}
               </div>
           </div>

@@ -133,7 +133,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSend, isUploading, place
                   handleSendText();
                 }
               }}
-              className="w-full bg-transparent px-4 py-3 text-white text-sm font-medium outline-none resize-none max-h-32 custom-scrollbar placeholder:text-slate-600"
+              className="w-full bg-transparent px-4 py-3 text-white text-sm font-medium outline-none resize-none max-h-32 custom-scrollbar placeholder:text-slate-500"
               placeholder={placeholder || 'Digite sua mensagem...'}
               rows={1}
               style={{ minHeight: '48px' }}

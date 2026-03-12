@@ -23,7 +23,7 @@ export const clientAvatarService = {
 
     if (uploadError) {
       console.error("Erro detalhado do Storage:", uploadError);
-      if (uploadError.message.includes("security policy")) {
+      if (uploadError.message?.includes("security policy")) {
         throw new Error("Erro de Permissão: O banco de dados bloqueou o upload. Certifique-se de executar o script SQL de políticas de Storage.");
       }
       throw new Error(`Erro no upload: ${uploadError.message}`);

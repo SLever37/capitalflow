@@ -67,6 +67,15 @@ export const generateConfissaoDividaHTML = (data: LegalDocumentParams, docId?: s
 
             <h2>1. DO RECONHECIMENTO DA DÍVIDA</h2>
             <p>Pelo presente instrumento, o(a) <strong>DEVEDOR(A)</strong> reconhece e confessa ser devedor(a) legítimo(a) da importância líquida e certa de <strong>${vm.totalDebt} (${numberToWordsBRL(data.totalDebt)})</strong>, correspondente ao montante total da operação ID ${data.loanId.substring(0,8)}.</p>
+            
+            ${(data.downPayment || 0) > 0 || (data.discount || 0) > 0 || (data.gracePeriod || 0) > 0 ? `
+            <p>As partes pactuaram as seguintes condições especiais para esta renegociação:</p>
+            <ul>
+                ${(data.downPayment || 0) > 0 ? `<li><strong>Pagamento de Entrada:</strong> O valor de ${vm.downPayment} foi pago como sinal e princípio de pagamento.</li>` : ''}
+                ${(data.discount || 0) > 0 ? `<li><strong>Desconto Concedido:</strong> Foi aplicado um desconto de ${vm.discount} sobre o saldo devedor original.</li>` : ''}
+                ${(data.gracePeriod || 0) > 0 ? `<li><strong>Período de Carência:</strong> Foi concedida uma carência de ${vm.gracePeriod} dias para o início do cronograma de pagamentos.</li>` : ''}
+            </ul>
+            ` : ''}
 
             <h2>2. DO PLANO DE PAGAMENTO</h2>
             <p>O montante acima confessado será liquidado mediante o seguinte cronograma de parcelas:</p>

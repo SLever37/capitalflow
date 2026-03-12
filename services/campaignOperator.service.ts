@@ -11,7 +11,7 @@ function isNetworkFetchError(err: any) {
   const name = String(err?.name || '');
   return (
     name === 'TypeError' &&
-    (msg === 'Failed to fetch' || msg.includes('Failed to fetch') || msg.includes('Load failed'))
+    (msg === 'Failed to fetch' || msg?.includes('Failed to fetch') || msg?.includes('Load failed'))
   );
 }
 

@@ -58,7 +58,7 @@ export const PublicLoanLeadPage: React.FC = () => {
           <p className="text-slate-400 text-sm font-medium">Dinheiro na conta hoje, sem burocracia.</p>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-[2rem] p-6 sm:p-8 shadow-2xl">
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl">
           <div className="bg-slate-950 rounded-2xl p-4 mb-6 border border-slate-800 flex items-center justify-between">
              <div>
                <p className="text-[10px] font-black uppercase text-slate-500 mb-1">Valor Disponível Hoje</p>
@@ -116,7 +116,7 @@ export const PublicLoanLeadPage: React.FC = () => {
             </button>
           </form>
           
-          <p className="text-[10px] text-slate-600 text-center mt-6">
+          <p className="text-[10px] text-slate-500 text-center mt-6">
             Seus dados estão seguros. Ao enviar, você concorda em receber contato via WhatsApp.
           </p>
         </div>

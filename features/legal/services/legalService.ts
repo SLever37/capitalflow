@@ -29,6 +29,9 @@ export const legalService = {
       agreementDate: new Date(agreement.createdAt).toLocaleDateString('pt-BR'),
       installments: agreement.installments,
       timestamp: new Date().toISOString(),
+      discount: agreement.discount,
+      gracePeriod: agreement.gracePeriod,
+      downPayment: agreement.downPayment,
     };
   },
 
@@ -40,7 +43,8 @@ export const legalService = {
       p_loan_id: safeUUID(params.loanId),
       p_tipo: 'CONFISSAO',
       p_snapshot: params,
-      p_acordo_id: safeUUID(entityId === params.loanId ? null : entityId)
+      p_acordo_id: safeUUID(entityId === params.loanId ? null : entityId),
+      p_dono_id: safeUUID(profileId)
     });
 
     if (error) throw new Error(`Falha na base de dados: ${error.message}`);
@@ -104,7 +108,7 @@ export const legalService = {
 
     const { error: signError } = await supabase.from('assinaturas_documento').insert({
       document_id: safeDocId,
-      profile_id: profileId,
+      profile_id: safeUUID(profileId),
       signer_name: signerInfo.name.toUpperCase(),
       signer_document: signerInfo.doc,
       role: role, // CREDOR, DEVEDOR, TESTEMUNHA_1, TESTEMUNHA_2

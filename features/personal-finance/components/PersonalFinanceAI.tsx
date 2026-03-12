@@ -44,7 +44,7 @@ export const PersonalFinanceAI: React.FC<Props> = ({ transactions, accounts, car
     }, [transactions.length, accounts.length]);
 
     return (
-        <div className="w-full bg-gradient-to-r from-slate-900 to-slate-900 border border-pink-500/30 rounded-[2.5rem] p-6 sm:p-8 relative overflow-hidden shadow-2xl mt-8">
+        <div className="w-full bg-gradient-to-r from-slate-900 to-slate-900 border border-pink-500/30 rounded-3xl p-6 sm:p-8 relative overflow-hidden shadow-2xl mt-8">
             <div className="absolute -top-20 -right-20 w-64 h-64 bg-pink-600/10 blur-[80px] rounded-full pointer-events-none"></div>
             
             <div className="flex justify-between items-start mb-6 relative z-10">

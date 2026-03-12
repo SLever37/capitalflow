@@ -1,5 +1,5 @@
 
-import { Loan, Installment } from '../../../types';
+import { Loan, Installment, LoanStatus } from '../../../types';
 import { calculateTotalDue } from '../../../domain/finance/calculations';
 import { normalizeLoanForCalc, normalizeInstallmentForCalc } from './portalAdapters';
 import { getDaysDiff } from '../../../utils/dateHelpers';
@@ -83,11 +83,34 @@ export const getPortalDueLabel = (daysLate: number, dueDateISO: string) => {
  * 1. RESUMO GERAL DA DÍVIDA (Card Principal)
  */
 export const resolveDebtSummary = (loan: Loan, installments: Installment[]): PortalDebtSummary => {
-    if (!loan || !installments) return { totalDue: 0, nextDueDate: null, pendingCount: 0, hasLateInstallments: false, maxDaysLate: 0 };
+    if (!loan) return { totalDue: 0, nextDueDate: null, pendingCount: 0, hasLateInstallments: false, maxDaysLate: 0 };
+
+    // Se houver acordo ativo, a dívida é baseada nos termos do acordo (Suporta ACTIVE e ATIVO)
+    if (loan.activeAgreement && (loan.activeAgreement.status === 'ACTIVE' || loan.activeAgreement.status === 'ATIVO')) {
+        const agreementInsts = loan.activeAgreement.installments || [];
+        const pending = agreementInsts.filter(i => i.status !== 'PAID' && i.status !== 'PAGO');
+        const totalDue = pending.reduce((acc, i) => acc + (Number(i.amount) - Number(i.paidAmount || 0)), 0);
+        
+        let maxDaysLate = 0;
+        pending.forEach(inst => {
+            const daysLate = getDaysDiff(inst.dueDate);
+            if (daysLate > maxDaysLate) maxDaysLate = daysLate;
+        });
+
+        return {
+            totalDue,
+            nextDueDate: pending.length > 0 ? new Date(pending[0].dueDate) : null,
+            pendingCount: pending.length,
+            hasLateInstallments: maxDaysLate > 0,
+            maxDaysLate
+        };
+    }
+
+    if (!installments) return { totalDue: 0, nextDueDate: null, pendingCount: 0, hasLateInstallments: false, maxDaysLate: 0 };
 
     const balance = loanEngine.computeRemainingBalance(loan);
     const pending = installments.filter(i => {
-        const isPaidByStatus = i.status === 'PAID';
+        const isPaidByStatus = i.status === LoanStatus.PAID || i.status === LoanStatus.PAGO;
         const isPaidByBalance = (Number(i.principalRemaining) || 0) === 0 && (Number(i.interestRemaining) || 0) === 0;
         return !isPaidByStatus && !isPaidByBalance;
     });
@@ -112,13 +135,51 @@ export const resolveDebtSummary = (loan: Loan, installments: Installment[]): Por
 /**
  * 2. DETALHE DA PARCELA (Lista e Badges)
  */
-export const resolveInstallmentDebt = (loan: Loan, inst: Installment): InstallmentDebtDetail => {
+export const resolveInstallmentDebt = (loan: Loan, inst: any): InstallmentDebtDetail => {
+    // Se for uma parcela de acordo (AgreementInstallment)
+    if (inst.agreementId) {
+        const amount = Number(inst.amount || 0);
+        const paidAmount = Number(inst.paidAmount || 0);
+        const remaining = amount - paidAmount;
+        const isPaidOff = inst.status === 'PAID' || inst.status === 'PAGO' || remaining <= 0.05;
+        const daysLate = getDaysDiff(inst.dueDate);
+        const isLate = daysLate > 0;
+        const dueInfo = getPortalDueLabel(daysLate, inst.dueDate);
+
+        let statusLabel = dueInfo.label;
+        let statusColor = 'text-slate-500';
+
+        if (isPaidOff) {
+            statusLabel = 'Quitada';
+            statusColor = 'text-emerald-500';
+        } else if (dueInfo.variant === 'OVERDUE') {
+            statusColor = 'text-rose-500 font-bold';
+        } else if (dueInfo.variant === 'DUE_TODAY') {
+            statusColor = 'text-amber-500 font-bold animate-pulse';
+        } else if (dueInfo.variant === 'DUE_SOON') {
+            statusColor = 'text-amber-500';
+        }
+
+        return {
+            total: remaining,
+            principal: remaining,
+            interest: 0,
+            lateFee: 0,
+            isLate,
+            daysLate,
+            dueDateISO: inst.dueDate,
+            statusLabel,
+            statusColor
+        };
+    }
+
+    // Lógica original para parcelas normais
     const loanCalc = normalizeLoanForCalc(loan);
     const instCalc = normalizeInstallmentForCalc(inst);
     const debt = calculateTotalDue(loanCalc, instCalc);
 
     // CORREÇÃO: Verificar se parcela está realmente quitada (status OU saldo zerado)
-    const isPaidByStatus = inst.status === 'PAID';
+    const isPaidByStatus = inst.status === LoanStatus.PAID || inst.status === LoanStatus.PAGO;
     const isPaidByBalance = (Number(inst.principalRemaining) || 0) === 0 && (Number(inst.interestRemaining) || 0) === 0;
     const isPaidOff = isPaidByStatus || isPaidByBalance;
 
@@ -156,7 +217,28 @@ export const resolveInstallmentDebt = (loan: Loan, inst: Installment): Installme
  * 3. OPÇÕES DE PAGAMENTO (Modal)
  * Define exatamente quanto cobrar em cada cenário.
  */
-export const resolvePaymentOptions = (loan: Loan, inst: Installment): PaymentOptions => {
+export const resolvePaymentOptions = (loan: Loan, inst: any): PaymentOptions => {
+    // Se for uma parcela de acordo
+    if (inst.agreementId) {
+        const amount = Number(inst.amount || 0);
+        const paidAmount = Number(inst.paidAmount || 0);
+        const remaining = amount - paidAmount;
+        const daysLate = getDaysDiff(inst.dueDate);
+
+        return {
+            totalToPay: remaining,
+            renewToPay: 0, // Acordos geralmente não permitem renovação da parcela individual
+            breakdown: {
+                principal: remaining,
+                interest: 0,
+                fine: 0
+            },
+            canRenew: false,
+            daysLate,
+            dueDateISO: inst.dueDate
+        };
+    }
+
     const loanCalc = normalizeLoanForCalc(loan);
     const instCalc = normalizeInstallmentForCalc(inst);
     const debt = calculateTotalDue(loanCalc, instCalc);

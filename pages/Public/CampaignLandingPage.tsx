@@ -129,7 +129,7 @@ export const CampaignLandingPage: React.FC<CampaignLandingPageProps> = ({ campai
           <p className="text-slate-400 text-sm font-medium">Preencha seus dados para simular agora.</p>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-[2rem] p-6 sm:p-8 shadow-2xl">
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="text-[10px] font-black uppercase text-slate-500 ml-1 mb-1 block">Seu Nome *</label>
@@ -184,7 +184,7 @@ export const CampaignLandingPage: React.FC<CampaignLandingPageProps> = ({ campai
             </button>
           </form>
           
-          <p className="text-[10px] text-slate-600 text-center mt-6">
+          <p className="text-[10px] text-slate-500 text-center mt-6">
             Seus dados estão seguros. Ao enviar, você concorda em receber contato via WhatsApp.
           </p>
         </div>

@@ -1,6 +1,7 @@
 // hooks/usePortalRouting.ts
 import { useState, useEffect } from 'react';
 import { supabasePortal } from '../lib/supabasePortal';
+import { portalService } from '../services/portal.service';
 
 const isUUID = (v: string | null) =>
   typeof v === 'string' &&
@@ -8,71 +9,47 @@ const isUUID = (v: string | null) =>
 
 export const usePortalRouting = () => {
   const [portalToken, setPortalToken] = useState<string | null>(null);
+  const [portalCode, setPortalCode] = useState<string | null>(null);
   const [legalSignToken, setLegalSignToken] = useState<string | null>(null);
 
   useEffect(() => {
     const validateAccess = async () => {
         const params = new URLSearchParams(window.location.search);
-        const portalParam = params.get('portal');
-        const codeParam = params.get('code');
+        const portal = params.get('portal');
+        const code = params.get('code');
         const legalParam = params.get('legal_sign');
 
         // 1. Validação do Portal (Token + Code)
-        if (portalParam) {
-            // Se não for UUID, já marca como inválido
-            if (!isUUID(portalParam)) {
+        // portal -> token, code -> shortcode
+        if (portal || code) {
+            if (!portal || !code) {
+                console.error("Portal Access: Missing portal token or security code.");
                 setPortalToken('INVALID_ACCESS');
-            } else {
-                let finalCode = codeParam;
+                setPortalCode(null);
+                return;
+            }
 
-                // Se não tiver code, tenta buscar via RPC (Compatibilidade Retroativa)
-                if (!finalCode) {
-                    setPortalToken('VALIDATING');
-                    try {
-                        const { data: fetchedCode, error: fetchError } = await supabasePortal
-                            .rpc('portal_get_shortcode_by_portal_token', { 
-                                p_portal_token: portalParam 
-                            });
+            setPortalToken('VALIDATING');
+            setPortalCode(null); // Limpa código anterior enquanto valida
+            
+            try {
+                const { data, error } = await supabasePortal.rpc('validate_portal_access', {
+                    p_token: portal,
+                    p_shortcode: code
+                });
 
-                        if (fetchError || !fetchedCode) {
-                            console.error("Portal Code Fetch Error:", fetchError);
-                            setPortalToken('INVALID_ACCESS');
-                            return;
-                        }
-                        
-                        finalCode = fetchedCode as string;
-                        
-                        // Atualiza URL para incluir o code (Canonicalização)
-                        const newUrl = new URL(window.location.href);
-                        newUrl.searchParams.set('code', finalCode);
-                        window.history.replaceState({}, document.title, newUrl.toString());
-                    } catch (e) {
-                        console.error("Portal Code Fetch Exception:", e);
-                        setPortalToken('INVALID_ACCESS');
-                        return;
-                    }
-                }
-
-                // Agora valida o acesso com o code (existente ou recuperado)
-                setPortalToken('VALIDATING');
-                
-                try {
-                    const { data, error } = await supabasePortal.rpc('validate_portal_access', {
-                        p_portal_token: portalParam,
-                        p_shortcode: finalCode
-                    });
-
-                    if (error || !data) {
-                        console.error("Portal Access Denied:", error);
-                        setPortalToken('INVALID_ACCESS');
-                    } else {
-                        // Acesso permitido
-                        setPortalToken(portalParam);
-                    }
-                } catch (e) {
-                    console.error("Portal Validation Error:", e);
+                if (error || data !== true) {
+                    console.error("Portal Access Denied:", error || 'Invalid access');
                     setPortalToken('INVALID_ACCESS');
+                } else {
+                    // Acesso permitido
+                    await portalService.markViewed(portal, code);
+                    setPortalToken(portal);
+                    setPortalCode(code);
                 }
+            } catch (e) {
+                console.error("Portal Validation Error:", e);
+                setPortalToken('PORTAL_UNAVAILABLE');
             }
         }
 
@@ -102,5 +79,5 @@ export const usePortalRouting = () => {
     validateAccess();
   }, []); // Executa apenas uma vez na montagem
 
-  return { portalToken, legalSignToken };
+  return { portalToken, portalCode, legalSignToken };
 };

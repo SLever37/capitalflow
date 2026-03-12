@@ -30,15 +30,8 @@ export const MasterPage: React.FC<MasterPageProps> = ({
 
   return (
     <div className="space-y-6">
-        <div className="bg-slate-900 border border-slate-800 p-6 rounded-[2rem]">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-                <div>
-                    <h2 className="text-xl font-black text-white uppercase flex items-center gap-2">
-                        <Shield className="text-rose-500" size={24}/> Gestão Master (SAC)
-                    </h2>
-                    <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">Administração de Operadores</p>
-                </div>
-                
+        <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl">
+            <div className="flex flex-col sm:flex-row justify-end items-start sm:items-center gap-4 mb-6">
                 <div className="bg-slate-950 border border-slate-800 p-2 rounded-2xl flex items-center gap-2 w-full sm:w-auto">
                     <Search className="text-slate-500 ml-2" size={16}/>
                     <input 
@@ -71,7 +64,7 @@ export const MasterPage: React.FC<MasterPageProps> = ({
                                         )}
                                     </div>
                                     <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider truncate">{u.usuario_email}</p>
-                                    <p className="text-[10px] text-slate-600 truncate">{u.nome_empresa || 'Empresa não definida'}</p>
+                                    <p className="text-[10px] text-slate-500 truncate">{u.nome_empresa || 'Empresa não definida'}</p>
                                 </div>
                             </div>
 
@@ -106,7 +99,7 @@ export const MasterPage: React.FC<MasterPageProps> = ({
                 })}
                 
                 {allUsers.length === 0 && (
-                    <div className="text-center py-10 text-slate-600 text-xs font-bold uppercase">Nenhum usuário encontrado.</div>
+                    <div className="text-center py-10 text-slate-500 text-xs font-bold uppercase">Nenhum usuário encontrado.</div>
                 )}
             </div>
         </div>

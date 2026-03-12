@@ -85,7 +85,7 @@ export const PublicLegalSignPage: React.FC<PublicLegalSignPageProps> = ({ token 
 
     if (status === 'ERROR') return (
         <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-            <div className="bg-rose-900/20 border border-rose-500 p-8 rounded-[2.5rem] text-center max-w-md shadow-2xl">
+            <div className="bg-rose-900/20 border border-rose-500 p-8 rounded-3xl text-center max-w-md shadow-2xl">
                 <AlertTriangle className="text-rose-500 mx-auto mb-4" size={56}/>
                 <h2 className="text-white font-black uppercase text-xl mb-2">Título Não Localizado</h2>
                 <p className="text-rose-200 text-sm leading-relaxed">{errorMessage}</p>
@@ -130,7 +130,7 @@ export const PublicLegalSignPage: React.FC<PublicLegalSignPageProps> = ({ token 
                              <p className="text-white font-black text-base uppercase mb-4">{expectedName}</p>
                              
                              <div className="space-y-1">
-                                <label className="text-[9px] font-black text-slate-600 uppercase ml-1">Informe seu CPF / CNPJ</label>
+                                <label className="text-[9px] font-black text-slate-500 uppercase ml-1">Informe seu CPF / CNPJ</label>
                                 <input 
                                     value={signerDoc} 
                                     onChange={e => setSignerDoc(maskDocument(e.target.value))} 
@@ -160,11 +160,11 @@ export const PublicLegalSignPage: React.FC<PublicLegalSignPageProps> = ({ token 
                             <button 
                                 onClick={handleSign}
                                 disabled={!acceptedTerms || !signerDoc}
-                                className="w-full py-6 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed text-white rounded-[2rem] font-black uppercase text-xs shadow-2xl shadow-indigo-600/20 transition-all active:scale-95 flex items-center justify-center gap-3"
+                                className="w-full py-6 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-30 disabled:cursor-not-allowed text-white rounded-2xl font-black uppercase text-xs shadow-2xl shadow-indigo-600/20 transition-all active:scale-95 flex items-center justify-center gap-3"
                             >
                                 <FileSignature size={20}/> Confirmar Assinatura
                             </button>
-                            <p className="text-center text-[9px] text-slate-600 font-bold uppercase tracking-widest">
+                            <p className="text-center text-[9px] text-slate-500 font-bold uppercase tracking-widest">
                                 IP: DETECTADO • CARIMBO DE TEMPO ATIVO
                             </p>
                         </div>
@@ -175,7 +175,7 @@ export const PublicLegalSignPage: React.FC<PublicLegalSignPageProps> = ({ token 
             {/* TERMS MODAL */}
             {showTerms && (
                 <div className="fixed inset-0 z-[100] bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4">
-                    <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-[2.5rem] p-8 space-y-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+                    <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-3xl p-8 space-y-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
                         <h2 className="text-white font-black uppercase text-lg flex items-center gap-2"><Scale size={20} className="text-indigo-500"/> Termos de Assinatura Eletrônica</h2>
                         <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 h-64 overflow-y-auto custom-scrollbar text-xs text-slate-400 leading-relaxed space-y-4">
                             <p><strong>1. VALIDADE:</strong> A assinatura eletrônica aqui realizada tem plena eficácia jurídica e executiva, suprindo a necessidade de assinatura física, conforme Art. 10 da MP 2.200-2/2001.</p>

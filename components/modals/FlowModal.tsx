@@ -37,7 +37,7 @@ export const FlowModal = ({ onClose, loans, profit }: { onClose: () => void, loa
         filteredTrans.forEach(t => {
             if (t.type === 'LEND_MORE') {
                 investment += t.amount;
-            } else if (t.type.includes('PAYMENT')) {
+            } else if (t.type?.includes('PAYMENT')) {
                 // Se temos os deltas detalhados (nova versão do DB)
                 if (t.interestDelta !== undefined) {
                     grossRevenue += (t.interestDelta + (t.lateFeeDelta || 0));
@@ -83,21 +83,13 @@ export const FlowModal = ({ onClose, loans, profit }: { onClose: () => void, loa
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <button
-            onClick={onClose}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all active:scale-95"
-          >
-            <ChevronLeft size={16} />
-            <span className="text-[10px] font-black uppercase tracking-widest">Voltar</span>
-          </button>
-          
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center text-white shrink-0 shadow-lg shadow-emerald-900/20">
               <ArrowRightLeft size={20} />
             </div>
             <div>
-              <h1 className="text-sm font-black text-white uppercase tracking-wider leading-none">Extrato Geral</h1>
-              <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 tracking-widest">
+              <h1 className="text-xl font-semibold text-white uppercase tracking-wider leading-none">Extrato <span className="text-blue-500">Geral</span></h1>
+              <p className="text-sm text-slate-500 font-medium uppercase mt-1 tracking-widest">
                 DRE e Resultado Financeiro
               </p>
             </div>
@@ -110,7 +102,7 @@ export const FlowModal = ({ onClose, loans, profit }: { onClose: () => void, loa
                 <div className="flex items-center justify-between bg-slate-900 p-1.5 rounded-2xl border border-slate-800">
                     <button onClick={() => handleMonthChange('prev')} className="p-2 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-white transition-colors"><ChevronLeft size={20}/></button>
                     <div className="text-center flex-1">
-                        <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Período</p>
+                        <p className="text-sm font-semibold uppercase text-slate-500 tracking-widest">Período</p>
                         <p className="text-sm font-black text-white uppercase">{new Date(selectedYear, selectedMonth).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</p>
                     </div>
                     <button onClick={() => handleMonthChange('next')} className="p-2 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-white transition-colors"><ChevronLeft className="rotate-180" size={20}/></button>
@@ -126,7 +118,7 @@ export const FlowModal = ({ onClose, loans, profit }: { onClose: () => void, loa
                     <div className="bg-emerald-950/20 border border-emerald-500/20 p-4 rounded-2xl">
                         <div className="flex items-center gap-2 mb-2">
                             <div className="p-1.5 bg-emerald-500/20 rounded-lg text-emerald-500"><TrendingUp size={14}/></div>
-                            <p className="text-[9px] font-black uppercase text-emerald-500">Receita Bruta (Juros)</p>
+                            <p className="text-sm font-semibold uppercase text-emerald-500">Receita Bruta (Juros)</p>
                         </div>
                         <p className="text-xl font-black text-white">R$ {dre.grossRevenue.toFixed(2)}</p>
                     </div>
@@ -134,7 +126,7 @@ export const FlowModal = ({ onClose, loans, profit }: { onClose: () => void, loa
                     <div className="bg-blue-950/20 border border-blue-500/20 p-4 rounded-2xl">
                         <div className="flex items-center gap-2 mb-2">
                             <div className="p-1.5 bg-blue-500/20 rounded-lg text-blue-500"><PiggyBank size={14}/></div>
-                            <p className="text-[9px] font-black uppercase text-blue-500">Recuperação Principal</p>
+                            <p className="text-sm font-semibold uppercase text-blue-500">Recuperação Principal</p>
                         </div>
                         <p className="text-xl font-black text-white">R$ {dre.principalRecovered.toFixed(2)}</p>
                     </div>
@@ -142,7 +134,7 @@ export const FlowModal = ({ onClose, loans, profit }: { onClose: () => void, loa
                     <div className="bg-rose-950/20 border border-rose-500/20 p-4 rounded-2xl">
                         <div className="flex items-center gap-2 mb-2">
                             <div className="p-1.5 bg-rose-500/20 rounded-lg text-rose-500"><TrendingDown size={14}/></div>
-                            <p className="text-[9px] font-black uppercase text-rose-500">Novos Aportes</p>
+                            <p className="text-sm font-semibold uppercase text-rose-500">Novos Aportes</p>
                         </div>
                         <p className="text-xl font-black text-white">R$ {dre.investment.toFixed(2)}</p>
                     </div>
@@ -151,7 +143,7 @@ export const FlowModal = ({ onClose, loans, profit }: { onClose: () => void, loa
                         <div className="relative z-10">
                             <div className="flex items-center gap-2 mb-2">
                                 <div className="p-1.5 bg-slate-700 rounded-lg text-white"><DollarSign size={14}/></div>
-                                <p className="text-[9px] font-black uppercase text-slate-400">Caixa Líquido (Mês)</p>
+                                <p className="text-sm font-semibold uppercase text-slate-400">Caixa Líquido (Mês)</p>
                             </div>
                             <p className={`text-xl font-black ${dre.cashFlow >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                                 {dre.cashFlow > 0 ? '+' : ''}R$ {dre.cashFlow.toFixed(2)}
@@ -163,8 +155,8 @@ export const FlowModal = ({ onClose, loans, profit }: { onClose: () => void, loa
                 {/* Lista Detalhada */}
                 <div className="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden flex flex-col flex-1 min-h-[350px]">
                     <div className="p-3 border-b border-slate-800 bg-slate-900/50 flex justify-between items-center shrink-0">
-                        <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Detalhamento das Operações</p>
-                        <button onClick={handlePrintReport} className="text-[9px] font-bold uppercase bg-slate-800 text-white px-3 py-1.5 rounded-lg flex items-center gap-1 hover:bg-blue-600 transition-colors">
+                        <p className="text-sm font-semibold uppercase text-slate-500 tracking-widest">Detalhamento das Operações</p>
+                        <button onClick={handlePrintReport} className="text-sm font-bold uppercase bg-slate-800 text-white px-3 py-1.5 rounded-lg flex items-center gap-1 hover:bg-blue-600 transition-colors">
                             <Printer size={12}/> Imprimir Relatório
                         </button>
                     </div>

@@ -39,7 +39,8 @@ type SendMessageParams = {
 const BUCKET = 'support_chat';
 const SIGNED_URL_TTL = 60 * 60; // 1h
 
-function extFromMime(mime: string) {
+function extFromMime(mime: string | null | undefined) {
+  if (!mime) return 'bin';
   if (mime.includes('webm')) return 'webm';
   if (mime.includes('ogg')) return 'ogg';
   if (mime.includes('wav')) return 'wav';

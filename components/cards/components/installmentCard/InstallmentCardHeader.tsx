@@ -11,7 +11,7 @@ interface InstallmentCardHeaderProps {
 export const InstallmentCardHeader: React.FC<InstallmentCardHeaderProps> = ({ realIndex, showProgress, renewalCount }) => {
     return (
         <div className="flex items-center gap-2 mb-4">
-            <p className="text-[8px] sm:text-[9px] font-black text-slate-500 uppercase">
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
                 {showProgress ? `${realIndex}ª Parcela` : 'Detalhes'}
             </p>
             {renewalCount && renewalCount > 0 ? (

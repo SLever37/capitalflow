@@ -17,31 +17,37 @@ export const QuickActions: React.FC<QuickActionsProps> = ({
     hasNotes, onMessage, onNote, onPortalLink, onViewDoc, onUploadPromissoria, onUploadDoc, onEdit
 }) => {
     return (
-        <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
-             <button onClick={(e) => { e.stopPropagation(); onEdit(e); }} className="flex items-center justify-center gap-2 px-3 py-2.5 bg-blue-600/10 text-blue-500 hover:bg-blue-600 hover:text-white rounded-xl text-[10px] font-black uppercase transition-all">
-                <FileEdit size={14} /> Editar
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:flex md:flex-wrap gap-2">
+             <button onClick={(e) => { e.stopPropagation(); onEdit(e); }} className="flex flex-col sm:flex-row items-center justify-center gap-1.5 px-3 py-3 bg-blue-600/10 text-blue-500 hover:bg-blue-600 hover:text-white rounded-xl transition-all">
+                <FileEdit size={14} /> 
+                <span className="text-[9px] font-black uppercase tracking-tight">Editar</span>
              </button>
 
-             <button onClick={(e) => { e.stopPropagation(); onMessage(e); }} className="flex items-center justify-center gap-2 px-3 py-2.5 bg-emerald-600/10 text-emerald-500 hover:bg-emerald-600 hover:text-white rounded-xl text-[10px] font-black uppercase transition-all">
-                <MessageSquare size={14} /> WhatsApp
+             <button onClick={(e) => { e.stopPropagation(); onMessage(e); }} className="flex flex-col sm:flex-row items-center justify-center gap-1.5 px-3 py-3 bg-emerald-600/10 text-emerald-500 hover:bg-emerald-600 hover:text-white rounded-xl transition-all">
+                <MessageSquare size={14} /> 
+                <span className="text-[9px] font-black uppercase tracking-tight">WhatsApp</span>
              </button>
              
-             <button onClick={(e) => { e.stopPropagation(); onPortalLink(e); }} className="flex items-center justify-center gap-2 px-3 py-2.5 bg-blue-600/10 text-blue-500 hover:bg-blue-600 hover:text-white rounded-xl text-[10px] font-black uppercase transition-all">
-                <LinkIcon size={14} /> Portal Link
+             <button onClick={(e) => { e.stopPropagation(); onPortalLink(e); }} className="flex flex-col sm:flex-row items-center justify-center gap-1.5 px-3 py-3 bg-blue-600/10 text-blue-500 hover:bg-blue-600 hover:text-white rounded-xl transition-all">
+                <LinkIcon size={14} /> 
+                <span className="text-[9px] font-black uppercase tracking-tight truncate">Portal Link</span>
              </button>
 
              {onUploadPromissoria && (
-                 <button onClick={(e) => { e.stopPropagation(); onUploadPromissoria(e); }} className="flex items-center justify-center gap-2 px-3 py-2.5 bg-purple-600/10 text-purple-500 hover:bg-purple-600 hover:text-white rounded-xl text-[10px] font-black uppercase transition-all">
-                    <FileText size={14} /> Promissória
+                 <button onClick={(e) => { e.stopPropagation(); onUploadPromissoria(e); }} className="flex flex-col sm:flex-row items-center justify-center gap-1.5 px-3 py-3 bg-purple-600/10 text-purple-500 hover:bg-purple-600 hover:text-white rounded-xl transition-all">
+                    <FileText size={14} /> 
+                    <span className="text-[9px] font-black uppercase tracking-tight">Promissória</span>
                  </button>
              )}
 
-             <button onClick={(e) => { e.stopPropagation(); onUploadDoc(e); }} className="flex items-center justify-center gap-2 px-3 py-2.5 bg-slate-800 text-slate-400 hover:bg-indigo-600 hover:text-white rounded-xl text-[10px] font-black uppercase transition-all">
-                <Upload size={14} /> Anexar
+             <button onClick={(e) => { e.stopPropagation(); onUploadDoc(e); }} className="flex flex-col sm:flex-row items-center justify-center gap-1.5 px-3 py-3 bg-slate-800 text-slate-400 hover:bg-indigo-600 hover:text-white rounded-xl transition-all">
+                <Upload size={14} /> 
+                <span className="text-[9px] font-black uppercase tracking-tight">Anexar</span>
              </button>
 
-             <button onClick={(e) => { e.stopPropagation(); onNote(e); }} className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all ${hasNotes ? 'bg-amber-600/10 text-amber-500 hover:bg-amber-600 hover:text-white' : 'bg-slate-800 text-slate-400 hover:text-white'}`}>
-                <FileEdit size={14} /> Notas {hasNotes && '(1)'}
+             <button onClick={(e) => { e.stopPropagation(); onNote(e); }} className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 px-3 py-3 rounded-xl transition-all ${hasNotes ? 'bg-amber-600/10 text-amber-500 hover:bg-amber-600 hover:text-white' : 'bg-slate-800 text-slate-400 hover:text-white'}`}>
+                <FileEdit size={14} /> 
+                <span className="text-[9px] font-black uppercase tracking-tight">Notas {hasNotes && '(1)'}</span>
              </button>
         </div>
     );

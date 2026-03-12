@@ -5,9 +5,94 @@
 }
 
 @layer base {
+  html, body {
+    @apply w-full overflow-x-hidden;
+    scroll-behavior: smooth;
+  }
+
   body {
     @apply bg-slate-950 text-slate-50;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-tap-highlight-color: transparent;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  body::-webkit-scrollbar {
+    display: none;
+  }
+
+  * {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  *::-webkit-scrollbar {
+    display: none;
+  }
+
+  #root {
+    @apply w-full min-h-screen;
+  }
+}
+
+@utility client-name {
+  font-size: clamp(0.875rem, 4vw, 1.125rem);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+@utility contract-name {
+  font-size: clamp(0.75rem, 3vw, 0.875rem);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+@utility card-title {
+  font-size: clamp(0.75rem, 3.5vw, 1rem);
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+@utility stat-value {
+  font-size: clamp(1.25rem, 5vw, 2.25rem);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+@utility section-title {
+  font-size: clamp(0.65rem, 2.5vw, 0.75rem);
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@utility table-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(80px, auto) minmax(80px, auto);
+  gap: 6px;
+  align-items: center;
+}
+
+@utility responsive-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  width: 100%;
+  padding: 12px;
+}
+
+@media (max-width: 768px) {
+  .responsive-card {
+    padding: 10px;
   }
 }
 
@@ -18,4 +103,19 @@
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+@layer utilities {
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+  .pl-safe {
+    padding-left: env(safe-area-inset-left);
+  }
+  .pr-safe {
+    padding-right: env(safe-area-inset-right);
+  }
 }

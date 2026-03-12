@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { ArrowLeft, ShieldCheck, Download, CheckCircle2, FileCheck, Landmark } from 'lucide-react';
+import { ChevronLeft, ShieldCheck, Download, CheckCircle2, FileCheck, Landmark } from 'lucide-react';
 import { Loan, UserProfile } from '../../../types';
 import { formatMoney } from '../../../utils/formatters';
 import { DocumentTemplates } from '../templates/DocumentTemplates';
@@ -40,8 +40,8 @@ export const TermoQuitacaoView: React.FC<TermoQuitacaoViewProps> = ({ loans, act
     return (
         <div className="space-y-6 animate-in slide-in-from-right duration-300">
             <div className="flex items-center gap-4 mb-8">
-                <button onClick={onBack} className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors">
-                    <ArrowLeft size={20}/>
+                <button onClick={onBack} className="text-slate-500 hover:text-white transition-colors" title="Voltar">
+                    <ChevronLeft size={24}/>
                 </button>
                 <div>
                     <h2 className="text-xl font-black text-white uppercase flex items-center gap-2">
@@ -51,16 +51,16 @@ export const TermoQuitacaoView: React.FC<TermoQuitacaoViewProps> = ({ loans, act
                 </div>
             </div>
 
-            <div className="bg-slate-900 border border-slate-800 p-8 rounded-[3rem]">
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {paidLoans.length === 0 ? (
                         <div className="col-span-2 text-center py-20 flex flex-col items-center opacity-40">
-                            <FileCheck size={64} className="text-slate-600 mb-4"/>
+                            <FileCheck size={64} className="text-slate-500 mb-4"/>
                             <p className="text-slate-500 font-black uppercase text-xs tracking-[0.2em]">Nenhum contrato quitado para emissão.</p>
                         </div>
                     ) : (
                         paidLoans.map(loan => (
-                            <div key={loan.id} className="bg-slate-950 p-6 rounded-[2rem] border border-emerald-500/20 flex flex-col gap-4 group hover:border-emerald-500 transition-all">
+                            <div key={loan.id} className="bg-slate-950 p-6 rounded-3xl border border-emerald-500/20 flex flex-col gap-4 group hover:border-emerald-500 transition-all">
                                 <div className="flex justify-between items-start">
                                     <div className="p-3 bg-emerald-500/10 text-emerald-500 rounded-2xl"><CheckCircle2 size={24}/></div>
                                     <div className="text-right">

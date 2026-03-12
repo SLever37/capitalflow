@@ -134,7 +134,7 @@ const useMemberActivation = (
         });
 
         if (signUpError) {
-          if (signUpError.message.includes('already registered')) {
+          if (signUpError.message?.includes('already registered')) {
             throw new Error(
               'Usuário já existe no sistema de autenticação. Use o mesmo código de acesso usado no cadastro ou contate o gestor.'
             );
@@ -552,7 +552,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         </button>
       </div>
 
-      <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-[2.5rem] p-8 shadow-2xl relative flex flex-col justify-center animate-in zoom-in-95 duration-300">
+      <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl relative flex flex-col justify-center animate-in zoom-in-95 duration-300">
         <div className="absolute inset-0 bg-blue-600/5 blur-3xl rounded-full pointer-events-none"></div>
 
         {inviteToken && inviteData ? (

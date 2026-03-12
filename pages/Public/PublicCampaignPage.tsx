@@ -190,7 +190,7 @@ export const PublicCampaignPage = () => {
                     {!chatOpen ? (
                         <div className="flex-1 flex flex-col">
                             {campaign.imageUrl && (
-                                <div className="w-full aspect-square rounded-[2.5rem] overflow-hidden mb-8 shadow-2xl border border-slate-800 relative group">
+                                <div className="w-full aspect-square rounded-3xl overflow-hidden mb-8 shadow-2xl border border-slate-800 relative group">
                                     <img src={campaign.imageUrl} alt={campaign.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"/>
                                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent opacity-80"></div>
                                     <div className="absolute bottom-8 left-8 right-8">
@@ -202,7 +202,7 @@ export const PublicCampaignPage = () => {
 
                             {step === 1 ? (
                                 <div className="space-y-6 animate-in slide-in-from-bottom-10 duration-500">
-                                    <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-[2rem]">
+                                    <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-3xl">
                                         <h2 className="text-xs font-black uppercase tracking-widest text-slate-500 mb-6 flex items-center gap-2">
                                             <CheckCircle2 size={16} className="text-blue-500"/>
                                             Quanto você precisa?
@@ -230,7 +230,7 @@ export const PublicCampaignPage = () => {
                                 </div>
                             ) : (
                                 <div className="space-y-6 animate-in slide-in-from-right-10 duration-500">
-                                    <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-[2rem] space-y-6">
+                                    <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-3xl space-y-6">
                                         <h2 className="text-xs font-black uppercase tracking-widest text-slate-500 mb-2 flex items-center gap-2">
                                             <User size={16} className="text-blue-500"/>
                                             Seus Dados
@@ -240,7 +240,7 @@ export const PublicCampaignPage = () => {
                                             <div className="space-y-1">
                                                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Nome Completo</label>
                                                 <div className="relative">
-                                                    <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600" size={18}/>
+                                                    <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18}/>
                                                     <input 
                                                         type="text"
                                                         value={leadName}
@@ -254,7 +254,7 @@ export const PublicCampaignPage = () => {
                                             <div className="space-y-1">
                                                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">WhatsApp</label>
                                                 <div className="relative">
-                                                    <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600" size={18}/>
+                                                    <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18}/>
                                                     <input 
                                                         type="tel"
                                                         value={leadPhone}
@@ -268,7 +268,7 @@ export const PublicCampaignPage = () => {
                                             <div className="space-y-1">
                                                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">CPF</label>
                                                 <div className="relative">
-                                                    <Fingerprint className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600" size={18}/>
+                                                    <Fingerprint className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18}/>
                                                     <input 
                                                         type="text"
                                                         value={leadCPF}
@@ -300,7 +300,7 @@ export const PublicCampaignPage = () => {
                             )}
                         </div>
                     ) : (
-                        <div className="flex-1 flex flex-col bg-slate-900/50 border border-slate-800 rounded-[2.5rem] overflow-hidden animate-in zoom-in-95 duration-500">
+                        <div className="flex-1 flex flex-col bg-slate-900/50 border border-slate-800 rounded-3xl overflow-hidden animate-in zoom-in-95 duration-500">
                             <div className="p-4 border-b border-slate-800 bg-slate-900 flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center font-black text-white">
